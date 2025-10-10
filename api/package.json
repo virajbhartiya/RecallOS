@@ -1,0 +1,34 @@
+{
+  "name": "servercode",
+  "version": "1.0.0",
+  "description": "Work Nexus",
+  "main": "App.ts",
+  "scripts": {
+    "start": "nodemon src/App.ts",
+    "start_cron": "node backupCron.js",
+    "build": "tsc --build",
+    "start:prod": "pm2 start App.ts --name 'servercode' && pm2 save"
+  },
+  "keywords": [
+    "Startup Marketplace"
+  ],
+  "author": "Viraj Bhartiya",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/compression": "^1.7.5",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^20.12.12",
+    "nodemon": "^3.0.1"
+  },
+  "dependencies": {
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "morgan": "^1.10.0",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.4.5"
+  }
+}

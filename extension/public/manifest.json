@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "RecallOS",
+  "name": "RecallOS Context Capture Extension",
   "version": "0.1.0",
   "action": {
     "default_title": "RecallOS",
@@ -17,7 +17,12 @@
       "run_at": "document_idle"
     }
   ],
-  "permissions": []
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "tabs",
+    "storage"
+  ]
 }
 
  
