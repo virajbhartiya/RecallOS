@@ -12,11 +12,12 @@ interface ContextData {
   title: string;
   content_snippet: string;
   timestamp: number;
+  wallet_address?: string;
 }
 
 export const captureMemory = () =>
-  catchAsync(async (req: Request<{}, {}, ContextData>, res: Response, next: NextFunction) => {
-    const { source, url, title, content_snippet, timestamp } = req.body;
+  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    const { source, url, title, content_snippet, timestamp, wallet_address } = req.body;
 
     // Validate required fields
     if (!source || !url || !title || !content_snippet || !timestamp) {
@@ -32,12 +33,14 @@ export const captureMemory = () =>
       title,
       content_snippet,
       timestamp,
-      received_at: Date.now()
+      received_at: Date.now(),
+      wallet_address: wallet_address || 'anonymous'
     };
 
     // Print formatted JSON to console
     console.log('\n=== RecallOS Memory Capture ===');
-    console.log(JSON.stringify(memoryData, null, 2));
+    console.log('Wallet Address:', wallet_address || 'Anonymous');
+    console.log('Data:', JSON.stringify(memoryData, null, 2));
     console.log('===============================\n');
 
     // Send success response

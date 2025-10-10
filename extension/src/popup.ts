@@ -2,17 +2,26 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   const apiEndpointInput = document.getElementById('apiEndpoint') as HTMLInputElement;
+  const walletAddressInput = document.getElementById('walletAddress') as HTMLInputElement;
   const saveButton = document.getElementById('saveEndpoint') as HTMLButtonElement;
+  const saveWalletButton = document.getElementById('saveWalletAddress') as HTMLButtonElement;
   const statusDiv = document.getElementById('status') as HTMLDivElement;
 
-  // Load current endpoint
+  // Load current settings
   try {
-    const response = await chrome.runtime.sendMessage({ type: 'GET_ENDPOINT' });
-    if (response.success) {
-      apiEndpointInput.value = response.endpoint;
+    const endpointResponse = await chrome.runtime.sendMessage({ type: 'GET_ENDPOINT' });
+    if (endpointResponse.success) {
+      apiEndpointInput.value = endpointResponse.endpoint;
+    }
+    
+    const walletResponse = await chrome.runtime.sendMessage({ type: 'GET_WALLET_ADDRESS' });
+    if (walletResponse.success && walletResponse.walletAddress) {
+      walletAddressInput.value = walletResponse.walletAddress;
+      statusDiv.textContent = `Connected: ${walletResponse.walletAddress.substring(0, 10)}...`;
+      statusDiv.className = 'status success';
     }
   } catch (error) {
-    console.error('Error loading endpoint:', error);
+    console.error('Error loading settings:', error);
   }
 
   // Save endpoint
@@ -32,6 +41,33 @@ document.addEventListener('DOMContentLoaded', async () => {
       
       if (response.success) {
         showStatus('Configuration saved successfully!', 'success');
+      } else {
+        showStatus(`Error: ${response.error}`, 'error');
+      }
+    } catch (error) {
+      showStatus(`Error: ${error}`, 'error');
+    }
+  });
+
+  // Save wallet address
+  saveWalletButton.addEventListener('click', async () => {
+    const walletAddress = walletAddressInput.value.trim();
+    
+    if (!walletAddress) {
+      showStatus('Please enter a wallet address', 'error');
+      return;
+    }
+
+    try {
+      const response = await chrome.runtime.sendMessage({ 
+        type: 'SET_WALLET_ADDRESS', 
+        walletAddress 
+      });
+      
+      if (response.success) {
+        showStatus('Wallet address saved successfully!', 'success');
+        statusDiv.textContent = `Connected: ${walletAddress.substring(0, 10)}...`;
+        statusDiv.className = 'status success';
       } else {
         showStatus(`Error: ${response.error}`, 'error');
       }
