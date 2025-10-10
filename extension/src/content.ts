@@ -151,7 +151,11 @@ function captureContext(): ContextData {
     url,
     title,
     content_snippet,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    full_content: extractFullContent(),
+    page_metadata: extractPageMetadata(),
+    page_structure: extractPageStructure(),
+    user_activity: extractUserActivity()
   };
 }
 
