@@ -1,0 +1,17 @@
+{
+  "name": "recallos-extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "NODE_ENV=development node build.mjs --watch",
+    "clean": "rimraf dist"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.22",
+    "esbuild": "^0.24.2",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.9.3"
+  }
+}
