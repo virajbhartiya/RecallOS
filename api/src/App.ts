@@ -6,6 +6,7 @@ import http from "http";
 import dotenv from "dotenv";
 import globalErrorHandler from "./controller/utils/globalErrorController";
 import { routes } from "./routes/index.route";
+import { prisma } from "./lib/prisma";
 
 dotenv.config();
 
@@ -42,8 +43,22 @@ app.use(
   ) => void
 );
 
-server.listen(port, () => {
+async function testDatabaseConnection() {
+  try {
+    await prisma.$connect();
+    console.log('Database connected successfully');
+    
+    const userCount = await prisma.user.count();
+    console.log(`Database ready - ${userCount} users in database`);
+  } catch (error) {
+    console.error('Database connection failed:', error);
+    process.exit(1);
+  }
+}
+
+server.listen(port, async () => {
   console.log(`RecallOS Context Capture API is running on port ${port}`);
+  await testDatabaseConnection();
 });
 
 process.on("unhandledRejection", (err: Error) => {

@@ -7,7 +7,11 @@
     "start": "nodemon src/App.ts",
     "start_cron": "node backupCron.js",
     "build": "tsc --build",
-    "start:prod": "pm2 start App.ts --name 'servercode' && pm2 save"
+    "start:prod": "pm2 start App.ts --name 'servercode' && pm2 save",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:studio": "prisma studio"
   },
   "keywords": [
     "Startup Marketplace"
@@ -23,11 +27,13 @@
     "nodemon": "^3.0.1"
   },
   "dependencies": {
+    "@prisma/client": "^6.17.1",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "morgan": "^1.10.0",
+    "prisma": "^6.17.1",
     "ts-node": "^10.9.1",
     "typescript": "^5.4.5"
   }

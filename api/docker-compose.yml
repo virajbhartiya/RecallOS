@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: recallos_db
+    restart: always
+    environment:
+      POSTGRES_USER: recall_user
+      POSTGRES_PASSWORD: securepassword
+      POSTGRES_DB: recallos
+    ports:
+      - "5432:5432"
+    volumes:
+      - recallos_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recall_user -d recallos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  recallos_data:
