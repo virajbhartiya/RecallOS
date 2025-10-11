@@ -13,6 +13,24 @@ export class GeminiService {
     this.ai = new GoogleGenAI({ apiKey });
   }
 
+  async generateEmbedding(text: string): Promise<number[]> {
+    try {
+      const response = await this.ai.models.embedContent({
+        model: "text-embedding-004",
+        contents: text,
+      });
+
+      if (!response.embeddings?.[0]?.values) {
+        throw new Error('No embedding generated from Gemini API');
+      }
+
+      return response.embeddings[0].values;
+    } catch (error) {
+      console.error('Error generating embedding:', error);
+      throw error;
+    }
+  }
+
   async summarizeContent(rawText: string, metadata?: any): Promise<string> {
     try {
       const contentType = metadata?.content_type || 'web_page';

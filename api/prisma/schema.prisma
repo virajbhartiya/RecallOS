@@ -41,10 +41,17 @@ model Memory {
   page_structure  Json?
   user_activity   Json?
   
+  // Memory mesh fields
+  importance_score Float?   @default(0.0)
+  access_count     Int      @default(0)
+  last_accessed    DateTime @default(now())
+  
   // Relations
   user            User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
   embeddings      Embedding[]
   avail_commits   AvailCommit[]
+  related_memories MemoryRelation[] @relation("MemoryRelations")
+  related_to_memories MemoryRelation[] @relation("RelatedMemories")
   
   @@map("memories")
 }
@@ -52,14 +59,31 @@ model Memory {
 model Embedding {
   id              String   @id @default(uuid()) @db.Uuid
   memory_id       String   @db.Uuid
-  vector          String?  // Store as JSON string for now
+  vector          Float[]  // Store as actual float array for better performance
   model_name      String
+  embedding_type  String   @default("content") // content, summary, title
   created_at      DateTime @default(now())
   
   // Relations
   memory          Memory   @relation(fields: [memory_id], references: [id], onDelete: Cascade)
   
   @@map("embeddings")
+}
+
+model MemoryRelation {
+  id              String   @id @default(uuid()) @db.Uuid
+  memory_id       String   @db.Uuid
+  related_memory_id String @db.Uuid
+  similarity_score Float
+  relation_type   String   // semantic, temporal, topical, user_behavior
+  created_at      DateTime @default(now())
+  
+  // Relations
+  memory          Memory   @relation("MemoryRelations", fields: [memory_id], references: [id], onDelete: Cascade)
+  related_memory  Memory   @relation("RelatedMemories", fields: [related_memory_id], references: [id], onDelete: Cascade)
+  
+  @@unique([memory_id, related_memory_id])
+  @@map("memory_relations")
 }
 
 model AvailCommit {

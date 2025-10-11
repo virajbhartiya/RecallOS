@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
 import { addContentJob, ContentJobData } from "../lib/queue";
+import { memoryMeshService } from "../services/memoryMesh";
 
 const catchAsync = (fn: Function) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -237,6 +238,153 @@ export const getUserMemories = () =>
       res.status(500).json({
         status: "error",
         message: "Failed to retrieve user memories",
+        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+      });
+    }
+  });
+
+export const getMemoryMesh = () =>
+  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    const { wallet_address } = req.params;
+    const { limit = 50 } = req.query;
+
+    if (!wallet_address) {
+      return res.status(400).json({
+        status: "error",
+        message: "Wallet address is required"
+      });
+    }
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { wallet_address }
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          status: "error",
+          message: "User not found"
+        });
+      }
+
+      const memoryMesh = await memoryMeshService.getMemoryMesh(user.id, parseInt(limit as string));
+
+      res.status(200).json({
+        status: "success",
+        data: memoryMesh
+      });
+
+    } catch (error) {
+      console.error('Error getting memory mesh:', error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to retrieve memory mesh",
+        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+      });
+    }
+  });
+
+export const searchMemories = () =>
+  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    const { wallet_address } = req.params;
+    const { q: query, limit = 10 } = req.query;
+
+    if (!wallet_address) {
+      return res.status(400).json({
+        status: "error",
+        message: "Wallet address is required"
+      });
+    }
+
+    if (!query) {
+      return res.status(400).json({
+        status: "error",
+        message: "Search query is required"
+      });
+    }
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { wallet_address }
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          status: "error",
+          message: "User not found"
+        });
+      }
+
+      const searchResults = await memoryMeshService.searchMemories(
+        user.id,
+        query as string,
+        parseInt(limit as string)
+      );
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          query,
+          results: searchResults,
+          count: searchResults.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error searching memories:', error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to search memories",
+        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+      });
+    }
+  });
+
+export const getRelatedMemories = () =>
+  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+    const { limit = 5 } = req.query;
+
+    if (!id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Memory ID is required"
+      });
+    }
+
+    try {
+      const memory = await prisma.memory.findUnique({
+        where: { id },
+        include: { user: true }
+      });
+
+      if (!memory) {
+        return res.status(404).json({
+          status: "error",
+          message: "Memory not found"
+        });
+      }
+
+      const relatedMemories = await memoryMeshService.findRelatedMemories(
+        id,
+        memory.user_id,
+        parseInt(limit as string)
+      );
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          memory_id: id,
+          related_memories: relatedMemories,
+          count: relatedMemories.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting related memories:', error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to retrieve related memories",
         error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
       });
     }
