@@ -6,9 +6,11 @@ const router = Router();
 // Memory storage routes
 router.post("/", MemoryController.storeMemories); // Root POST route
 router.post("/store", MemoryController.storeMemories);
+router.post("/store-data", MemoryController.storeMemoryData); // Store complete memory data
 router.get("/status/:hash", MemoryController.getMemoryStatus);
 router.get("/user/:userAddress/count", MemoryController.getUserMemoryCount);
 router.get("/batch/:merkleRoot", MemoryController.getBatchMetadata);
+router.get("/batches", MemoryController.getAllBatches);
 router.post("/proof", MemoryController.generateProof);
 router.get("/health", MemoryController.healthCheck);
 

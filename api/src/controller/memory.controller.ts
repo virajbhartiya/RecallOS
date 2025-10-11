@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { storeMemories, getMemoryStatus, getUserMemoryCount, getBatchMetadata, getMemoryProof } from "../services/blockchain";
+import { storeMemories, storeMemoryData, getMemoryStatus as getBlockchainMemoryStatus, getUserMemoryCount, getBatchMetadata, getMemoryProof, getAllUserBatches, MemoryData } from "../services/blockchain";
 
 export class MemoryController {
   // Store memories on blockchain
@@ -18,7 +18,8 @@ export class MemoryController {
       
       res.status(200).json({
         success: true,
-        data: result
+        data: result,
+        message: result.skipped ? "Batch already exists, skipped submission" : "Memories stored successfully"
       });
     } catch (error) {
       console.error("Error storing memories:", error);
@@ -41,7 +42,7 @@ export class MemoryController {
         });
       }
 
-      const isVerified = await getMemoryStatus(hash);
+      const isVerified = await getBlockchainMemoryStatus(hash);
       
       res.status(200).json({
         success: true,
@@ -142,6 +143,65 @@ export class MemoryController {
       res.status(500).json({
         success: false,
         error: error.message || "Failed to generate proof"
+      });
+    }
+  }
+
+  // Store complete memory data on blockchain (after Gemini processing)
+  static async storeMemoryData(req: Request, res: Response) {
+    try {
+      const { memoryData, userAddress } = req.body;
+      
+      if (!memoryData || !Array.isArray(memoryData) || memoryData.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "Memory data array is required and cannot be empty"
+        });
+      }
+
+      // Validate memory data structure
+      for (const memory of memoryData) {
+        if (!memory.summary || !memory.timestamp) {
+          return res.status(400).json({
+            success: false,
+            error: "Each memory must have summary and timestamp"
+          });
+        }
+      }
+
+      const result = await storeMemoryData(memoryData, userAddress);
+      
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: result.skipped ? "Batch already exists, skipped submission" : "Memory data stored successfully"
+      });
+    } catch (error) {
+      console.error("Error storing memory data:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to store memory data"
+      });
+    }
+  }
+
+  // Get all batches for the current wallet
+  static async getAllBatches(req: Request, res: Response) {
+    try {
+      const batches = await getAllUserBatches();
+      
+      res.status(200).json({
+        success: true,
+        data: {
+          batches,
+          count: batches.length
+        }
+      });
+    } catch (error) {
+      console.error("Error getting all batches:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to get batches"
       });
     }
   }

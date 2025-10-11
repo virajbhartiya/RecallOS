@@ -60,10 +60,12 @@ async function sendToBackend(data: ContextData): Promise<void> {
     const apiEndpoint = await getApiEndpoint();
     const walletAddress = await getWalletAddress();
     
-    // Add wallet address to the data payload
+    // Transform data to match API expectations
+    const memories = [data.meaningful_content || data.content_snippet || data.full_content || 'No content available'];
+    
     const payload = {
-      ...data,
-      wallet_address: walletAddress || 'anonymous'
+      memories: memories,
+      userAddress: walletAddress || 'anonymous'
     };
     
     console.log('RecallOS: Sending to backend:', payload);

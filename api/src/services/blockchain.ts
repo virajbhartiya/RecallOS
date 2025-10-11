@@ -22,6 +22,9 @@ let provider: ethers.JsonRpcProvider;
 let wallet: ethers.Wallet;
 let contract: ethers.Contract;
 
+// Track submitted batches to prevent duplicates
+const submittedBatches = new Set<string>();
+
 function initializeBlockchain() {
   const rpcUrl = process.env.SEPOLIA_RPC_URL;
   const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
@@ -74,10 +77,85 @@ export async function submitBatch(hashes: string[]) {
     throw new Error("Blockchain not initialized. Check environment variables.");
   }
   
+  console.log(`Contract address: ${contract.target}`);
+  console.log(`Wallet address: ${wallet.address}`);
+  
   try {
     const { tree, root } = generateMerkleTree(hashes);
+    
+    // Check if this batch has already been submitted
+    if (submittedBatches.has(root)) {
+      console.log(`Batch with root ${root} already submitted, skipping...`);
+      return { 
+        txHash: null as string | null, 
+        root,
+        blockNumber: null as number | null,
+        gasUsed: null as string | null,
+        skipped: true
+      };
+    }
+    
+    // Check if batch exists on blockchain
+    try {
+      const batchMetadata = await contract.batches(root);
+      if (batchMetadata.timestamp > 0) {
+        console.log(`Batch with root ${root} already exists on blockchain, skipping...`);
+        console.log(`Batch submitted by: ${batchMetadata.user}`);
+        console.log(`Batch timestamp: ${new Date(Number(batchMetadata.timestamp) * 1000).toISOString()}`);
+        console.log(`Batch hash count: ${batchMetadata.hashCount}`);
+        
+        // Try to get the original transaction hash
+        try {
+          const txInfo = await getBatchTransactionHash(root);
+          if (txInfo) {
+            console.log(`Original transaction hash: ${txInfo.txHash}`);
+            console.log(`Original block number: ${txInfo.blockNumber}`);
+          }
+        } catch (txError) {
+          console.log("Could not retrieve original transaction hash");
+        }
+        
+        submittedBatches.add(root);
+        return { 
+          txHash: null as string | null, 
+          root,
+          blockNumber: null as number | null,
+          gasUsed: null as string | null,
+          skipped: true,
+          existingBatch: {
+            user: batchMetadata.user,
+            timestamp: batchMetadata.timestamp.toString(),
+            hashCount: batchMetadata.hashCount.toString()
+          }
+        };
+      }
+    } catch (checkError) {
+      // If we can't check, proceed with submission
+      console.log("Could not check batch existence, proceeding with submission...");
+    }
+    
+    console.log(`Submitting batch with root: ${root}`);
+    console.log(`Hashes count: ${hashes.length}`);
+    console.log(`First hash: ${hashes[0]}`);
+    
+    // Try to estimate gas first
+    try {
+      const gasEstimate = await contract.submitMemoryBatch.estimateGas(root, hashes);
+      console.log(`Gas estimate: ${gasEstimate.toString()}`);
+    } catch (gasError) {
+      console.error("Gas estimation failed:", gasError);
+      throw new Error(`Gas estimation failed: ${gasError.message}`);
+    }
+    
     const tx = await contract.submitMemoryBatch(root, hashes);
-    await tx.wait();
+    console.log(`Transaction submitted: ${tx.hash}`);
+    
+    const receipt = await tx.wait();
+    console.log(`Transaction confirmed in block: ${receipt.blockNumber}`);
+    
+    // Mark batch as submitted
+    submittedBatches.add(root);
+    
     return { 
       txHash: tx.hash, 
       root,
@@ -86,6 +164,20 @@ export async function submitBatch(hashes: string[]) {
     };
   } catch (error) {
     console.error("Error submitting batch:", error);
+    
+    // If error is "Batch exists", mark it as submitted to prevent retries
+    if (error.message && error.message.includes("Batch exists")) {
+      const { tree, root } = generateMerkleTree(hashes);
+      submittedBatches.add(root);
+      console.log(`Marked batch ${root} as submitted due to 'Batch exists' error`);
+    }
+    
+    // Check if it's a transaction revert
+    if (error.code === 'CALL_EXCEPTION' && error.receipt && error.receipt.status === 0) {
+      console.error("Transaction was reverted. Receipt:", error.receipt);
+      console.error("Transaction data:", error.transaction);
+    }
+    
     throw new Error(`Failed to submit memory batch: ${error.message}`);
   }
 }
@@ -149,7 +241,68 @@ export async function getBatchMetadata(merkleRoot: string) {
   }
 }
 
-// New function to store memories with automatic batching
+// Interface for complete memory data
+export interface MemoryData {
+  summary: string;
+  timestamp: number;
+  location?: string;
+  url?: string;
+  title?: string;
+  source?: string;
+  content?: string;
+  metadata?: any;
+}
+
+// Function to create a hash from complete memory data
+export function createMemoryHash(memoryData: MemoryData): string {
+  // Create a structured object with all memory data
+  const memoryObject = {
+    summary: memoryData.summary,
+    timestamp: memoryData.timestamp,
+    location: memoryData.location || '',
+    url: memoryData.url || '',
+    title: memoryData.title || '',
+    source: memoryData.source || '',
+    content: memoryData.content || '',
+    metadata: memoryData.metadata || {}
+  };
+  
+  // Convert to JSON string and hash it
+  const memoryString = JSON.stringify(memoryObject, Object.keys(memoryObject).sort());
+  return ethers.keccak256(ethers.toUtf8Bytes(memoryString));
+}
+
+// New function to store complete memory data on blockchain
+export async function storeMemoryData(memoryData: MemoryData[], userAddress?: string) {
+  if (!memoryData || memoryData.length === 0) {
+    throw new Error("Memory data array cannot be empty");
+  }
+  
+  try {
+    // Generate hashes for the complete memory data
+    const hashes = memoryData.map(memory => createMemoryHash(memory));
+    
+    // Submit batch to blockchain
+    const result = await submitBatch(hashes);
+    
+    return {
+      success: true,
+      txHash: result.txHash,
+      merkleRoot: result.root,
+      blockNumber: result.blockNumber,
+      gasUsed: result.gasUsed,
+      memoryCount: memoryData.length,
+      userAddress: userAddress || wallet.address,
+      skipped: result.skipped || false,
+      memoryHashes: hashes
+    };
+  } catch (error) {
+    console.error("Error storing memory data:", error);
+    throw new Error(`Failed to store memory data: ${error.message}`);
+  }
+}
+
+// Legacy function for backward compatibility
 export async function storeMemories(memories: string[], userAddress?: string) {
   if (!memories || memories.length === 0) {
     throw new Error("Memories array cannot be empty");
@@ -169,7 +322,8 @@ export async function storeMemories(memories: string[], userAddress?: string) {
       blockNumber: result.blockNumber,
       gasUsed: result.gasUsed,
       memoryCount: memories.length,
-      userAddress: userAddress || wallet.address
+      userAddress: userAddress || wallet.address,
+      skipped: result.skipped || false
     };
   } catch (error) {
     console.error("Error storing memories:", error);
@@ -208,4 +362,81 @@ export function onMemoryVerified(callback: (user: string, hash: string) => void)
 
 export function removeAllListeners() {
   contract.removeAllListeners();
+}
+
+// Function to clear submitted batches cache (useful for testing or reset)
+export function clearSubmittedBatches() {
+  submittedBatches.clear();
+  console.log("Cleared submitted batches cache");
+}
+
+// Function to get submitted batches count
+export function getSubmittedBatchesCount() {
+  return submittedBatches.size;
+}
+
+// Function to get all batches submitted by the current wallet
+export async function getAllUserBatches() {
+  if (!contract) {
+    throw new Error("Blockchain not initialized. Check environment variables.");
+  }
+  
+  try {
+    const filter = contract.filters.MemoryBatchSubmitted(wallet.address);
+    const events = await contract.queryFilter(filter);
+    
+    return events.map(event => {
+      if ('args' in event && event.args) {
+        const eventArgs = event.args as any;
+        return {
+          txHash: event.transactionHash,
+          blockNumber: event.blockNumber,
+          user: eventArgs.user,
+          merkleRoot: eventArgs.merkleRoot,
+          count: eventArgs.count.toString()
+        };
+      }
+      return null;
+    }).filter(Boolean);
+  } catch (error) {
+    console.error("Error getting user batches:", error);
+    throw new Error(`Failed to get user batches: ${error.message}`);
+  }
+}
+
+// Function to get transaction hash for an existing batch by looking up events
+export async function getBatchTransactionHash(merkleRoot: string) {
+  if (!contract) {
+    throw new Error("Blockchain not initialized. Check environment variables.");
+  }
+  
+  try {
+    // Since merkleRoot is not indexed, we need to get all MemoryBatchSubmitted events
+    // and filter them manually. We'll get events from the wallet address.
+    const filter = contract.filters.MemoryBatchSubmitted(wallet.address);
+    
+    // Get past events
+    const events = await contract.queryFilter(filter);
+    
+    // Filter events to find the one with matching merkleRoot
+    for (const event of events) {
+      if ('args' in event && event.args) {
+        const eventArgs = event.args as any;
+        if (eventArgs.merkleRoot === merkleRoot) {
+          return {
+            txHash: event.transactionHash,
+            blockNumber: event.blockNumber,
+            user: eventArgs.user,
+            merkleRoot: eventArgs.merkleRoot,
+            count: eventArgs.count.toString()
+          };
+        }
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("Error getting batch transaction hash:", error);
+    throw new Error(`Failed to get batch transaction hash: ${error.message}`);
+  }
 }
