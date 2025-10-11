@@ -148,8 +148,7 @@ export const getMemory = () =>
               created_at: true
             }
           },
-          embeddings: true,
-          avail_commits: true
+          embeddings: true
         }
       });
 
@@ -205,8 +204,7 @@ export const getUserMemories = () =>
       const memories = await prisma.memory.findMany({
         where: { user_id: user.id },
         include: {
-          embeddings: true,
-          avail_commits: true
+          embeddings: true
         },
         orderBy: { created_at: 'desc' },
         take: parseInt(limit as string),
@@ -385,6 +383,113 @@ export const getRelatedMemories = () =>
       res.status(500).json({
         status: "error",
         message: "Failed to retrieve related memories",
+        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+      });
+    }
+  });
+
+export const getMemoryProof = () =>
+  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Memory ID is required"
+      });
+    }
+
+    try {
+      // First check if it's a memory with a hash
+      const memory = await prisma.memory.findUnique({
+        where: { id },
+        select: { hash: true }
+      });
+
+      if (!memory) {
+        return res.status(404).json({
+          status: "error",
+          message: "Memory not found"
+        });
+      }
+
+      if (!memory.hash) {
+        return res.status(404).json({
+          status: "error",
+          message: "Memory has not been anchored yet"
+        });
+      }
+
+      // Find the memory snapshot with cross-chain proofs
+      const memorySnapshot = await prisma.memorySnapshot.findUnique({
+        where: { summary_hash: memory.hash }
+      });
+
+      if (!memorySnapshot) {
+        return res.status(404).json({
+          status: "error",
+          message: "Memory snapshot not found"
+        });
+      }
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          summary_hash: memorySnapshot.summary_hash,
+          nexus_commit_hash: memorySnapshot.nexus_commit_hash,
+          cross_chain_proofs: memorySnapshot.cross_chain_proofs,
+          created_at: memorySnapshot.created_at
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting memory proof:', error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to retrieve memory proof",
+        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+      });
+    }
+  });
+
+export const getMemorySnapshotProof = () =>
+  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({
+        status: "error",
+        message: "Memory snapshot ID is required"
+      });
+    }
+
+    try {
+      const memorySnapshot = await prisma.memorySnapshot.findUnique({
+        where: { id }
+      });
+
+      if (!memorySnapshot) {
+        return res.status(404).json({
+          status: "error",
+          message: "Memory snapshot not found"
+        });
+      }
+
+      res.status(200).json({
+        status: "success",
+        data: {
+          summary_hash: memorySnapshot.summary_hash,
+          nexus_commit_hash: memorySnapshot.nexus_commit_hash,
+          cross_chain_proofs: memorySnapshot.cross_chain_proofs,
+          created_at: memorySnapshot.created_at
+        }
+      });
+
+    } catch (error) {
+      console.error('Error getting memory snapshot proof:', error);
+      res.status(500).json({
+        status: "error",
+        message: "Failed to retrieve memory snapshot proof",
         error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
       });
     }

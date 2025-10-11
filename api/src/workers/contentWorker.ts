@@ -2,6 +2,7 @@ import { contentQueue, ContentJobData } from '../lib/queue';
 import { geminiService } from '../services/gemini';
 import { memoryMeshService } from '../services/memoryMesh';
 import { prisma } from '../lib/prisma';
+import { createHash } from 'crypto';
 
 export const startContentWorker = () => {
   contentQueue.process('process-content', async (job: any) => {
@@ -28,6 +29,20 @@ export const startContentWorker = () => {
         // Step 4: Create memory relations
         await memoryMeshService.createMemoryRelations(metadata.memory_id, user_id);
         console.log(`Created memory relations for memory ${metadata.memory_id}`);
+
+        // Step 5: Create memory snapshot for cross-chain anchoring
+        const summaryHash = createHash('sha256').update(summary).digest('hex');
+        
+        // Store memory snapshot
+        await prisma.memorySnapshot.create({
+          data: {
+            user_id,
+            raw_text,
+            summary,
+            summary_hash: summaryHash
+          }
+        });
+        console.log(`Created memory snapshot for memory ${metadata.memory_id}`);
       } else {
         // Only store in summarized_content if it's NOT from a memory
         const summarizedContent = await prisma.summarizedContent.create({

@@ -57,6 +57,7 @@ async function testDatabaseConnection() {
   }
 }
 
+
 server.listen(port, async () => {
   console.log(`RecallOS Context Capture API is running on port ${port}`);
   await testDatabaseConnection();

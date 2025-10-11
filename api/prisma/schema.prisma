@@ -19,6 +19,7 @@ model User {
   // Relations
   memories        Memory[]
   summarized_content SummarizedContent[]
+  memory_snapshots MemorySnapshot[]
   
   @@map("users")
 }
@@ -49,7 +50,6 @@ model Memory {
   // Relations
   user            User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
   embeddings      Embedding[]
-  avail_commits   AvailCommit[]
   related_memories MemoryRelation[] @relation("MemoryRelations")
   related_to_memories MemoryRelation[] @relation("RelatedMemories")
   
@@ -86,18 +86,6 @@ model MemoryRelation {
   @@map("memory_relations")
 }
 
-model AvailCommit {
-  id              String   @id @default(uuid()) @db.Uuid
-  memory_id       String   @db.Uuid
-  tx_hash         String
-  block_number    BigInt
-  anchored_at     DateTime @default(now())
-  
-  // Relations
-  memory          Memory   @relation(fields: [memory_id], references: [id], onDelete: Cascade)
-  
-  @@map("avail_commits")
-}
 
 model SummarizedContent {
   id              String   @id @default(uuid()) @db.Uuid
@@ -110,4 +98,20 @@ model SummarizedContent {
   user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   
   @@map("summarized_content")
+}
+
+model MemorySnapshot {
+  id                    String   @id @default(uuid()) @db.Uuid
+  user_id               String   @db.Uuid
+  raw_text              String
+  summary               String
+  summary_hash          String   @unique
+  nexus_commit_hash     String?
+  cross_chain_proofs    Json?
+  created_at            DateTime @default(now())
+  
+  // Relations
+  user                  User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@map("memory_snapshots")
 }
