@@ -1,20 +1,15 @@
-import express from "express";
-import { 
-  captureMemory, 
-  getMemory, 
-  getUserMemories, 
-  getMemoryMesh, 
-  searchMemories, 
-  getRelatedMemories 
-} from "../controller/memory.controller";
+import { Router } from "express";
+import { MemoryController } from "../controller/memory.controller";
 
-const router = express.Router();
+const router = Router();
 
-router.post("/", captureMemory());
-router.get("/:id", getMemory());
-router.get("/user/:wallet_address", getUserMemories());
-router.get("/mesh/:wallet_address", getMemoryMesh());
-router.get("/search/:wallet_address", searchMemories());
-router.get("/:id/related", getRelatedMemories());
+// Memory storage routes
+router.post("/", MemoryController.storeMemories); // Root POST route
+router.post("/store", MemoryController.storeMemories);
+router.get("/status/:hash", MemoryController.getMemoryStatus);
+router.get("/user/:userAddress/count", MemoryController.getUserMemoryCount);
+router.get("/batch/:merkleRoot", MemoryController.getBatchMetadata);
+router.post("/proof", MemoryController.generateProof);
+router.get("/health", MemoryController.healthCheck);
 
 export default router;

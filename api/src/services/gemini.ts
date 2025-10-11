@@ -6,7 +6,9 @@ export class GeminiService {
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY environment variable is required');
+      console.warn('GEMINI_API_KEY environment variable is not set. Gemini service will be disabled.');
+      this.ai = null as any;
+      return;
     }
     
     // The client gets the API key from the environment variable `GEMINI_API_KEY`
@@ -14,6 +16,10 @@ export class GeminiService {
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
+    if (!this.ai) {
+      throw new Error('Gemini service is not initialized. Please set GEMINI_API_KEY environment variable.');
+    }
+    
     try {
       const response = await this.ai.models.embedContent({
         model: "text-embedding-004",
@@ -32,6 +38,10 @@ export class GeminiService {
   }
 
   async summarizeContent(rawText: string, metadata?: any): Promise<string> {
+    if (!this.ai) {
+      throw new Error('Gemini service is not initialized. Please set GEMINI_API_KEY environment variable.');
+    }
+    
     try {
       const contentType = metadata?.content_type || 'web_page';
       const contentSummary = metadata?.content_summary || '';

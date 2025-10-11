@@ -1,496 +1,169 @@
-import { Request, Response, NextFunction } from "express";
-import { prisma } from "../lib/prisma";
-import { addContentJob, ContentJobData } from "../lib/queue";
-import { memoryMeshService } from "../services/memoryMesh";
+import { Request, Response } from "express";
+import { storeMemories, getMemoryStatus, getUserMemoryCount, getBatchMetadata, getMemoryProof } from "../services/blockchain";
 
-const catchAsync = (fn: Function) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    fn(req, res, next).catch(next);
-  };
-};
-
-
-export const captureMemory = () =>
-  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const { 
-      source, 
-      url, 
-      title, 
-      content_snippet, 
-      timestamp, 
-      wallet_address,
-      full_content,
-      meaningful_content,
-      content_summary,
-      content_type,
-      key_topics,
-      reading_time,
-      page_metadata,
-      page_structure,
-      user_activity,
-      content_quality
-    } = req.body;
-
-    // Validate required fields
-    if (!source || !url || !title || !content_snippet || !timestamp) {
-      return res.status(400).json({
-        status: "error",
-        message: "Missing required fields: source, url, title, content_snippet, timestamp"
-      });
-    }
-
+export class MemoryController {
+  // Store memories on blockchain
+  static async storeMemories(req: Request, res: Response) {
     try {
-      let user = await prisma.user.findUnique({
-        where: { wallet_address: wallet_address || 'anonymous' }
-      });
-
-      if (!user) {
-        user = await prisma.user.create({
-          data: {
-            wallet_address: wallet_address || 'anonymous'
-          }
+      const { memories, userAddress } = req.body;
+      
+      if (!memories || !Array.isArray(memories) || memories.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: "Memories array is required and cannot be empty"
         });
       }
 
-      // Store memory in database first
-      const memory = await prisma.memory.create({
-        data: {
-          user_id: user.id,
-          source,
-          url,
-          title,
-          content: content_snippet,
-          timestamp: BigInt(timestamp),
-          full_content: meaningful_content || full_content || null,
-          page_metadata: page_metadata ? {
-            ...page_metadata,
-            content_type,
-            key_topics,
-            reading_time,
-            content_quality
-          } : {
-            content_type,
-            key_topics,
-            reading_time,
-            content_quality
-          },
-          page_structure: page_structure || null,
-          user_activity: user_activity || null
-        }
-      });
-
-      // Queue content for Gemini processing
-      const contentToProcess = meaningful_content || full_content || content_snippet;
-      if (contentToProcess && contentToProcess.length > 0) {
-        const jobData: ContentJobData = {
-          user_id: user.id,
-          raw_text: contentToProcess,
-          metadata: {
-            url: url,
-            timestamp: timestamp,
-            memory_id: memory.id,
-            source: source,
-            title: title,
-            content_type: content_type,
-            content_summary: content_summary
-          }
-        };
-
-        const job = await addContentJob(jobData);
-        console.log(`Queued memory ${memory.id} for Gemini processing with job ${job.id}`);
-      }
-
+      const result = await storeMemories(memories, userAddress);
+      
       res.status(200).json({
-        status: "success",
-        message: "Memory captured and queued for processing",
-        data: {
-          id: memory.id,
-          user_id: user.id,
-          source: memory.source,
-          url: memory.url,
-          title: memory.title,
-          content: memory.content,
-          timestamp: memory.timestamp.toString(),
-          created_at: memory.created_at,
-          processing_status: "queued"
-        }
+        success: true,
+        data: result
       });
-
     } catch (error) {
-      console.error('Database error:', error);
+      console.error("Error storing memories:", error);
       res.status(500).json({
-        status: "error",
-        message: "Failed to store memory in database",
-        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+        success: false,
+        error: error.message || "Failed to store memories"
       });
     }
-  });
+  }
 
-export const getMemory = () =>
-  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({
-        status: "error",
-        message: "Memory ID is required"
-      });
-    }
-
+  // Get memory verification status
+  static async getMemoryStatus(req: Request, res: Response) {
     try {
-      const memory = await prisma.memory.findUnique({
-        where: { id },
-        include: {
-          user: {
-            select: {
-              id: true,
-              wallet_address: true,
-              created_at: true
-            }
-          },
-          embeddings: true
-        }
-      });
-
-      if (!memory) {
-        return res.status(404).json({
-          status: "error",
-          message: "Memory not found"
+      const { hash } = req.params;
+      
+      if (!hash) {
+        return res.status(400).json({
+          success: false,
+          error: "Memory hash is required"
         });
       }
 
+      const isVerified = await getMemoryStatus(hash);
+      
       res.status(200).json({
-        status: "success",
+        success: true,
         data: {
-          ...memory,
-          timestamp: memory.timestamp.toString()
+          hash,
+          isVerified
         }
       });
-
     } catch (error) {
-      console.error('Database error:', error);
+      console.error("Error getting memory status:", error);
       res.status(500).json({
-        status: "error",
-        message: "Failed to retrieve memory",
-        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+        success: false,
+        error: error.message || "Failed to get memory status"
       });
     }
-  });
+  }
 
-export const getUserMemories = () =>
-  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const { wallet_address } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
-
-    if (!wallet_address) {
-      return res.status(400).json({
-        status: "error",
-        message: "Wallet address is required"
-      });
-    }
-
+  // Get user memory count
+  static async getUserMemoryCount(req: Request, res: Response) {
     try {
-      const user = await prisma.user.findUnique({
-        where: { wallet_address }
-      });
-
-      if (!user) {
-        return res.status(404).json({
-          status: "error",
-          message: "User not found"
+      const { userAddress } = req.params;
+      
+      if (!userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: "User address is required"
         });
       }
 
-      const memories = await prisma.memory.findMany({
-        where: { user_id: user.id },
-        include: {
-          embeddings: true
-        },
-        orderBy: { created_at: 'desc' },
-        take: parseInt(limit as string),
-        skip: parseInt(offset as string)
-      });
-
-      const total = await prisma.memory.count({
-        where: { user_id: user.id }
-      });
-
+      const count = await getUserMemoryCount(userAddress);
+      
       res.status(200).json({
-        status: "success",
+        success: true,
         data: {
-          memories: memories.map((memory: any) => ({
-            ...memory,
-            timestamp: memory.timestamp.toString()
-          })),
-          pagination: {
-            total,
-            limit: parseInt(limit as string),
-            offset: parseInt(offset as string),
-            hasMore: total > parseInt(offset as string) + parseInt(limit as string)
-          }
+          userAddress,
+          memoryCount: count
         }
       });
-
     } catch (error) {
-      console.error('Database error:', error);
+      console.error("Error getting user memory count:", error);
       res.status(500).json({
-        status: "error",
-        message: "Failed to retrieve user memories",
-        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+        success: false,
+        error: error.message || "Failed to get user memory count"
       });
     }
-  });
+  }
 
-export const getMemoryMesh = () =>
-  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const { wallet_address } = req.params;
-    const { limit = 50 } = req.query;
-
-    if (!wallet_address) {
-      return res.status(400).json({
-        status: "error",
-        message: "Wallet address is required"
-      });
-    }
-
+  // Get batch metadata
+  static async getBatchMetadata(req: Request, res: Response) {
     try {
-      const user = await prisma.user.findUnique({
-        where: { wallet_address }
-      });
-
-      if (!user) {
-        return res.status(404).json({
-          status: "error",
-          message: "User not found"
+      const { merkleRoot } = req.params;
+      
+      if (!merkleRoot) {
+        return res.status(400).json({
+          success: false,
+          error: "Merkle root is required"
         });
       }
 
-      const memoryMesh = await memoryMeshService.getMemoryMesh(user.id, parseInt(limit as string));
-
+      const metadata = await getBatchMetadata(merkleRoot);
+      
       res.status(200).json({
-        status: "success",
-        data: memoryMesh
-      });
-
-    } catch (error) {
-      console.error('Error getting memory mesh:', error);
-      res.status(500).json({
-        status: "error",
-        message: "Failed to retrieve memory mesh",
-        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
-      });
-    }
-  });
-
-export const searchMemories = () =>
-  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const { wallet_address } = req.params;
-    const { q: query, limit = 10 } = req.query;
-
-    if (!wallet_address) {
-      return res.status(400).json({
-        status: "error",
-        message: "Wallet address is required"
-      });
-    }
-
-    if (!query) {
-      return res.status(400).json({
-        status: "error",
-        message: "Search query is required"
-      });
-    }
-
-    try {
-      const user = await prisma.user.findUnique({
-        where: { wallet_address }
-      });
-
-      if (!user) {
-        return res.status(404).json({
-          status: "error",
-          message: "User not found"
-        });
-      }
-
-      const searchResults = await memoryMeshService.searchMemories(
-        user.id,
-        query as string,
-        parseInt(limit as string)
-      );
-
-      res.status(200).json({
-        status: "success",
+        success: true,
         data: {
-          query,
-          results: searchResults,
-          count: searchResults.length
+          merkleRoot,
+          ...metadata
         }
       });
-
     } catch (error) {
-      console.error('Error searching memories:', error);
+      console.error("Error getting batch metadata:", error);
       res.status(500).json({
-        status: "error",
-        message: "Failed to search memories",
-        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+        success: false,
+        error: error.message || "Failed to get batch metadata"
       });
     }
-  });
+  }
 
-export const getRelatedMemories = () =>
-  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
-    const { limit = 5 } = req.query;
-
-    if (!id) {
-      return res.status(400).json({
-        status: "error",
-        message: "Memory ID is required"
-      });
-    }
-
+  // Generate proof for a specific memory
+  static async generateProof(req: Request, res: Response) {
     try {
-      const memory = await prisma.memory.findUnique({
-        where: { id },
-        include: { user: true }
-      });
-
-      if (!memory) {
-        return res.status(404).json({
-          status: "error",
-          message: "Memory not found"
+      const { memory, allMemories } = req.body;
+      
+      if (!memory || !allMemories || !Array.isArray(allMemories)) {
+        return res.status(400).json({
+          success: false,
+          error: "Memory and allMemories array are required"
         });
       }
 
-      const relatedMemories = await memoryMeshService.findRelatedMemories(
-        id,
-        memory.user_id,
-        parseInt(limit as string)
-      );
-
+      const proof = getMemoryProof(memory, allMemories);
+      
       res.status(200).json({
-        status: "success",
-        data: {
-          memory_id: id,
-          related_memories: relatedMemories,
-          count: relatedMemories.length
-        }
+        success: true,
+        data: proof
       });
-
     } catch (error) {
-      console.error('Error getting related memories:', error);
+      console.error("Error generating proof:", error);
       res.status(500).json({
-        status: "error",
-        message: "Failed to retrieve related memories",
-        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+        success: false,
+        error: error.message || "Failed to generate proof"
       });
     }
-  });
+  }
 
-export const getMemoryProof = () =>
-  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({
-        status: "error",
-        message: "Memory ID is required"
-      });
-    }
-
+  // Health check for blockchain connection
+  static async healthCheck(req: Request, res: Response) {
     try {
-      // First check if it's a memory with a hash
-      const memory = await prisma.memory.findUnique({
-        where: { id },
-        select: { hash: true }
-      });
-
-      if (!memory) {
-        return res.status(404).json({
-          status: "error",
-          message: "Memory not found"
-        });
-      }
-
-      if (!memory.hash) {
-        return res.status(404).json({
-          status: "error",
-          message: "Memory has not been anchored yet"
-        });
-      }
-
-      // Find the memory snapshot with cross-chain proofs
-      const memorySnapshot = await prisma.memorySnapshot.findUnique({
-        where: { summary_hash: memory.hash }
-      });
-
-      if (!memorySnapshot) {
-        return res.status(404).json({
-          status: "error",
-          message: "Memory snapshot not found"
-        });
-      }
-
+      // Try to get a simple contract call to verify connection
+      const testAddress = "0x0000000000000000000000000000000000000000";
+      await getUserMemoryCount(testAddress);
+      
       res.status(200).json({
-        status: "success",
-        data: {
-          summary_hash: memorySnapshot.summary_hash,
-          nexus_commit_hash: memorySnapshot.nexus_commit_hash,
-          cross_chain_proofs: memorySnapshot.cross_chain_proofs,
-          created_at: memorySnapshot.created_at
-        }
+        success: true,
+        message: "Blockchain connection is healthy",
+        timestamp: new Date().toISOString()
       });
-
     } catch (error) {
-      console.error('Error getting memory proof:', error);
-      res.status(500).json({
-        status: "error",
-        message: "Failed to retrieve memory proof",
-        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
+      res.status(503).json({
+        success: false,
+        error: "Blockchain connection is not available",
+        details: error.message
       });
     }
-  });
-
-export const getMemorySnapshotProof = () =>
-  catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const { id } = req.params;
-
-    if (!id) {
-      return res.status(400).json({
-        status: "error",
-        message: "Memory snapshot ID is required"
-      });
-    }
-
-    try {
-      const memorySnapshot = await prisma.memorySnapshot.findUnique({
-        where: { id }
-      });
-
-      if (!memorySnapshot) {
-        return res.status(404).json({
-          status: "error",
-          message: "Memory snapshot not found"
-        });
-      }
-
-      res.status(200).json({
-        status: "success",
-        data: {
-          summary_hash: memorySnapshot.summary_hash,
-          nexus_commit_hash: memorySnapshot.nexus_commit_hash,
-          cross_chain_proofs: memorySnapshot.cross_chain_proofs,
-          created_at: memorySnapshot.created_at
-        }
-      });
-
-    } catch (error) {
-      console.error('Error getting memory snapshot proof:', error);
-      res.status(500).json({
-        status: "error",
-        message: "Failed to retrieve memory snapshot proof",
-        error: process.env.NODE_ENV === 'development' ? error : 'Internal server error'
-      });
-    }
-  });
+  }
+}

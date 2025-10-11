@@ -5,6 +5,12 @@ import { prisma } from '../lib/prisma';
 import { createHash } from 'crypto';
 
 export const startContentWorker = () => {
+  // Check if Redis is available before starting the worker
+  if (!contentQueue) {
+    console.warn('Content queue not available. Content worker will not start.');
+    return;
+  }
+  
   contentQueue.process('process-content', async (job: any) => {
     const { user_id, raw_text, metadata } = job.data as ContentJobData;
     
