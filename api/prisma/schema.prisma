@@ -18,6 +18,7 @@ model User {
   
   // Relations
   memories        Memory[]
+  summarized_content SummarizedContent[]
   
   @@map("users")
 }
@@ -72,4 +73,17 @@ model AvailCommit {
   memory          Memory   @relation(fields: [memory_id], references: [id], onDelete: Cascade)
   
   @@map("avail_commits")
+}
+
+model SummarizedContent {
+  id              String   @id @default(uuid()) @db.Uuid
+  user_id         String   @db.Uuid
+  original_text   String
+  summary         String
+  created_at      DateTime @default(now())
+  
+  // Relations
+  user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  
+  @@map("summarized_content")
 }

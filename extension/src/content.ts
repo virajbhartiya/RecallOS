@@ -7,23 +7,42 @@ interface ContextData {
   content_snippet: string;
   timestamp: number;
   full_content?: string;
+  meaningful_content?: string;
+  content_summary?: string;
+  content_type?: string;
+  key_topics?: string[];
+  reading_time?: number;
   page_metadata?: {
     description?: string;
     keywords?: string;
     author?: string;
     viewport?: string;
     language?: string;
+    published_date?: string;
+    modified_date?: string;
+    canonical_url?: string;
   };
   page_structure?: {
     headings: string[];
     links: string[];
     images: string[];
     forms: string[];
+    code_blocks?: string[];
+    tables?: string[];
   };
   user_activity?: {
     scroll_position: number;
     window_size: { width: number; height: number };
     focused_element?: string;
+    time_on_page?: number;
+    interaction_count?: number;
+  };
+  content_quality?: {
+    word_count: number;
+    has_images: boolean;
+    has_code: boolean;
+    has_tables: boolean;
+    readability_score?: number;
   };
 }
 
@@ -69,6 +88,112 @@ function extractVisibleText(): string {
   }
   
   return textNodes.join(' ');
+}
+
+function extractMeaningfulContent(): string {
+  // Priority order for content extraction
+  const contentSelectors = [
+    'article', 'main', '[role="main"]', '.content', '.post', '.article',
+    '.entry', '.story', '.blog-post', '.news-article', '.tutorial',
+    '.documentation', '.guide', '.how-to', '.explanation'
+  ];
+  
+  let meaningfulContent = '';
+  
+  // Try to find main content areas first
+  for (const selector of contentSelectors) {
+    const element = document.querySelector(selector);
+    if (element) {
+      const text = element.textContent?.trim();
+      if (text && text.length > 100) {
+        meaningfulContent = text;
+        break;
+      }
+    }
+  }
+  
+  // If no main content found, extract from paragraphs and headings
+  if (!meaningfulContent) {
+    const paragraphs = Array.from(document.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote'))
+      .map(el => el.textContent?.trim())
+      .filter(text => text && text.length > 20)
+      .join(' ');
+    
+    if (paragraphs.length > 100) {
+      meaningfulContent = paragraphs;
+    }
+  }
+  
+  // Fallback to visible text if nothing else works
+  if (!meaningfulContent) {
+    meaningfulContent = extractVisibleText();
+  }
+  
+  // Clean and limit content
+  return meaningfulContent
+    .replace(/\s+/g, ' ')
+    .replace(/\n\s*\n/g, '\n')
+    .substring(0, 8000); // Limit to 8000 characters for meaningful content
+}
+
+function extractContentSummary(): string {
+  const title = document.title;
+  const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+  const firstHeading = document.querySelector('h1, h2, h3')?.textContent?.trim() || '';
+  const firstParagraph = document.querySelector('p')?.textContent?.trim() || '';
+  
+  const summary = [title, metaDescription, firstHeading, firstParagraph]
+    .filter(text => text && text.length > 0)
+    .join(' | ');
+  
+  return summary.substring(0, 500);
+}
+
+function extractContentType(): string {
+  const url = window.location.href;
+  const title = document.title.toLowerCase();
+  const metaKeywords = document.querySelector('meta[name="keywords"]')?.getAttribute('content')?.toLowerCase() || '';
+  
+  // Determine content type based on URL patterns and content
+  if (url.includes('/blog/') || url.includes('/post/') || title.includes('blog')) return 'blog_post';
+  if (url.includes('/docs/') || url.includes('/documentation/') || title.includes('docs')) return 'documentation';
+  if (url.includes('/tutorial/') || url.includes('/guide/') || title.includes('tutorial') || title.includes('guide')) return 'tutorial';
+  if (url.includes('/news/') || title.includes('news')) return 'news_article';
+  if (url.includes('/product/') || title.includes('product')) return 'product_page';
+  if (url.includes('/about/') || title.includes('about')) return 'about_page';
+  if (url.includes('/contact/') || title.includes('contact')) return 'contact_page';
+  if (url.includes('/search') || title.includes('search')) return 'search_results';
+  if (url.includes('/forum/') || url.includes('/discussion/')) return 'forum_post';
+  if (url.includes('/github.com/') || url.includes('/gitlab.com/')) return 'code_repository';
+  if (url.includes('/stackoverflow.com/') || url.includes('/stackexchange.com/')) return 'qa_thread';
+  if (url.includes('/youtube.com/') || url.includes('/vimeo.com/')) return 'video_content';
+  if (url.includes('/twitter.com/') || url.includes('/x.com/')) return 'social_media';
+  if (url.includes('/reddit.com/')) return 'reddit_post';
+  if (url.includes('/medium.com/') || url.includes('/substack.com/')) return 'article';
+  
+  return 'web_page';
+}
+
+function extractKeyTopics(): string[] {
+  const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'))
+    .map(h => h.textContent?.trim())
+    .filter(text => text && text.length > 0 && text.length < 100)
+    .slice(0, 10);
+  
+  const keywords = document.querySelector('meta[name="keywords"]')?.getAttribute('content')?.split(',').map(k => k.trim()) || [];
+  
+  const topics = [...headings, ...keywords]
+    .filter(topic => topic && topic.length > 2 && topic.length < 50)
+    .slice(0, 15);
+  
+  return [...new Set(topics)]; // Remove duplicates
+}
+
+function extractReadingTime(): number {
+  const content = extractMeaningfulContent();
+  const wordsPerMinute = 200;
+  const wordCount = content.split(/\s+/).length;
+  return Math.ceil(wordCount / wordsPerMinute);
 }
 
 function extractFullContent(): string {

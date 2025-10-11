@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import globalErrorHandler from "./controller/utils/globalErrorController";
 import { routes } from "./routes/index.route";
 import { prisma } from "./lib/prisma";
+import { startContentWorker } from "./workers/contentWorker";
 
 dotenv.config();
 
@@ -59,6 +60,9 @@ async function testDatabaseConnection() {
 server.listen(port, async () => {
   console.log(`RecallOS Context Capture API is running on port ${port}`);
   await testDatabaseConnection();
+  
+  // Start the content processing worker
+  startContentWorker();
 });
 
 process.on("unhandledRejection", (err: Error) => {

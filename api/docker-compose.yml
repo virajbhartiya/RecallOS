@@ -1,23 +1,51 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:15
     container_name: recallos_db
-    restart: always
+    restart: unless-stopped
     environment:
       POSTGRES_USER: recall_user
-      POSTGRES_PASSWORD: securepassword
+      POSTGRES_PASSWORD: securepassword123
       POSTGRES_DB: recallos
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
     ports:
       - "5432:5432"
     volumes:
       - recallos_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U recall_user -d recallos"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    networks:
+      - recallos_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: recallos_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass redispassword123
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - recallos_network
 
 volumes:
   recallos_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  recallos_network:
+    driver: bridge

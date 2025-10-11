@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { prisma } from "../lib/prisma";
+import { addContentJob, ContentJobData } from "../lib/queue";
 
 const catchAsync = (fn: Function) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -44,6 +45,7 @@ export const captureMemory = () =>
         });
       }
 
+      // Store memory in database first
       const memory = await prisma.memory.create({
         data: {
           user_id: user.id,
@@ -59,9 +61,28 @@ export const captureMemory = () =>
         }
       });
 
+      // Queue content for Gemini processing
+      const contentToProcess = full_content || content_snippet;
+      if (contentToProcess && contentToProcess.length > 0) {
+        const jobData: ContentJobData = {
+          user_id: user.id,
+          raw_text: contentToProcess,
+          metadata: {
+            url: url,
+            timestamp: timestamp,
+            memory_id: memory.id,
+            source: source,
+            title: title
+          }
+        };
+
+        const job = await addContentJob(jobData);
+        console.log(`Queued memory ${memory.id} for Gemini processing with job ${job.id}`);
+      }
+
       res.status(200).json({
         status: "success",
-        message: "Memory captured and stored successfully",
+        message: "Memory captured and queued for processing",
         data: {
           id: memory.id,
           user_id: user.id,
@@ -70,7 +91,8 @@ export const captureMemory = () =>
           title: memory.title,
           content: memory.content,
           timestamp: memory.timestamp.toString(),
-          created_at: memory.created_at
+          created_at: memory.created_at,
+          processing_status: "queued"
         }
       });
 
