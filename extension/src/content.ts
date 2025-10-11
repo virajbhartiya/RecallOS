@@ -58,6 +58,10 @@ let hasUserActivity = false;
 const MIN_CAPTURE_INTERVAL = 10000; // Minimum 10 seconds between captures
 const ACTIVITY_TIMEOUT = 30000; // 30 seconds of inactivity before capturing
 
+// Initialize page tracking
+(window as any).pageLoadTime = Date.now();
+(window as any).interactionCount = 0;
+
 function extractVisibleText(): string {
   const walker = document.createTreeWalker(
     document.body,
@@ -207,13 +211,19 @@ function extractPageMetadata() {
   const keywords = document.querySelector('meta[name="keywords"]') as HTMLMetaElement;
   const author = document.querySelector('meta[name="author"]') as HTMLMetaElement;
   const viewport = document.querySelector('meta[name="viewport"]') as HTMLMetaElement;
+  const published = document.querySelector('meta[property="article:published_time"]') as HTMLMetaElement;
+  const modified = document.querySelector('meta[property="article:modified_time"]') as HTMLMetaElement;
+  const canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
   
   return {
     description: meta?.content || '',
     keywords: keywords?.content || '',
     author: author?.content || '',
     viewport: viewport?.content || '',
-    language: document.documentElement.lang || ''
+    language: document.documentElement.lang || '',
+    published_date: published?.content || '',
+    modified_date: modified?.content || '',
+    canonical_url: canonical?.href || ''
   };
 }
 
@@ -250,7 +260,42 @@ function extractPageStructure() {
     })
     .slice(0, 10);
 
-  return { headings, links, images, forms };
+  const codeBlocks = Array.from(document.querySelectorAll('pre, code'))
+    .map(code => code.textContent?.trim())
+    .filter(code => code && code.length > 10)
+    .slice(0, 10);
+
+  const tables = Array.from(document.querySelectorAll('table'))
+    .map(table => {
+      const headers = Array.from(table.querySelectorAll('th'))
+        .map(th => th.textContent?.trim())
+        .filter(text => text && text.length > 0);
+      return headers.length > 0 ? `Table with columns: ${headers.join(', ')}` : 'Table';
+    })
+    .slice(0, 5);
+
+  return { headings, links, images, forms, code_blocks: codeBlocks, tables };
+}
+
+function extractContentQuality() {
+  const content = extractMeaningfulContent();
+  const wordCount = content.split(/\s+/).length;
+  const hasImages = document.querySelectorAll('img').length > 0;
+  const hasCode = document.querySelectorAll('pre, code').length > 0;
+  const hasTables = document.querySelectorAll('table').length > 0;
+  
+  // Simple readability score based on sentence length and word complexity
+  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
+  const avgWordsPerSentence = sentences.length > 0 ? wordCount / sentences.length : 0;
+  const readabilityScore = Math.max(0, Math.min(100, 100 - (avgWordsPerSentence - 10) * 2));
+  
+  return {
+    word_count: wordCount,
+    has_images: hasImages,
+    has_code: hasCode,
+    has_tables: hasTables,
+    readability_score: Math.round(readabilityScore)
+  };
 }
 
 function extractUserActivity() {
@@ -260,15 +305,17 @@ function extractUserActivity() {
       width: window.innerWidth,
       height: window.innerHeight
     },
-    focused_element: document.activeElement?.tagName || ''
+    focused_element: document.activeElement?.tagName || '',
+    time_on_page: Date.now() - (window as any).pageLoadTime || 0,
+    interaction_count: (window as any).interactionCount || 0
   };
 }
 
 function captureContext(): ContextData {
   const url = window.location.href;
   const title = document.title;
-  const fullText = extractVisibleText();
-  const content_snippet = fullText.substring(0, 500);
+  const meaningfulContent = extractMeaningfulContent();
+  const content_snippet = meaningfulContent.substring(0, 500);
   
   return {
     source: 'extension',
@@ -277,9 +324,15 @@ function captureContext(): ContextData {
     content_snippet,
     timestamp: Date.now(),
     full_content: extractFullContent(),
+    meaningful_content: meaningfulContent,
+    content_summary: extractContentSummary(),
+    content_type: extractContentType(),
+    key_topics: extractKeyTopics(),
+    reading_time: extractReadingTime(),
     page_metadata: extractPageMetadata(),
     page_structure: extractPageStructure(),
-    user_activity: extractUserActivity()
+    user_activity: extractUserActivity(),
+    content_quality: extractContentQuality()
   };
 }
 
@@ -535,6 +588,7 @@ document.addEventListener('click', () => {
   lastActivityTime = Date.now();
   hasUserActivity = true;
   activityLevel = 'high';
+  (window as any).interactionCount++;
 });
 
 document.addEventListener('scroll', () => {
@@ -543,12 +597,14 @@ document.addEventListener('scroll', () => {
   if (activityLevel === 'low') {
     activityLevel = 'normal';
   }
+  (window as any).interactionCount++;
 });
 
 document.addEventListener('keydown', () => {
   lastActivityTime = Date.now();
   hasUserActivity = true;
   activityLevel = 'high';
+  (window as any).interactionCount++;
 });
 
 let mouseMoveTimeout: number | null = null;

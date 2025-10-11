@@ -19,9 +19,15 @@ export const captureMemory = () =>
       timestamp, 
       wallet_address,
       full_content,
+      meaningful_content,
+      content_summary,
+      content_type,
+      key_topics,
+      reading_time,
       page_metadata,
       page_structure,
-      user_activity
+      user_activity,
+      content_quality
     } = req.body;
 
     // Validate required fields
@@ -54,15 +60,26 @@ export const captureMemory = () =>
           title,
           content: content_snippet,
           timestamp: BigInt(timestamp),
-          full_content: full_content || null,
-          page_metadata: page_metadata || null,
+          full_content: meaningful_content || full_content || null,
+          page_metadata: page_metadata ? {
+            ...page_metadata,
+            content_type,
+            key_topics,
+            reading_time,
+            content_quality
+          } : {
+            content_type,
+            key_topics,
+            reading_time,
+            content_quality
+          },
           page_structure: page_structure || null,
           user_activity: user_activity || null
         }
       });
 
       // Queue content for Gemini processing
-      const contentToProcess = full_content || content_snippet;
+      const contentToProcess = meaningful_content || full_content || content_snippet;
       if (contentToProcess && contentToProcess.length > 0) {
         const jobData: ContentJobData = {
           user_id: user.id,
@@ -72,7 +89,9 @@ export const captureMemory = () =>
             timestamp: timestamp,
             memory_id: memory.id,
             source: source,
-            title: title
+            title: title,
+            content_type: content_type,
+            content_summary: content_summary
           }
         };
 

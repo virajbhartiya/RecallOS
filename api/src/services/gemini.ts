@@ -13,11 +13,47 @@ export class GeminiService {
     this.ai = new GoogleGenAI({ apiKey });
   }
 
-  async summarizeContent(rawText: string): Promise<string> {
+  async summarizeContent(rawText: string, metadata?: any): Promise<string> {
     try {
+      const contentType = metadata?.content_type || 'web_page';
+      const contentSummary = metadata?.content_summary || '';
+      
+      let prompt = '';
+      
+      // Customize prompt based on content type
+      switch (contentType) {
+        case 'blog_post':
+        case 'article':
+          prompt = `Analyze this blog post/article and provide a comprehensive summary focusing on:\n1. Main topic and key arguments\n2. Important insights and takeaways\n3. Supporting evidence or examples\n4. Author's perspective or conclusions\n\nContent: ${rawText}`;
+          break;
+        case 'documentation':
+          prompt = `Summarize this documentation focusing on:\n1. Main concepts and procedures\n2. Key technical details\n3. Important warnings or notes\n4. Practical applications\n\nContent: ${rawText}`;
+          break;
+        case 'tutorial':
+        case 'guide':
+          prompt = `Summarize this tutorial/guide focusing on:\n1. Learning objectives\n2. Step-by-step process\n3. Key techniques or methods\n4. Important tips or best practices\n\nContent: ${rawText}`;
+          break;
+        case 'news_article':
+          prompt = `Summarize this news article focusing on:\n1. Main event or story\n2. Key facts and figures\n3. Important quotes or statements\n4. Implications or consequences\n\nContent: ${rawText}`;
+          break;
+        case 'code_repository':
+          prompt = `Analyze this code repository content and provide a summary focusing on:\n1. Project purpose and functionality\n2. Key technical components\n3. Important code patterns or algorithms\n4. Usage instructions or examples\n\nContent: ${rawText}`;
+          break;
+        case 'qa_thread':
+          prompt = `Summarize this Q&A thread focusing on:\n1. Main question or problem\n2. Key answers or solutions\n3. Important technical details\n4. Best practices or recommendations\n\nContent: ${rawText}`;
+          break;
+        default:
+          prompt = `Analyze this web content and provide a meaningful summary focusing on:\n1. Main topic and purpose\n2. Key information and insights\n3. Important details or data\n4. Practical value or applications\n\nContent: ${rawText}`;
+      }
+      
+      // Add content summary context if available
+      if (contentSummary) {
+        prompt = `Context: ${contentSummary}\n\n${prompt}`;
+      }
+
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Summarize key insights from the following content:\n\n${rawText}`,
+        contents: prompt,
       });
 
       if (!response.text) {

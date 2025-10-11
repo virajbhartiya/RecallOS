@@ -10,7 +10,7 @@ export const startContentWorker = () => {
       console.log(`Processing content for user ${user_id}`);
       
       // Step 1: Call Gemini API to summarize key points
-      const summary = await geminiService.summarizeContent(raw_text);
+      const summary = await geminiService.summarizeContent(raw_text, metadata);
       
       // Step 2: Store in PostgreSQL
       const summarizedContent = await prisma.summarizedContent.create({

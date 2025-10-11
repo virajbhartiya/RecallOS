@@ -28,6 +28,8 @@ export interface ContentJobData {
     memory_id?: string;
     source?: string;
     title?: string;
+    content_type?: string;
+    content_summary?: string;
   };
 }
 
