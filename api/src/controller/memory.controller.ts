@@ -76,6 +76,42 @@ export class MemoryController {
 
       const timestamp = Math.floor(Date.now() / 1000);
 
+      // Check for duplicate memories
+      const existingMemory = await prisma.memory.findFirst({
+        where: {
+          user_id: user.id,
+          OR: [
+            { hash: memoryHash },
+            { 
+              AND: [
+                { url: url || 'unknown' },
+                { 
+                  created_at: {
+                    gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Within last 24 hours
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      });
+
+      if (existingMemory) {
+        console.log(`Duplicate memory detected for user ${user.id}, skipping creation`);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Duplicate memory detected, skipping creation',
+          data: {
+            userAddress,
+            existingMemoryId: existingMemory.id,
+            memoryHash,
+            urlHash,
+            isDuplicate: true
+          },
+        });
+      }
+
       const memory = await prisma.memory.create({
         data: {
           user_id: user.id,

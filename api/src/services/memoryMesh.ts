@@ -137,7 +137,7 @@ export class MemoryMeshService {
       });
 
       return similarities
-        .filter((item: any) => item.similarity > 0.3)
+        .filter((item: any) => item.similarity > 0.4) // Increased threshold for better quality
         .sort((a: any, b: any) => b.similarity - a.similarity)
         .slice(0, limit)
         .map((item: any) => ({
@@ -201,6 +201,9 @@ export class MemoryMeshService {
 
       const uniqueRelations = this.deduplicateRelations(allRelations);
 
+      // Clean up existing relations with low similarity scores
+      await this.cleanupLowQualityRelations(memoryId);
+
       const relationPromises = uniqueRelations.map(async relatedMemory => {
         const existingRelation = await prisma.memoryRelation.findUnique({
           where: {
@@ -221,9 +224,13 @@ export class MemoryMeshService {
             },
           });
         } else {
-          if (
-            relatedMemory.similarity_score > existingRelation.similarity_score
-          ) {
+          // Update if new similarity is significantly better or if relation type is more specific
+          const shouldUpdate = 
+            relatedMemory.similarity_score > existingRelation.similarity_score + 0.05 ||
+            (relatedMemory.similarity_score > existingRelation.similarity_score && 
+             this.isMoreSpecificRelationType(relatedMemory.relation_type, existingRelation.relation_type));
+
+          if (shouldUpdate) {
             await prisma.memoryRelation.update({
               where: { id: existingRelation.id },
               data: {
@@ -270,49 +277,86 @@ export class MemoryMeshService {
       const metadata = memory.page_metadata as any;
 
       const topics = metadata.topics || [];
-
       const categories = metadata.categories || [];
+      const keyPoints = metadata.keyPoints || [];
+      const searchableTerms = metadata.searchableTerms || [];
 
       if (topics.length === 0 && categories.length === 0) {
         return [];
       }
 
+      // Find memories with overlapping topics or categories
       const relatedMemories = await prisma.memory.findMany({
         where: {
           user_id: userId,
           id: { not: memoryId },
-          page_metadata: {
-            path: ['topics'],
-            array_contains: topics,
-          },
+          OR: [
+            {
+              page_metadata: {
+                path: ['topics'],
+                array_contains: topics,
+              },
+            },
+            {
+              page_metadata: {
+                path: ['categories'],
+                array_contains: categories,
+              },
+            },
+            {
+              page_metadata: {
+                path: ['searchableTerms'],
+                array_contains: searchableTerms,
+              },
+            },
+          ],
         },
-        take: limit * 2,
+        take: limit * 3,
       });
 
       const topicalSimilarities = relatedMemories.map((relatedMemory: any) => {
         const relatedMetadata = relatedMemory.page_metadata as any;
 
         const relatedTopics = relatedMetadata?.topics || [];
-
         const relatedCategories = relatedMetadata?.categories || [];
+        const relatedKeyPoints = relatedMetadata?.keyPoints || [];
+        const relatedSearchableTerms = relatedMetadata?.searchableTerms || [];
 
+        // Calculate multiple types of topical overlap
         const topicOverlap = this.calculateSetOverlap(topics, relatedTopics);
+        const categoryOverlap = this.calculateSetOverlap(categories, relatedCategories);
+        const keyPointOverlap = this.calculateSetOverlap(keyPoints, relatedKeyPoints);
+        const searchableTermOverlap = this.calculateSetOverlap(searchableTerms, relatedSearchableTerms);
 
-        const categoryOverlap = this.calculateSetOverlap(
-          categories,
-          relatedCategories
-        );
+        // Weighted similarity calculation
+        const similarity = 
+          topicOverlap * 0.4 +           // Topics are most important
+          categoryOverlap * 0.3 +        // Categories are second most important
+          keyPointOverlap * 0.2 +        // Key points provide additional context
+          searchableTermOverlap * 0.1;   // Searchable terms provide minimal context
 
-        const similarity = topicOverlap * 0.7 + categoryOverlap * 0.3;
+        // Boost similarity if URL domains match (same website)
+        let urlBoost = 0;
+        if (memory.url && relatedMemory.url) {
+          try {
+            const memoryDomain = new URL(memory.url).hostname;
+            const relatedDomain = new URL(relatedMemory.url).hostname;
+            if (memoryDomain === relatedDomain) {
+              urlBoost = 0.1;
+            }
+          } catch (e) {
+            // Invalid URLs, no boost
+          }
+        }
 
         return {
           ...relatedMemory,
-          similarity_score: similarity,
+          similarity_score: Math.min(1, similarity + urlBoost),
         };
       });
 
       return topicalSimilarities
-        .filter(item => item.similarity_score > 0.2)
+        .filter(item => item.similarity_score > 0.25)
         .sort((a, b) => b.similarity_score - a.similarity_score)
         .slice(0, limit);
     } catch (error) {
@@ -337,41 +381,79 @@ export class MemoryMeshService {
       }
 
       const memoryTime = Number(memory.timestamp);
+      const memoryCreatedAt = new Date(memory.created_at);
 
-      const oneDay = 24 * 60 * 60;
-
+      // Define time windows for different temporal relationships
+      const oneHour = 60 * 60;
+      const oneDay = 24 * oneHour;
       const oneWeek = 7 * oneDay;
+      const oneMonth = 30 * oneDay;
 
+      // Get memories within a month range
       const temporalMemories = await prisma.memory.findMany({
         where: {
           user_id: userId,
           id: { not: memoryId },
-          timestamp: {
-            gte: BigInt(memoryTime - oneWeek),
-            lte: BigInt(memoryTime + oneWeek),
-          },
+          OR: [
+            // Same day (high temporal relevance)
+            {
+              created_at: {
+                gte: new Date(memoryCreatedAt.getTime() - oneDay * 1000),
+                lte: new Date(memoryCreatedAt.getTime() + oneDay * 1000),
+              }
+            },
+            // Same week (medium temporal relevance)
+            {
+              created_at: {
+                gte: new Date(memoryCreatedAt.getTime() - oneWeek * 1000),
+                lte: new Date(memoryCreatedAt.getTime() + oneWeek * 1000),
+              }
+            },
+            // Same month (low temporal relevance)
+            {
+              created_at: {
+                gte: new Date(memoryCreatedAt.getTime() - oneMonth * 1000),
+                lte: new Date(memoryCreatedAt.getTime() + oneMonth * 1000),
+              }
+            }
+          ]
         },
-        orderBy: { timestamp: 'desc' },
-        take: limit * 2,
+        orderBy: { created_at: 'desc' },
+        take: limit * 3,
       });
 
       const temporalSimilarities = temporalMemories.map(
         (relatedMemory: any) => {
           const timeDiff = Math.abs(
-            Number(relatedMemory.timestamp) - memoryTime
+            relatedMemory.created_at.getTime() - memoryCreatedAt.getTime()
           );
 
-          const similarity = Math.max(0, 1 - timeDiff / oneWeek);
+          let similarity = 0;
+          
+          // Calculate similarity based on time proximity with exponential decay
+          if (timeDiff <= oneHour * 1000) {
+            // Same hour - very high similarity
+            similarity = 0.9 + (0.1 * (1 - timeDiff / (oneHour * 1000)));
+          } else if (timeDiff <= oneDay * 1000) {
+            // Same day - high similarity
+            similarity = 0.7 + (0.2 * (1 - timeDiff / (oneDay * 1000)));
+          } else if (timeDiff <= oneWeek * 1000) {
+            // Same week - medium similarity
+            similarity = 0.4 + (0.3 * (1 - timeDiff / (oneWeek * 1000)));
+          } else if (timeDiff <= oneMonth * 1000) {
+            // Same month - low similarity
+            similarity = 0.1 + (0.3 * (1 - timeDiff / (oneMonth * 1000)));
+          }
 
           return {
             ...relatedMemory,
-            similarity_score: similarity,
+            similarity_score: Math.max(0, similarity),
           };
         }
       );
 
       return temporalSimilarities
-        .filter(item => item.similarity_score > 0.1)
+        .filter(item => item.similarity_score > 0.15)
         .sort((a, b) => b.similarity_score - a.similarity_score)
         .slice(0, limit);
     } catch (error) {
@@ -389,18 +471,63 @@ export class MemoryMeshService {
 
     return intersection.length / union.length;
   }
+
+  private async cleanupLowQualityRelations(memoryId: string): Promise<void> {
+    try {
+      // Remove relations with very low similarity scores
+      await prisma.memoryRelation.deleteMany({
+        where: {
+          memory_id: memoryId,
+          similarity_score: { lt: 0.2 }
+        }
+      });
+
+      // Keep only the top 15 relations per memory to avoid clutter
+      const relations = await prisma.memoryRelation.findMany({
+        where: { memory_id: memoryId },
+        orderBy: { similarity_score: 'desc' },
+        skip: 15
+      });
+
+      if (relations.length > 0) {
+        await prisma.memoryRelation.deleteMany({
+          where: {
+            id: { in: relations.map(r => r.id) }
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error cleaning up low quality relations:', error);
+    }
+  }
+
+  private isMoreSpecificRelationType(newType: string, existingType: string): boolean {
+    // Define hierarchy of relation types (more specific to less specific)
+    const typeHierarchy = {
+      'semantic': 3,
+      'topical': 2,
+      'temporal': 1
+    };
+
+    return (typeHierarchy[newType] || 0) > (typeHierarchy[existingType] || 0);
+  }
   private deduplicateRelations(relations: any[]): any[] {
-    const seen = new Set();
+    const seen = new Map<string, any>();
 
     return relations.filter(relation => {
       const key = relation.id;
+      const existingRelation = seen.get(key);
 
-      if (seen.has(key)) {
+      if (existingRelation) {
+        // Keep the relation with higher similarity score
+        if (relation.similarity_score > existingRelation.similarity_score) {
+          seen.set(key, relation);
+          return true;
+        }
         return false;
       }
 
-      seen.add(key);
-
+      seen.set(key, relation);
       return true;
     });
   }
