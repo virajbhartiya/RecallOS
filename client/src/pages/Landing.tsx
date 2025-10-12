@@ -49,27 +49,32 @@ const Section: React.FC<{
 export const Landing = () => {
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        return
+      }
+
       switch (event.key.toLowerCase()) {
         case 'c':
-          // Launch console action
-          console.log('Launch console')
+          window.open('/console', '_blank')
           break
         case 'd':
-          // Read docs action
-          console.log('Read docs')
+          window.open('/docs', '_blank')
           break
         case 'e':
-          // Install extension action
-          console.log('Install extension')
+          window.open('https://chrome.google.com/webstore', '_blank')
           break
         case 'g':
-          // GitHub action
-          console.log('Open GitHub')
+          window.open('https://github.com/virajbhartiya/RecallOS', '_blank')
           break
-        case 'w':
-          // Connect wallet action
-          console.log('Connect wallet')
+        case 'w': {
+          const walletButton = document.querySelector('[data-wallet-connect]') as HTMLButtonElement
+          if (walletButton) {
+            walletButton.click()
+          } else {
+            alert('Wallet connection feature coming soon!')
+          }
           break
+        }
       }
     }
 
@@ -84,21 +89,34 @@ export const Landing = () => {
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-8">
-              <div className="text-sm font-mono text-gray-600 uppercase tracking-wide">
+              <button 
+                className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                onClick={() => window.open('/docs', '_blank')}
+              >
                 [D] DOCS
-              </div>
-              <div className="text-sm font-mono text-gray-600 uppercase tracking-wide">
+              </button>
+              <button 
+                className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                onClick={() => window.open('https://github.com/virajbhartiya/RecallOS', '_blank')}
+              >
                 [G] GITHUB
-              </div>
+              </button>
               <div className="text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
                 [TESTNET]
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="text-sm font-mono text-gray-600 uppercase tracking-wide">
+              <button 
+                className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                onClick={() => window.open('/console', '_blank')}
+              >
                 [C] CONSOLE
-              </div>
-              <button className="px-3 py-1 text-xs font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200">
+              </button>
+              <button 
+                className="px-3 py-1 text-xs font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
+                data-wallet-connect
+                onClick={() => alert('Wallet connection feature coming soon!')}
+              >
                 [W] CONNECT WALLET
               </button>
             </div>
@@ -183,11 +201,19 @@ export const Landing = () => {
               </div>
               
               <div className="flex flex-col sm:flex-row gap-4 mt-8">
-                <ConsoleButton variant="console_key" className="group relative overflow-hidden">
+                <ConsoleButton 
+                  variant="console_key" 
+                  className="group relative overflow-hidden"
+                  onClick={() => window.open('https://chrome.google.com/webstore', '_blank')}
+                >
                   <span className="relative z-10">[E] INSTALL EXTENSION</span>
                   <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
                 </ConsoleButton>
-                <ConsoleButton variant="outlined" className="group relative overflow-hidden">
+                <ConsoleButton 
+                  variant="outlined" 
+                  className="group relative overflow-hidden"
+                  onClick={() => window.open('/docs', '_blank')}
+                >
                   <span className="relative z-10">[D] READ DOCS</span>
                   <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
                 </ConsoleButton>
