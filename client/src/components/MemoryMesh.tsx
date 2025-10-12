@@ -177,7 +177,7 @@ const Edge: React.FC<{
 
 const MemoryMesh: React.FC<MemoryMeshProps> = ({
   className = '',
-  autoRotate = true,
+  autoRotate = false,
   expandNodeOnClick = true,
   userAddress
 }) => {
@@ -187,6 +187,8 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
   const [meshData, setMeshData] = useState<MemoryMesh | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [selectedNodeDetails, setSelectedNodeDetails] = useState<MemoryMeshNode | null>(null)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
 
   // Fetch mesh data from API
   useEffect(() => {
@@ -319,6 +321,13 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
   const handleNodeClick = (nodeId: string) => {
     if (expandNodeOnClick) {
       setActiveNode(activeNode === nodeId ? null : nodeId)
+    }
+    
+    // Show detailed view
+    const node = nodes.find(n => n.id === nodeId)
+    if (node) {
+      setSelectedNodeDetails(node)
+      setShowDetailsModal(true)
     }
   }
 
@@ -458,6 +467,110 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
           [FIG. 3] Live Memory Mesh ({nodes.length} nodes, {edges.length} connections)
         </div>
       </div>
+
+      {/* Memory Details Modal */}
+      {showDetailsModal && selectedNodeDetails && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-light">Memory Details</h2>
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {/* Memory Type Badge */}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-mono text-gray-600">Type:</span>
+                  <span 
+                    className="px-2 py-1 rounded text-xs font-mono text-white"
+                    style={{ backgroundColor: nodeColors[selectedNodeDetails.type] || '#666666' }}
+                  >
+                    {selectedNodeDetails.type.toUpperCase()}
+                  </span>
+                </div>
+
+                {/* Title */}
+                <div>
+                  <span className="text-sm font-mono text-gray-600 block mb-1">Title:</span>
+                  <h3 className="text-lg font-light">{selectedNodeDetails.title || 'Untitled Memory'}</h3>
+                </div>
+
+                {/* Summary */}
+                {selectedNodeDetails.summary && (
+                  <div>
+                    <span className="text-sm font-mono text-gray-600 block mb-1">Summary:</span>
+                    <p className="text-gray-800 leading-relaxed">{selectedNodeDetails.summary}</p>
+                  </div>
+                )}
+
+                {/* Memory ID */}
+                <div>
+                  <span className="text-sm font-mono text-gray-600 block mb-1">Memory ID:</span>
+                  <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">
+                    {selectedNodeDetails.memory_id}
+                  </code>
+                </div>
+
+                {/* Importance Score */}
+                <div>
+                  <span className="text-sm font-mono text-gray-600 block mb-1">Importance Score:</span>
+                  <div className="flex items-center gap-2">
+                    <div className="w-32 bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-blue-500 h-2 rounded-full" 
+                        style={{ width: `${(selectedNodeDetails.importance_score || 0) * 100}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-mono">
+                      {((selectedNodeDetails.importance_score || 0) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                </div>
+
+                {/* Related Connections */}
+                <div>
+                  <span className="text-sm font-mono text-gray-600 block mb-2">Related Connections:</span>
+                  <div className="space-y-2">
+                    {edges
+                      .filter(edge => edge.source === selectedNodeDetails.id || edge.target === selectedNodeDetails.id)
+                      .map((edge, index) => {
+                        const relatedNode = nodes.find(n => 
+                          n.id === (edge.source === selectedNodeDetails.id ? edge.target : edge.source)
+                        )
+                        return (
+                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                            <div className="flex items-center gap-2">
+                              <div 
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: nodeColors[relatedNode?.type || 'manual'] || '#666666' }}
+                              ></div>
+                              <span className="text-sm font-mono">{relatedNode?.label || 'Unknown'}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-gray-500">{edge.relation_type}</span>
+                              <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded">
+                                {((edge.similarity_score || 0) * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    {edges.filter(edge => edge.source === selectedNodeDetails.id || edge.target === selectedNodeDetails.id).length === 0 && (
+                      <p className="text-sm text-gray-500 italic">No connections found</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
