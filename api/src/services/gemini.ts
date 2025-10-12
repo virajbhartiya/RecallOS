@@ -11,7 +11,6 @@ export class GeminiService {
       return;
     }
     
-    // The client gets the API key from the environment variable `GEMINI_API_KEY`
     this.ai = new GoogleGenAI({ apiKey });
   }
 
@@ -51,7 +50,6 @@ export class GeminiService {
       
       let prompt = '';
       
-      // Customize prompt based on content type for better RAG processing
       switch (contentType) {
         case 'blog_post':
         case 'article':
@@ -80,7 +78,6 @@ export class GeminiService {
           prompt = `Analyze this web content for a personal memory system. Extract and summarize:\n\n1. **Main Topic**: What is this content about?\n2. **Key Information**: Important facts, insights, or data\n3. **Practical Value**: How can this information be useful?\n4. **Important Details**: Specific examples, numbers, or specifics\n5. **Related Concepts**: What topics connect to this?\n6. **Actionable Insights**: What can be done with this information?\n\nContent: ${rawText}`;
       }
       
-      // Add context information
       const contextInfo = [];
       if (title) contextInfo.push(`Title: ${title}`);
       if (url) contextInfo.push(`URL: ${url}`);
@@ -150,7 +147,6 @@ Return only valid JSON, no additional text.`;
         throw new Error('No metadata generated from Gemini API');
       }
 
-      // Parse JSON response
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('Invalid JSON response from Gemini API');
@@ -158,7 +154,6 @@ Return only valid JSON, no additional text.`;
 
       const extractedMetadata = JSON.parse(jsonMatch[0]);
       
-      // Validate and clean the response
       return {
         topics: Array.isArray(extractedMetadata.topics) ? extractedMetadata.topics.slice(0, 10) : [],
         categories: Array.isArray(extractedMetadata.categories) ? extractedMetadata.categories.slice(0, 5) : [],
@@ -169,7 +164,6 @@ Return only valid JSON, no additional text.`;
       };
     } catch (error) {
       console.error('Error extracting content metadata:', error);
-      // Return default metadata if extraction fails
       return {
         topics: metadata?.key_topics?.slice(0, 5) || [],
         categories: [metadata?.content_type || 'web_page'],

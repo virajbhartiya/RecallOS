@@ -3,31 +3,37 @@ import { MemoryController } from "../controller/memory.controller";
 
 const router = Router();
 
-// Memory processing and storage routes
-router.post("/process", MemoryController.processRawContent); // Process raw content and store on blockchain
-router.post("/", MemoryController.storeMemory); // Store single memory
-router.post("/batch", MemoryController.storeMemoryBatch); // Store memory batch
+router.post("/process", MemoryController.processRawContent);
+router.post("/", MemoryController.storeMemory); 
+router.post("/batch", MemoryController.storeMemoryBatch);
 
 // Query routes
-router.get("/user/:userAddress", MemoryController.getUserMemories); // Get all memories for user
-router.get("/user/:userAddress/count", MemoryController.getUserMemoryCount); // Get memory count
-router.get("/user/:userAddress/memory/:index", MemoryController.getMemory); // Get specific memory by index
-router.get("/user/:userAddress/recent", MemoryController.getRecentMemories); // Get recent memories
-router.get("/user/:userAddress/by-url", MemoryController.getMemoriesByUrlHash); // Get memories by URL hash
-router.get("/user/:userAddress/by-timestamp", MemoryController.getMemoriesByTimestampRange); // Get memories by timestamp range
+router.get("/user/:userAddress", MemoryController.getUserMemories);
+router.get("/user/:userAddress/count", MemoryController.getUserMemoryCount);
+router.get("/user/:userAddress/memory/:index", MemoryController.getMemory); 
+router.get("/user/:userAddress/recent", MemoryController.getRecentMemories);
+router.get("/user/:userAddress/by-url", MemoryController.getMemoriesByUrlHash);
+router.get("/user/:userAddress/by-timestamp", MemoryController.getMemoriesByTimestampRange);
 
 // Enhanced RAG search routes
-router.get("/search", MemoryController.searchMemories); // Search memories with filters
-router.get("/insights", MemoryController.getMemoryInsights); // Get memory analytics and insights
+router.get("/search", MemoryController.searchMemories);
+router.get("/insights", MemoryController.getMemoryInsights);
 
 // Blockchain transaction routes
-router.get("/transactions", MemoryController.getMemoriesWithTransactionDetails); // Get memories with transaction details
-router.get("/transaction/:memoryId", MemoryController.getMemoryTransactionStatus); // Get transaction status for specific memory
-router.post("/retry-failed", MemoryController.retryFailedTransactions); // Retry failed blockchain transactions
+router.get("/transactions", MemoryController.getMemoriesWithTransactionDetails);
+router.get("/transaction/:memoryId", MemoryController.getMemoryTransactionStatus);
+router.post("/retry-failed", MemoryController.retryFailedTransactions); 
+
+// Memory mesh and embedding routes
+router.get("/mesh/:userAddress", MemoryController.getMemoryMesh);
+router.get("/relations/:memoryId", MemoryController.getMemoryWithRelations);
+router.get("/cluster/:memoryId", MemoryController.getMemoryCluster);
+router.get("/search-embeddings", MemoryController.searchMemoriesWithEmbeddings);
+router.post("/process-mesh/:memoryId", MemoryController.processMemoryForMesh);
 
 // Hash-based queries
-router.get("/hash/:hash", MemoryController.getMemoryByHash); // Get memory by hash
-router.get("/exists/:hash", MemoryController.isMemoryStored); // Check if memory exists
+router.get("/hash/:hash", MemoryController.getMemoryByHash);
+router.get("/exists/:hash", MemoryController.isMemoryStored);
 
 // Health check
 router.get("/health", MemoryController.healthCheck);

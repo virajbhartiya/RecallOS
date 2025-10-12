@@ -13,24 +13,20 @@ export class MemoryMeshService {
         throw new Error(`Memory ${memoryId} not found`);
       }
 
-      // Generate embeddings for different parts of the memory
       const embeddingPromises = [];
 
-      // Content embedding
       if (memory.content) {
         embeddingPromises.push(
           this.createEmbedding(memoryId, memory.content, 'content')
         );
       }
 
-      // Summary embedding
       if (memory.summary) {
         embeddingPromises.push(
           this.createEmbedding(memoryId, memory.summary, 'summary')
         );
       }
 
-      // Title embedding
       if (memory.title) {
         embeddingPromises.push(
           this.createEmbedding(memoryId, memory.title, 'title')
@@ -74,13 +70,11 @@ export class MemoryMeshService {
         return [];
       }
 
-      // Get content embedding for similarity search
       const contentEmbedding = memory.embeddings.find((e: any) => e.embedding_type === 'content');
       if (!contentEmbedding) {
         return [];
       }
 
-      // Find similar memories using vector similarity
       const similarMemories = await this.findSimilarMemories(
         contentEmbedding.vector,
         userId,
@@ -102,7 +96,6 @@ export class MemoryMeshService {
     limit: number
   ): Promise<any[]> {
     try {
-      // Get all memories with embeddings for the user
       const memories = await prisma.memory.findMany({
         where: {
           user_id: userId,
@@ -116,7 +109,6 @@ export class MemoryMeshService {
         }
       });
 
-      // Calculate cosine similarity for each memory
       const similarities = memories.map((memory: any) => {
         const embedding = memory.embeddings[0];
         if (!embedding) return { memory, similarity: 0 };
@@ -125,9 +117,8 @@ export class MemoryMeshService {
         return { memory, similarity };
       });
 
-      // Sort by similarity and return top results
       return similarities
-        .filter((item: any) => item.similarity > 0.3) // Only include reasonably similar memories
+        .filter((item: any) => item.similarity > 0.3)
         .sort((a: any, b: any) => b.similarity - a.similarity)
         .slice(0, limit)
         .map((item: any) => ({
@@ -167,10 +158,31 @@ export class MemoryMeshService {
 
   async createMemoryRelations(memoryId: string, userId: string): Promise<void> {
     try {
-      const relatedMemories = await this.findRelatedMemories(memoryId, userId, 10);
+      const memory = await prisma.memory.findUnique({
+        where: { id: memoryId }
+      });
+
+      if (!memory) {
+        throw new Error(`Memory ${memoryId} not found`);
+      }
+
+      // Find different types of relationships
+      const [semanticRelations, topicalRelations, temporalRelations] = await Promise.all([
+        this.findSemanticRelations(memoryId, userId, 8),
+        this.findTopicalRelations(memoryId, userId, 5),
+        this.findTemporalRelations(memoryId, userId, 3)
+      ]);
+
+      const allRelations = [
+        ...semanticRelations.map(r => ({ ...r, relation_type: 'semantic' })),
+        ...topicalRelations.map(r => ({ ...r, relation_type: 'topical' })),
+        ...temporalRelations.map(r => ({ ...r, relation_type: 'temporal' }))
+      ];
+
+      // Remove duplicates and create relations
+      const uniqueRelations = this.deduplicateRelations(allRelations);
       
-      const relationPromises = relatedMemories.map(async (relatedMemory) => {
-        // Check if relation already exists
+      const relationPromises = uniqueRelations.map(async (relatedMemory) => {
         const existingRelation = await prisma.memoryRelation.findUnique({
           where: {
             memory_id_related_memory_id: {
@@ -186,18 +198,161 @@ export class MemoryMeshService {
               memory_id: memoryId,
               related_memory_id: relatedMemory.id,
               similarity_score: relatedMemory.similarity_score,
-              relation_type: 'semantic'
+              relation_type: relatedMemory.relation_type
             }
           });
+        } else {
+          // Update existing relation if similarity score is higher
+          if (relatedMemory.similarity_score > existingRelation.similarity_score) {
+            await prisma.memoryRelation.update({
+              where: { id: existingRelation.id },
+              data: {
+                similarity_score: relatedMemory.similarity_score,
+                relation_type: relatedMemory.relation_type
+              }
+            });
+          }
         }
       });
 
       await Promise.all(relationPromises);
-      console.log(`Created memory relations for ${memoryId}`);
+      console.log(`Created ${uniqueRelations.length} memory relations for ${memoryId}`);
     } catch (error) {
       console.error(`Error creating memory relations for ${memoryId}:`, error);
       throw error;
     }
+  }
+
+  private async findSemanticRelations(memoryId: string, userId: string, limit: number): Promise<any[]> {
+    return this.findRelatedMemories(memoryId, userId, limit);
+  }
+
+  private async findTopicalRelations(memoryId: string, userId: string, limit: number): Promise<any[]> {
+    try {
+      const memory = await prisma.memory.findUnique({
+        where: { id: memoryId }
+      });
+
+      if (!memory || !memory.page_metadata) {
+        return [];
+      }
+
+      const metadata = memory.page_metadata as any;
+      const topics = metadata.topics || [];
+      const categories = metadata.categories || [];
+
+      if (topics.length === 0 && categories.length === 0) {
+        return [];
+      }
+
+      // Find memories with similar topics or categories
+      const relatedMemories = await prisma.memory.findMany({
+        where: {
+          user_id: userId,
+          id: { not: memoryId },
+          page_metadata: {
+            path: ['topics'],
+            array_contains: topics
+          }
+        },
+        take: limit * 2 // Get more to filter by similarity
+      });
+
+      // Calculate topical similarity based on shared topics/categories
+      const topicalSimilarities = relatedMemories.map((relatedMemory: any) => {
+        const relatedMetadata = relatedMemory.page_metadata as any;
+        const relatedTopics = relatedMetadata?.topics || [];
+        const relatedCategories = relatedMetadata?.categories || [];
+
+        const topicOverlap = this.calculateSetOverlap(topics, relatedTopics);
+        const categoryOverlap = this.calculateSetOverlap(categories, relatedCategories);
+        
+        const similarity = (topicOverlap * 0.7) + (categoryOverlap * 0.3);
+        
+        return {
+          ...relatedMemory,
+          similarity_score: similarity
+        };
+      });
+
+      return topicalSimilarities
+        .filter(item => item.similarity_score > 0.2)
+        .sort((a, b) => b.similarity_score - a.similarity_score)
+        .slice(0, limit);
+    } catch (error) {
+      console.error('Error finding topical relations:', error);
+      return [];
+    }
+  }
+
+  private async findTemporalRelations(memoryId: string, userId: string, limit: number): Promise<any[]> {
+    try {
+      const memory = await prisma.memory.findUnique({
+        where: { id: memoryId }
+      });
+
+      if (!memory) {
+        return [];
+      }
+
+      const memoryTime = Number(memory.timestamp);
+      const oneDay = 24 * 60 * 60; // 1 day in seconds
+      const oneWeek = 7 * oneDay;
+
+      // Find memories within temporal proximity
+      const temporalMemories = await prisma.memory.findMany({
+        where: {
+          user_id: userId,
+          id: { not: memoryId },
+          timestamp: {
+            gte: BigInt(memoryTime - oneWeek),
+            lte: BigInt(memoryTime + oneWeek)
+          }
+        },
+        orderBy: { timestamp: 'desc' },
+        take: limit * 2
+      });
+
+      // Calculate temporal similarity (closer in time = higher similarity)
+      const temporalSimilarities = temporalMemories.map((relatedMemory: any) => {
+        const timeDiff = Math.abs(Number(relatedMemory.timestamp) - memoryTime);
+        const similarity = Math.max(0, 1 - (timeDiff / oneWeek));
+        
+        return {
+          ...relatedMemory,
+          similarity_score: similarity
+        };
+      });
+
+      return temporalSimilarities
+        .filter(item => item.similarity_score > 0.1)
+        .sort((a, b) => b.similarity_score - a.similarity_score)
+        .slice(0, limit);
+    } catch (error) {
+      console.error('Error finding temporal relations:', error);
+      return [];
+    }
+  }
+
+  private calculateSetOverlap(setA: string[], setB: string[]): number {
+    if (setA.length === 0 || setB.length === 0) return 0;
+    
+    const intersection = setA.filter(item => setB.includes(item));
+    const union = [...new Set([...setA, ...setB])];
+    
+    return intersection.length / union.length; // Jaccard similarity
+  }
+
+  private deduplicateRelations(relations: any[]): any[] {
+    const seen = new Set();
+    return relations.filter(relation => {
+      const key = relation.id;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   }
 
   async getMemoryMesh(userId: string, limit: number = 50): Promise<any> {
@@ -241,20 +396,156 @@ export class MemoryMeshService {
 
   async searchMemories(userId: string, query: string, limit: number = 10): Promise<any[]> {
     try {
-      // Generate embedding for search query
       const queryEmbedding = await geminiService.generateEmbedding(query);
 
-      // Find similar memories
       const similarMemories = await this.findSimilarMemories(
         queryEmbedding,
         userId,
-        '', // Don't exclude any memory for search
+        '',
         limit
       );
 
       return similarMemories;
     } catch (error) {
       console.error(`Error searching memories for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  async processMemoryForMesh(memoryId: string, userId: string): Promise<void> {
+    try {
+      console.log(`Processing memory ${memoryId} for mesh integration...`);
+      
+      // Generate embeddings for the memory
+      await this.generateEmbeddingsForMemory(memoryId);
+      
+      // Create relationships with other memories
+      await this.createMemoryRelations(memoryId, userId);
+      
+      console.log(`Successfully processed memory ${memoryId} for mesh`);
+    } catch (error) {
+      console.error(`Error processing memory ${memoryId} for mesh:`, error);
+      throw error;
+    }
+  }
+
+  async getMemoryWithRelations(memoryId: string, userId: string): Promise<any> {
+    try {
+      const memory = await prisma.memory.findUnique({
+        where: { id: memoryId },
+        include: {
+          embeddings: true,
+          related_memories: {
+            include: {
+              related_memory: {
+                select: {
+                  id: true,
+                  title: true,
+                  url: true,
+                  created_at: true,
+                  summary: true,
+                  page_metadata: true
+                }
+              }
+            },
+            orderBy: { similarity_score: 'desc' }
+          },
+          related_to_memories: {
+            include: {
+              memory: {
+                select: {
+                  id: true,
+                  title: true,
+                  url: true,
+                  created_at: true,
+                  summary: true,
+                  page_metadata: true
+                }
+              }
+            },
+            orderBy: { similarity_score: 'desc' }
+          }
+        }
+      });
+
+      if (!memory) {
+        throw new Error(`Memory ${memoryId} not found`);
+      }
+
+      return {
+        ...memory,
+        relation_stats: {
+          outgoing_relations: memory.related_memories.length,
+          incoming_relations: memory.related_to_memories.length,
+          total_relations: memory.related_memories.length + memory.related_to_memories.length,
+          has_embeddings: memory.embeddings.length > 0
+        }
+      };
+    } catch (error) {
+      console.error(`Error getting memory with relations for ${memoryId}:`, error);
+      throw error;
+    }
+  }
+
+  async getMemoryCluster(userId: string, centerMemoryId: string, depth: number = 2): Promise<any> {
+    try {
+      const visited = new Set();
+      const cluster = new Map();
+      
+      const processMemory = async (memoryId: string, currentDepth: number) => {
+        if (currentDepth > depth || visited.has(memoryId)) {
+          return;
+        }
+        
+        visited.add(memoryId);
+        
+        const memory = await prisma.memory.findUnique({
+          where: { id: memoryId },
+          include: {
+            related_memories: {
+              include: {
+                related_memory: {
+                  select: {
+                    id: true,
+                    title: true,
+                    url: true,
+                    created_at: true,
+                    summary: true
+                  }
+                }
+              },
+              orderBy: { similarity_score: 'desc' },
+              take: 5
+            }
+          }
+        });
+
+        if (memory) {
+          cluster.set(memoryId, {
+            ...memory,
+            depth: currentDepth,
+            relation_count: memory.related_memories.length
+          });
+
+          // Recursively process related memories
+          for (const relation of memory.related_memories) {
+            if (relation.similarity_score > 0.3) { // Only follow strong relationships
+              await processMemory(relation.related_memory.id, currentDepth + 1);
+            }
+          }
+        }
+      };
+
+      await processMemory(centerMemoryId, 0);
+
+      return {
+        center_memory_id: centerMemoryId,
+        cluster_size: cluster.size,
+        max_depth: depth,
+        memories: Array.from(cluster.values())
+      };
+    } catch (error) {
+      console.error(`Error getting memory cluster for ${centerMemoryId}:`, error);
       throw error;
     }
   }

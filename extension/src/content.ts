@@ -58,125 +58,267 @@ let hasUserActivity = false;
 const MIN_CAPTURE_INTERVAL = 10000; // Minimum 10 seconds between captures
 const ACTIVITY_TIMEOUT = 30000; // 30 seconds of inactivity before capturing
 
+// Privacy extension detection and handling
+let privacyExtensionDetected = false;
+let privacyExtensionType = 'unknown';
+
+function detectPrivacyExtensions(): void {
+  try {
+    // Check for common privacy extensions that might interfere
+    const privacyExtensions = [
+      'uBlock Origin',
+      'AdBlock Plus',
+      'Ghostery',
+      'Privacy Badger',
+      'DuckDuckGo Privacy Essentials',
+      'Brave Shields',
+      'AdGuard',
+      'NoScript',
+      'ScriptSafe',
+      'uMatrix'
+    ];
+
+    // Check if any privacy extensions are likely active
+    const hasAdBlockers = document.querySelectorAll('[id*="adblock"], [class*="adblock"], [id*="ublock"], [class*="ublock"]').length > 0;
+    const hasPrivacyElements = document.querySelectorAll('[id*="privacy"], [class*="privacy"], [id*="ghostery"], [class*="ghostery"]').length > 0;
+    
+    if (hasAdBlockers || hasPrivacyElements) {
+      privacyExtensionDetected = true;
+      privacyExtensionType = 'adblocker';
+      console.log('RecallOS: Privacy extension detected, enabling compatibility mode');
+    }
+
+    // Check for CSP (Content Security Policy) restrictions
+    if (document.querySelector('meta[http-equiv="Content-Security-Policy"]')) {
+      privacyExtensionDetected = true;
+      privacyExtensionType = 'csp';
+      console.log('RecallOS: CSP detected, enabling compatibility mode');
+    }
+
+    // Check for iframe restrictions
+    try {
+      const testIframe = document.createElement('iframe');
+      testIframe.style.display = 'none';
+      document.body.appendChild(testIframe);
+      document.body.removeChild(testIframe);
+    } catch (error) {
+      privacyExtensionDetected = true;
+      privacyExtensionType = 'iframe_restriction';
+      console.log('RecallOS: Iframe restrictions detected, enabling compatibility mode');
+    }
+
+  } catch (error) {
+    console.log('RecallOS: Error detecting privacy extensions:', error);
+  }
+}
+
 // Initialize page tracking
 (window as any).pageLoadTime = Date.now();
 (window as any).interactionCount = 0;
 
+// Detect privacy extensions on load
+detectPrivacyExtensions();
+
 function extractVisibleText(): string {
-  const walker = document.createTreeWalker(
-    document.body,
-    NodeFilter.SHOW_TEXT,
-    {
-      acceptNode: (node) => {
-        const parent = node.parentElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-        
-        const style = window.getComputedStyle(parent);
-        if (style.display === 'none' || style.visibility === 'hidden') {
-          return NodeFilter.FILTER_REJECT;
+  try {
+    // Check if document.body exists and is accessible
+    if (!document.body || !document.body.textContent) {
+      console.log('RecallOS: Document body not accessible, using fallback');
+      return document.documentElement?.textContent || document.title || '';
+    }
+
+    const walker = document.createTreeWalker(
+      document.body,
+      NodeFilter.SHOW_TEXT,
+      {
+        acceptNode: (node) => {
+          try {
+            const parent = node.parentElement;
+            if (!parent) return NodeFilter.FILTER_REJECT;
+            
+            const style = window.getComputedStyle(parent);
+            if (style.display === 'none' || style.visibility === 'hidden') {
+              return NodeFilter.FILTER_REJECT;
+            }
+            
+            return NodeFilter.FILTER_ACCEPT;
+          } catch (error) {
+            // If we can't access computed styles due to privacy extensions, accept the node
+            console.log('RecallOS: Privacy extension blocking style access, accepting node');
+            return NodeFilter.FILTER_ACCEPT;
+          }
         }
-        
-        return NodeFilter.FILTER_ACCEPT;
+      }
+    );
+
+    const textNodes: string[] = [];
+    let node;
+    
+    while (node = walker.nextNode()) {
+      try {
+        const text = node.textContent?.trim();
+        if (text && text.length > 0) {
+          textNodes.push(text);
+        }
+      } catch (error) {
+        console.log('RecallOS: Error accessing text content:', error);
+        continue;
       }
     }
-  );
-
-  const textNodes: string[] = [];
-  let node;
-  
-  while (node = walker.nextNode()) {
-    const text = node.textContent?.trim();
-    if (text && text.length > 0) {
-      textNodes.push(text);
+    
+    return textNodes.join(' ');
+  } catch (error) {
+    console.log('RecallOS: Error in extractVisibleText, using fallback:', error);
+    // Fallback to simpler text extraction
+    try {
+      return document.body?.textContent || document.documentElement?.textContent || document.title || '';
+    } catch (fallbackError) {
+      console.log('RecallOS: Fallback also failed:', fallbackError);
+      return document.title || window.location.href;
     }
   }
-  
-  return textNodes.join(' ');
 }
 
 function extractMeaningfulContent(): string {
-  // Remove common boilerplate elements
-  const boilerplateSelectors = [
-    'nav', 'header', 'footer', '.nav', '.navigation', '.menu', '.sidebar',
-    '.advertisement', '.ads', '.ad', '.promo', '.banner', '.cookie-notice',
-    '.newsletter', '.subscribe', '.social-share', '.share-buttons',
-    '.comments', '.comment', '.related', '.recommended', '.trending',
-    '.breadcrumb', '.breadcrumbs', '.pagination', '.pager',
-    '.search', '.search-box', '.search-form', '.filter', '.sort',
-    '.modal', '.popup', '.overlay', '.tooltip', '.dropdown',
-    '.cookie-banner', '.gdpr', '.privacy-notice', '.terms',
-    '.author-bio', '.author-info', '.author-box', '.byline',
-    '.tags', '.categories', '.meta', '.metadata', '.date',
-    '.social-media', '.social-links', '.follow-us', '.connect',
-    '.newsletter-signup', '.email-signup', '.subscription',
-    '.sponsor', '.sponsored', '.affiliate', '.partner',
-    '.disclaimer', '.legal', '.terms-of-service', '.privacy-policy'
-  ];
+  try {
+    // Check if document.body is accessible
+    if (!document.body || !document.body.innerHTML) {
+      console.log('RecallOS: Document body not accessible for meaningful content extraction');
+      return extractVisibleText();
+    }
 
-  // Remove boilerplate elements
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = document.body.innerHTML;
-  
-  boilerplateSelectors.forEach(selector => {
-    const elements = tempDiv.querySelectorAll(selector);
-    elements.forEach(el => el.remove());
-  });
+    // Remove common boilerplate elements
+    const boilerplateSelectors = [
+      'nav', 'header', 'footer', '.nav', '.navigation', '.menu', '.sidebar',
+      '.advertisement', '.ads', '.ad', '.promo', '.banner', '.cookie-notice',
+      '.newsletter', '.subscribe', '.social-share', '.share-buttons',
+      '.comments', '.comment', '.related', '.recommended', '.trending',
+      '.breadcrumb', '.breadcrumbs', '.pagination', '.pager',
+      '.search', '.search-box', '.search-form', '.filter', '.sort',
+      '.modal', '.popup', '.overlay', '.tooltip', '.dropdown',
+      '.cookie-banner', '.gdpr', '.privacy-notice', '.terms',
+      '.author-bio', '.author-info', '.author-box', '.byline',
+      '.tags', '.categories', '.meta', '.metadata', '.date',
+      '.social-media', '.social-links', '.follow-us', '.connect',
+      '.newsletter-signup', '.email-signup', '.subscription',
+      '.sponsor', '.sponsored', '.affiliate', '.partner',
+      '.disclaimer', '.legal', '.terms-of-service', '.privacy-policy'
+    ];
 
-  // Priority order for content extraction
-  const contentSelectors = [
-    'article', 'main', '[role="main"]', '.content', '.post', '.article',
-    '.entry', '.story', '.blog-post', '.news-article', '.tutorial',
-    '.documentation', '.guide', '.how-to', '.explanation', '.text',
-    '.body', '.main-content', '.article-content', '.post-content',
-    '.entry-content', '.page-content', '.content-body'
-  ];
-  
-  let meaningfulContent = '';
-  
-  // Try to find main content areas first
-  for (const selector of contentSelectors) {
-    const element = tempDiv.querySelector(selector);
-    if (element) {
-      const text = cleanAndExtractText(element);
-      if (text && text.length > 100) {
-        meaningfulContent = text;
-        break;
+    // Remove boilerplate elements with error handling
+    const tempDiv = document.createElement('div');
+    try {
+      tempDiv.innerHTML = document.body.innerHTML;
+    } catch (error) {
+      console.log('RecallOS: Error accessing innerHTML, using textContent fallback');
+      tempDiv.textContent = document.body.textContent || '';
+    }
+    
+    boilerplateSelectors.forEach(selector => {
+      try {
+        const elements = tempDiv.querySelectorAll(selector);
+        elements.forEach(el => el.remove());
+      } catch (error) {
+        console.log('RecallOS: Error removing boilerplate elements:', error);
+      }
+    });
+
+    // Priority order for content extraction
+    const contentSelectors = [
+      'article', 'main', '[role="main"]', '.content', '.post', '.article',
+      '.entry', '.story', '.blog-post', '.news-article', '.tutorial',
+      '.documentation', '.guide', '.how-to', '.explanation', '.text',
+      '.body', '.main-content', '.article-content', '.post-content',
+      '.entry-content', '.page-content', '.content-body'
+    ];
+    
+    let meaningfulContent = '';
+    
+    // Try to find main content areas first
+    for (const selector of contentSelectors) {
+      try {
+        const element = tempDiv.querySelector(selector);
+        if (element) {
+          const text = cleanAndExtractText(element);
+          if (text && text.length > 100) {
+            meaningfulContent = text;
+            break;
+          }
+        }
+      } catch (error) {
+        console.log('RecallOS: Error querying content selector:', selector, error);
+        continue;
       }
     }
-  }
-  
-  // If no main content found, extract from meaningful paragraphs and headings
-  if (!meaningfulContent) {
-    const meaningfulElements = tempDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, div');
-    const paragraphs = Array.from(meaningfulElements)
-      .map(el => cleanAndExtractText(el))
-      .filter(text => text && text.length > 30 && !isBoilerplateText(text))
-      .join(' ');
     
-    if (paragraphs.length > 200) {
-      meaningfulContent = paragraphs;
+    // If no main content found, extract from meaningful paragraphs and headings
+    if (!meaningfulContent) {
+      try {
+        const meaningfulElements = tempDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, div');
+        const paragraphs = Array.from(meaningfulElements)
+          .map(el => {
+            try {
+              return cleanAndExtractText(el);
+            } catch (error) {
+              return '';
+            }
+          })
+          .filter(text => text && text.length > 30 && !isBoilerplateText(text))
+          .join(' ');
+        
+        if (paragraphs.length > 200) {
+          meaningfulContent = paragraphs;
+        }
+      } catch (error) {
+        console.log('RecallOS: Error extracting meaningful elements:', error);
+      }
     }
+    
+    // Fallback to cleaned visible text if nothing else works
+    if (!meaningfulContent) {
+      try {
+        meaningfulContent = cleanAndExtractText(tempDiv);
+      } catch (error) {
+        console.log('RecallOS: Error in fallback extraction:', error);
+        meaningfulContent = extractVisibleText();
+      }
+    }
+    
+    // Final cleanup and limit content
+    return cleanText(meaningfulContent).substring(0, 10000);
+  } catch (error) {
+    console.log('RecallOS: Error in extractMeaningfulContent, using fallback:', error);
+    return extractVisibleText();
   }
-  
-  // Fallback to cleaned visible text if nothing else works
-  if (!meaningfulContent) {
-    meaningfulContent = cleanAndExtractText(tempDiv);
-  }
-  
-  // Final cleanup and limit content
-  return cleanText(meaningfulContent).substring(0, 10000);
 }
 
 function cleanAndExtractText(element: Element): string {
   if (!element) return '';
   
-  // Remove script and style elements
-  const scripts = element.querySelectorAll('script, style, noscript');
-  scripts.forEach(el => el.remove());
-  
-  // Get text content and clean it
-  const text = element.textContent || '';
-  return cleanText(text);
+  try {
+    // Remove script and style elements with error handling
+    const scripts = element.querySelectorAll('script, style, noscript');
+    scripts.forEach(el => {
+      try {
+        el.remove();
+      } catch (error) {
+        console.log('RecallOS: Error removing script/style element:', error);
+      }
+    });
+    
+    // Get text content and clean it
+    const text = element.textContent || '';
+    return cleanText(text);
+  } catch (error) {
+    console.log('RecallOS: Error in cleanAndExtractText:', error);
+    // Fallback to direct text access
+    try {
+      return cleanText(element.textContent || '');
+    } catch (fallbackError) {
+      console.log('RecallOS: Fallback also failed in cleanAndExtractText:', fallbackError);
+      return '';
+    }
+  }
 }
 
 function cleanText(text: string): string {
@@ -507,28 +649,76 @@ function extractUserActivity() {
 }
 
 function captureContext(): ContextData {
-  const url = window.location.href;
-  const title = document.title;
-  const meaningfulContent = extractMeaningfulContent();
-  const content_snippet = meaningfulContent.substring(0, 500);
-  
-  return {
-    source: 'extension',
-    url,
-    title,
-    content_snippet,
-    timestamp: Date.now(),
-    full_content: extractFullContent(),
-    meaningful_content: meaningfulContent,
-    content_summary: extractContentSummary(),
-    content_type: extractContentType(),
-    key_topics: extractKeyTopics(),
-    reading_time: extractReadingTime(),
-    page_metadata: extractPageMetadata(),
-    page_structure: extractPageStructure(),
-    user_activity: extractUserActivity(),
-    content_quality: extractContentQuality()
-  };
+  try {
+    const url = window.location.href;
+    const title = document.title || '';
+    const meaningfulContent = extractMeaningfulContent();
+    const content_snippet = meaningfulContent.substring(0, 500);
+    
+    return {
+      source: 'extension',
+      url,
+      title,
+      content_snippet,
+      timestamp: Date.now(),
+      full_content: extractFullContent(),
+      meaningful_content: meaningfulContent,
+      content_summary: extractContentSummary(),
+      content_type: extractContentType(),
+      key_topics: extractKeyTopics(),
+      reading_time: extractReadingTime(),
+      page_metadata: extractPageMetadata(),
+      page_structure: extractPageStructure(),
+      user_activity: extractUserActivity(),
+      content_quality: extractContentQuality()
+    };
+  } catch (error) {
+    console.log('RecallOS: Error in captureContext, using minimal fallback:', error);
+    // Return minimal context data if everything fails
+    return {
+      source: 'extension',
+      url: window.location.href,
+      title: document.title || '',
+      content_snippet: 'Content extraction failed due to privacy extension conflicts',
+      timestamp: Date.now(),
+      full_content: 'Content extraction failed due to privacy extension conflicts',
+      meaningful_content: 'Content extraction failed due to privacy extension conflicts',
+      content_summary: 'Content extraction failed due to privacy extension conflicts',
+      content_type: 'web_page',
+      key_topics: [],
+      reading_time: 0,
+      page_metadata: {
+        description: '',
+        keywords: '',
+        author: '',
+        viewport: '',
+        language: '',
+        published_date: '',
+        modified_date: '',
+        canonical_url: ''
+      },
+      page_structure: {
+        headings: [],
+        links: [],
+        images: [],
+        forms: []
+      },
+      user_activity: {
+        scroll_position: 0,
+        window_size: { width: 0, height: 0 },
+        focused_element: '',
+        time_on_page: 0,
+        interaction_count: 0
+      },
+      content_quality: {
+        word_count: 0,
+        has_images: false,
+        has_code: false,
+        has_tables: false,
+        readability_score: 0
+      }
+    };
+  }
 }
 
 function sendContextToBackground() {
@@ -545,7 +735,16 @@ function sendContextToBackground() {
     }
 
     const contextData = captureContext();
+    
+    // Add privacy extension information to context data
+    (contextData as any).privacy_extension_info = {
+      detected: privacyExtensionDetected,
+      type: privacyExtensionType,
+      compatibility_mode: privacyExtensionDetected
+    };
+    
     console.log('RecallOS: Captured context:', contextData);
+    console.log('RecallOS: Privacy extension detected:', privacyExtensionDetected, 'Type:', privacyExtensionType);
     
     chrome.runtime.sendMessage(
       { type: 'CAPTURE_CONTEXT', data: contextData },

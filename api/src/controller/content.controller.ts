@@ -7,12 +7,10 @@ export const submitContent = async (req: Request, res: Response, next: NextFunct
   try {
     const { user_id, raw_text, metadata } = req.body;
 
-    // Validate required fields
     if (!user_id || !raw_text) {
       return next(new AppError('user_id and raw_text are required', 400));
     }
 
-    // Verify user exists
     const user = await prisma.user.findUnique({
       where: { id: user_id }
     });
@@ -21,12 +19,10 @@ export const submitContent = async (req: Request, res: Response, next: NextFunct
       return next(new AppError('User not found', 404));
     }
 
-    // Validate raw_text length
     if (raw_text.length > 100000) {
       return next(new AppError('Content too large. Maximum 100,000 characters allowed.', 400));
     }
 
-    // Enqueue job in Redis queue
     const jobData: ContentJobData = {
       user_id,
       raw_text,
@@ -58,7 +54,6 @@ export const getSummarizedContent = async (req: Request, res: Response, next: Ne
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    // Verify user exists
     const user = await prisma.user.findUnique({
       where: { id: user_id }
     });

@@ -1,6 +1,5 @@
 import Queue from 'bull';
 
-// Only create the queue if Redis is properly configured
 export let contentQueue: Queue.Queue | null = null;
 
 if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {

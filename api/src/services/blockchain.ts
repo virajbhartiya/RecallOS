@@ -1,10 +1,8 @@
 import { ethers } from "ethers";
 import dotenv from "dotenv";
 
-// Load environment variables
 dotenv.config();
 
-// Contract ABI - simplified memory storage
 const CONTRACT_ABI = [
   "function storeMemory(bytes32 hash, bytes32 urlHash, uint256 timestamp) external",
   "function storeMemoryBatch(bytes32[] calldata hashes, bytes32[] calldata urlHashes, uint256[] calldata timestamps) external",
@@ -21,7 +19,6 @@ const CONTRACT_ABI = [
   "event MemoryBatchStored(address indexed user, uint256 count)"
 ];
 
-// Initialize blockchain connection
 let provider: ethers.JsonRpcProvider;
 let wallet: ethers.Wallet;
 let contract: ethers.Contract;
@@ -46,14 +43,12 @@ function initializeBlockchain() {
   console.log('Blockchain initialized successfully');
 }
 
-// Initialize on module load
 try {
   initializeBlockchain();
 } catch (error) {
   console.warn("Blockchain not initialized:", error.message);
 }
 
-// Export initialization function for manual initialization
 export function initializeBlockchainConnection() {
   try {
     initializeBlockchain();
@@ -64,58 +59,92 @@ export function initializeBlockchainConnection() {
   }
 }
 
-
-
-
-
-
-// Interface for simplified memory data
 export interface MemoryData {
   hash: string;
   urlHash: string;
   timestamp: number;
 }
 
-// Function to hash a URL
 export function hashUrl(url: string): string {
   return ethers.keccak256(ethers.toUtf8Bytes(url));
 }
 
 
-// Store a single memory on blockchain
 export async function storeMemory(hash: string, url: string, timestamp: number) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
   }
   
-  try {
-    const urlHash = hashUrl(url);
-    console.log(`Storing memory: hash=${hash}, urlHash=${urlHash}, timestamp=${timestamp}`);
-    
-    // Get current gas price and add 10% buffer
-    const gasPrice = await provider.getFeeData();
-    const gasPriceWithBuffer = gasPrice.gasPrice ? gasPrice.gasPrice * BigInt(110) / BigInt(100) : undefined;
-    
-    const tx = await contract.storeMemory(hash, urlHash, timestamp, {
-      gasPrice: gasPriceWithBuffer
-    });
-    const receipt = await tx.wait();
-    
-    console.log(`Memory stored successfully: ${tx.hash}`);
-    
-    return {
-      success: true,
-      txHash: tx.hash,
-      blockNumber: receipt.blockNumber,
-      gasUsed: receipt.gasUsed?.toString()
-    };
-  } catch (error) {
-    console.error("Error storing memory:", error);
-    throw new Error(`Failed to store memory: ${error.message}`);
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const urlHash = hashUrl(url);
+      console.log(`Storing memory: hash=${hash}, urlHash=${urlHash}, timestamp=${timestamp} (attempt ${attempt}/${maxRetries})`);
+      
+      // Get current gas price with dynamic buffer based on attempt
+      const gasPrice = await provider.getFeeData();
+      const bufferMultiplier = 100 + (attempt * 20); // 120%, 140%, 160%
+      const gasPriceWithBuffer = gasPrice.gasPrice ? 
+        gasPrice.gasPrice * BigInt(bufferMultiplier) / BigInt(100) : undefined;
+      
+      // Estimate gas limit for the transaction
+      let gasLimit: bigint | undefined;
+      try {
+        gasLimit = await contract.storeMemory.estimateGas(hash, urlHash, timestamp, {
+          gasPrice: gasPriceWithBuffer
+        });
+        // Add 20% buffer to gas limit
+        gasLimit = gasLimit * BigInt(120) / BigInt(100);
+      } catch (gasEstimateError) {
+        console.log(`Gas estimation failed, using default: ${gasEstimateError.message}`);
+        gasLimit = BigInt(200000); // Default gas limit for single memory
+      }
+      
+      console.log(`Using gas price: ${gasPriceWithBuffer?.toString()}, gas limit: ${gasLimit?.toString()}`);
+      
+      const tx = await contract.storeMemory(hash, urlHash, timestamp, {
+        gasPrice: gasPriceWithBuffer,
+        gasLimit: gasLimit
+      });
+      const receipt = await tx.wait();
+      
+      console.log(`Memory stored successfully: ${tx.hash}`);
+      
+      return {
+        success: true,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed?.toString()
+      };
+    } catch (error: any) {
+      lastError = error;
+      console.error(`Error storing memory (attempt ${attempt}/${maxRetries}):`, error.message);
+      
+      // Check if it's a gas-related error that we can retry
+      if (error.code === 'REPLACEMENT_UNDERPRICED' || 
+          error.message.includes('replacement fee too low') ||
+          error.message.includes('gas price too low') ||
+          error.message.includes('transaction underpriced')) {
+        
+        if (attempt < maxRetries) {
+          console.log(`Retrying with higher gas price in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+      }
+      
+      // For non-gas related errors or final attempt, throw immediately
+      if (attempt === maxRetries || !error.message.includes('gas') && !error.message.includes('fee')) {
+        break;
+      }
+    }
   }
+  
+  throw new Error(`Failed to store memory after ${maxRetries} attempts: ${lastError?.message}`);
 }
 
-// Store multiple memories in a batch
 export async function storeMemoryBatch(memories: MemoryData[]) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -125,40 +154,82 @@ export async function storeMemoryBatch(memories: MemoryData[]) {
     throw new Error("Memories array cannot be empty");
   }
   
-  try {
-    console.log(`Storing batch of ${memories.length} memories`);
-    
-    const hashes = memories.map(m => m.hash);
-    const urlHashes = memories.map(m => m.urlHash);
-    const timestamps = memories.map(m => m.timestamp);
-    
-    // Get current gas price and add 10% buffer
-    const gasPrice = await provider.getFeeData();
-    const gasPriceWithBuffer = gasPrice.gasPrice ? gasPrice.gasPrice * BigInt(110) / BigInt(100) : undefined;
-    
-    const tx = await contract.storeMemoryBatch(hashes, urlHashes, timestamps, {
-      gasPrice: gasPriceWithBuffer
-    });
-    const receipt = await tx.wait();
-    
-    console.log(`Memory batch stored successfully: ${tx.hash}`);
-    
-    return {
-      success: true,
-      txHash: tx.hash,
-      blockNumber: receipt.blockNumber,
-      gasUsed: receipt.gasUsed?.toString(),
-      memoryCount: memories.length
-    };
-  } catch (error) {
-    console.error("Error storing memory batch:", error);
-    throw new Error(`Failed to store memory batch: ${error.message}`);
+  const maxRetries = 3;
+  let lastError: Error | null = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`Storing batch of ${memories.length} memories (attempt ${attempt}/${maxRetries})`);
+      
+      const hashes = memories.map(m => m.hash);
+      const urlHashes = memories.map(m => m.urlHash);
+      const timestamps = memories.map(m => m.timestamp);
+      
+      // Get current gas price with dynamic buffer based on attempt
+      const gasPrice = await provider.getFeeData();
+      const bufferMultiplier = 100 + (attempt * 20); // 120%, 140%, 160%
+      const gasPriceWithBuffer = gasPrice.gasPrice ? 
+        gasPrice.gasPrice * BigInt(bufferMultiplier) / BigInt(100) : undefined;
+      
+      // Estimate gas limit for the transaction
+      let gasLimit: bigint | undefined;
+      try {
+        gasLimit = await contract.storeMemoryBatch.estimateGas(hashes, urlHashes, timestamps, {
+          gasPrice: gasPriceWithBuffer
+        });
+        // Add 20% buffer to gas limit
+        gasLimit = gasLimit * BigInt(120) / BigInt(100);
+      } catch (gasEstimateError) {
+        console.log(`Gas estimation failed, using default: ${gasEstimateError.message}`);
+        gasLimit = BigInt(500000); // Default gas limit
+      }
+      
+      console.log(`Using gas price: ${gasPriceWithBuffer?.toString()}, gas limit: ${gasLimit?.toString()}`);
+      
+      const tx = await contract.storeMemoryBatch(hashes, urlHashes, timestamps, {
+        gasPrice: gasPriceWithBuffer,
+        gasLimit: gasLimit
+      });
+      const receipt = await tx.wait();
+      
+      console.log(`Memory batch stored successfully: ${tx.hash}`);
+      
+      return {
+        success: true,
+        txHash: tx.hash,
+        blockNumber: receipt.blockNumber,
+        gasUsed: receipt.gasUsed?.toString(),
+        memoryCount: memories.length
+      };
+    } catch (error: any) {
+      lastError = error;
+      console.error(`Error storing memory batch (attempt ${attempt}/${maxRetries}):`, error.message);
+      
+      // Check if it's a gas-related error that we can retry
+      if (error.code === 'REPLACEMENT_UNDERPRICED' || 
+          error.message.includes('replacement fee too low') ||
+          error.message.includes('gas price too low') ||
+          error.message.includes('transaction underpriced')) {
+        
+        if (attempt < maxRetries) {
+          console.log(`Retrying with higher gas price in 2 seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          continue;
+        }
+      }
+      
+      // For non-gas related errors or final attempt, throw immediately
+      if (attempt === maxRetries || !error.message.includes('gas') && !error.message.includes('fee')) {
+        break;
+      }
+    }
   }
+  
+  throw new Error(`Failed to store memory batch after ${maxRetries} attempts: ${lastError?.message}`);
 }
 
 
 
-// Event listeners for real-time updates
 export function onMemoryStored(callback: (user: string, hash: string, urlHash: string, timestamp: number) => void) {
   contract.on("MemoryStored", (user, hash, urlHash, timestamp) => {
     callback(user, hash, urlHash, timestamp.toNumber());
@@ -175,9 +246,6 @@ export function removeAllListeners() {
   contract.removeAllListeners();
 }
 
-// Query functions for the simplified contract
-
-// Get a specific memory by user and index
 export async function getMemory(userAddress: string, index: number) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -196,7 +264,6 @@ export async function getMemory(userAddress: string, index: number) {
   }
 }
 
-// Get all memories for a user
 export async function getUserMemories(userAddress: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -215,7 +282,6 @@ export async function getUserMemories(userAddress: string) {
   }
 }
 
-// Get memory count for a user
 export async function getUserMemoryCount(userAddress: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -230,7 +296,6 @@ export async function getUserMemoryCount(userAddress: string) {
   }
 }
 
-// Check if a memory exists
 export async function isMemoryStored(hash: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -244,7 +309,6 @@ export async function isMemoryStored(hash: string) {
   }
 }
 
-// Get the owner of a memory
 export async function getMemoryOwner(hash: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -258,7 +322,6 @@ export async function getMemoryOwner(hash: string) {
   }
 }
 
-// Get memories by URL
 export async function getMemoriesByUrlHash(userAddress: string, urlHash: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -277,7 +340,6 @@ export async function getMemoriesByUrlHash(userAddress: string, urlHash: string)
   }
 }
 
-// Get memories by timestamp range
 export async function getMemoriesByTimestampRange(userAddress: string, startTime: number, endTime: number) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -296,7 +358,6 @@ export async function getMemoriesByTimestampRange(userAddress: string, startTime
   }
 }
 
-// Get recent memories
 export async function getRecentMemories(userAddress: string, count: number) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -315,7 +376,6 @@ export async function getRecentMemories(userAddress: string, count: number) {
   }
 }
 
-// Get memory by hash
 export async function getMemoryByHash(hash: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");

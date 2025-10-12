@@ -60,6 +60,10 @@ async function sendToBackend(data: ContextData): Promise<void> {
     const apiEndpoint = await getApiEndpoint();
     const walletAddress = await getWalletAddress();
     
+    // Check if privacy extension conflicts are detected
+    const privacyInfo = (data as any).privacy_extension_info;
+    const hasPrivacyConflicts = privacyInfo?.detected || false;
+    
     // Send raw content data for backend processing
     const payload = {
       content: data.meaningful_content || data.content_snippet || data.full_content || 'No content available',
@@ -70,13 +74,17 @@ async function sendToBackend(data: ContextData): Promise<void> {
         source: data.source,
         timestamp: data.timestamp,
         content_type: data.content_type || 'web_page',
-        content_summary: data.content_summary
+        content_summary: data.content_summary,
+        privacy_extension_conflicts: hasPrivacyConflicts,
+        privacy_extension_type: privacyInfo?.type || 'none',
+        compatibility_mode: privacyInfo?.compatibility_mode || false
       }
     };
     
     console.log('RecallOS: Sending to backend:', payload);
     console.log('RecallOS: Using endpoint:', apiEndpoint);
     console.log('RecallOS: Wallet Address:', walletAddress || 'Anonymous');
+    console.log('RecallOS: Privacy conflicts detected:', hasPrivacyConflicts);
     
     const response = await fetch(apiEndpoint, {
       method: 'POST',
