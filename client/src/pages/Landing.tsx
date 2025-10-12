@@ -1,5 +1,7 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useScrollAnimation } from '../hooks/useScrollAnimation'
+import { useWallet } from '../contexts/WalletContext'
+import WalletModal from '../components/WalletModal'
 
 const ConsoleButton: React.FC<{
   children: React.ReactNode
@@ -47,6 +49,9 @@ const Section: React.FC<{
 }
 
 export const Landing = () => {
+  const { isConnected, address } = useWallet()
+  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
+
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
@@ -67,12 +72,7 @@ export const Landing = () => {
           window.open('https://github.com/virajbhartiya/RecallOS', '_blank')
           break
         case 'w': {
-          const walletButton = document.querySelector('[data-wallet-connect]') as HTMLButtonElement
-          if (walletButton) {
-            walletButton.click()
-          } else {
-            alert('Wallet connection feature coming soon!')
-          }
+          setIsWalletModalOpen(true)
           break
         }
       }
@@ -84,7 +84,6 @@ export const Landing = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 text-black relative font-primary" role="main">
-      {/* Navigation Header */}
       <header className="border-b border-gray-200 bg-white">
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
@@ -112,19 +111,23 @@ export const Landing = () => {
               >
                 [C] CONSOLE
               </button>
+              {isConnected && (
+                <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>{address?.slice(0, 6)}...{address?.slice(-4)}</span>
+                </div>
+              )}
               <button 
                 className="px-3 py-1 text-xs font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
-                data-wallet-connect
-                onClick={() => alert('Wallet connection feature coming soon!')}
+                onClick={() => setIsWalletModalOpen(true)}
               >
-                [W] CONNECT WALLET
+                [W] {isConnected ? 'WALLET' : 'CONNECT WALLET'}
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Grid overlay */}
       <div className="fixed inset-0 pointer-events-none opacity-10">
         <div className="w-full h-full" style={{
           backgroundImage: `
@@ -301,6 +304,11 @@ export const Landing = () => {
           </div>
         </div>
       </Section>
+
+      <WalletModal 
+        isOpen={isWalletModalOpen} 
+        onClose={() => setIsWalletModalOpen(false)} 
+      />
 
     </div>
   )
