@@ -503,7 +503,7 @@ export class MemoryMeshService {
 
   private isMoreSpecificRelationType(newType: string, existingType: string): boolean {
     // Define hierarchy of relation types (more specific to less specific)
-    const typeHierarchy = {
+    const typeHierarchy: Record<string, number> = {
       'semantic': 3,
       'topical': 2,
       'temporal': 1
