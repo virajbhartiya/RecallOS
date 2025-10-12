@@ -110,6 +110,15 @@ const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
 
             <div className="flex space-x-3">
               <button
+                onClick={() => {
+                  onClose()
+                  window.location.href = '/memories'
+                }}
+                className="flex-1 px-4 py-3 text-sm font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
+              >
+                VIEW MEMORIES
+              </button>
+              <button
                 onClick={handleDisconnect}
                 className="flex-1 px-4 py-3 text-sm font-mono uppercase tracking-wide border border-red-300 bg-white hover:bg-red-50 hover:border-red-500 text-red-600 hover:text-red-700 transition-all duration-200"
               >

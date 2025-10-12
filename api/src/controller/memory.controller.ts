@@ -44,13 +44,18 @@ export class MemoryController {
         });
       }
 
-      let user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress },
+      let user = await prisma.user.findFirst({
+        where: { 
+          wallet_address: {
+            equals: userAddress,
+            mode: 'insensitive'
+          }
+        },
       });
 
       if (!user) {
         user = await prisma.user.create({
-          data: { wallet_address: userAddress },
+          data: { wallet_address: userAddress.toLowerCase() },
         });
         console.log(`✅ Created new user: ${user.id}`);
       }
@@ -424,6 +429,54 @@ export class MemoryController {
 
       const limit = count ? parseInt(count as string) : 10;
 
+      const user = await prisma.user.findUnique({
+        where: { wallet_address: userAddress.toLowerCase() },
+      });
+
+      if (user) {
+        const memories = await prisma.memory.findMany({
+          where: { user_id: user.id },
+          select: {
+            id: true,
+            title: true,
+            url: true,
+            hash: true,
+            timestamp: true,
+            created_at: true,
+            tx_hash: true,
+            block_number: true,
+            gas_used: true,
+            tx_status: true,
+            blockchain_network: true,
+            confirmed_at: true,
+            summary: true,
+            content: true,
+            source: true,
+            page_metadata: true,
+          } as any,
+          orderBy: { created_at: 'desc' },
+          take: limit,
+        });
+
+        // Convert BigInt values to strings for JSON serialization
+        const serializedMemories = memories.map((memory: any) => ({
+          ...memory,
+          timestamp: memory.timestamp ? memory.timestamp.toString() : null,
+          block_number: memory.block_number ? memory.block_number.toString() : null,
+        }));
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            userAddress,
+            count: limit,
+            memories: serializedMemories,
+            actualCount: memories.length,
+          },
+        });
+      }
+
+      // Fallback to blockchain data if user not found in database
       const memories = await getRecentMemories(userAddress, limit);
 
       res.status(200).json({
@@ -455,11 +508,49 @@ export class MemoryController {
         });
       }
 
-      const memory = await getMemoryByHash(hash);
+      // First try to get full memory details from database
+      const memory = await prisma.memory.findUnique({
+        where: { hash: hash },
+        select: {
+          id: true,
+          title: true,
+          url: true,
+          hash: true,
+          timestamp: true,
+          created_at: true,
+          tx_hash: true,
+          block_number: true,
+          gas_used: true,
+          tx_status: true,
+          blockchain_network: true,
+          confirmed_at: true,
+          summary: true,
+          content: true,
+          source: true,
+          page_metadata: true,
+        } as any,
+      });
+
+      if (memory) {
+        // Convert BigInt values to strings for JSON serialization
+        const serializedMemory = {
+          ...memory,
+          timestamp: memory.timestamp ? memory.timestamp.toString() : null,
+          block_number: memory.block_number ? memory.block_number.toString() : null,
+        };
+
+        return res.status(200).json({
+          success: true,
+          data: serializedMemory,
+        });
+      }
+
+      // Fallback to blockchain data if not found in database
+      const blockchainMemory = await getMemoryByHash(hash);
 
       res.status(200).json({
         success: true,
-        data: memory,
+        data: blockchainMemory,
       });
     } catch (error) {
       console.error('Error getting memory by hash:', error);
@@ -478,6 +569,24 @@ export class MemoryController {
         return res.status(400).json({
           success: false,
           error: 'User address is required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { wallet_address: userAddress.toLowerCase() },
+      });
+
+      if (user) {
+        const count = await prisma.memory.count({
+          where: { user_id: user.id },
+        });
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            userAddress,
+            memoryCount: count,
+          },
         });
       }
 
@@ -519,7 +628,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -621,7 +730,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -732,8 +841,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+      const user = await prisma.user.findFirst({
+        where: { 
+          wallet_address: {
+            equals: userAddress as string,
+            mode: 'insensitive'
+          }
+        },
       });
 
       if (!user) {
@@ -767,6 +881,8 @@ export class MemoryController {
           blockchain_network: true,
           confirmed_at: true,
           summary: true,
+          content: true,
+          source: true,
           page_metadata: true,
         } as any,
         orderBy: { created_at: 'desc' },
@@ -785,10 +901,17 @@ export class MemoryController {
 
         transactionStats[status] = (transactionStats[status] || 0) + 1;
       });
+      // Convert BigInt values to strings for JSON serialization
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp ? memory.timestamp.toString() : null,
+        block_number: memory.block_number ? memory.block_number.toString() : null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
-          memories,
+          memories: serializedMemories,
           transactionStats,
           totalMemories: memories.length,
         },
@@ -874,7 +997,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -987,7 +1110,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress },
+        where: { wallet_address: userAddress.toLowerCase() },
       });
 
       if (!user) {
@@ -1029,7 +1152,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1069,7 +1192,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1110,7 +1233,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1157,7 +1280,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1213,7 +1336,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress },
+        where: { wallet_address: userAddress.toLowerCase() },
       });
 
       if (!user) {
@@ -1282,7 +1405,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1341,7 +1464,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {

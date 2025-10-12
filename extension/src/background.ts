@@ -82,7 +82,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
         'No content available',
       url: data.url,
       title: data.title,
-      userAddress: walletAddress || 'anonymous',
+      userAddress: walletAddress ? walletAddress.toLowerCase() : 'anonymous',
       metadata: {
         source: data.source,
         timestamp: data.timestamp,

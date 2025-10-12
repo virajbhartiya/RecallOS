@@ -1,17 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react'
-
-interface MemoryNode {
-  id: string
-  type: 'manual' | 'on_chain' | 'browser' | 'reasoning'
-  label: string
-  x: number
-  y: number
-}
-
-interface MemoryEdge {
-  source: string
-  target: string
-}
+import { MemoryService } from '../services/memoryService'
+import { LoadingSpinner, ErrorMessage } from './ui/loading-spinner'
+import type { MemoryMeshNode, MemoryMesh } from '../types/memory'
 
 interface MemoryMeshProps {
   className?: string
@@ -19,6 +9,7 @@ interface MemoryMeshProps {
   zoomOnHover?: boolean
   expandNodeOnClick?: boolean
   particleTrailOnHover?: boolean
+  userAddress?: string
 }
 
 const nodeColors = {
@@ -29,7 +20,7 @@ const nodeColors = {
 }
 
 const Node: React.FC<{
-  node: MemoryNode
+  node: MemoryMeshNode
   isHovered: boolean
   isActive: boolean
   onClick: () => void
@@ -102,8 +93,8 @@ const Node: React.FC<{
 }
 
 const Edge: React.FC<{
-  source: MemoryNode
-  target: MemoryNode
+  source: MemoryMeshNode
+  target: MemoryMeshNode
   isHighlighted: boolean
 }> = ({ source, target, isHighlighted }) => {
   return (
@@ -119,50 +110,59 @@ const Edge: React.FC<{
   )
 }
 
-export const MemoryMesh: React.FC<MemoryMeshProps> = ({
+const MemoryMesh: React.FC<MemoryMeshProps> = ({
   className = '',
   autoRotate = true,
-  expandNodeOnClick = true
+  expandNodeOnClick = true,
+  userAddress
 }) => {
   const [activeNode, setActiveNode] = useState<string | null>(null)
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
   const [rotation, setRotation] = useState(0)
+  const [meshData, setMeshData] = useState<MemoryMesh | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  // Generate sample memory nodes
-  const nodes = useMemo((): MemoryNode[] => {
-    const nodeTypes: Array<'manual' | 'on_chain' | 'browser' | 'reasoning'> = 
-      ['manual', 'on_chain', 'browser', 'reasoning']
-    
-    return Array.from({ length: 30 }, (_, i) => ({
-      id: `node-${i}`,
-      type: nodeTypes[i % nodeTypes.length],
-      label: `Memory ${i + 1}`,
+  // Fetch mesh data from API
+  useEffect(() => {
+    const fetchMeshData = async () => {
+      if (!userAddress) return
+      
+      setIsLoading(true)
+      setError(null)
+      
+      try {
+        const data = await MemoryService.getMemoryMesh(userAddress, 50)
+        setMeshData(data)
+      } catch (err) {
+        setError('Failed to load memory mesh')
+        console.error('Error fetching mesh data:', err)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchMeshData()
+  }, [userAddress])
+
+  // Transform API data to visualization format
+  const { nodes, edges } = useMemo(() => {
+    if (!meshData) {
+      return { nodes: [], edges: [] }
+    }
+
+    // Transform nodes with positioning
+    const transformedNodes = meshData.nodes.map((node) => ({
+      ...node,
       x: Math.random() * 300 + 50,
       y: Math.random() * 200 + 50
     }))
-  }, [])
 
-  // Generate sample edges
-  const edges = useMemo((): MemoryEdge[] => {
-    const edgeList: MemoryEdge[] = []
-    for (let i = 0; i < nodes.length; i++) {
-      // Connect each node to 1-3 random other nodes
-      const numConnections = Math.floor(Math.random() * 3) + 1
-      const connectedNodes = new Set<number>()
-      
-      while (connectedNodes.size < numConnections) {
-        const targetIndex = Math.floor(Math.random() * nodes.length)
-        if (targetIndex !== i && !connectedNodes.has(targetIndex)) {
-          connectedNodes.add(targetIndex)
-          edgeList.push({
-            source: nodes[i].id,
-            target: nodes[targetIndex].id
-          })
-        }
-      }
+    return {
+      nodes: transformedNodes,
+      edges: meshData.edges
     }
-    return edgeList
-  }, [nodes])
+  }, [meshData])
 
   // Auto-rotation effect
   useEffect(() => {
@@ -183,6 +183,38 @@ export const MemoryMesh: React.FC<MemoryMeshProps> = ({
 
   const handleNodeHover = (nodeId: string, hovered: boolean) => {
     setHoveredNode(hovered ? nodeId : null)
+  }
+
+  if (isLoading) {
+    return (
+      <div className={`w-full h-full ${className}`}>
+        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+          <LoadingSpinner size="lg" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={`w-full h-full ${className}`}>
+        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+          <ErrorMessage message={error} />
+        </div>
+      </div>
+    )
+  }
+
+  if (!userAddress) {
+    return (
+      <div className={`w-full h-full ${className}`}>
+        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+          <div className="text-sm font-mono text-gray-600">
+            [CONNECT WALLET TO VIEW MESH]
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -240,9 +272,11 @@ export const MemoryMesh: React.FC<MemoryMeshProps> = ({
         
         {/* Overlay text */}
         <div className="absolute bottom-4 left-4 text-xs font-mono text-gray-500">
-          [FIG. 3] Live Memory Mesh
+          [FIG. 3] Live Memory Mesh ({nodes.length} nodes, {edges.length} connections)
         </div>
       </div>
     </div>
   )
 }
+
+export { MemoryMesh }
