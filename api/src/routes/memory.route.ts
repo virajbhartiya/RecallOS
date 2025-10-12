@@ -16,6 +16,15 @@ router.get("/user/:userAddress/recent", MemoryController.getRecentMemories); // 
 router.get("/user/:userAddress/by-url", MemoryController.getMemoriesByUrlHash); // Get memories by URL hash
 router.get("/user/:userAddress/by-timestamp", MemoryController.getMemoriesByTimestampRange); // Get memories by timestamp range
 
+// Enhanced RAG search routes
+router.get("/search", MemoryController.searchMemories); // Search memories with filters
+router.get("/insights", MemoryController.getMemoryInsights); // Get memory analytics and insights
+
+// Blockchain transaction routes
+router.get("/transactions", MemoryController.getMemoriesWithTransactionDetails); // Get memories with transaction details
+router.get("/transaction/:memoryId", MemoryController.getMemoryTransactionStatus); // Get transaction status for specific memory
+router.post("/retry-failed", MemoryController.retryFailedTransactions); // Retry failed blockchain transactions
+
 // Hash-based queries
 router.get("/hash/:hash", MemoryController.getMemoryByHash); // Get memory by hash
 router.get("/exists/:hash", MemoryController.isMemoryStored); // Check if memory exists

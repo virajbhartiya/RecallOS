@@ -47,6 +47,14 @@ model Memory {
   access_count     Int      @default(0)
   last_accessed    DateTime @default(now())
   
+  // Blockchain transaction fields
+  tx_hash         String?  @unique
+  block_number    BigInt?
+  gas_used        String?
+  tx_status       String?  @default("pending") // pending, confirmed, failed
+  blockchain_network String? @default("sepolia")
+  confirmed_at    DateTime?
+  
   // Relations
   user            User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
   embeddings      Embedding[]
