@@ -73,7 +73,13 @@ export interface MemoryMeshNode {
   memory_id: string
   title?: string
   summary?: string
+  content?: string
+  full_content?: string
   importance_score?: number
+  tx_hash?: string
+  block_number?: number
+  blockchain_network?: string
+  tx_status?: 'pending' | 'confirmed' | 'failed'
 }
 
 export interface MemoryMeshEdge {
