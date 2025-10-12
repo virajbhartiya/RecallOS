@@ -13,10 +13,10 @@ interface ContextData {
 async function getApiEndpoint(): Promise<string> {
   try {
     const result = await chrome.storage.sync.get(['apiEndpoint']);
-    return result.apiEndpoint || 'http://localhost:3000/api/memory';
+    return result.apiEndpoint || 'http://localhost:3000/api/memory/process';
   } catch (error) {
     console.error('RecallOS: Error getting API endpoint from storage:', error);
-    return 'http://localhost:3000/api/memory';
+    return 'http://localhost:3000/api/memory/process';
   }
 }
 
@@ -60,12 +60,18 @@ async function sendToBackend(data: ContextData): Promise<void> {
     const apiEndpoint = await getApiEndpoint();
     const walletAddress = await getWalletAddress();
     
-    // Transform data to match API expectations
-    const memories = [data.meaningful_content || data.content_snippet || data.full_content || 'No content available'];
-    
+    // Send raw content data for backend processing
     const payload = {
-      memories: memories,
-      userAddress: walletAddress || 'anonymous'
+      content: data.meaningful_content || data.content_snippet || data.full_content || 'No content available',
+      url: data.url,
+      title: data.title,
+      userAddress: walletAddress || 'anonymous',
+      metadata: {
+        source: data.source,
+        timestamp: data.timestamp,
+        content_type: data.content_type || 'web_page',
+        content_summary: data.content_summary
+      }
     };
     
     console.log('RecallOS: Sending to backend:', payload);

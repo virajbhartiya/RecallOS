@@ -1,20 +1,24 @@
 import { ethers } from "ethers";
-import { MerkleTree } from "merkletreejs";
-import keccak256 from "keccak256";
 import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
 
-// Contract ABI - this would be generated after deployment
+// Contract ABI - simplified memory storage
 const CONTRACT_ABI = [
-  "function submitMemoryBatch(bytes32 merkleRoot, bytes32[] calldata hashes) external",
-  "function verifyMemory(bytes32 hash, bytes32[] calldata proof, bytes32 merkleRoot) external returns (bool)",
-  "function getMemoryStatus(bytes32 hash) external view returns (bool)",
+  "function storeMemory(bytes32 hash, bytes32 urlHash, uint256 timestamp) external",
+  "function storeMemoryBatch(bytes32[] calldata hashes, bytes32[] calldata urlHashes, uint256[] calldata timestamps) external",
+  "function getMemory(address user, uint256 index) external view returns (bytes32 hash, bytes32 urlHash, uint256 timestamp)",
+  "function getUserMemories(address user) external view returns (tuple(bytes32 hash, bytes32 urlHash, uint256 timestamp)[] memory)",
   "function getUserMemoryCount(address user) external view returns (uint256)",
-  "function batches(bytes32) external view returns (address user, uint256 timestamp, uint256 hashCount)",
-  "event MemoryBatchSubmitted(address indexed user, bytes32 merkleRoot, uint256 count)",
-  "event MemoryVerified(address indexed user, bytes32 hash)"
+  "function isMemoryStored(bytes32 hash) external view returns (bool)",
+  "function getMemoryOwner(bytes32 hash) external view returns (address)",
+  "function getMemoriesByUrlHash(address user, bytes32 urlHash) external view returns (tuple(bytes32 hash, bytes32 urlHash, uint256 timestamp)[] memory)",
+  "function getMemoriesByTimestampRange(address user, uint256 startTime, uint256 endTime) external view returns (tuple(bytes32 hash, bytes32 urlHash, uint256 timestamp)[] memory)",
+  "function getRecentMemories(address user, uint256 count) external view returns (tuple(bytes32 hash, bytes32 urlHash, uint256 timestamp)[] memory)",
+  "function getMemoryByHash(bytes32 hash) external view returns (address owner, bytes32 urlHash, uint256 timestamp)",
+  "event MemoryStored(address indexed user, bytes32 indexed hash, bytes32 urlHash, uint256 timestamp)",
+  "event MemoryBatchStored(address indexed user, uint256 count)"
 ];
 
 // Initialize blockchain connection
@@ -22,8 +26,6 @@ let provider: ethers.JsonRpcProvider;
 let wallet: ethers.Wallet;
 let contract: ethers.Contract;
 
-// Track submitted batches to prevent duplicates
-const submittedBatches = new Set<string>();
 
 function initializeBlockchain() {
   const rpcUrl = process.env.SEPOLIA_RPC_URL;
@@ -62,153 +64,158 @@ export function initializeBlockchainConnection() {
   }
 }
 
-export function generateMerkleTree(hashes: string[]) {
-  if (!hashes || hashes.length === 0) {
-    throw new Error("Hashes array cannot be empty");
-  }
-  
-  const leaves = hashes.map(x => Buffer.from(ethers.keccak256(x).slice(2), 'hex'));
-  const tree = new MerkleTree(leaves, keccak256, { sortPairs: true });
-  return { tree, root: tree.getHexRoot() };
+
+
+
+
+
+// Interface for simplified memory data
+export interface MemoryData {
+  hash: string;
+  urlHash: string;
+  timestamp: number;
 }
 
-export async function submitBatch(hashes: string[]) {
+// Function to hash a URL
+export function hashUrl(url: string): string {
+  return ethers.keccak256(ethers.toUtf8Bytes(url));
+}
+
+
+// Store a single memory on blockchain
+export async function storeMemory(hash: string, url: string, timestamp: number) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
   }
   
-  console.log(`Contract address: ${contract.target}`);
-  console.log(`Wallet address: ${wallet.address}`);
-  
   try {
-    const { tree, root } = generateMerkleTree(hashes);
+    const urlHash = hashUrl(url);
+    console.log(`Storing memory: hash=${hash}, urlHash=${urlHash}, timestamp=${timestamp}`);
     
-    // Check if this batch has already been submitted
-    if (submittedBatches.has(root)) {
-      console.log(`Batch with root ${root} already submitted, skipping...`);
-      return { 
-        txHash: null as string | null, 
-        root,
-        blockNumber: null as number | null,
-        gasUsed: null as string | null,
-        skipped: true
-      };
-    }
+    // Get current gas price and add 10% buffer
+    const gasPrice = await provider.getFeeData();
+    const gasPriceWithBuffer = gasPrice.gasPrice ? gasPrice.gasPrice * BigInt(110) / BigInt(100) : undefined;
     
-    // Check if batch exists on blockchain
-    try {
-      const batchMetadata = await contract.batches(root);
-      if (batchMetadata.timestamp > 0) {
-        console.log(`Batch with root ${root} already exists on blockchain, skipping...`);
-        console.log(`Batch submitted by: ${batchMetadata.user}`);
-        console.log(`Batch timestamp: ${new Date(Number(batchMetadata.timestamp) * 1000).toISOString()}`);
-        console.log(`Batch hash count: ${batchMetadata.hashCount}`);
-        
-        // Try to get the original transaction hash
-        try {
-          const txInfo = await getBatchTransactionHash(root);
-          if (txInfo) {
-            console.log(`Original transaction hash: ${txInfo.txHash}`);
-            console.log(`Original block number: ${txInfo.blockNumber}`);
-          }
-        } catch (txError) {
-          console.log("Could not retrieve original transaction hash");
-        }
-        
-        submittedBatches.add(root);
-        return { 
-          txHash: null as string | null, 
-          root,
-          blockNumber: null as number | null,
-          gasUsed: null as string | null,
-          skipped: true,
-          existingBatch: {
-            user: batchMetadata.user,
-            timestamp: batchMetadata.timestamp.toString(),
-            hashCount: batchMetadata.hashCount.toString()
-          }
-        };
-      }
-    } catch (checkError) {
-      // If we can't check, proceed with submission
-      console.log("Could not check batch existence, proceeding with submission...");
-    }
-    
-    console.log(`Submitting batch with root: ${root}`);
-    console.log(`Hashes count: ${hashes.length}`);
-    console.log(`First hash: ${hashes[0]}`);
-    
-    // Try to estimate gas first
-    try {
-      const gasEstimate = await contract.submitMemoryBatch.estimateGas(root, hashes);
-      console.log(`Gas estimate: ${gasEstimate.toString()}`);
-    } catch (gasError) {
-      console.error("Gas estimation failed:", gasError);
-      throw new Error(`Gas estimation failed: ${gasError.message}`);
-    }
-    
-    const tx = await contract.submitMemoryBatch(root, hashes);
-    console.log(`Transaction submitted: ${tx.hash}`);
-    
+    const tx = await contract.storeMemory(hash, urlHash, timestamp, {
+      gasPrice: gasPriceWithBuffer
+    });
     const receipt = await tx.wait();
-    console.log(`Transaction confirmed in block: ${receipt.blockNumber}`);
     
-    // Mark batch as submitted
-    submittedBatches.add(root);
+    console.log(`Memory stored successfully: ${tx.hash}`);
     
-    return { 
-      txHash: tx.hash, 
-      root,
-      blockNumber: tx.blockNumber,
-      gasUsed: tx.gasUsed?.toString()
+    return {
+      success: true,
+      txHash: tx.hash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed?.toString()
     };
   } catch (error) {
-    console.error("Error submitting batch:", error);
-    
-    // If error is "Batch exists", mark it as submitted to prevent retries
-    if (error.message && error.message.includes("Batch exists")) {
-      const { tree, root } = generateMerkleTree(hashes);
-      submittedBatches.add(root);
-      console.log(`Marked batch ${root} as submitted due to 'Batch exists' error`);
-    }
-    
-    // Check if it's a transaction revert
-    if (error.code === 'CALL_EXCEPTION' && error.receipt && error.receipt.status === 0) {
-      console.error("Transaction was reverted. Receipt:", error.receipt);
-      console.error("Transaction data:", error.transaction);
-    }
-    
-    throw new Error(`Failed to submit memory batch: ${error.message}`);
+    console.error("Error storing memory:", error);
+    throw new Error(`Failed to store memory: ${error.message}`);
   }
 }
 
-export async function verifyMemory(hash: string, proof: string[], root: string) {
+// Store multiple memories in a batch
+export async function storeMemoryBatch(memories: MemoryData[]) {
+  if (!contract) {
+    throw new Error("Blockchain not initialized. Check environment variables.");
+  }
+  
+  if (!memories || memories.length === 0) {
+    throw new Error("Memories array cannot be empty");
+  }
+  
+  try {
+    console.log(`Storing batch of ${memories.length} memories`);
+    
+    const hashes = memories.map(m => m.hash);
+    const urlHashes = memories.map(m => m.urlHash);
+    const timestamps = memories.map(m => m.timestamp);
+    
+    // Get current gas price and add 10% buffer
+    const gasPrice = await provider.getFeeData();
+    const gasPriceWithBuffer = gasPrice.gasPrice ? gasPrice.gasPrice * BigInt(110) / BigInt(100) : undefined;
+    
+    const tx = await contract.storeMemoryBatch(hashes, urlHashes, timestamps, {
+      gasPrice: gasPriceWithBuffer
+    });
+    const receipt = await tx.wait();
+    
+    console.log(`Memory batch stored successfully: ${tx.hash}`);
+    
+    return {
+      success: true,
+      txHash: tx.hash,
+      blockNumber: receipt.blockNumber,
+      gasUsed: receipt.gasUsed?.toString(),
+      memoryCount: memories.length
+    };
+  } catch (error) {
+    console.error("Error storing memory batch:", error);
+    throw new Error(`Failed to store memory batch: ${error.message}`);
+  }
+}
+
+
+
+// Event listeners for real-time updates
+export function onMemoryStored(callback: (user: string, hash: string, urlHash: string, timestamp: number) => void) {
+  contract.on("MemoryStored", (user, hash, urlHash, timestamp) => {
+    callback(user, hash, urlHash, timestamp.toNumber());
+  });
+}
+
+export function onMemoryBatchStored(callback: (user: string, count: number) => void) {
+  contract.on("MemoryBatchStored", (user, count) => {
+    callback(user, count.toNumber());
+  });
+}
+
+export function removeAllListeners() {
+  contract.removeAllListeners();
+}
+
+// Query functions for the simplified contract
+
+// Get a specific memory by user and index
+export async function getMemory(userAddress: string, index: number) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
   }
   
   try {
-    const result = await contract.verifyMemory(hash, proof, root);
-    return result;
+    const result = await contract.getMemory(userAddress, index);
+    return {
+      hash: result.hash,
+      urlHash: result.urlHash,
+      timestamp: result.timestamp.toString()
+    };
   } catch (error) {
-    console.error("Error verifying memory:", error);
-    throw new Error(`Failed to verify memory: ${error.message}`);
+    console.error("Error getting memory:", error);
+    throw new Error(`Failed to get memory: ${error.message}`);
   }
 }
 
-export async function getMemoryStatus(hash: string) {
+// Get all memories for a user
+export async function getUserMemories(userAddress: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
   }
   
   try {
-    return await contract.getMemoryStatus(hash);
+    const memories = await contract.getUserMemories(userAddress);
+    return memories.map((mem: any) => ({
+      hash: mem.hash,
+      urlHash: mem.urlHash,
+      timestamp: mem.timestamp.toString()
+    }));
   } catch (error) {
-    console.error("Error getting memory status:", error);
-    throw new Error(`Failed to get memory status: ${error.message}`);
+    console.error("Error getting user memories:", error);
+    throw new Error(`Failed to get user memories: ${error.message}`);
   }
 }
 
+// Get memory count for a user
 export async function getUserMemoryCount(userAddress: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
@@ -223,220 +230,107 @@ export async function getUserMemoryCount(userAddress: string) {
   }
 }
 
-export async function getBatchMetadata(merkleRoot: string) {
+// Check if a memory exists
+export async function isMemoryStored(hash: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
   }
   
   try {
-    const batch = await contract.batches(merkleRoot);
-    return {
-      user: batch.user,
-      timestamp: batch.timestamp.toString(),
-      hashCount: batch.hashCount.toString()
-    };
+    return await contract.isMemoryStored(hash);
   } catch (error) {
-    console.error("Error getting batch metadata:", error);
-    throw new Error(`Failed to get batch metadata: ${error.message}`);
+    console.error("Error checking if memory is stored:", error);
+    throw new Error(`Failed to check if memory is stored: ${error.message}`);
   }
 }
 
-// Interface for complete memory data
-export interface MemoryData {
-  summary: string;
-  timestamp: number;
-  location?: string;
-  url?: string;
-  title?: string;
-  source?: string;
-  content?: string;
-  metadata?: any;
-}
-
-// Function to create a hash from complete memory data
-export function createMemoryHash(memoryData: MemoryData): string {
-  // Create a structured object with all memory data
-  const memoryObject = {
-    summary: memoryData.summary,
-    timestamp: memoryData.timestamp,
-    location: memoryData.location || '',
-    url: memoryData.url || '',
-    title: memoryData.title || '',
-    source: memoryData.source || '',
-    content: memoryData.content || '',
-    metadata: memoryData.metadata || {}
-  };
-  
-  // Convert to JSON string and hash it
-  const memoryString = JSON.stringify(memoryObject, Object.keys(memoryObject).sort());
-  return ethers.keccak256(ethers.toUtf8Bytes(memoryString));
-}
-
-// New function to store complete memory data on blockchain
-export async function storeMemoryData(memoryData: MemoryData[], userAddress?: string) {
-  if (!memoryData || memoryData.length === 0) {
-    throw new Error("Memory data array cannot be empty");
-  }
-  
-  try {
-    // Generate hashes for the complete memory data
-    const hashes = memoryData.map(memory => createMemoryHash(memory));
-    
-    // Submit batch to blockchain
-    const result = await submitBatch(hashes);
-    
-    return {
-      success: true,
-      txHash: result.txHash,
-      merkleRoot: result.root,
-      blockNumber: result.blockNumber,
-      gasUsed: result.gasUsed,
-      memoryCount: memoryData.length,
-      userAddress: userAddress || wallet.address,
-      skipped: result.skipped || false,
-      memoryHashes: hashes
-    };
-  } catch (error) {
-    console.error("Error storing memory data:", error);
-    throw new Error(`Failed to store memory data: ${error.message}`);
-  }
-}
-
-// Legacy function for backward compatibility
-export async function storeMemories(memories: string[], userAddress?: string) {
-  if (!memories || memories.length === 0) {
-    throw new Error("Memories array cannot be empty");
-  }
-  
-  try {
-    // Generate hashes for the memories
-    const hashes = memories.map(memory => ethers.keccak256(ethers.toUtf8Bytes(memory)));
-    
-    // Submit batch to blockchain
-    const result = await submitBatch(hashes);
-    
-    return {
-      success: true,
-      txHash: result.txHash,
-      merkleRoot: result.root,
-      blockNumber: result.blockNumber,
-      gasUsed: result.gasUsed,
-      memoryCount: memories.length,
-      userAddress: userAddress || wallet.address,
-      skipped: result.skipped || false
-    };
-  } catch (error) {
-    console.error("Error storing memories:", error);
-    throw new Error(`Failed to store memories: ${error.message}`);
-  }
-}
-
-// Function to get proof for a specific memory
-export function getMemoryProof(memory: string, allMemories: string[]) {
-  const hashes = allMemories.map(m => ethers.keccak256(ethers.toUtf8Bytes(m)));
-  const { tree } = generateMerkleTree(hashes);
-  const targetHash = ethers.keccak256(ethers.toUtf8Bytes(memory));
-  const leaves = hashes.map(x => Buffer.from(x.slice(2), 'hex'));
-  const targetLeaf = Buffer.from(targetHash.slice(2), 'hex');
-  
-  const proof = tree.getHexProof(targetLeaf);
-  return {
-    proof,
-    root: tree.getHexRoot(),
-    hash: targetHash
-  };
-}
-
-// Event listeners for real-time updates
-export function onMemoryBatchSubmitted(callback: (user: string, merkleRoot: string, count: number) => void) {
-  contract.on("MemoryBatchSubmitted", (user, merkleRoot, count) => {
-    callback(user, merkleRoot, count.toNumber());
-  });
-}
-
-export function onMemoryVerified(callback: (user: string, hash: string) => void) {
-  contract.on("MemoryVerified", (user, hash) => {
-    callback(user, hash);
-  });
-}
-
-export function removeAllListeners() {
-  contract.removeAllListeners();
-}
-
-// Function to clear submitted batches cache (useful for testing or reset)
-export function clearSubmittedBatches() {
-  submittedBatches.clear();
-  console.log("Cleared submitted batches cache");
-}
-
-// Function to get submitted batches count
-export function getSubmittedBatchesCount() {
-  return submittedBatches.size;
-}
-
-// Function to get all batches submitted by the current wallet
-export async function getAllUserBatches() {
+// Get the owner of a memory
+export async function getMemoryOwner(hash: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
   }
   
   try {
-    const filter = contract.filters.MemoryBatchSubmitted(wallet.address);
-    const events = await contract.queryFilter(filter);
-    
-    return events.map(event => {
-      if ('args' in event && event.args) {
-        const eventArgs = event.args as any;
-        return {
-          txHash: event.transactionHash,
-          blockNumber: event.blockNumber,
-          user: eventArgs.user,
-          merkleRoot: eventArgs.merkleRoot,
-          count: eventArgs.count.toString()
-        };
-      }
-      return null;
-    }).filter(Boolean);
+    return await contract.getMemoryOwner(hash);
   } catch (error) {
-    console.error("Error getting user batches:", error);
-    throw new Error(`Failed to get user batches: ${error.message}`);
+    console.error("Error getting memory owner:", error);
+    throw new Error(`Failed to get memory owner: ${error.message}`);
   }
 }
 
-// Function to get transaction hash for an existing batch by looking up events
-export async function getBatchTransactionHash(merkleRoot: string) {
+// Get memories by URL
+export async function getMemoriesByUrlHash(userAddress: string, urlHash: string) {
   if (!contract) {
     throw new Error("Blockchain not initialized. Check environment variables.");
   }
   
   try {
-    // Since merkleRoot is not indexed, we need to get all MemoryBatchSubmitted events
-    // and filter them manually. We'll get events from the wallet address.
-    const filter = contract.filters.MemoryBatchSubmitted(wallet.address);
-    
-    // Get past events
-    const events = await contract.queryFilter(filter);
-    
-    // Filter events to find the one with matching merkleRoot
-    for (const event of events) {
-      if ('args' in event && event.args) {
-        const eventArgs = event.args as any;
-        if (eventArgs.merkleRoot === merkleRoot) {
-          return {
-            txHash: event.transactionHash,
-            blockNumber: event.blockNumber,
-            user: eventArgs.user,
-            merkleRoot: eventArgs.merkleRoot,
-            count: eventArgs.count.toString()
-          };
-        }
-      }
-    }
-    
-    return null;
+    const memories = await contract.getMemoriesByUrlHash(userAddress, urlHash);
+    return memories.map((mem: any) => ({
+      hash: mem.hash,
+      urlHash: mem.urlHash,
+      timestamp: mem.timestamp.toString()
+    }));
   } catch (error) {
-    console.error("Error getting batch transaction hash:", error);
-    throw new Error(`Failed to get batch transaction hash: ${error.message}`);
+    console.error("Error getting memories by URL hash:", error);
+    throw new Error(`Failed to get memories by URL hash: ${error.message}`);
   }
 }
+
+// Get memories by timestamp range
+export async function getMemoriesByTimestampRange(userAddress: string, startTime: number, endTime: number) {
+  if (!contract) {
+    throw new Error("Blockchain not initialized. Check environment variables.");
+  }
+  
+  try {
+    const memories = await contract.getMemoriesByTimestampRange(userAddress, startTime, endTime);
+    return memories.map((mem: any) => ({
+      hash: mem.hash,
+      urlHash: mem.urlHash,
+      timestamp: mem.timestamp.toString()
+    }));
+  } catch (error) {
+    console.error("Error getting memories by timestamp range:", error);
+    throw new Error(`Failed to get memories by timestamp range: ${error.message}`);
+  }
+}
+
+// Get recent memories
+export async function getRecentMemories(userAddress: string, count: number) {
+  if (!contract) {
+    throw new Error("Blockchain not initialized. Check environment variables.");
+  }
+  
+  try {
+    const memories = await contract.getRecentMemories(userAddress, count);
+    return memories.map((mem: any) => ({
+      hash: mem.hash,
+      urlHash: mem.urlHash,
+      timestamp: mem.timestamp.toString()
+    }));
+  } catch (error) {
+    console.error("Error getting recent memories:", error);
+    throw new Error(`Failed to get recent memories: ${error.message}`);
+  }
+}
+
+// Get memory by hash
+export async function getMemoryByHash(hash: string) {
+  if (!contract) {
+    throw new Error("Blockchain not initialized. Check environment variables.");
+  }
+  
+  try {
+    const result = await contract.getMemoryByHash(hash);
+    return {
+      owner: result.owner,
+      urlHash: result.urlHash,
+      timestamp: result.timestamp.toString()
+    };
+  } catch (error) {
+    console.error("Error getting memory by hash:", error);
+    throw new Error(`Failed to get memory by hash: ${error.message}`);
+  }
+}
+

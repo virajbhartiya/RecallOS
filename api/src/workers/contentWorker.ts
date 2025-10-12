@@ -1,7 +1,6 @@
 import { contentQueue, ContentJobData } from '../lib/queue';
 import { geminiService } from '../services/gemini';
 import { memoryMeshService } from '../services/memoryMesh';
-import { storeMemoryData, MemoryData } from '../services/blockchain';
 import { prisma } from '../lib/prisma';
 import { createHash } from 'crypto';
 
@@ -51,51 +50,6 @@ export const startContentWorker = () => {
         });
         console.log(`Created memory snapshot for memory ${metadata.memory_id}`);
 
-        // Step 6: Store complete memory data on blockchain
-        try {
-          // Get the memory record to get all the data
-          const memoryRecord = await prisma.memory.findUnique({
-            where: { id: metadata.memory_id }
-          });
-
-          if (memoryRecord) {
-            const memoryData: MemoryData = {
-              summary: summary,
-              timestamp: Number(memoryRecord.timestamp),
-              location: (metadata as any).location || '',
-              url: memoryRecord.url || '',
-              title: memoryRecord.title || '',
-              source: memoryRecord.source || '',
-              content: memoryRecord.content || '',
-              metadata: {
-                memory_id: metadata.memory_id,
-                user_id: user_id,
-                page_metadata: memoryRecord.page_metadata,
-                page_structure: memoryRecord.page_structure,
-                user_activity: memoryRecord.user_activity
-              }
-            };
-
-            // Store on blockchain
-            const blockchainResult = await storeMemoryData([memoryData]);
-            console.log(`Stored memory ${metadata.memory_id} on blockchain:`, {
-              txHash: blockchainResult.txHash,
-              merkleRoot: blockchainResult.merkleRoot,
-              blockNumber: blockchainResult.blockNumber
-            });
-
-            // Update memory record with blockchain hash
-            await prisma.memory.update({
-              where: { id: metadata.memory_id },
-              data: { 
-                hash: blockchainResult.memoryHashes[0] // Store the blockchain hash
-              }
-            });
-          }
-        } catch (blockchainError) {
-          console.error(`Failed to store memory ${metadata.memory_id} on blockchain:`, blockchainError);
-          // Don't throw here - we still want the memory to be processed even if blockchain storage fails
-        }
       } else {
         // Only store in summarized_content if it's NOT from a memory
         const summarizedContent = await prisma.summarizedContent.create({
