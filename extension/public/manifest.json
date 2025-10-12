@@ -19,16 +19,8 @@
       "match_about_blank": false
     }
   ],
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "tabs",
-    "storage",
-    "webNavigation"
-  ],
-  "host_permissions": [
-    "<all_urls>"
-  ],
+  "permissions": ["activeTab", "scripting", "tabs", "storage", "webNavigation"],
+  "host_permissions": ["<all_urls>"],
   "web_accessible_resources": [
     {
       "resources": ["content.js"],

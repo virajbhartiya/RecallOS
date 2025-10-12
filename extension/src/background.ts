@@ -23,23 +23,38 @@ async function getWalletAddress(): Promise<string | null> {
   try {
     const result = await chrome.storage.sync.get(['wallet_address']);
     if (result.wallet_address) {
-      console.log('RecallOS: Found wallet address in storage:', result.wallet_address);
+      console.log(
+        'RecallOS: Found wallet address in storage:',
+        result.wallet_address
+      );
       return result.wallet_address;
     }
 
-    console.log('RecallOS: No wallet address found in storage, trying content script...');
+    console.log(
+      'RecallOS: No wallet address found in storage, trying content script...'
+    );
 
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
       try {
-        const response = await chrome.tabs.sendMessage(tabs[0].id, { type: 'GET_WALLET_ADDRESS' });
+        const response = await chrome.tabs.sendMessage(tabs[0].id, {
+          type: 'GET_WALLET_ADDRESS',
+        });
         if (response?.walletAddress) {
-          console.log('RecallOS: Found wallet address in content script:', response.walletAddress);
-          await chrome.storage.sync.set({ wallet_address: response.walletAddress });
+          console.log(
+            'RecallOS: Found wallet address in content script:',
+            response.walletAddress
+          );
+          await chrome.storage.sync.set({
+            wallet_address: response.walletAddress,
+          });
           return response.walletAddress;
         }
       } catch (error) {
-        console.log('RecallOS: Could not get wallet address from content script:', error);
+        console.log(
+          'RecallOS: Could not get wallet address from content script:',
+          error
+        );
       }
     }
 
@@ -55,12 +70,16 @@ async function sendToBackend(data: ContextData): Promise<void> {
   try {
     const apiEndpoint = await getApiEndpoint();
     const walletAddress = await getWalletAddress();
-    
+
     const privacyInfo = (data as any).privacy_extension_info;
     const hasPrivacyConflicts = privacyInfo?.detected || false;
-    
+
     const payload = {
-      content: data.meaningful_content || data.content_snippet || data.full_content || 'No content available',
+      content:
+        data.meaningful_content ||
+        data.content_snippet ||
+        data.full_content ||
+        'No content available',
       url: data.url,
       title: data.title,
       userAddress: walletAddress || 'anonymous',
@@ -71,15 +90,15 @@ async function sendToBackend(data: ContextData): Promise<void> {
         content_summary: data.content_summary,
         privacy_extension_conflicts: hasPrivacyConflicts,
         privacy_extension_type: privacyInfo?.type || 'none',
-        compatibility_mode: privacyInfo?.compatibility_mode || false
-      }
+        compatibility_mode: privacyInfo?.compatibility_mode || false,
+      },
     };
-    
+
     console.log('RecallOS: Sending to backend:', payload);
     console.log('RecallOS: Using endpoint:', apiEndpoint);
     console.log('RecallOS: Wallet Address:', walletAddress || 'Anonymous');
     console.log('RecallOS: Privacy conflicts detected:', hasPrivacyConflicts);
-    
+
     const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
@@ -103,9 +122,11 @@ chrome.runtime.onInstalled.addListener(() => {
   console.log('RecallOS Context Capture Extension installed.');
 });
 
-chrome.tabs.onActivated.addListener(async (activeInfo) => {
+chrome.tabs.onActivated.addListener(async activeInfo => {
   try {
-    await chrome.tabs.sendMessage(activeInfo.tabId, { type: 'CAPTURE_CONTEXT_NOW' });
+    await chrome.tabs.sendMessage(activeInfo.tabId, {
+      type: 'CAPTURE_CONTEXT_NOW',
+    });
   } catch (error) {
     console.log('RecallOS: Could not send message to tab:', error);
   }
@@ -142,7 +163,12 @@ async function setWalletAddress(walletAddress: string): Promise<void> {
 
 chrome.runtime.onMessage.addListener(
   (
-    message: { type?: string; data?: ContextData; endpoint?: string; walletAddress?: string },
+    message: {
+      type?: string;
+      data?: ContextData;
+      endpoint?: string;
+      walletAddress?: string;
+    },
     _sender: chrome.runtime.MessageSender,
     sendResponse: (response: unknown) => void
   ) => {
@@ -151,66 +177,64 @@ chrome.runtime.onMessage.addListener(
         .then(() => {
           sendResponse({ success: true, message: 'Context sent to backend' });
         })
-        .catch((error) => {
+        .catch(error => {
           console.error('RecallOS: Failed to send context:', error);
           sendResponse({ success: false, error: error.message });
         });
-      
+
       return true; // Keep message channel open for async response
     }
-    
+
     if (message?.type === 'SET_ENDPOINT' && message.endpoint) {
       setApiEndpoint(message.endpoint)
         .then(() => {
           sendResponse({ success: true, message: 'API endpoint updated' });
         })
-        .catch((error) => {
+        .catch(error => {
           sendResponse({ success: false, error: error.message });
         });
-      
+
       return true;
     }
-    
+
     if (message?.type === 'GET_ENDPOINT') {
       getApiEndpoint()
-        .then((endpoint) => {
+        .then(endpoint => {
           sendResponse({ success: true, endpoint });
         })
-        .catch((error) => {
+        .catch(error => {
           sendResponse({ success: false, error: error.message });
         });
-      
+
       return true;
     }
-    
+
     if (message?.type === 'SET_WALLET_ADDRESS' && message.walletAddress) {
       setWalletAddress(message.walletAddress)
         .then(() => {
           sendResponse({ success: true, message: 'Wallet address updated' });
         })
-        .catch((error) => {
+        .catch(error => {
           sendResponse({ success: false, error: error.message });
         });
-      
+
       return true;
     }
-    
+
     if (message?.type === 'GET_WALLET_ADDRESS') {
       getWalletAddress()
-        .then((walletAddress) => {
+        .then(walletAddress => {
           sendResponse({ success: true, walletAddress });
         })
-        .catch((error) => {
+        .catch(error => {
           sendResponse({ success: false, error: error.message });
         });
-      
+
       return true;
     }
-    
+
     if (message?.type === 'PING') {
       sendResponse({ type: 'PONG', from: 'background' });
     }
   }
 );
-
-

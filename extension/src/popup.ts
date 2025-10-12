@@ -1,17 +1,29 @@
 /// <reference types="chrome" />
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const apiEndpointInput = document.getElementById('apiEndpoint') as HTMLInputElement;
-  const walletAddressInput = document.getElementById('walletAddress') as HTMLInputElement;
-  const saveButton = document.getElementById('saveEndpoint') as HTMLButtonElement;
-  const saveWalletButton = document.getElementById('saveWalletAddress') as HTMLButtonElement;
+  const apiEndpointInput = document.getElementById(
+    'apiEndpoint'
+  ) as HTMLInputElement;
+  const walletAddressInput = document.getElementById(
+    'walletAddress'
+  ) as HTMLInputElement;
+  const saveButton = document.getElementById(
+    'saveEndpoint'
+  ) as HTMLButtonElement;
+  const saveWalletButton = document.getElementById(
+    'saveWalletAddress'
+  ) as HTMLButtonElement;
   const statusDiv = document.getElementById('status') as HTMLDivElement;
   try {
-    const endpointResponse = await chrome.runtime.sendMessage({ type: 'GET_ENDPOINT' });
+    const endpointResponse = await chrome.runtime.sendMessage({
+      type: 'GET_ENDPOINT',
+    });
     if (endpointResponse.success) {
       apiEndpointInput.value = endpointResponse.endpoint;
     }
-    const walletResponse = await chrome.runtime.sendMessage({ type: 'GET_WALLET_ADDRESS' });
+    const walletResponse = await chrome.runtime.sendMessage({
+      type: 'GET_WALLET_ADDRESS',
+    });
     if (walletResponse.success && walletResponse.walletAddress) {
       walletAddressInput.value = walletResponse.walletAddress;
       statusDiv.textContent = `Connected: ${walletResponse.walletAddress.substring(0, 10)}...`;
@@ -27,9 +39,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     try {
-      const response = await chrome.runtime.sendMessage({ 
-        type: 'SET_ENDPOINT', 
-        endpoint 
+      const response = await chrome.runtime.sendMessage({
+        type: 'SET_ENDPOINT',
+        endpoint,
       });
       if (response.success) {
         showStatus('Configuration saved successfully!', 'success');
@@ -47,9 +59,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
     try {
-      const response = await chrome.runtime.sendMessage({ 
-        type: 'SET_WALLET_ADDRESS', 
-        walletAddress 
+      const response = await chrome.runtime.sendMessage({
+        type: 'SET_WALLET_ADDRESS',
+        walletAddress,
       });
       if (response.success) {
         showStatus('Wallet address saved successfully!', 'success');

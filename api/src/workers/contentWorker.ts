@@ -1,45 +1,66 @@
 import { contentQueue, ContentJobData } from '../lib/queue';
+
 import { geminiService } from '../services/gemini';
+
 import { memoryMeshService } from '../services/memoryMesh';
+
 import { prisma } from '../lib/prisma';
+
 import { createHash } from 'crypto';
+
 export const startContentWorker = () => {
   if (!contentQueue) {
     console.warn('Content queue not available. Content worker will not start.');
+
     return;
   }
+
   contentQueue.process('process-content', async (job: any) => {
     const { user_id, raw_text, metadata } = job.data as ContentJobData;
+
     try {
       console.log(`Processing content for user ${user_id}`);
+
       const summary = await geminiService.summarizeContent(raw_text, metadata);
+
       if (metadata?.memory_id) {
         await prisma.memory.update({
           where: { id: metadata.memory_id },
-          data: { summary: summary }
+          data: { summary: summary },
         });
         console.log(`Updated memory ${metadata.memory_id} with Gemini summary`);
         await memoryMeshService.generateEmbeddingsForMemory(metadata.memory_id);
         console.log(`Generated embeddings for memory ${metadata.memory_id}`);
-        await memoryMeshService.createMemoryRelations(metadata.memory_id, user_id);
-        console.log(`Created memory relations for memory ${metadata.memory_id}`);
+        await memoryMeshService.createMemoryRelations(
+          metadata.memory_id,
+          user_id
+        );
+        console.log(
+          `Created memory relations for memory ${metadata.memory_id}`
+        );
+
         const summaryHash = createHash('sha256').update(summary).digest('hex');
+
         await prisma.memorySnapshot.create({
           data: {
             user_id,
             raw_text,
             summary,
-            summary_hash: summaryHash
-          }
+            summary_hash: summaryHash,
+          },
         });
         console.log(`Created memory snapshot for memory ${metadata.memory_id}`);
       } else {
         const user = await prisma.user.findUnique({
-          where: { id: user_id }
+          where: { id: user_id },
         });
+
         if (user) {
-          const memoryHash = '0x' + createHash('sha256').update(summary).digest('hex');
+          const memoryHash =
+            '0x' + createHash('sha256').update(summary).digest('hex');
+
           const timestamp = Math.floor(Date.now() / 1000);
+
           const memory = await prisma.memory.create({
             data: {
               user_id,
@@ -51,34 +72,42 @@ export const startContentWorker = () => {
               hash: memoryHash,
               timestamp: BigInt(timestamp),
               full_content: raw_text,
-              page_metadata: metadata || {}
-            }
+              page_metadata: metadata || {},
+            },
           });
-          console.log(`Created memory ${memory.id} from queue processing for user ${user_id}`);
+
+          console.log(
+            `Created memory ${memory.id} from queue processing for user ${user_id}`
+          );
           await memoryMeshService.generateEmbeddingsForMemory(memory.id);
           await memoryMeshService.createMemoryRelations(memory.id, user_id);
-          const summaryHash = '0x' + createHash('sha256').update(summary).digest('hex');
+
+          const summaryHash =
+            '0x' + createHash('sha256').update(summary).digest('hex');
+
           await prisma.memorySnapshot.create({
             data: {
               user_id,
               raw_text,
               summary,
-              summary_hash: summaryHash
-            }
+              summary_hash: summaryHash,
+            },
           });
           console.log(`Created memory snapshot for memory ${memory.id}`);
         }
       }
+
       console.log(`Successfully processed content for user ${user_id}`);
+
       return {
         success: true,
         contentId: metadata?.memory_id || 'memory_processed',
         memoryId: metadata?.memory_id || null,
-        summary: summary.substring(0, 100) + '...', 
+        summary: summary.substring(0, 100) + '...',
       };
     } catch (error) {
       console.error(`Error processing content for user ${user_id}:`, error);
-      throw error; 
+      throw error;
     }
   });
   contentQueue.on('completed', (job: any, result: any) => {

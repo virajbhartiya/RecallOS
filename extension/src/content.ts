@@ -54,8 +54,8 @@ let activityLevel = 'normal';
 let lastActivityTime = Date.now();
 let lastCaptureTime = 0;
 let hasUserActivity = false;
-const MIN_CAPTURE_INTERVAL = 10000; 
-const ACTIVITY_TIMEOUT = 30000; 
+const MIN_CAPTURE_INTERVAL = 10000;
+const ACTIVITY_TIMEOUT = 30000;
 let privacyExtensionDetected = false;
 let privacyExtensionType = 'unknown';
 function detectPrivacyExtensions(): void {
@@ -70,14 +70,22 @@ function detectPrivacyExtensions(): void {
       'AdGuard',
       'NoScript',
       'ScriptSafe',
-      'uMatrix'
+      'uMatrix',
     ];
-    const hasAdBlockers = document.querySelectorAll('[id*="adblock"], [class*="adblock"], [id*="ublock"], [class*="ublock"]').length > 0;
-    const hasPrivacyElements = document.querySelectorAll('[id*="privacy"], [class*="privacy"], [id*="ghostery"], [class*="ghostery"]').length > 0;
+    const hasAdBlockers =
+      document.querySelectorAll(
+        '[id*="adblock"], [class*="adblock"], [id*="ublock"], [class*="ublock"]'
+      ).length > 0;
+    const hasPrivacyElements =
+      document.querySelectorAll(
+        '[id*="privacy"], [class*="privacy"], [id*="ghostery"], [class*="ghostery"]'
+      ).length > 0;
     if (hasAdBlockers || hasPrivacyElements) {
       privacyExtensionDetected = true;
       privacyExtensionType = 'adblocker';
-      console.log('RecallOS: Privacy extension detected, enabling compatibility mode');
+      console.log(
+        'RecallOS: Privacy extension detected, enabling compatibility mode'
+      );
     }
     if (document.querySelector('meta[http-equiv="Content-Security-Policy"]')) {
       privacyExtensionDetected = true;
@@ -92,7 +100,9 @@ function detectPrivacyExtensions(): void {
     } catch (error) {
       privacyExtensionDetected = true;
       privacyExtensionType = 'iframe_restriction';
-      console.log('RecallOS: Iframe restrictions detected, enabling compatibility mode');
+      console.log(
+        'RecallOS: Iframe restrictions detected, enabling compatibility mode'
+      );
     }
   } catch (error) {
     console.log('RecallOS: Error detecting privacy extensions:', error);
@@ -111,7 +121,7 @@ function extractVisibleText(): string {
       document.body,
       NodeFilter.SHOW_TEXT,
       {
-        acceptNode: (node) => {
+        acceptNode: node => {
           try {
             const parent = node.parentElement;
             if (!parent) return NodeFilter.FILTER_REJECT;
@@ -121,15 +131,17 @@ function extractVisibleText(): string {
             }
             return NodeFilter.FILTER_ACCEPT;
           } catch (error) {
-            console.log('RecallOS: Privacy extension blocking style access, accepting node');
+            console.log(
+              'RecallOS: Privacy extension blocking style access, accepting node'
+            );
             return NodeFilter.FILTER_ACCEPT;
           }
-        }
+        },
       }
     );
     const textNodes: string[] = [];
     let node;
-    while (node = walker.nextNode()) {
+    while ((node = walker.nextNode())) {
       try {
         const text = node.textContent?.trim();
         if (text && text.length > 0) {
@@ -142,9 +154,17 @@ function extractVisibleText(): string {
     }
     return textNodes.join(' ');
   } catch (error) {
-    console.log('RecallOS: Error in extractVisibleText, using fallback:', error);
+    console.log(
+      'RecallOS: Error in extractVisibleText, using fallback:',
+      error
+    );
     try {
-      return document.body?.textContent || document.documentElement?.textContent || document.title || '';
+      return (
+        document.body?.textContent ||
+        document.documentElement?.textContent ||
+        document.title ||
+        ''
+      );
     } catch (fallbackError) {
       console.log('RecallOS: Fallback also failed:', fallbackError);
       return document.title || window.location.href;
@@ -154,30 +174,84 @@ function extractVisibleText(): string {
 function extractMeaningfulContent(): string {
   try {
     if (!document.body || !document.body.innerHTML) {
-      console.log('RecallOS: Document body not accessible for meaningful content extraction');
+      console.log(
+        'RecallOS: Document body not accessible for meaningful content extraction'
+      );
       return extractVisibleText();
     }
     const boilerplateSelectors = [
-      'nav', 'header', 'footer', '.nav', '.navigation', '.menu', '.sidebar',
-      '.advertisement', '.ads', '.ad', '.promo', '.banner', '.cookie-notice',
-      '.newsletter', '.subscribe', '.social-share', '.share-buttons',
-      '.comments', '.comment', '.related', '.recommended', '.trending',
-      '.breadcrumb', '.breadcrumbs', '.pagination', '.pager',
-      '.search', '.search-box', '.search-form', '.filter', '.sort',
-      '.modal', '.popup', '.overlay', '.tooltip', '.dropdown',
-      '.cookie-banner', '.gdpr', '.privacy-notice', '.terms',
-      '.author-bio', '.author-info', '.author-box', '.byline',
-      '.tags', '.categories', '.meta', '.metadata', '.date',
-      '.social-media', '.social-links', '.follow-us', '.connect',
-      '.newsletter-signup', '.email-signup', '.subscription',
-      '.sponsor', '.sponsored', '.affiliate', '.partner',
-      '.disclaimer', '.legal', '.terms-of-service', '.privacy-policy'
+      'nav',
+      'header',
+      'footer',
+      '.nav',
+      '.navigation',
+      '.menu',
+      '.sidebar',
+      '.advertisement',
+      '.ads',
+      '.ad',
+      '.promo',
+      '.banner',
+      '.cookie-notice',
+      '.newsletter',
+      '.subscribe',
+      '.social-share',
+      '.share-buttons',
+      '.comments',
+      '.comment',
+      '.related',
+      '.recommended',
+      '.trending',
+      '.breadcrumb',
+      '.breadcrumbs',
+      '.pagination',
+      '.pager',
+      '.search',
+      '.search-box',
+      '.search-form',
+      '.filter',
+      '.sort',
+      '.modal',
+      '.popup',
+      '.overlay',
+      '.tooltip',
+      '.dropdown',
+      '.cookie-banner',
+      '.gdpr',
+      '.privacy-notice',
+      '.terms',
+      '.author-bio',
+      '.author-info',
+      '.author-box',
+      '.byline',
+      '.tags',
+      '.categories',
+      '.meta',
+      '.metadata',
+      '.date',
+      '.social-media',
+      '.social-links',
+      '.follow-us',
+      '.connect',
+      '.newsletter-signup',
+      '.email-signup',
+      '.subscription',
+      '.sponsor',
+      '.sponsored',
+      '.affiliate',
+      '.partner',
+      '.disclaimer',
+      '.legal',
+      '.terms-of-service',
+      '.privacy-policy',
     ];
     const tempDiv = document.createElement('div');
     try {
       tempDiv.innerHTML = document.body.innerHTML;
     } catch (error) {
-      console.log('RecallOS: Error accessing innerHTML, using textContent fallback');
+      console.log(
+        'RecallOS: Error accessing innerHTML, using textContent fallback'
+      );
       tempDiv.textContent = document.body.textContent || '';
     }
     boilerplateSelectors.forEach(selector => {
@@ -189,11 +263,29 @@ function extractMeaningfulContent(): string {
       }
     });
     const contentSelectors = [
-      'article', 'main', '[role="main"]', '.content', '.post', '.article',
-      '.entry', '.story', '.blog-post', '.news-article', '.tutorial',
-      '.documentation', '.guide', '.how-to', '.explanation', '.text',
-      '.body', '.main-content', '.article-content', '.post-content',
-      '.entry-content', '.page-content', '.content-body'
+      'article',
+      'main',
+      '[role="main"]',
+      '.content',
+      '.post',
+      '.article',
+      '.entry',
+      '.story',
+      '.blog-post',
+      '.news-article',
+      '.tutorial',
+      '.documentation',
+      '.guide',
+      '.how-to',
+      '.explanation',
+      '.text',
+      '.body',
+      '.main-content',
+      '.article-content',
+      '.post-content',
+      '.entry-content',
+      '.page-content',
+      '.content-body',
     ];
     let meaningfulContent = '';
     for (const selector of contentSelectors) {
@@ -207,13 +299,19 @@ function extractMeaningfulContent(): string {
           }
         }
       } catch (error) {
-        console.log('RecallOS: Error querying content selector:', selector, error);
+        console.log(
+          'RecallOS: Error querying content selector:',
+          selector,
+          error
+        );
         continue;
       }
     }
     if (!meaningfulContent) {
       try {
-        const meaningfulElements = tempDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, div');
+        const meaningfulElements = tempDiv.querySelectorAll(
+          'p, h1, h2, h3, h4, h5, h6, li, blockquote, div'
+        );
         const paragraphs = Array.from(meaningfulElements)
           .map(el => {
             try {
@@ -241,7 +339,10 @@ function extractMeaningfulContent(): string {
     }
     return cleanText(meaningfulContent).substring(0, 10000);
   } catch (error) {
-    console.log('RecallOS: Error in extractMeaningfulContent, using fallback:', error);
+    console.log(
+      'RecallOS: Error in extractMeaningfulContent, using fallback:',
+      error
+    );
     return extractVisibleText();
   }
 }
@@ -263,7 +364,10 @@ function cleanAndExtractText(element: Element): string {
     try {
       return cleanText(element.textContent || '');
     } catch (fallbackError) {
-      console.log('RecallOS: Fallback also failed in cleanAndExtractText:', fallbackError);
+      console.log(
+        'RecallOS: Fallback also failed in cleanAndExtractText:',
+        fallbackError
+      );
       return '';
     }
   }
@@ -297,7 +401,7 @@ function isBoilerplateText(text: string): boolean {
     /^(ad blocker|disable ad blocker)/i,
     /^(javascript|enable javascript)/i,
     /^(browser|upgrade|update)/i,
-    /^(mobile|desktop|tablet)/i
+    /^(mobile|desktop|tablet)/i,
   ];
   const shortText = text.toLowerCase().trim();
   if (shortText.length < 20) return true;
@@ -305,12 +409,23 @@ function isBoilerplateText(text: string): boolean {
 }
 function extractContentSummary(): string {
   const title = document.title;
-  const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
-  const ogDescription = document.querySelector('meta[property="og:description"]')?.getAttribute('content') || '';
-  const twitterDescription = document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') || '';
-  const mainHeading = document.querySelector('h1')?.textContent?.trim() || 
-                     document.querySelector('h2')?.textContent?.trim() || 
-                     document.querySelector('h3')?.textContent?.trim() || '';
+  const metaDescription =
+    document
+      .querySelector('meta[name="description"]')
+      ?.getAttribute('content') || '';
+  const ogDescription =
+    document
+      .querySelector('meta[property="og:description"]')
+      ?.getAttribute('content') || '';
+  const twitterDescription =
+    document
+      .querySelector('meta[name="twitter:description"]')
+      ?.getAttribute('content') || '';
+  const mainHeading =
+    document.querySelector('h1')?.textContent?.trim() ||
+    document.querySelector('h2')?.textContent?.trim() ||
+    document.querySelector('h3')?.textContent?.trim() ||
+    '';
   const paragraphs = Array.from(document.querySelectorAll('p'))
     .map(p => p.textContent?.trim())
     .filter(text => text && text.length > 50 && !isBoilerplateText(text));
@@ -324,29 +439,61 @@ function extractContentSummary(): string {
     metaDescription || ogDescription || twitterDescription,
     mainHeading,
     firstParagraph,
-    ...headings
+    ...headings,
   ].filter(text => text && text.length > 0);
   return summaryParts.join(' | ').substring(0, 800);
 }
 function extractContentType(): string {
   const url = window.location.href;
   const title = document.title.toLowerCase();
-  const metaKeywords = document.querySelector('meta[name="keywords"]')?.getAttribute('content')?.toLowerCase() || '';
-  if (url.includes('/blog/') || url.includes('/post/') || title.includes('blog')) return 'blog_post';
-  if (url.includes('/docs/') || url.includes('/documentation/') || title.includes('docs')) return 'documentation';
-  if (url.includes('/tutorial/') || url.includes('/guide/') || title.includes('tutorial') || title.includes('guide')) return 'tutorial';
+  const metaKeywords =
+    document
+      .querySelector('meta[name="keywords"]')
+      ?.getAttribute('content')
+      ?.toLowerCase() || '';
+  if (
+    url.includes('/blog/') ||
+    url.includes('/post/') ||
+    title.includes('blog')
+  )
+    return 'blog_post';
+  if (
+    url.includes('/docs/') ||
+    url.includes('/documentation/') ||
+    title.includes('docs')
+  )
+    return 'documentation';
+  if (
+    url.includes('/tutorial/') ||
+    url.includes('/guide/') ||
+    title.includes('tutorial') ||
+    title.includes('guide')
+  )
+    return 'tutorial';
   if (url.includes('/news/') || title.includes('news')) return 'news_article';
-  if (url.includes('/product/') || title.includes('product')) return 'product_page';
+  if (url.includes('/product/') || title.includes('product'))
+    return 'product_page';
   if (url.includes('/about/') || title.includes('about')) return 'about_page';
-  if (url.includes('/contact/') || title.includes('contact')) return 'contact_page';
-  if (url.includes('/search') || title.includes('search')) return 'search_results';
-  if (url.includes('/forum/') || url.includes('/discussion/')) return 'forum_post';
-  if (url.includes('/github.com/') || url.includes('/gitlab.com/')) return 'code_repository';
-  if (url.includes('/stackoverflow.com/') || url.includes('/stackexchange.com/')) return 'qa_thread';
-  if (url.includes('/youtube.com/') || url.includes('/vimeo.com/')) return 'video_content';
-  if (url.includes('/twitter.com/') || url.includes('/x.com/')) return 'social_media';
+  if (url.includes('/contact/') || title.includes('contact'))
+    return 'contact_page';
+  if (url.includes('/search') || title.includes('search'))
+    return 'search_results';
+  if (url.includes('/forum/') || url.includes('/discussion/'))
+    return 'forum_post';
+  if (url.includes('/github.com/') || url.includes('/gitlab.com/'))
+    return 'code_repository';
+  if (
+    url.includes('/stackoverflow.com/') ||
+    url.includes('/stackexchange.com/')
+  )
+    return 'qa_thread';
+  if (url.includes('/youtube.com/') || url.includes('/vimeo.com/'))
+    return 'video_content';
+  if (url.includes('/twitter.com/') || url.includes('/x.com/'))
+    return 'social_media';
   if (url.includes('/reddit.com/')) return 'reddit_post';
-  if (url.includes('/medium.com/') || url.includes('/substack.com/')) return 'article';
+  if (url.includes('/medium.com/') || url.includes('/substack.com/'))
+    return 'article';
   return 'web_page';
 }
 function extractKeyTopics(): string[] {
@@ -354,11 +501,32 @@ function extractKeyTopics(): string[] {
     .map(h => h.textContent?.trim())
     .filter(text => text && text.length > 0 && text.length < 100)
     .slice(0, 8);
-  const metaKeywords = document.querySelector('meta[name="keywords"]')?.getAttribute('content')?.split(',').map(k => k.trim()) || [];
-  const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || '';
-  const ogKeywords = document.querySelector('meta[property="og:keywords"]')?.getAttribute('content')?.split(',').map(k => k.trim()) || [];
-  const twitterTitle = document.querySelector('meta[name="twitter:title"]')?.getAttribute('content') || '';
-  const twitterKeywords = document.querySelector('meta[name="twitter:keywords"]')?.getAttribute('content')?.split(',').map(k => k.trim()) || [];
+  const metaKeywords =
+    document
+      .querySelector('meta[name="keywords"]')
+      ?.getAttribute('content')
+      ?.split(',')
+      .map(k => k.trim()) || [];
+  const ogTitle =
+    document
+      .querySelector('meta[property="og:title"]')
+      ?.getAttribute('content') || '';
+  const ogKeywords =
+    document
+      .querySelector('meta[property="og:keywords"]')
+      ?.getAttribute('content')
+      ?.split(',')
+      .map(k => k.trim()) || [];
+  const twitterTitle =
+    document
+      .querySelector('meta[name="twitter:title"]')
+      ?.getAttribute('content') || '';
+  const twitterKeywords =
+    document
+      .querySelector('meta[name="twitter:keywords"]')
+      ?.getAttribute('content')
+      ?.split(',')
+      .map(k => k.trim()) || [];
   const structuredData = extractStructuredDataTopics();
   const urlTopics = extractUrlTopics();
   const allTopics = [
@@ -369,14 +537,16 @@ function extractKeyTopics(): string[] {
     ...structuredData,
     ...urlTopics,
     ogTitle,
-    twitterTitle
+    twitterTitle,
   ].filter(topic => topic && topic.length > 2 && topic.length < 50);
   return [...new Set(allTopics)].slice(0, 20);
 }
 function extractStructuredDataTopics(): string[] {
   const topics: string[] = [];
   try {
-    const scripts = document.querySelectorAll('script[type="application/ld+json"]');
+    const scripts = document.querySelectorAll(
+      'script[type="application/ld+json"]'
+    );
     scripts.forEach(script => {
       try {
         const data = JSON.parse(script.textContent || '');
@@ -387,7 +557,9 @@ function extractStructuredDataTopics(): string[] {
           if (Array.isArray(data.keywords)) {
             topics.push(...data.keywords);
           } else if (typeof data.keywords === 'string') {
-            topics.push(...data.keywords.split(',').map((k: string) => k.trim()));
+            topics.push(
+              ...data.keywords.split(',').map((k: string) => k.trim())
+            );
           }
         }
         if (data.about) {
@@ -397,25 +569,27 @@ function extractStructuredDataTopics(): string[] {
             topics.push(data.about);
           }
         }
-      } catch (e) {
-      }
+      } catch (e) {}
     });
-  } catch (e) {
-  }
+  } catch (e) {}
   return topics;
 }
 function extractUrlTopics(): string[] {
   const url = window.location.href;
   const pathname = window.location.pathname;
-  const segments = pathname.split('/')
+  const segments = pathname
+    .split('/')
     .filter(segment => segment && segment.length > 2 && segment.length < 30)
-    .filter(segment => !/^\d+$/.test(segment)) 
-    .filter(segment => !/^(page|p|id|slug|post|article)$/i.test(segment)); 
+    .filter(segment => !/^\d+$/.test(segment))
+    .filter(segment => !/^(page|p|id|slug|post|article)$/i.test(segment));
   const domain = window.location.hostname;
   const domainTopics: string[] = [];
   if (domain.includes('github.com')) {
     domainTopics.push('programming', 'code', 'repository');
-  } else if (domain.includes('stackoverflow.com') || domain.includes('stackexchange.com')) {
+  } else if (
+    domain.includes('stackoverflow.com') ||
+    domain.includes('stackexchange.com')
+  ) {
     domainTopics.push('programming', 'question', 'answer');
   } else if (domain.includes('medium.com') || domain.includes('substack.com')) {
     domainTopics.push('article', 'blog', 'writing');
@@ -436,16 +610,32 @@ function extractReadingTime(): number {
 }
 function extractFullContent(): string {
   const fullText = extractVisibleText();
-  return fullText.length > 5000 ? fullText.substring(0, 5000) + '...' : fullText;
+  return fullText.length > 5000
+    ? fullText.substring(0, 5000) + '...'
+    : fullText;
 }
 function extractPageMetadata() {
-  const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement;
-  const keywords = document.querySelector('meta[name="keywords"]') as HTMLMetaElement;
-  const author = document.querySelector('meta[name="author"]') as HTMLMetaElement;
-  const viewport = document.querySelector('meta[name="viewport"]') as HTMLMetaElement;
-  const published = document.querySelector('meta[property="article:published_time"]') as HTMLMetaElement;
-  const modified = document.querySelector('meta[property="article:modified_time"]') as HTMLMetaElement;
-  const canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
+  const meta = document.querySelector(
+    'meta[name="description"]'
+  ) as HTMLMetaElement;
+  const keywords = document.querySelector(
+    'meta[name="keywords"]'
+  ) as HTMLMetaElement;
+  const author = document.querySelector(
+    'meta[name="author"]'
+  ) as HTMLMetaElement;
+  const viewport = document.querySelector(
+    'meta[name="viewport"]'
+  ) as HTMLMetaElement;
+  const published = document.querySelector(
+    'meta[property="article:published_time"]'
+  ) as HTMLMetaElement;
+  const modified = document.querySelector(
+    'meta[property="article:modified_time"]'
+  ) as HTMLMetaElement;
+  const canonical = document.querySelector(
+    'link[rel="canonical"]'
+  ) as HTMLLinkElement;
   return {
     description: meta?.content || '',
     keywords: keywords?.content || '',
@@ -454,14 +644,16 @@ function extractPageMetadata() {
     language: document.documentElement.lang || '',
     published_date: published?.content || '',
     modified_date: modified?.content || '',
-    canonical_url: canonical?.href || ''
+    canonical_url: canonical?.href || '',
   };
 }
 function extractPageStructure() {
-  const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'))
+  const headings = Array.from(
+    document.querySelectorAll('h1, h2, h3, h4, h5, h6')
+  )
     .map(h => h.textContent?.trim())
     .filter(text => text && text.length > 0)
-    .slice(0, 20); 
+    .slice(0, 20);
   const links = Array.from(document.querySelectorAll('a[href]'))
     .map(a => {
       const href = (a as HTMLAnchorElement).href;
@@ -480,8 +672,15 @@ function extractPageStructure() {
     .slice(0, 20);
   const forms = Array.from(document.querySelectorAll('form'))
     .map(form => {
-      const inputs = Array.from(form.querySelectorAll('input, textarea, select'))
-        .map(input => (input as HTMLInputElement).name || (input as HTMLInputElement).type || 'input')
+      const inputs = Array.from(
+        form.querySelectorAll('input, textarea, select')
+      )
+        .map(
+          input =>
+            (input as HTMLInputElement).name ||
+            (input as HTMLInputElement).type ||
+            'input'
+        )
         .join(', ');
       return inputs ? `Form with: ${inputs}` : 'Form';
     })
@@ -495,7 +694,9 @@ function extractPageStructure() {
       const headers = Array.from(table.querySelectorAll('th'))
         .map(th => th.textContent?.trim())
         .filter(text => text && text.length > 0);
-      return headers.length > 0 ? `Table with columns: ${headers.join(', ')}` : 'Table';
+      return headers.length > 0
+        ? `Table with columns: ${headers.join(', ')}`
+        : 'Table';
     })
     .slice(0, 5);
   return { headings, links, images, forms, code_blocks: codeBlocks, tables };
@@ -507,14 +708,18 @@ function extractContentQuality() {
   const hasCode = document.querySelectorAll('pre, code').length > 0;
   const hasTables = document.querySelectorAll('table').length > 0;
   const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
-  const avgWordsPerSentence = sentences.length > 0 ? wordCount / sentences.length : 0;
-  const readabilityScore = Math.max(0, Math.min(100, 100 - (avgWordsPerSentence - 10) * 2));
+  const avgWordsPerSentence =
+    sentences.length > 0 ? wordCount / sentences.length : 0;
+  const readabilityScore = Math.max(
+    0,
+    Math.min(100, 100 - (avgWordsPerSentence - 10) * 2)
+  );
   return {
     word_count: wordCount,
     has_images: hasImages,
     has_code: hasCode,
     has_tables: hasTables,
-    readability_score: Math.round(readabilityScore)
+    readability_score: Math.round(readabilityScore),
   };
 }
 function extractUserActivity() {
@@ -522,11 +727,11 @@ function extractUserActivity() {
     scroll_position: window.pageYOffset || document.documentElement.scrollTop,
     window_size: {
       width: window.innerWidth,
-      height: window.innerHeight
+      height: window.innerHeight,
     },
     focused_element: document.activeElement?.tagName || '',
     time_on_page: Date.now() - (window as any).pageLoadTime || 0,
-    interaction_count: (window as any).interactionCount || 0
+    interaction_count: (window as any).interactionCount || 0,
   };
 }
 function captureContext(): ContextData {
@@ -550,19 +755,26 @@ function captureContext(): ContextData {
       page_metadata: extractPageMetadata(),
       page_structure: extractPageStructure(),
       user_activity: extractUserActivity(),
-      content_quality: extractContentQuality()
+      content_quality: extractContentQuality(),
     };
   } catch (error) {
-    console.log('RecallOS: Error in captureContext, using minimal fallback:', error);
+    console.log(
+      'RecallOS: Error in captureContext, using minimal fallback:',
+      error
+    );
     return {
       source: 'extension',
       url: window.location.href,
       title: document.title || '',
-      content_snippet: 'Content extraction failed due to privacy extension conflicts',
+      content_snippet:
+        'Content extraction failed due to privacy extension conflicts',
       timestamp: Date.now(),
-      full_content: 'Content extraction failed due to privacy extension conflicts',
-      meaningful_content: 'Content extraction failed due to privacy extension conflicts',
-      content_summary: 'Content extraction failed due to privacy extension conflicts',
+      full_content:
+        'Content extraction failed due to privacy extension conflicts',
+      meaningful_content:
+        'Content extraction failed due to privacy extension conflicts',
+      content_summary:
+        'Content extraction failed due to privacy extension conflicts',
       content_type: 'web_page',
       key_topics: [],
       reading_time: 0,
@@ -574,28 +786,28 @@ function captureContext(): ContextData {
         language: '',
         published_date: '',
         modified_date: '',
-        canonical_url: ''
+        canonical_url: '',
       },
       page_structure: {
         headings: [],
         links: [],
         images: [],
-        forms: []
+        forms: [],
       },
       user_activity: {
         scroll_position: 0,
         window_size: { width: 0, height: 0 },
         focused_element: '',
         time_on_page: 0,
-        interaction_count: 0
+        interaction_count: 0,
       },
       content_quality: {
         word_count: 0,
         has_images: false,
         has_code: false,
         has_tables: false,
-        readability_score: 0
-      }
+        readability_score: 0,
+      },
     };
   }
 }
@@ -606,7 +818,7 @@ function sendContextToBackground() {
       return;
     }
     const now = Date.now();
-    if ((now - lastCaptureTime) < MIN_CAPTURE_INTERVAL) {
+    if (now - lastCaptureTime < MIN_CAPTURE_INTERVAL) {
       console.log('RecallOS: Skipping capture - too soon since last capture');
       return;
     }
@@ -614,15 +826,23 @@ function sendContextToBackground() {
     (contextData as any).privacy_extension_info = {
       detected: privacyExtensionDetected,
       type: privacyExtensionType,
-      compatibility_mode: privacyExtensionDetected
+      compatibility_mode: privacyExtensionDetected,
     };
     console.log('RecallOS: Captured context:', contextData);
-    console.log('RecallOS: Privacy extension detected:', privacyExtensionDetected, 'Type:', privacyExtensionType);
+    console.log(
+      'RecallOS: Privacy extension detected:',
+      privacyExtensionDetected,
+      'Type:',
+      privacyExtensionType
+    );
     chrome.runtime.sendMessage(
       { type: 'CAPTURE_CONTEXT', data: contextData },
-      (response) => {
+      response => {
         if (chrome.runtime.lastError) {
-          console.error('RecallOS: Error sending to background:', chrome.runtime.lastError);
+          console.error(
+            'RecallOS: Error sending to background:',
+            chrome.runtime.lastError
+          );
           return;
         }
         console.log('RecallOS: Background response:', response);
@@ -661,7 +881,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const walletAddress = localStorage.getItem('wallet_address');
       sendResponse({ walletAddress });
     } catch (error) {
-      console.error('RecallOS: Error getting wallet address from localStorage:', error);
+      console.error(
+        'RecallOS: Error getting wallet address from localStorage:',
+        error
+      );
       sendResponse({ walletAddress: null });
     }
     return true;
@@ -683,20 +906,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.type === 'GET_MONITORING_STATUS') {
-    sendResponse({ 
-      success: true, 
-      isActive, 
-      activityLevel, 
-      isMonitoring: !!captureInterval 
+    sendResponse({
+      success: true,
+      isActive,
+      activityLevel,
+      isMonitoring: !!captureInterval,
     });
     return true;
   }
 });
-window.addEventListener('message', (event) => {
+window.addEventListener('message', event => {
   if (event.data.type === 'WALLET_ADDRESS' && event.data.walletAddress) {
-    chrome.storage.sync.set({ wallet_address: event.data.walletAddress }, () => {
-      console.log('RecallOS: Wallet address received and stored from frontend');
-    });
+    chrome.storage.sync.set(
+      { wallet_address: event.data.walletAddress },
+      () => {
+        console.log(
+          'RecallOS: Wallet address received and stored from frontend'
+        );
+      }
+    );
   }
 });
 setInterval(() => {
@@ -704,13 +932,15 @@ setInterval(() => {
     const walletAddress = localStorage.getItem('wallet_address');
     if (walletAddress) {
       chrome.storage.sync.set({ wallet_address: walletAddress }, () => {
-        console.log('RecallOS: Wallet address synced from localStorage:', walletAddress);
+        console.log(
+          'RecallOS: Wallet address synced from localStorage:',
+          walletAddress
+        );
       });
     }
-  } catch (error) {
-  }
+  } catch (error) {}
 }, 2000);
-chrome.storage.sync.get(['wallet_address'], (result) => {
+chrome.storage.sync.get(['wallet_address'], result => {
   if (result.wallet_address) {
   } else {
     console.log('RecallOS: No wallet address found in storage');
@@ -722,25 +952,32 @@ function hasContentChanged(): boolean {
   const currentContent = extractVisibleText();
   const urlChanged = currentUrl !== lastUrl;
   const titleChanged = currentTitle !== lastTitle;
-  const contentChanged = currentContent !== lastContent && 
+  const contentChanged =
+    currentContent !== lastContent &&
     (Math.abs(currentContent.length - lastContent.length) > 100 ||
-     currentContent.substring(0, 200) !== lastContent.substring(0, 200));
+      currentContent.substring(0, 200) !== lastContent.substring(0, 200));
   return urlChanged || titleChanged || contentChanged;
 }
 function shouldCaptureBasedOnActivity(): boolean {
   const now = Date.now();
   const timeSinceLastActivity = now - lastActivityTime;
   const timeSinceLastCapture = now - lastCaptureTime;
-  return hasUserActivity && 
-         timeSinceLastCapture >= MIN_CAPTURE_INTERVAL &&
-         (hasContentChanged() || timeSinceLastActivity >= ACTIVITY_TIMEOUT);
+  return (
+    hasUserActivity &&
+    timeSinceLastCapture >= MIN_CAPTURE_INTERVAL &&
+    (hasContentChanged() || timeSinceLastActivity >= ACTIVITY_TIMEOUT)
+  );
 }
 function getMonitoringInterval(): number {
   switch (activityLevel) {
-    case 'high': return 10000;
-    case 'normal': return 20000;
-    case 'low': return 60000;
-    default: return 20000;
+    case 'high':
+      return 10000;
+    case 'normal':
+      return 20000;
+    case 'low':
+      return 60000;
+    default:
+      return 20000;
   }
 }
 function updateActivityLevel() {

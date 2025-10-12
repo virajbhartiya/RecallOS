@@ -1,5 +1,7 @@
 import Queue from 'bull';
+
 export let contentQueue: Queue.Queue | null = null;
+
 if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {
   contentQueue = new Queue('content processing', {
     redis: {
@@ -18,8 +20,11 @@ if (process.env.REDIS_PASSWORD && process.env.REDIS_PASSWORD.trim() !== '') {
     },
   });
 } else {
-  console.warn('Redis password not configured. Queue functionality will be disabled.');
+  console.warn(
+    'Redis password not configured. Queue functionality will be disabled.'
+  );
 }
+
 export interface ContentJobData {
   user_id: string;
   raw_text: string;
@@ -34,9 +39,13 @@ export interface ContentJobData {
     content_summary?: string;
   };
 }
+
 export const addContentJob = async (data: ContentJobData) => {
   if (!contentQueue) {
-    throw new Error('Content queue is not available. Please configure Redis properly.');
+    throw new Error(
+      'Content queue is not available. Please configure Redis properly.'
+    );
   }
+
   return await contentQueue.add('process-content', data);
 };
