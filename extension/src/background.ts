@@ -74,12 +74,21 @@ async function sendToBackend(data: ContextData): Promise<void> {
     const privacyInfo = (data as any).privacy_extension_info;
     const hasPrivacyConflicts = privacyInfo?.detected || false;
 
+    // Validate content before sending
+    const content = data.meaningful_content || data.content_snippet || data.full_content || '';
+    const isValidContent = content && 
+                          content.length > 50 && 
+                          !content.includes('Content extraction failed') &&
+                          !content.includes('No content available');
+
+    // Don't send if content is invalid or privacy extensions are blocking
+    if (!isValidContent) {
+      console.log('RecallOS: Invalid or blocked content, skipping backend send');
+      return;
+    }
+
     const payload = {
-      content:
-        data.meaningful_content ||
-        data.content_snippet ||
-        data.full_content ||
-        'No content available',
+      content: content,
       url: data.url,
       title: data.title,
       userAddress: walletAddress ? walletAddress.toLowerCase() : 'anonymous',
