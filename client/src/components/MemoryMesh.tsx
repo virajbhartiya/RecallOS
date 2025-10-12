@@ -36,10 +36,11 @@ const Node: React.FC<{
     return () => clearInterval(interval)
   }, [])
 
-  const color = nodeColors[node.type]
-  const size = node.type === 'reasoning' ? 12 : node.type === 'on_chain' ? 10 : 8
+  const color = nodeColors[node.type] || '#666666'
+  const baseSize = Math.max(6, Math.min(16, 8 + (node.importance_score || 0) * 8))
   const scale = isActive ? 1.5 : isHovered ? 1.2 : 1
-  const pulseScale = 1 + Math.sin(pulse) * 0.1
+  const pulseScale = 1 + Math.sin(pulse) * 0.05
+  const finalSize = baseSize * scale * pulseScale
 
   return (
     <g>
@@ -48,8 +49,21 @@ const Node: React.FC<{
         <circle
           cx={node.x}
           cy={node.y}
-          r={size * 1.5 * scale}
+          r={finalSize * 1.8}
           fill="#b8b8ff"
+          opacity={0.2}
+        />
+      )}
+      
+      {/* Connection indicator for nodes with relationships */}
+      {node.importance_score && node.importance_score > 0 && (
+        <circle
+          cx={node.x}
+          cy={node.y}
+          r={finalSize + 2}
+          fill="none"
+          stroke={color}
+          strokeWidth={1}
           opacity={0.3}
         />
       )}
@@ -58,9 +72,9 @@ const Node: React.FC<{
       <circle
         cx={node.x}
         cy={node.y}
-        r={size * scale * pulseScale}
+        r={finalSize}
         fill={color}
-        opacity={0.8}
+        opacity={0.9}
         stroke="#000"
         strokeWidth={1}
         onClick={onClick}
@@ -75,18 +89,41 @@ const Node: React.FC<{
         style={{ cursor: 'pointer' }}
       />
       
+      {/* Type indicator */}
+      <text
+        x={node.x}
+        y={node.y + 3}
+        textAnchor="middle"
+        fontSize="8"
+        fill="#fff"
+        fontFamily="monospace"
+        fontWeight="bold"
+      >
+        {node.type.charAt(0).toUpperCase()}
+      </text>
+      
       {/* Label on hover */}
       {(hovered || isActive) && (
-        <text
-          x={node.x}
-          y={node.y - size - 5}
-          textAnchor="middle"
-          fontSize="10"
-          fill="#000"
-          fontFamily="monospace"
-        >
-          {node.label}
-        </text>
+        <g>
+          <rect
+            x={node.x - 40}
+            y={node.y - finalSize - 25}
+            width={80}
+            height={20}
+            fill="rgba(0,0,0,0.8)"
+            rx={3}
+          />
+          <text
+            x={node.x}
+            y={node.y - finalSize - 10}
+            textAnchor="middle"
+            fontSize="9"
+            fill="#fff"
+            fontFamily="monospace"
+          >
+            {node.label}
+          </text>
+        </g>
       )}
     </g>
   )
@@ -96,16 +133,44 @@ const Edge: React.FC<{
   source: MemoryMeshNode
   target: MemoryMeshNode
   isHighlighted: boolean
-}> = ({ source, target, isHighlighted }) => {
+  relationType?: string
+  similarityScore?: number
+}> = ({ source, target, isHighlighted, relationType, similarityScore }) => {
+  const getEdgeColor = (type?: string) => {
+    switch (type) {
+      case 'semantic': return '#4A90E2'
+      case 'topical': return '#FFD700'
+      case 'temporal': return '#FF5C5C'
+      default: return '#666666'
+    }
+  }
+
+  const getEdgeStyle = (type?: string) => {
+    switch (type) {
+      case 'semantic': return 'solid'
+      case 'topical': return 'dashed'
+      case 'temporal': return 'dotted'
+      default: return 'solid'
+    }
+  }
+
+  const color = getEdgeColor(relationType)
+  const strokeDasharray = getEdgeStyle(relationType) === 'dashed' ? '5,5' : 
+                         getEdgeStyle(relationType) === 'dotted' ? '2,2' : 'none'
+  
+  const opacity = isHighlighted ? 0.8 : Math.max(0.2, (similarityScore || 0.3) * 0.6)
+  const strokeWidth = isHighlighted ? 2 : Math.max(1, (similarityScore || 0.3) * 2)
+
   return (
     <line
       x1={source.x}
       y1={source.y}
       x2={target.x}
       y2={target.y}
-      stroke={isHighlighted ? "#b8b8ff" : "rgba(0,0,0,0.1)"}
-      strokeWidth={isHighlighted ? 2 : 1}
-      opacity={isHighlighted ? 0.8 : 0.3}
+      stroke={isHighlighted ? "#b8b8ff" : color}
+      strokeWidth={strokeWidth}
+      strokeDasharray={strokeDasharray}
+      opacity={opacity}
     />
   )
 }
@@ -141,28 +206,104 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
         setIsLoading(false)
       }
     }
+    
 
     fetchMeshData()
   }, [userAddress])
 
-  // Transform API data to visualization format
+  // Force-directed layout algorithm
+  const layoutNodes = (nodes: MemoryMeshNode[], edges: { source: string; target: string; relation_type?: string; similarity_score?: number }[]) => {
+    const width = 400
+    const height = 300
+    const iterations = 100
+    const k = Math.sqrt((width * height) / nodes.length)
+    
+    // Initialize positions
+    const positionedNodes = nodes.map((node, i) => ({
+      ...node,
+      x: (i % 3) * (width / 3) + width / 6 + Math.random() * 50 - 25,
+      y: Math.floor(i / 3) * (height / Math.ceil(nodes.length / 3)) + height / 6 + Math.random() * 50 - 25,
+      vx: 0,
+      vy: 0
+    }))
+
+    // Force simulation
+    for (let iter = 0; iter < iterations; iter++) {
+      // Repulsion forces between all nodes
+      for (let i = 0; i < positionedNodes.length; i++) {
+        for (let j = i + 1; j < positionedNodes.length; j++) {
+          const dx = positionedNodes[i].x - positionedNodes[j].x
+          const dy = positionedNodes[i].y - positionedNodes[j].y
+          const distance = Math.sqrt(dx * dx + dy * dy) || 1
+          const force = (k * k) / distance
+          
+          positionedNodes[i].vx += (dx / distance) * force * 0.01
+          positionedNodes[i].vy += (dy / distance) * force * 0.01
+          positionedNodes[j].vx -= (dx / distance) * force * 0.01
+          positionedNodes[j].vy -= (dy / distance) * force * 0.01
+        }
+      }
+
+      // Attraction forces for connected nodes
+      edges.forEach(edge => {
+        const source = positionedNodes.find(n => n.id === edge.source)
+        const target = positionedNodes.find(n => n.id === edge.target)
+        
+        if (source && target) {
+          const dx = target.x - source.x
+          const dy = target.y - source.y
+          const distance = Math.sqrt(dx * dx + dy * dy) || 1
+          const force = (distance * distance) / k
+          
+          source.vx += (dx / distance) * force * 0.01
+          source.vy += (dy / distance) * force * 0.01
+          target.vx -= (dx / distance) * force * 0.01
+          target.vy -= (dy / distance) * force * 0.01
+        }
+      })
+
+      // Apply velocity and damping
+      positionedNodes.forEach(node => {
+        node.vx *= 0.9
+        node.vy *= 0.9
+        node.x += node.vx
+        node.y += node.vy
+        
+        // Keep nodes within bounds
+        node.x = Math.max(30, Math.min(width - 30, node.x))
+        node.y = Math.max(30, Math.min(height - 30, node.y))
+      })
+    }
+
+    return positionedNodes.map(node => ({
+      id: node.id,
+      type: node.type,
+      label: node.label,
+      memory_id: node.memory_id,
+      title: node.title,
+      summary: node.summary,
+      importance_score: node.importance_score,
+      x: node.x,
+      y: node.y
+    }))
+  }
+
+  // Transform API data to visualization format with proper positioning
   const { nodes, edges } = useMemo(() => {
-    if (!meshData) {
+    if (!meshData || !meshData.nodes || meshData.nodes.length === 0) {
       return { nodes: [], edges: [] }
     }
 
-    // Transform nodes with positioning
-    const transformedNodes = meshData.nodes.map((node) => ({
-      ...node,
-      x: Math.random() * 300 + 50,
-      y: Math.random() * 200 + 50
-    }))
+    // Use force-directed layout algorithm for better positioning
+    const transformedNodes = layoutNodes(meshData.nodes, meshData.edges || [])
+    const processedEdges = meshData.edges || []
 
     return {
       nodes: transformedNodes,
-      edges: meshData.edges
+      edges: processedEdges
     }
   }, [meshData])
+
 
   // Auto-rotation effect
   useEffect(() => {
@@ -253,6 +394,8 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
                 source={sourceNode}
                 target={targetNode}
                 isHighlighted={isHighlighted}
+                relationType={edge.relation_type}
+                similarityScore={edge.similarity_score}
               />
             )
           })}
@@ -270,6 +413,46 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
           ))}
         </svg>
         
+        {/* Legend */}
+        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg p-3 text-xs font-mono">
+          <div className="font-bold mb-2">Memory Types</div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+              <span>Manual</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <span>On-chain</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+              <span>Browser</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full bg-red-500"></div>
+              <span>Reasoning</span>
+            </div>
+          </div>
+          <div className="mt-3 pt-2 border-t border-gray-200">
+            <div className="font-bold mb-1">Relationships</div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-blue-500"></div>
+                <span>Semantic</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-yellow-500 border-dashed border-t border-yellow-500"></div>
+                <span>Topical</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-0.5 bg-red-500 border-dotted border-t border-red-500"></div>
+                <span>Temporal</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Overlay text */}
         <div className="absolute bottom-4 left-4 text-xs font-mono text-gray-500">
           [FIG. 3] Live Memory Mesh ({nodes.length} nodes, {edges.length} connections)

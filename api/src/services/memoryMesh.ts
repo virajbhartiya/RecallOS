@@ -420,23 +420,62 @@ export class MemoryMeshService {
                   url: true,
                   created_at: true,
                   summary: true,
+                  source: true,
+                  timestamp: true,
                 },
               },
             },
             orderBy: { similarity_score: 'desc' },
-            take: 5,
+            take: 10,
           },
         },
         orderBy: { created_at: 'desc' },
         take: limit,
       });
 
+      // Create nodes from memories
+      const nodes = memories.map((memory: any) => ({
+        id: memory.id,
+        type: memory.source || 'on_chain',
+        label: memory.title || memory.summary?.substring(0, 20) || 'Memory',
+        memory_id: memory.id,
+        title: memory.title,
+        summary: memory.summary,
+        importance_score: memory.related_memories.length / 10, // Normalize to 0-1
+        x: 0, // Will be calculated by frontend
+        y: 0, // Will be calculated by frontend
+      }));
+
+      // Create edges from relationships
+      const edges: any[] = [];
+      const nodeIds = new Set(nodes.map(n => n.id));
+      
+      memories.forEach((memory: any) => {
+        memory.related_memories.forEach((relation: any) => {
+          if (nodeIds.has(relation.related_memory.id)) {
+            edges.push({
+              source: memory.id,
+              target: relation.related_memory.id,
+              relation_type: relation.relation_type || 'semantic',
+              similarity_score: relation.similarity_score,
+            });
+          }
+        });
+      });
+
+      // Create clusters based on source types
+      const clusters: { [key: string]: string[] } = {};
+      nodes.forEach(node => {
+        if (!clusters[node.type]) {
+          clusters[node.type] = [];
+        }
+        clusters[node.type].push(node.id);
+      });
+
       return {
-        memories: memories.map((memory: any) => ({
-          ...memory,
-          related_count: memory.related_memories.length,
-          has_embeddings: memory.embeddings.length > 0,
-        })),
+        nodes,
+        edges,
+        clusters,
       };
     } catch (error) {
       console.error(`Error getting memory mesh for user ${userId}:`, error);
