@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState, useEffect } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 
 interface MemoryNode {
   id: string
@@ -122,9 +122,7 @@ const Edge: React.FC<{
 export const MemoryMesh: React.FC<MemoryMeshProps> = ({
   className = '',
   autoRotate = true,
-  zoomOnHover = true,
-  expandNodeOnClick = true,
-  particleTrailOnHover = true
+  expandNodeOnClick = true
 }) => {
   const [activeNode, setActiveNode] = useState<string | null>(null)
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
