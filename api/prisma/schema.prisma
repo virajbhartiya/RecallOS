@@ -1,29 +1,18 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 model User {
   id              String   @id @default(uuid()) @db.Uuid
   wallet_address  String   @unique
-  privy_user_id   String?
   created_at      DateTime @default(now())
-  
-  // Relations
   memories        Memory[]
-  summarized_content SummarizedContent[]
   memory_snapshots MemorySnapshot[]
-  
   @@map("users")
 }
-
 model Memory {
   id              String   @id @default(uuid()) @db.Uuid
   user_id         String   @db.Uuid
@@ -35,91 +24,52 @@ model Memory {
   hash            String?  @unique
   timestamp       BigInt
   created_at      DateTime @default(now())
-  
-  // Additional fields for rich context
   full_content    String?
   page_metadata   Json?
-  page_structure  Json?
-  user_activity   Json?
-  
-  // Memory mesh fields
   importance_score Float?   @default(0.0)
   access_count     Int      @default(0)
   last_accessed    DateTime @default(now())
-  
-  // Blockchain transaction fields
   tx_hash         String?  @unique
   block_number    BigInt?
   gas_used        String?
-  tx_status       String?  @default("pending") // pending, confirmed, failed
+  tx_status       String?  @default("pending") 
   blockchain_network String? @default("sepolia")
   confirmed_at    DateTime?
-  
-  // Relations
   user            User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
   embeddings      Embedding[]
   related_memories MemoryRelation[] @relation("MemoryRelations")
   related_to_memories MemoryRelation[] @relation("RelatedMemories")
-  
   @@map("memories")
 }
-
 model Embedding {
   id              String   @id @default(uuid()) @db.Uuid
   memory_id       String   @db.Uuid
-  vector          Float[]  // Store as actual float array for better performance
+  vector          Float[]  
   model_name      String
-  embedding_type  String   @default("content") // content, summary, title
+  embedding_type  String   @default("content") 
   created_at      DateTime @default(now())
-  
-  // Relations
   memory          Memory   @relation(fields: [memory_id], references: [id], onDelete: Cascade)
-  
   @@map("embeddings")
 }
-
 model MemoryRelation {
   id              String   @id @default(uuid()) @db.Uuid
   memory_id       String   @db.Uuid
   related_memory_id String @db.Uuid
   similarity_score Float
-  relation_type   String   // semantic, temporal, topical, user_behavior
+  relation_type   String   
   created_at      DateTime @default(now())
-  
-  // Relations
   memory          Memory   @relation("MemoryRelations", fields: [memory_id], references: [id], onDelete: Cascade)
   related_memory  Memory   @relation("RelatedMemories", fields: [related_memory_id], references: [id], onDelete: Cascade)
-  
   @@unique([memory_id, related_memory_id])
   @@map("memory_relations")
 }
-
-
-model SummarizedContent {
-  id              String   @id @default(uuid()) @db.Uuid
-  user_id         String   @db.Uuid
-  original_text   String
-  summary         String
-  created_at      DateTime @default(now())
-  
-  // Relations
-  user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  
-  @@map("summarized_content")
-}
-
 model MemorySnapshot {
   id                    String   @id @default(uuid()) @db.Uuid
   user_id               String   @db.Uuid
   raw_text              String
   summary               String
   summary_hash          String   @unique
-  nexus_commit_hash     String?
-  cross_chain_proofs    Json?
   created_at            DateTime @default(now())
-  
-  // Relations
   user                  User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  
   @@map("memory_snapshots")
 }

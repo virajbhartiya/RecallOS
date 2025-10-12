@@ -1,7 +1,5 @@
 # On-Chain Memory Data Flow
-
 ## Data Flow Diagram
-
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   User Memory   │───▶│   Database       │───▶│   Gemini AI     │
@@ -14,9 +12,7 @@
 │   Storage       │    │   & Batching     │    │   Memory Data   │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
-
 ## Detailed Data Structure
-
 ### 1. Raw Memory Data
 ```
 MemoryData {
@@ -36,7 +32,6 @@ MemoryData {
   }
 }
 ```
-
 ### 2. Hash Generation Process
 ```
 1. Sort object keys alphabetically
@@ -44,21 +39,18 @@ MemoryData {
 3. Apply Keccak256 hashing
 4. Result: 0x8f4e2a1b3c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b
 ```
-
 ### 3. On-Chain Storage
 ```
 Smart Contract Storage:
 ├── batches[merkleRoot] → BatchMetadata
 ├── verifiedHashes[hash] → bool
 └── userMemories[user] → bytes32[]
-
 BatchMetadata {
   user: address,
   timestamp: uint256,
   hashCount: uint256
 }
 ```
-
 ### 4. Transaction Data
 ```
 Transaction {
@@ -69,9 +61,7 @@ Transaction {
   logs: [MemoryBatchSubmitted event]
 }
 ```
-
 ## Example Memory Data
-
 ### Real Example:
 ```json
 {
@@ -105,40 +95,30 @@ Transaction {
   }
 }
 ```
-
 ### Generated Hash:
 ```
 0x8f4e2a1b3c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b
 ```
-
 ## Verification Process
-
 ### To Verify a Memory:
 1. **Reconstruct** the original memory data
 2. **Generate** the hash using the same process
 3. **Check** if hash exists in `verifiedHashes` mapping
 4. **Verify** Merkle proof against batch's merkle root
-
 ### Verification Code:
 ```javascript
 // 1. Reconstruct memory data
 const memoryData = { /* complete memory object */ };
-
 // 2. Generate hash
 const hash = createMemoryHash(memoryData);
-
 // 3. Verify on-chain
 const isVerified = await contract.getMemoryStatus(hash);
-
 // 4. Get Merkle proof
 const proof = getMemoryProof(memoryData, allMemoriesInBatch);
-
 // 5. Verify Merkle proof
 const isValid = await contract.verifyMemory(hash, proof, merkleRoot);
 ```
-
 ## Key Benefits
-
 - ✅ **Complete Data**: All memory context stored
 - ✅ **Immutable**: Cannot be modified once stored
 - ✅ **Verifiable**: Anyone can verify using Merkle proofs

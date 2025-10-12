@@ -20,7 +20,9 @@
     "docker:down": "docker-compose down",
     "docker:restart": "docker-compose restart",
     "docker:logs": "docker-compose logs -f",
-    "setup": "npm run docker:up && sleep 10 && npm run db:setup"
+    "setup": "npm run docker:up && sleep 10 && npm run db:setup",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "keywords": [
     "Startup Marketplace"

@@ -45,26 +45,21 @@ interface ContextData {
     readability_score?: number;
   };
 }
-
 let lastUrl = location.href;
 let lastContent = '';
 let lastTitle = '';
-let captureInterval: number | null = null;
+let captureInterval: ReturnType<typeof setInterval> | null = null;
 let isActive = true;
 let activityLevel = 'normal';
 let lastActivityTime = Date.now();
 let lastCaptureTime = 0;
 let hasUserActivity = false;
-const MIN_CAPTURE_INTERVAL = 10000; // Minimum 10 seconds between captures
-const ACTIVITY_TIMEOUT = 30000; // 30 seconds of inactivity before capturing
-
-// Privacy extension detection and handling
+const MIN_CAPTURE_INTERVAL = 10000; 
+const ACTIVITY_TIMEOUT = 30000; 
 let privacyExtensionDetected = false;
 let privacyExtensionType = 'unknown';
-
 function detectPrivacyExtensions(): void {
   try {
-    // Check for common privacy extensions that might interfere
     const privacyExtensions = [
       'uBlock Origin',
       'AdBlock Plus',
@@ -77,25 +72,18 @@ function detectPrivacyExtensions(): void {
       'ScriptSafe',
       'uMatrix'
     ];
-
-    // Check if any privacy extensions are likely active
     const hasAdBlockers = document.querySelectorAll('[id*="adblock"], [class*="adblock"], [id*="ublock"], [class*="ublock"]').length > 0;
     const hasPrivacyElements = document.querySelectorAll('[id*="privacy"], [class*="privacy"], [id*="ghostery"], [class*="ghostery"]').length > 0;
-    
     if (hasAdBlockers || hasPrivacyElements) {
       privacyExtensionDetected = true;
       privacyExtensionType = 'adblocker';
       console.log('RecallOS: Privacy extension detected, enabling compatibility mode');
     }
-
-    // Check for CSP (Content Security Policy) restrictions
     if (document.querySelector('meta[http-equiv="Content-Security-Policy"]')) {
       privacyExtensionDetected = true;
       privacyExtensionType = 'csp';
       console.log('RecallOS: CSP detected, enabling compatibility mode');
     }
-
-    // Check for iframe restrictions
     try {
       const testIframe = document.createElement('iframe');
       testIframe.style.display = 'none';
@@ -106,27 +94,19 @@ function detectPrivacyExtensions(): void {
       privacyExtensionType = 'iframe_restriction';
       console.log('RecallOS: Iframe restrictions detected, enabling compatibility mode');
     }
-
   } catch (error) {
     console.log('RecallOS: Error detecting privacy extensions:', error);
   }
 }
-
-// Initialize page tracking
 (window as any).pageLoadTime = Date.now();
 (window as any).interactionCount = 0;
-
-// Detect privacy extensions on load
 detectPrivacyExtensions();
-
 function extractVisibleText(): string {
   try {
-    // Check if document.body exists and is accessible
     if (!document.body || !document.body.textContent) {
       console.log('RecallOS: Document body not accessible, using fallback');
       return document.documentElement?.textContent || document.title || '';
     }
-
     const walker = document.createTreeWalker(
       document.body,
       NodeFilter.SHOW_TEXT,
@@ -135,25 +115,20 @@ function extractVisibleText(): string {
           try {
             const parent = node.parentElement;
             if (!parent) return NodeFilter.FILTER_REJECT;
-            
             const style = window.getComputedStyle(parent);
             if (style.display === 'none' || style.visibility === 'hidden') {
               return NodeFilter.FILTER_REJECT;
             }
-            
             return NodeFilter.FILTER_ACCEPT;
           } catch (error) {
-            // If we can't access computed styles due to privacy extensions, accept the node
             console.log('RecallOS: Privacy extension blocking style access, accepting node');
             return NodeFilter.FILTER_ACCEPT;
           }
         }
       }
     );
-
     const textNodes: string[] = [];
     let node;
-    
     while (node = walker.nextNode()) {
       try {
         const text = node.textContent?.trim();
@@ -165,11 +140,9 @@ function extractVisibleText(): string {
         continue;
       }
     }
-    
     return textNodes.join(' ');
   } catch (error) {
     console.log('RecallOS: Error in extractVisibleText, using fallback:', error);
-    // Fallback to simpler text extraction
     try {
       return document.body?.textContent || document.documentElement?.textContent || document.title || '';
     } catch (fallbackError) {
@@ -178,16 +151,12 @@ function extractVisibleText(): string {
     }
   }
 }
-
 function extractMeaningfulContent(): string {
   try {
-    // Check if document.body is accessible
     if (!document.body || !document.body.innerHTML) {
       console.log('RecallOS: Document body not accessible for meaningful content extraction');
       return extractVisibleText();
     }
-
-    // Remove common boilerplate elements
     const boilerplateSelectors = [
       'nav', 'header', 'footer', '.nav', '.navigation', '.menu', '.sidebar',
       '.advertisement', '.ads', '.ad', '.promo', '.banner', '.cookie-notice',
@@ -204,8 +173,6 @@ function extractMeaningfulContent(): string {
       '.sponsor', '.sponsored', '.affiliate', '.partner',
       '.disclaimer', '.legal', '.terms-of-service', '.privacy-policy'
     ];
-
-    // Remove boilerplate elements with error handling
     const tempDiv = document.createElement('div');
     try {
       tempDiv.innerHTML = document.body.innerHTML;
@@ -213,7 +180,6 @@ function extractMeaningfulContent(): string {
       console.log('RecallOS: Error accessing innerHTML, using textContent fallback');
       tempDiv.textContent = document.body.textContent || '';
     }
-    
     boilerplateSelectors.forEach(selector => {
       try {
         const elements = tempDiv.querySelectorAll(selector);
@@ -222,8 +188,6 @@ function extractMeaningfulContent(): string {
         console.log('RecallOS: Error removing boilerplate elements:', error);
       }
     });
-
-    // Priority order for content extraction
     const contentSelectors = [
       'article', 'main', '[role="main"]', '.content', '.post', '.article',
       '.entry', '.story', '.blog-post', '.news-article', '.tutorial',
@@ -231,10 +195,7 @@ function extractMeaningfulContent(): string {
       '.body', '.main-content', '.article-content', '.post-content',
       '.entry-content', '.page-content', '.content-body'
     ];
-    
     let meaningfulContent = '';
-    
-    // Try to find main content areas first
     for (const selector of contentSelectors) {
       try {
         const element = tempDiv.querySelector(selector);
@@ -250,8 +211,6 @@ function extractMeaningfulContent(): string {
         continue;
       }
     }
-    
-    // If no main content found, extract from meaningful paragraphs and headings
     if (!meaningfulContent) {
       try {
         const meaningfulElements = tempDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote, div');
@@ -265,7 +224,6 @@ function extractMeaningfulContent(): string {
           })
           .filter(text => text && text.length > 30 && !isBoilerplateText(text))
           .join(' ');
-        
         if (paragraphs.length > 200) {
           meaningfulContent = paragraphs;
         }
@@ -273,8 +231,6 @@ function extractMeaningfulContent(): string {
         console.log('RecallOS: Error extracting meaningful elements:', error);
       }
     }
-    
-    // Fallback to cleaned visible text if nothing else works
     if (!meaningfulContent) {
       try {
         meaningfulContent = cleanAndExtractText(tempDiv);
@@ -283,20 +239,15 @@ function extractMeaningfulContent(): string {
         meaningfulContent = extractVisibleText();
       }
     }
-    
-    // Final cleanup and limit content
     return cleanText(meaningfulContent).substring(0, 10000);
   } catch (error) {
     console.log('RecallOS: Error in extractMeaningfulContent, using fallback:', error);
     return extractVisibleText();
   }
 }
-
 function cleanAndExtractText(element: Element): string {
   if (!element) return '';
-  
   try {
-    // Remove script and style elements with error handling
     const scripts = element.querySelectorAll('script, style, noscript');
     scripts.forEach(el => {
       try {
@@ -305,13 +256,10 @@ function cleanAndExtractText(element: Element): string {
         console.log('RecallOS: Error removing script/style element:', error);
       }
     });
-    
-    // Get text content and clean it
     const text = element.textContent || '';
     return cleanText(text);
   } catch (error) {
     console.log('RecallOS: Error in cleanAndExtractText:', error);
-    // Fallback to direct text access
     try {
       return cleanText(element.textContent || '');
     } catch (fallbackError) {
@@ -320,7 +268,6 @@ function cleanAndExtractText(element: Element): string {
     }
   }
 }
-
 function cleanText(text: string): string {
   return text
     .replace(/\s+/g, ' ')
@@ -329,7 +276,6 @@ function cleanText(text: string): string {
     .replace(/\s+/g, ' ')
     .trim();
 }
-
 function isBoilerplateText(text: string): boolean {
   const boilerplatePatterns = [
     /^(cookie|privacy|terms|subscribe|newsletter|follow us|share|like|comment)/i,
@@ -353,40 +299,26 @@ function isBoilerplateText(text: string): boolean {
     /^(browser|upgrade|update)/i,
     /^(mobile|desktop|tablet)/i
   ];
-  
   const shortText = text.toLowerCase().trim();
-  
-  // Check if text is too short to be meaningful
   if (shortText.length < 20) return true;
-  
-  // Check against boilerplate patterns
   return boilerplatePatterns.some(pattern => pattern.test(shortText));
 }
-
 function extractContentSummary(): string {
   const title = document.title;
   const metaDescription = document.querySelector('meta[name="description"]')?.getAttribute('content') || '';
   const ogDescription = document.querySelector('meta[property="og:description"]')?.getAttribute('content') || '';
   const twitterDescription = document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') || '';
-  
-  // Get the main heading (prefer h1, fallback to first h2/h3)
   const mainHeading = document.querySelector('h1')?.textContent?.trim() || 
                      document.querySelector('h2')?.textContent?.trim() || 
                      document.querySelector('h3')?.textContent?.trim() || '';
-  
-  // Get the first meaningful paragraph (skip boilerplate)
   const paragraphs = Array.from(document.querySelectorAll('p'))
     .map(p => p.textContent?.trim())
     .filter(text => text && text.length > 50 && !isBoilerplateText(text));
   const firstParagraph = paragraphs[0] || '';
-  
-  // Get key topics from headings
   const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
     .map(h => h.textContent?.trim())
     .filter(text => text && text.length > 0 && text.length < 100)
     .slice(0, 3);
-  
-  // Combine meaningful elements
   const summaryParts = [
     title,
     metaDescription || ogDescription || twitterDescription,
@@ -394,16 +326,12 @@ function extractContentSummary(): string {
     firstParagraph,
     ...headings
   ].filter(text => text && text.length > 0);
-  
   return summaryParts.join(' | ').substring(0, 800);
 }
-
 function extractContentType(): string {
   const url = window.location.href;
   const title = document.title.toLowerCase();
   const metaKeywords = document.querySelector('meta[name="keywords"]')?.getAttribute('content')?.toLowerCase() || '';
-  
-  // Determine content type based on URL patterns and content
   if (url.includes('/blog/') || url.includes('/post/') || title.includes('blog')) return 'blog_post';
   if (url.includes('/docs/') || url.includes('/documentation/') || title.includes('docs')) return 'documentation';
   if (url.includes('/tutorial/') || url.includes('/guide/') || title.includes('tutorial') || title.includes('guide')) return 'tutorial';
@@ -419,35 +347,20 @@ function extractContentType(): string {
   if (url.includes('/twitter.com/') || url.includes('/x.com/')) return 'social_media';
   if (url.includes('/reddit.com/')) return 'reddit_post';
   if (url.includes('/medium.com/') || url.includes('/substack.com/')) return 'article';
-  
   return 'web_page';
 }
-
 function extractKeyTopics(): string[] {
-  // Extract headings (prioritize h1, h2, h3)
   const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
     .map(h => h.textContent?.trim())
     .filter(text => text && text.length > 0 && text.length < 100)
     .slice(0, 8);
-  
-  // Extract meta keywords
   const metaKeywords = document.querySelector('meta[name="keywords"]')?.getAttribute('content')?.split(',').map(k => k.trim()) || [];
-  
-  // Extract Open Graph tags
   const ogTitle = document.querySelector('meta[property="og:title"]')?.getAttribute('content') || '';
   const ogKeywords = document.querySelector('meta[property="og:keywords"]')?.getAttribute('content')?.split(',').map(k => k.trim()) || [];
-  
-  // Extract Twitter tags
   const twitterTitle = document.querySelector('meta[name="twitter:title"]')?.getAttribute('content') || '';
   const twitterKeywords = document.querySelector('meta[name="twitter:keywords"]')?.getAttribute('content')?.split(',').map(k => k.trim()) || [];
-  
-  // Extract from structured data (JSON-LD)
   const structuredData = extractStructuredDataTopics();
-  
-  // Extract from URL path segments
   const urlTopics = extractUrlTopics();
-  
-  // Combine all topics
   const allTopics = [
     ...headings,
     ...metaKeywords,
@@ -458,14 +371,10 @@ function extractKeyTopics(): string[] {
     ogTitle,
     twitterTitle
   ].filter(topic => topic && topic.length > 2 && topic.length < 50);
-  
-  // Remove duplicates and return top topics
   return [...new Set(allTopics)].slice(0, 20);
 }
-
 function extractStructuredDataTopics(): string[] {
   const topics: string[] = [];
-  
   try {
     const scripts = document.querySelectorAll('script[type="application/ld+json"]');
     scripts.forEach(script => {
@@ -489,30 +398,21 @@ function extractStructuredDataTopics(): string[] {
           }
         }
       } catch (e) {
-        // Ignore invalid JSON
       }
     });
   } catch (e) {
-    // Ignore errors
   }
-  
   return topics;
 }
-
 function extractUrlTopics(): string[] {
   const url = window.location.href;
   const pathname = window.location.pathname;
-  
-  // Extract meaningful path segments
   const segments = pathname.split('/')
     .filter(segment => segment && segment.length > 2 && segment.length < 30)
-    .filter(segment => !/^\d+$/.test(segment)) // Exclude pure numbers
-    .filter(segment => !/^(page|p|id|slug|post|article)$/i.test(segment)); // Exclude common pagination/ID patterns
-  
-  // Extract domain-specific topics
+    .filter(segment => !/^\d+$/.test(segment)) 
+    .filter(segment => !/^(page|p|id|slug|post|article)$/i.test(segment)); 
   const domain = window.location.hostname;
   const domainTopics: string[] = [];
-  
   if (domain.includes('github.com')) {
     domainTopics.push('programming', 'code', 'repository');
   } else if (domain.includes('stackoverflow.com') || domain.includes('stackexchange.com')) {
@@ -526,23 +426,18 @@ function extractUrlTopics(): string[] {
   } else if (domain.includes('wikipedia.org')) {
     domainTopics.push('encyclopedia', 'reference', 'information');
   }
-  
   return [...segments, ...domainTopics];
 }
-
 function extractReadingTime(): number {
   const content = extractMeaningfulContent();
   const wordsPerMinute = 200;
   const wordCount = content.split(/\s+/).length;
   return Math.ceil(wordCount / wordsPerMinute);
 }
-
 function extractFullContent(): string {
-  // Get all visible text content (up to 5000 characters)
   const fullText = extractVisibleText();
   return fullText.length > 5000 ? fullText.substring(0, 5000) + '...' : fullText;
 }
-
 function extractPageMetadata() {
   const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement;
   const keywords = document.querySelector('meta[name="keywords"]') as HTMLMetaElement;
@@ -551,7 +446,6 @@ function extractPageMetadata() {
   const published = document.querySelector('meta[property="article:published_time"]') as HTMLMetaElement;
   const modified = document.querySelector('meta[property="article:modified_time"]') as HTMLMetaElement;
   const canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
-  
   return {
     description: meta?.content || '',
     keywords: keywords?.content || '',
@@ -563,13 +457,11 @@ function extractPageMetadata() {
     canonical_url: canonical?.href || ''
   };
 }
-
 function extractPageStructure() {
   const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'))
     .map(h => h.textContent?.trim())
     .filter(text => text && text.length > 0)
-    .slice(0, 20); // Limit to first 20 headings
-
+    .slice(0, 20); 
   const links = Array.from(document.querySelectorAll('a[href]'))
     .map(a => {
       const href = (a as HTMLAnchorElement).href;
@@ -578,7 +470,6 @@ function extractPageStructure() {
     })
     .filter(link => link.length > 0)
     .slice(0, 30);
-
   const images = Array.from(document.querySelectorAll('img[src]'))
     .map(img => {
       const src = (img as HTMLImageElement).src;
@@ -587,7 +478,6 @@ function extractPageStructure() {
     })
     .filter(img => img.length > 0)
     .slice(0, 20);
-
   const forms = Array.from(document.querySelectorAll('form'))
     .map(form => {
       const inputs = Array.from(form.querySelectorAll('input, textarea, select'))
@@ -596,12 +486,10 @@ function extractPageStructure() {
       return inputs ? `Form with: ${inputs}` : 'Form';
     })
     .slice(0, 10);
-
   const codeBlocks = Array.from(document.querySelectorAll('pre, code'))
     .map(code => code.textContent?.trim())
     .filter(code => code && code.length > 10)
     .slice(0, 10);
-
   const tables = Array.from(document.querySelectorAll('table'))
     .map(table => {
       const headers = Array.from(table.querySelectorAll('th'))
@@ -610,22 +498,17 @@ function extractPageStructure() {
       return headers.length > 0 ? `Table with columns: ${headers.join(', ')}` : 'Table';
     })
     .slice(0, 5);
-
   return { headings, links, images, forms, code_blocks: codeBlocks, tables };
 }
-
 function extractContentQuality() {
   const content = extractMeaningfulContent();
   const wordCount = content.split(/\s+/).length;
   const hasImages = document.querySelectorAll('img').length > 0;
   const hasCode = document.querySelectorAll('pre, code').length > 0;
   const hasTables = document.querySelectorAll('table').length > 0;
-  
-  // Simple readability score based on sentence length and word complexity
   const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const avgWordsPerSentence = sentences.length > 0 ? wordCount / sentences.length : 0;
   const readabilityScore = Math.max(0, Math.min(100, 100 - (avgWordsPerSentence - 10) * 2));
-  
   return {
     word_count: wordCount,
     has_images: hasImages,
@@ -634,7 +517,6 @@ function extractContentQuality() {
     readability_score: Math.round(readabilityScore)
   };
 }
-
 function extractUserActivity() {
   return {
     scroll_position: window.pageYOffset || document.documentElement.scrollTop,
@@ -647,14 +529,12 @@ function extractUserActivity() {
     interaction_count: (window as any).interactionCount || 0
   };
 }
-
 function captureContext(): ContextData {
   try {
     const url = window.location.href;
     const title = document.title || '';
     const meaningfulContent = extractMeaningfulContent();
     const content_snippet = meaningfulContent.substring(0, 500);
-    
     return {
       source: 'extension',
       url,
@@ -674,7 +554,6 @@ function captureContext(): ContextData {
     };
   } catch (error) {
     console.log('RecallOS: Error in captureContext, using minimal fallback:', error);
-    // Return minimal context data if everything fails
     return {
       source: 'extension',
       url: window.location.href,
@@ -720,32 +599,25 @@ function captureContext(): ContextData {
     };
   }
 }
-
 function sendContextToBackground() {
   try {
     if (!chrome.runtime?.id) {
       console.log('RecallOS: Extension context invalidated, skipping capture');
       return;
     }
-
     const now = Date.now();
     if ((now - lastCaptureTime) < MIN_CAPTURE_INTERVAL) {
       console.log('RecallOS: Skipping capture - too soon since last capture');
       return;
     }
-
     const contextData = captureContext();
-    
-    // Add privacy extension information to context data
     (contextData as any).privacy_extension_info = {
       detected: privacyExtensionDetected,
       type: privacyExtensionType,
       compatibility_mode: privacyExtensionDetected
     };
-    
     console.log('RecallOS: Captured context:', contextData);
     console.log('RecallOS: Privacy extension detected:', privacyExtensionDetected, 'Type:', privacyExtensionType);
-    
     chrome.runtime.sendMessage(
       { type: 'CAPTURE_CONTEXT', data: contextData },
       (response) => {
@@ -756,13 +628,11 @@ function sendContextToBackground() {
         console.log('RecallOS: Background response:', response);
       }
     );
-    
     lastCaptureTime = now;
   } catch (error) {
     console.error('RecallOS: Error capturing context:', error);
   }
 }
-
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     hasUserActivity = true;
@@ -772,24 +642,20 @@ if (document.readyState === 'loading') {
   hasUserActivity = true;
   sendContextToBackground();
 }
-
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
     hasUserActivity = true;
     lastActivityTime = Date.now();
   }
 });
-
 window.addEventListener('focus', () => {
   hasUserActivity = true;
   lastActivityTime = Date.now();
 });
-
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!chrome.runtime?.id) {
     return false;
   }
-
   if (message.type === 'GET_WALLET_ADDRESS') {
     try {
       const walletAddress = localStorage.getItem('wallet_address');
@@ -800,26 +666,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     return true;
   }
-  
   if (message.type === 'CAPTURE_CONTEXT_NOW') {
     hasUserActivity = true;
     sendContextToBackground();
     sendResponse({ success: true });
     return true;
   }
-  
   if (message.type === 'START_MONITORING') {
     startContinuousMonitoring();
     sendResponse({ success: true, activityLevel });
     return true;
   }
-  
   if (message.type === 'STOP_MONITORING') {
     stopContinuousMonitoring();
     sendResponse({ success: true });
     return true;
   }
-  
   if (message.type === 'GET_MONITORING_STATUS') {
     sendResponse({ 
       success: true, 
@@ -830,7 +692,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 });
-
 window.addEventListener('message', (event) => {
   if (event.data.type === 'WALLET_ADDRESS' && event.data.walletAddress) {
     chrome.storage.sync.set({ wallet_address: event.data.walletAddress }, () => {
@@ -838,7 +699,6 @@ window.addEventListener('message', (event) => {
     });
   }
 });
-
 setInterval(() => {
   try {
     const walletAddress = localStorage.getItem('wallet_address');
@@ -848,42 +708,33 @@ setInterval(() => {
       });
     }
   } catch (error) {
-    // Ignore errors if localStorage is not accessible
   }
 }, 2000);
-
 chrome.storage.sync.get(['wallet_address'], (result) => {
   if (result.wallet_address) {
   } else {
     console.log('RecallOS: No wallet address found in storage');
   }
 });
-
 function hasContentChanged(): boolean {
   const currentUrl = location.href;
   const currentTitle = document.title;
   const currentContent = extractVisibleText();
-  
   const urlChanged = currentUrl !== lastUrl;
   const titleChanged = currentTitle !== lastTitle;
-  
   const contentChanged = currentContent !== lastContent && 
     (Math.abs(currentContent.length - lastContent.length) > 100 ||
      currentContent.substring(0, 200) !== lastContent.substring(0, 200));
-  
   return urlChanged || titleChanged || contentChanged;
 }
-
 function shouldCaptureBasedOnActivity(): boolean {
   const now = Date.now();
   const timeSinceLastActivity = now - lastActivityTime;
   const timeSinceLastCapture = now - lastCaptureTime;
-
   return hasUserActivity && 
          timeSinceLastCapture >= MIN_CAPTURE_INTERVAL &&
          (hasContentChanged() || timeSinceLastActivity >= ACTIVITY_TIMEOUT);
 }
-
 function getMonitoringInterval(): number {
   switch (activityLevel) {
     case 'high': return 10000;
@@ -892,11 +743,9 @@ function getMonitoringInterval(): number {
     default: return 20000;
   }
 }
-
 function updateActivityLevel() {
   const now = Date.now();
   const timeSinceLastActivity = now - lastActivityTime;
-  
   if (timeSinceLastActivity < 15000) {
     activityLevel = 'high';
   } else if (timeSinceLastActivity < 120000) {
@@ -905,27 +754,21 @@ function updateActivityLevel() {
     activityLevel = 'low';
   }
 }
-
 function startContinuousMonitoring() {
   if (captureInterval) {
     clearInterval(captureInterval);
   }
-  
   updateActivityLevel();
   const interval = getMonitoringInterval();
-  
   captureInterval = setInterval(() => {
     if (!chrome.runtime?.id) {
       stopContinuousMonitoring();
       return;
     }
-
     if (isActive) {
       updateActivityLevel();
-      
       if (shouldCaptureBasedOnActivity()) {
         sendContextToBackground();
-        
         hasUserActivity = false;
         if (Date.now() - lastCaptureTime < 1000) {
           lastUrl = location.href;
@@ -933,7 +776,6 @@ function startContinuousMonitoring() {
           lastContent = extractVisibleText();
         }
       }
-      
       const newInterval = getMonitoringInterval();
       if (newInterval !== interval) {
         startContinuousMonitoring();
@@ -941,16 +783,13 @@ function startContinuousMonitoring() {
     }
   }, interval);
 }
-
 function stopContinuousMonitoring() {
   if (captureInterval) {
     clearInterval(captureInterval);
     captureInterval = null;
   }
 }
-
 startContinuousMonitoring();
-
 new MutationObserver(() => {
   const url = location.href;
   if (url !== lastUrl) {
@@ -958,7 +797,6 @@ new MutationObserver(() => {
     setTimeout(sendContextToBackground, 1000);
   }
 }).observe(document, { subtree: true, childList: true });
-
 document.addEventListener('visibilitychange', () => {
   isActive = !document.hidden;
   if (isActive) {
@@ -967,24 +805,20 @@ document.addEventListener('visibilitychange', () => {
     stopContinuousMonitoring();
   }
 });
-
 window.addEventListener('blur', () => {
   isActive = false;
   stopContinuousMonitoring();
 });
-
 window.addEventListener('focus', () => {
   isActive = true;
   startContinuousMonitoring();
 });
-
 document.addEventListener('click', () => {
   lastActivityTime = Date.now();
   hasUserActivity = true;
   activityLevel = 'high';
   (window as any).interactionCount++;
 });
-
 document.addEventListener('scroll', () => {
   lastActivityTime = Date.now();
   hasUserActivity = true;
@@ -993,18 +827,15 @@ document.addEventListener('scroll', () => {
   }
   (window as any).interactionCount++;
 });
-
 document.addEventListener('keydown', () => {
   lastActivityTime = Date.now();
   hasUserActivity = true;
   activityLevel = 'high';
   (window as any).interactionCount++;
 });
-
-let mouseMoveTimeout: number | null = null;
+let mouseMoveTimeout: ReturnType<typeof setTimeout> | null = null;
 document.addEventListener('mousemove', () => {
   if (mouseMoveTimeout) return;
-  
   mouseMoveTimeout = setTimeout(() => {
     lastActivityTime = Date.now();
     hasUserActivity = true;
@@ -1014,5 +845,3 @@ document.addEventListener('mousemove', () => {
     mouseMoveTimeout = null;
   }, 3000);
 });
-
- 

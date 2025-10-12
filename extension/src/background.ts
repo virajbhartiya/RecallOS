@@ -9,7 +9,6 @@ interface ContextData {
   wallet_address?: string;
 }
 
-// Get API endpoint from storage or use default
 async function getApiEndpoint(): Promise<string> {
   try {
     const result = await chrome.storage.sync.get(['apiEndpoint']);
@@ -22,7 +21,6 @@ async function getApiEndpoint(): Promise<string> {
 
 async function getWalletAddress(): Promise<string | null> {
   try {
-    // First try to get from chrome.storage.sync
     const result = await chrome.storage.sync.get(['wallet_address']);
     if (result.wallet_address) {
       console.log('RecallOS: Found wallet address in storage:', result.wallet_address);
@@ -31,14 +29,12 @@ async function getWalletAddress(): Promise<string | null> {
 
     console.log('RecallOS: No wallet address found in storage, trying content script...');
 
-    // Fallback: try to get from localStorage via content script
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
       try {
         const response = await chrome.tabs.sendMessage(tabs[0].id, { type: 'GET_WALLET_ADDRESS' });
         if (response?.walletAddress) {
           console.log('RecallOS: Found wallet address in content script:', response.walletAddress);
-          // Store it in sync storage for future use
           await chrome.storage.sync.set({ wallet_address: response.walletAddress });
           return response.walletAddress;
         }
@@ -60,11 +56,9 @@ async function sendToBackend(data: ContextData): Promise<void> {
     const apiEndpoint = await getApiEndpoint();
     const walletAddress = await getWalletAddress();
     
-    // Check if privacy extension conflicts are detected
     const privacyInfo = (data as any).privacy_extension_info;
     const hasPrivacyConflicts = privacyInfo?.detected || false;
     
-    // Send raw content data for backend processing
     const payload = {
       content: data.meaningful_content || data.content_snippet || data.full_content || 'No content available',
       url: data.url,

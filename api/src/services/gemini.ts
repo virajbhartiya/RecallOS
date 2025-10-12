@@ -1,8 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
-
 export class GeminiService {
   private ai: GoogleGenAI;
-
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -10,46 +8,37 @@ export class GeminiService {
       this.ai = null as any;
       return;
     }
-    
     this.ai = new GoogleGenAI({ apiKey });
   }
-
   async generateEmbedding(text: string): Promise<number[]> {
     if (!this.ai) {
       throw new Error('Gemini service is not initialized. Please set GEMINI_API_KEY environment variable.');
     }
-    
     try {
       const response = await this.ai.models.embedContent({
         model: "text-embedding-004",
         contents: text,
       });
-
       if (!response.embeddings?.[0]?.values) {
         throw new Error('No embedding generated from Gemini API');
       }
-
       return response.embeddings[0].values;
     } catch (error) {
       console.error('Error generating embedding:', error);
       throw error;
     }
   }
-
   async summarizeContent(rawText: string, metadata?: any): Promise<string> {
     if (!this.ai) {
       throw new Error('Gemini service is not initialized. Please set GEMINI_API_KEY environment variable.');
     }
-    
     try {
       const contentType = metadata?.content_type || 'web_page';
       const contentSummary = metadata?.content_summary || '';
       const keyTopics = metadata?.key_topics || [];
       const url = metadata?.url || '';
       const title = metadata?.title || '';
-      
       let prompt = '';
-      
       switch (contentType) {
         case 'blog_post':
         case 'article':
@@ -77,33 +66,27 @@ export class GeminiService {
         default:
           prompt = `Analyze this web content for a personal memory system. Extract and summarize:\n\n1. **Main Topic**: What is this content about?\n2. **Key Information**: Important facts, insights, or data\n3. **Practical Value**: How can this information be useful?\n4. **Important Details**: Specific examples, numbers, or specifics\n5. **Related Concepts**: What topics connect to this?\n6. **Actionable Insights**: What can be done with this information?\n\nContent: ${rawText}`;
       }
-      
       const contextInfo = [];
       if (title) contextInfo.push(`Title: ${title}`);
       if (url) contextInfo.push(`URL: ${url}`);
       if (contentSummary) contextInfo.push(`Context: ${contentSummary}`);
       if (keyTopics.length > 0) contextInfo.push(`Topics: ${keyTopics.join(', ')}`);
-      
       if (contextInfo.length > 0) {
         prompt = `${contextInfo.join('\n')}\n\n${prompt}`;
       }
-
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
       });
-
       if (!response.text) {
         throw new Error('No summary generated from Gemini API');
       }
-
       return response.text;
     } catch (error) {
       console.error('Error calling Gemini API:', error);
       throw error;
     }
   }
-
   async extractContentMetadata(rawText: string, metadata?: any): Promise<{
     topics: string[];
     categories: string[];
@@ -115,45 +98,34 @@ export class GeminiService {
     if (!this.ai) {
       throw new Error('Gemini service is not initialized. Please set GEMINI_API_KEY environment variable.');
     }
-    
     try {
       const contentType = metadata?.content_type || 'web_page';
       const title = metadata?.title || '';
       const url = metadata?.url || '';
-      
       const prompt = `Analyze this content and extract structured metadata for a personal memory system. Return a JSON object with the following fields:
-
 1. **topics**: Array of 5-10 specific topics/subjects this content covers
 2. **categories**: Array of 3-5 broader categories this content belongs to
 3. **keyPoints**: Array of 5-8 most important points or insights
 4. **sentiment**: Overall sentiment (positive, negative, neutral, informative)
 5. **importance**: Importance score from 1-10 (10 being most important for personal memory)
 6. **searchableTerms**: Array of 10-15 terms someone might search for to find this content
-
 Content Type: ${contentType}
 Title: ${title}
 URL: ${url}
-
 Content: ${rawText.substring(0, 4000)}
-
 Return only valid JSON, no additional text.`;
-
       const response = await this.ai.models.generateContent({
         model: "gemini-2.5-flash",
         contents: prompt,
       });
-
       if (!response.text) {
         throw new Error('No metadata generated from Gemini API');
       }
-
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error('Invalid JSON response from Gemini API');
       }
-
       const extractedMetadata = JSON.parse(jsonMatch[0]);
-      
       return {
         topics: Array.isArray(extractedMetadata.topics) ? extractedMetadata.topics.slice(0, 10) : [],
         categories: Array.isArray(extractedMetadata.categories) ? extractedMetadata.categories.slice(0, 5) : [],
@@ -175,5 +147,4 @@ Return only valid JSON, no additional text.`;
     }
   }
 }
-
 export const geminiService = new GeminiService();
