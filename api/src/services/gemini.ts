@@ -64,29 +64,32 @@ export class GeminiService {
       switch (contentType) {
         case 'blog_post':
         case 'article':
-          prompt = `Analyze this blog post/article for a personal memory system. Extract and summarize:\n\n1. **Main Topic**: What is this about?\n2. **Key Insights**: What are the main points, arguments, or findings?\n3. **Actionable Information**: What can the reader do with this information?\n4. **Important Details**: Key facts, statistics, examples, or evidence\n5. **Author's Perspective**: What viewpoint or conclusion is presented?\n6. **Related Concepts**: What topics or ideas are connected to this?\n\nContent: ${rawText}`;
+          prompt = `Summarize this blog post/article concisely for a personal memory system. Focus on:\n\n- Main topic and key insights\n- Practical takeaways or actionable advice\n- Important facts or examples\n- Why this matters for future reference\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
           break;
         case 'documentation':
-          prompt = `Analyze this documentation for a personal memory system. Extract and summarize:\n\n1. **Purpose**: What does this document explain or teach?\n2. **Key Concepts**: Main technical concepts, procedures, or methods\n3. **Important Details**: Critical technical specifications, warnings, or requirements\n4. **Practical Usage**: How to apply this information\n5. **Dependencies**: What other knowledge or tools are needed?\n6. **Common Issues**: Potential problems or troubleshooting tips\n\nContent: ${rawText}`;
+          prompt = `Summarize this documentation concisely for a personal memory system. Focus on:\n\n- What it teaches and main concepts\n- Key procedures or methods\n- Important warnings or requirements\n- When to use this information\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
           break;
         case 'tutorial':
         case 'guide':
-          prompt = `Analyze this tutorial/guide for a personal memory system. Extract and summarize:\n\n1. **Learning Objective**: What will the reader learn or achieve?\n2. **Step-by-Step Process**: The main steps or stages\n3. **Key Techniques**: Important methods, tools, or approaches used\n4. **Prerequisites**: What knowledge or tools are needed beforehand?\n5. **Best Practices**: Important tips, warnings, or recommendations\n6. **Expected Outcomes**: What results should the reader expect?\n\nContent: ${rawText}`;
+          prompt = `Summarize this tutorial/guide concisely for a personal memory system. Focus on:\n\n- What you'll learn and main steps\n- Key techniques or tools used\n- Important tips or warnings\n- Expected results or outcomes\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
           break;
         case 'news_article':
-          prompt = `Analyze this news article for a personal memory system. Extract and summarize:\n\n1. **Main Event**: What happened and when?\n2. **Key Facts**: Important details, numbers, dates, locations\n3. **Stakeholders**: Who is involved and what are their positions?\n4. **Implications**: What does this mean for the future?\n5. **Context**: Background information that helps understand the event\n6. **Quotes**: Important statements from key people\n\nContent: ${rawText}`;
+          prompt = `Summarize this news article concisely for a personal memory system. Focus on:\n\n- What happened and when\n- Key facts and important details\n- Who's involved and their positions\n- Why this matters or future implications\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
           break;
         case 'code_repository':
-          prompt = `Analyze this code repository content for a personal memory system. Extract and summarize:\n\n1. **Project Purpose**: What does this code do and why?\n2. **Key Components**: Main modules, functions, or classes\n3. **Technical Approach**: Programming languages, frameworks, or patterns used\n4. **Usage Instructions**: How to install, configure, or use this code\n5. **Important Features**: Key functionality or capabilities\n6. **Dependencies**: What other libraries or tools are required?\n\nContent: ${rawText}`;
+          prompt = `Summarize this code repository concisely for a personal memory system. Focus on:\n\n- What it does and main purpose\n- Key components or features\n- How to use or install it\n- Important dependencies or requirements\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
           break;
         case 'qa_thread':
-          prompt = `Analyze this Q&A thread for a personal memory system. Extract and summarize:\n\n1. **Main Question**: What problem or question is being asked?\n2. **Best Answer**: The most helpful or accepted solution\n3. **Alternative Solutions**: Other approaches or answers provided\n4. **Technical Details**: Important code, commands, or configurations\n5. **Common Issues**: Related problems others might face\n6. **Best Practices**: Recommended approaches or warnings\n\nContent: ${rawText}`;
+          prompt = `Summarize this Q&A thread concisely for a personal memory system. Focus on:\n\n- The main question or problem\n- Best solution or answer\n- Key technical details or code\n- When to use this solution\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
           break;
         case 'video_content':
-          prompt = `Analyze this video content description for a personal memory system. Extract and summarize:\n\n1. **Video Topic**: What is this video about?\n2. **Key Learning Points**: Main concepts or skills covered\n3. **Practical Applications**: How can this knowledge be used?\n4. **Important Timestamps**: Key sections or moments (if mentioned)\n5. **Related Topics**: What other subjects connect to this?\n6. **Action Items**: What should the viewer do next?\n\nContent: ${rawText}`;
+          prompt = `Summarize this video content concisely for a personal memory system. Focus on:\n\n- What it's about and main topics\n- Key learning points or skills\n- Practical applications or use cases\n- Important takeaways or next steps\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
+          break;
+        case 'social_media':
+          prompt = `Summarize this social media post concisely for a personal memory system. Focus on:\n\n- Main message or opinion shared\n- Key insights or predictions\n- Important context or background\n- Why this matters or implications\n\nKeep it under 150 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
           break;
         default:
-          prompt = `Analyze this web content for a personal memory system. Extract and summarize:\n\n1. **Main Topic**: What is this content about?\n2. **Key Information**: Important facts, insights, or data\n3. **Practical Value**: How can this information be useful?\n4. **Important Details**: Specific examples, numbers, or specifics\n5. **Related Concepts**: What topics connect to this?\n6. **Actionable Insights**: What can be done with this information?\n\nContent: ${rawText}`;
+          prompt = `Summarize this web content concisely for a personal memory system. Focus on:\n\n- Main topic and key points\n- Important facts or insights\n- Practical value or applications\n- Why this matters for future reference\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
       }
 
       const contextInfo = [];
