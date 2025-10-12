@@ -1,0 +1,432 @@
+import { getRequest, postRequest } from '../utility/generalServices'
+import type {
+  Memory,
+  MemoryInsights,
+  MemoryMesh,
+  MemorySearchResponse,
+  MemoryWithRelations,
+  MemoryCluster,
+  SearchFilters
+} from '../types/memory'
+
+interface ApiMemoryResponse {
+  id?: string
+  hash?: string
+  timestamp: string | number
+  created_at?: string
+  title?: string
+  summary?: string
+  content?: string
+  source?: string
+  url?: string
+  tx_status?: string
+  blockchain_network?: string
+  page_metadata?: Record<string, unknown>
+  access_count?: number
+  last_accessed?: string
+  tx_hash?: string
+  block_number?: string | number
+  gas_used?: string
+  confirmed_at?: string
+}
+
+export class MemoryService {
+  private static baseUrl = '/memory'
+  
+  // Normalize wallet address to handle case sensitivity
+  private static normalizeAddress(address: string): string {
+    return address.toLowerCase()
+  }
+
+  static async getMemoriesWithTransactionDetails(
+    userAddress: string,
+    status?: 'pending' | 'confirmed' | 'failed',
+    limit?: number
+  ): Promise<Memory[]> {
+    const normalizedAddress = this.normalizeAddress(userAddress)
+    const params = new URLSearchParams()
+    params.append('userAddress', normalizedAddress)
+    if (status) params.append('status', status)
+    if (limit) params.append('limit', limit.toString())
+    
+    try {
+      const response = await getRequest(`${this.baseUrl}/transactions?${params.toString()}`)
+      console.log('Database transactions response:', response)
+      const data = response.data?.data
+      console.log('Database transactions data:', data)
+      
+      // Check if the API returned an error
+      if (response.data?.success === false) {
+        throw new Error(response.data?.error || 'API returned error')
+      }
+      
+      if (Array.isArray(data?.memories) && data.memories.length > 0) {
+        // Map API response to Memory interface
+        return data.memories.map((mem: ApiMemoryResponse) => ({
+          id: mem.id || mem.hash,
+          user_id: userAddress,
+          hash: mem.hash,
+          timestamp: typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp,
+          created_at: mem.created_at || new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toISOString(),
+          title: mem.title || 'Memory',
+          summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
+          content: mem.content || '',
+          source: mem.source || 'on_chain',
+          url: mem.url,
+          tx_status: mem.tx_status || 'confirmed',
+          blockchain_network: mem.blockchain_network || 'sepolia',
+          page_metadata: mem.page_metadata,
+          access_count: mem.access_count || 0,
+          last_accessed: mem.last_accessed || new Date().toISOString(),
+          tx_hash: mem.tx_hash,
+          block_number: mem.block_number ? (typeof mem.block_number === 'string' ? parseInt(mem.block_number) : mem.block_number) : undefined,
+          gas_used: mem.gas_used,
+          confirmed_at: mem.confirmed_at
+        } as Memory))
+      }
+    } catch (error) {
+      console.error('Error fetching memories from database:', error)
+    }
+    
+    // Fallback: Try to get recent memories from database first
+    try {
+      const response = await getRequest(`${this.baseUrl}/user/${normalizedAddress}/recent?count=${limit || 50}`)
+      const data = response.data?.data
+      console.log('Recent memories response:', response)
+      console.log('Recent memories data:', data)
+      
+      if (Array.isArray(data?.memories) && data.memories.length > 0) {
+        // The API now returns full memory details from database, so we can use them directly
+        return data.memories.map((mem: ApiMemoryResponse) => ({
+          id: mem.id || mem.hash,
+          hash: mem.hash,
+          timestamp: typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp,
+          created_at: mem.created_at || new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toISOString(),
+          title: mem.title || 'Memory',
+          summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
+          content: mem.content || '',
+          source: mem.source || 'on_chain',
+          user_id: userAddress,
+          url: mem.url,
+          tx_status: mem.tx_status || 'confirmed',
+          blockchain_network: mem.blockchain_network || 'sepolia',
+          page_metadata: mem.page_metadata,
+          access_count: mem.access_count || 0,
+          last_accessed: mem.last_accessed || new Date().toISOString()
+        } as Memory))
+      }
+    } catch (fallbackError) {
+      console.error('Fallback to recent memories also failed:', fallbackError)
+    }
+    
+    return []
+  }
+
+  static async getMemoryMesh(userAddress: string, limit: number = 50): Promise<MemoryMesh> {
+    const normalizedAddress = this.normalizeAddress(userAddress)
+    const response = await getRequest(`${this.baseUrl}/mesh/${normalizedAddress}?limit=${limit}`)
+    return response.data?.data || { nodes: [], edges: [], clusters: {} }
+  }
+
+  static async searchMemories(
+    userAddress: string,
+    query: string,
+    filters: SearchFilters = {},
+    page: number = 1,
+    limit: number = 10
+  ): Promise<MemorySearchResponse> {
+    const normalizedAddress = this.normalizeAddress(userAddress)
+    const params = new URLSearchParams({
+      userAddress: normalizedAddress,
+      query,
+      page: page.toString(),
+      limit: limit.toString()
+    })
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (typeof value === 'object') {
+          params.append(key, JSON.stringify(value))
+        } else {
+          params.append(key, value.toString())
+        }
+      }
+    })
+
+    const response = await getRequest(`${this.baseUrl}/search?${params.toString()}`)
+    return response.data || { results: [], total: 0, page, limit, filters }
+  }
+
+  static async searchMemoriesWithEmbeddings(
+    userAddress: string,
+    query: string,
+    limit: number = 10
+  ): Promise<MemorySearchResponse> {
+    const normalizedAddress = this.normalizeAddress(userAddress)
+    const params = new URLSearchParams({
+      userAddress: normalizedAddress,
+      query,
+      limit: limit.toString()
+    })
+
+    const response = await getRequest(`${this.baseUrl}/search-embeddings?${params.toString()}`)
+    return response.data || { results: [], total: 0, page: 1, limit, filters: {} }
+  }
+
+  static async getMemoryInsights(userAddress: string): Promise<MemoryInsights> {
+    const normalizedAddress = this.normalizeAddress(userAddress)
+    const params = new URLSearchParams()
+    params.append('userAddress', normalizedAddress)
+    
+    try {
+      const response = await getRequest(`${this.baseUrl}/insights?${params.toString()}`)
+      
+      // Check if the API returned an error
+      if (response.data?.success === false) {
+        throw new Error(response.data?.error || 'API returned error')
+      }
+      
+      const data = response.data?.data
+      
+      if (data) {
+        return {
+          total_memories: data.totalMemories || 0,
+          total_transactions: 0,
+          confirmed_transactions: 0,
+          pending_transactions: 0,
+          failed_transactions: 0,
+          categories: data.topCategories?.reduce((acc: Record<string, number>, cat: { category: string; count: number }) => {
+            acc[cat.category] = cat.count
+            return acc
+          }, {} as Record<string, number>) || {},
+          sentiment_distribution: {
+            positive: data.sentimentDistribution?.positive || 0,
+            negative: data.sentimentDistribution?.negative || 0,
+            neutral: data.sentimentDistribution?.neutral || 0
+          },
+          topology: { total_nodes: 0, total_edges: 0, average_connections: 0, largest_cluster_size: 0 },
+          recent_activity: { last_7_days: 0, last_30_days: 0 }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching insights from database:', error)
+      // If user not found (404), try to create the user and then retry
+      if (error && typeof error === 'object' && 'response' in error && (error as { response: { status: number } }).response?.status === 404) {
+        console.log('User not found for insights. Attempting to create user record...')
+        try {
+          // Try to create user by calling the process endpoint with minimal data
+          const createResponse = await postRequest(`${this.baseUrl}/process`, {
+            content: 'User initialization',
+            url: 'user-init',
+            title: 'User Setup',
+            userAddress: userAddress,
+            metadata: { source: 'manual' }
+          })
+          console.log('User creation response for insights:', createResponse)
+          console.log('User created successfully, retrying insights fetch...')
+          
+          // Retry the original request
+          const retryResponse = await getRequest(`${this.baseUrl}/insights?${params.toString()}`)
+          const retryData = retryResponse.data?.data
+          if (retryData) {
+            return {
+              total_memories: retryData.totalMemories || 0,
+              total_transactions: 0,
+              confirmed_transactions: 0,
+              pending_transactions: 0,
+              failed_transactions: 0,
+              categories: retryData.topCategories?.reduce((acc: Record<string, number>, cat: { category: string; count: number }) => {
+                acc[cat.category] = cat.count
+                return acc
+              }, {} as Record<string, number>) || {},
+              sentiment_distribution: {
+                positive: retryData.sentimentDistribution?.positive || 0,
+                negative: retryData.sentimentDistribution?.negative || 0,
+                neutral: retryData.sentimentDistribution?.neutral || 0
+              },
+              topology: { total_nodes: 0, total_edges: 0, average_connections: 0, largest_cluster_size: 0 },
+              recent_activity: { last_7_days: 0, last_30_days: 0 }
+            }
+          }
+        } catch (createError) {
+          console.error('Failed to create user for insights:', createError)
+        }
+      }
+    }
+    
+    // Fallback: create basic insights from blockchain data
+    try {
+      const count = await this.getUserMemoryCount(userAddress)
+      return {
+        total_memories: count,
+        total_transactions: count,
+        confirmed_transactions: count,
+        pending_transactions: 0,
+        failed_transactions: 0,
+        categories: { 'on_chain': count },
+        sentiment_distribution: { positive: 0, negative: 0, neutral: count },
+        topology: { total_nodes: count, total_edges: 0, average_connections: 0, largest_cluster_size: count },
+        recent_activity: { last_7_days: count, last_30_days: count }
+      }
+    } catch (fallbackError) {
+      console.error('Fallback insights also failed:', fallbackError)
+      return {
+        total_memories: 0,
+        total_transactions: 0,
+        confirmed_transactions: 0,
+        pending_transactions: 0,
+        failed_transactions: 0,
+        categories: {},
+        sentiment_distribution: { positive: 0, negative: 0, neutral: 0 },
+        topology: { total_nodes: 0, total_edges: 0, average_connections: 0, largest_cluster_size: 0 },
+        recent_activity: { last_7_days: 0, last_30_days: 0 }
+      }
+    }
+  }
+
+  static async getRecentMemories(userAddress: string, count: number = 10): Promise<Memory[]> {
+    const normalizedAddress = this.normalizeAddress(userAddress)
+    console.log('Fetching recent memories for:', normalizedAddress)
+    
+    // First try the database endpoint for full data
+    try {
+      const response = await getRequest(`${this.baseUrl}/transactions?userAddress=${normalizedAddress}&limit=${count}`)
+      console.log('Database memories API response:', response)
+      const data = response.data?.data
+      console.log('Database memories data:', data)
+      if (Array.isArray(data?.memories) && data.memories.length > 0) {
+        return data.memories
+      }
+    } catch (error) {
+      console.error('Error fetching recent memories from database:', error)
+    }
+    
+    // Fallback to recent memories endpoint (now returns full database data)
+    try {
+      const response = await getRequest(`${this.baseUrl}/user/${normalizedAddress}/recent?count=${count}`)
+      console.log('Recent memories API response:', response)
+      const data = response.data?.data
+      console.log('Recent memories data:', data)
+      
+      if (Array.isArray(data?.memories) && data.memories.length > 0) {
+        // The API now returns full memory details from database, so we can use them directly
+        return data.memories.map((mem: ApiMemoryResponse) => ({
+          id: mem.id || mem.hash,
+          hash: mem.hash,
+          timestamp: typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp,
+          created_at: mem.created_at || new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toISOString(),
+          title: mem.title || 'Memory',
+          summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
+          content: mem.content || '',
+          source: mem.source || 'on_chain',
+          user_id: userAddress,
+          url: mem.url,
+          tx_status: mem.tx_status || 'confirmed',
+          blockchain_network: mem.blockchain_network || 'sepolia',
+          page_metadata: mem.page_metadata,
+          access_count: mem.access_count || 0,
+          last_accessed: mem.last_accessed || new Date().toISOString()
+        } as Memory))
+      }
+    } catch (error) {
+      console.error('Error fetching recent memories from API:', error)
+    }
+    
+    return []
+  }
+
+  static async getUserMemories(
+    userAddress: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{ memories: Memory[]; total: number; page: number; limit: number }> {
+    const response = await getRequest(`${this.baseUrl}/user/${userAddress}?page=${page}&limit=${limit}`)
+    const data = response.data?.data
+    return data || { memories: [], total: 0, page, limit }
+  }
+
+  static async getMemoryWithRelations(memoryId: string): Promise<MemoryWithRelations> {
+    const response = await getRequest(`${this.baseUrl}/relations/${memoryId}`)
+    return response.data?.data
+  }
+
+  static async getMemoryCluster(
+    memoryId: string,
+    depth: number = 2
+  ): Promise<MemoryCluster> {
+    const response = await getRequest(`${this.baseUrl}/cluster/${memoryId}?depth=${depth}`)
+    return response.data?.data
+  }
+
+  static async getUserMemoryCount(userAddress: string): Promise<number> {
+    const normalizedAddress = this.normalizeAddress(userAddress)
+    console.log('Fetching memory count for:', normalizedAddress)
+    try {
+      const response = await getRequest(`${this.baseUrl}/user/${normalizedAddress}/count`)
+      console.log('Memory count API response:', response)
+      const count = response.data?.data?.memoryCount
+      console.log('Memory count data:', count)
+      return typeof count === 'number' ? count : parseInt(count) || 0
+    } catch (error) {
+      console.error('Error fetching memory count:', error)
+      // Fallback: try to get count from transactions endpoint
+      try {
+        const response = await getRequest(`${this.baseUrl}/transactions?userAddress=${normalizedAddress}&limit=1000`)
+        const data = response.data?.data
+        return Array.isArray(data?.memories) ? data.memories.length : 0
+      } catch (fallbackError) {
+        console.error('Fallback count also failed:', fallbackError)
+        return 0
+      }
+    }
+  }
+
+  static async getMemoryByHash(hash: string): Promise<Memory | null> {
+    const response = await getRequest(`${this.baseUrl}/hash/${hash}`)
+    return response.data?.data || null
+  }
+
+  static async isMemoryStored(hash: string): Promise<boolean> {
+    const response = await getRequest(`${this.baseUrl}/exists/${hash}`)
+    return response.data?.data?.exists || false
+  }
+
+  static async processMemoryForMesh(memoryId: string): Promise<void> {
+    await postRequest(`${this.baseUrl}/process-mesh/${memoryId}`, {})
+  }
+
+  static async getMemorySnapshots(
+    userAddress: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{ snapshots: unknown[]; total: number; page: number; limit: number }> {
+    const response = await getRequest(`${this.baseUrl}/snapshots/${userAddress}?page=${page}&limit=${limit}`)
+    return response.data?.data || { snapshots: [], total: 0, page, limit }
+  }
+
+  static async getMemoryTransactionStatus(memoryId: string): Promise<{
+    tx_hash?: string
+    block_number?: number
+    gas_used?: string
+    tx_status: 'pending' | 'confirmed' | 'failed'
+    blockchain_network?: string
+    confirmed_at?: string
+  }> {
+    const response = await getRequest(`${this.baseUrl}/transaction/${memoryId}`)
+    return response.data?.data || { tx_status: 'pending' }
+  }
+
+  static async retryFailedTransactions(userAddress: string): Promise<{
+    retried_count: number
+    success_count: number
+    failed_count: number
+  }> {
+    const response = await postRequest(`${this.baseUrl}/retry-failed`, { userAddress })
+    return response.data?.data || { retried_count: 0, success_count: 0, failed_count: 0 }
+  }
+
+  static async healthCheck(): Promise<{ status: string; timestamp: string }> {
+    const response = await getRequest(`${this.baseUrl}/health`)
+    return response.data?.data || { status: 'unknown', timestamp: new Date().toISOString() }
+  }
+}

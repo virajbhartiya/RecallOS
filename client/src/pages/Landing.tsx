@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { useScrollAnimation } from '../hooks/useScrollAnimation'
 import { useWallet } from '../contexts/WalletContext'
 import WalletModal from '../components/WalletModal'
+import { MemoryService } from '../services/memoryService'
+import { LoadingCard } from '../components/ui/loading-spinner'
+import type { Memory } from '../types/memory'
 
 const ConsoleButton: React.FC<{
   children: React.ReactNode
@@ -48,9 +51,86 @@ const Section: React.FC<{
   )
 }
 
+const MemoryPreviewCard: React.FC<{ memory: Memory }> = ({ memory }) => {
+  const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return 'No date'
+    try {
+      const date = new Date(dateString)
+      if (isNaN(date.getTime())) return 'Invalid date'
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric'
+      })
+    } catch {
+      return 'Invalid date'
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 p-3 hover:border-black transition-all duration-300">
+      <div className="text-xs font-mono text-gray-600 mb-1">
+        {formatDate(memory.created_at)}
+      </div>
+      <h4 className="text-sm font-light mb-1 line-clamp-2">
+        {memory.title || 'Untitled Memory'}
+      </h4>
+      {memory.summary && (
+        <p className="text-xs text-gray-600 line-clamp-2">
+          {memory.summary}
+        </p>
+      )}
+      <div className="flex items-center justify-between mt-2 text-xs font-mono text-gray-500">
+        <span>[{memory.source?.toUpperCase() || 'UNKNOWN'}]</span>
+        {memory.tx_status && (
+          <span className={`px-1 py-0.5 text-xs border rounded ${
+            memory.tx_status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-200' :
+            memory.tx_status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+            'bg-gray-100 text-gray-800 border-gray-200'
+          }`}>
+            {memory.tx_status}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export const Landing = () => {
   const { isConnected, address } = useWallet()
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
+  const [recentMemories, setRecentMemories] = useState<Memory[]>([])
+  const [memoryCount, setMemoryCount] = useState(0)
+  const [isLoadingMemories, setIsLoadingMemories] = useState(false)
+
+  // Fetch recent memories when wallet is connected
+  useEffect(() => {
+    const fetchRecentMemories = async () => {
+      if (!isConnected || !address) {
+        setRecentMemories([])
+        setMemoryCount(0)
+        return
+      }
+
+      setIsLoadingMemories(true)
+      try {
+        const [memories, count] = await Promise.all([
+          MemoryService.getRecentMemories(address, 3),
+          MemoryService.getUserMemoryCount(address)
+        ])
+        // Ensure memories is always an array
+        setRecentMemories(Array.isArray(memories) ? memories : [])
+        setMemoryCount(typeof count === 'number' ? count : 0)
+      } catch (error) {
+        console.error('Error fetching recent memories:', error)
+        setRecentMemories([])
+        setMemoryCount(0)
+      } finally {
+        setIsLoadingMemories(false)
+      }
+    }
+
+    fetchRecentMemories()
+  }, [isConnected, address])
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -71,6 +151,11 @@ export const Landing = () => {
         case 'g':
           window.open('https://github.com/virajbhartiya/RecallOS', '_blank')
           break
+        case 'm':
+          if (isConnected) {
+            window.location.href = '/memories'
+          }
+          break
         case 'w': {
           setIsWalletModalOpen(true)
           break
@@ -80,7 +165,7 @@ export const Landing = () => {
 
     window.addEventListener('keydown', handleKeyPress)
     return () => window.removeEventListener('keydown', handleKeyPress)
-  }, [])
+  }, [isConnected])
 
   return (
     <div className="min-h-screen bg-gray-50 text-black relative font-primary" role="main">
@@ -111,6 +196,14 @@ export const Landing = () => {
               >
                 [C] CONSOLE
               </button>
+              {isConnected && (
+                <button 
+                  className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                  onClick={() => window.location.href = '/memories'}
+                >
+                  [M] MEMORIES
+                </button>
+              )}
               {isConnected && (
                 <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -304,6 +397,107 @@ export const Landing = () => {
           </div>
         </div>
       </Section>
+
+      {/* Memory Preview Section */}
+      {isConnected && (
+        <Section className="bg-gray-50">
+          <div className="text-center mb-8">
+            <h2 className="text-3xl font-light font-editorial mb-4">
+              Your Memory Network
+            </h2>
+            <div className="flex items-center justify-center space-x-4 text-sm font-mono text-gray-600">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                <span>{memoryCount} MEMORIES</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
+                <span>BLOCKCHAIN VERIFIED</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+            {/* Recent Memories */}
+            <div>
+              <div className="text-sm font-mono text-gray-600 mb-4 uppercase tracking-wide">
+                [RECENT MEMORIES]
+              </div>
+              {isLoadingMemories ? (
+                <div className="space-y-3">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <LoadingCard key={index} />
+                  ))}
+                </div>
+              ) : recentMemories.length > 0 ? (
+                <div className="space-y-3">
+                  {recentMemories.map((memory) => (
+                    <MemoryPreviewCard key={memory.id} memory={memory} />
+                  ))}
+                </div>
+              ) : (
+                <div className="bg-white border border-gray-200 p-6 text-center">
+                  <div className="text-sm font-mono text-gray-600 mb-2">
+                    [NO MEMORIES YET]
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Install the browser extension to start building your memory network
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Memory Stats */}
+            <div>
+              <div className="text-sm font-mono text-gray-600 mb-4 uppercase tracking-wide">
+                [MEMORY STATS]
+              </div>
+              <div className="bg-white border border-gray-200 p-6">
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div className="text-center">
+                    <div className="text-2xl font-light font-mono text-gray-800">
+                      {memoryCount}
+                    </div>
+                    <div className="text-xs font-mono text-gray-600 mt-1">TOTAL MEMORIES</div>
+                  </div>
+                  <div className="text-center">
+                  <div className="text-2xl font-light font-mono text-gray-800">
+                    {Array.isArray(recentMemories) ? recentMemories.filter(m => m.tx_status === 'confirmed').length : 0}
+                  </div>
+                    <div className="text-xs font-mono text-gray-600 mt-1">CONFIRMED</div>
+                  </div>
+                </div>
+                
+                <div className="border-t border-gray-200 pt-4">
+                  <div className="text-xs font-mono text-gray-600 mb-2 uppercase tracking-wide">
+                    SOURCE BREAKDOWN
+                  </div>
+                  <div className="space-y-1">
+                    {['browser', 'manual', 'on_chain', 'reasoning'].map(source => {
+                      const count = Array.isArray(recentMemories) ? recentMemories.filter(m => m.source === source).length : 0
+                      return count > 0 ? (
+                        <div key={source} className="flex justify-between text-xs">
+                          <span className="capitalize">{source}</span>
+                          <span>{count}</span>
+                        </div>
+                      ) : null
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <button
+                  onClick={() => window.location.href = '/memories'}
+                  className="w-full px-4 py-3 text-sm font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
+                >
+                  [VIEW ALL MEMORIES]
+                </button>
+              </div>
+            </div>
+          </div>
+        </Section>
+      )}
 
       <WalletModal 
         isOpen={isWalletModalOpen} 

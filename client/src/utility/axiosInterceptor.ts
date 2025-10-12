@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { getLocalStorage } from './helper'
 
-const baseURL = import.meta.env.VITE_SERVER_URL + '/api'
+const baseURL = (import.meta.env.VITE_SERVER_URL || 'http://localhost:3000') + '/api'
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
