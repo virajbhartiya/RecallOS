@@ -15,20 +15,16 @@ docker-compose up -d postgres
 
 # Wait for PostgreSQL to be ready
 echo "⏳ Waiting for PostgreSQL to be ready..."
-until docker exec recallos_db pg_isready -U recall_user -d recallos > /dev/null 2>&1; do
+until docker exec recallos_db pg_isready -U postgres -d recallos > /dev/null 2>&1; do
     echo "Waiting for PostgreSQL..."
     sleep 2
 done
 
 echo "✅ PostgreSQL is ready!"
 
-# Install pgvector extension
-echo "🔧 Installing pgvector extension..."
-docker exec recallos_db psql -U recall_user -d recallos -c "CREATE EXTENSION IF NOT EXISTS vector;"
-
-# Install uuid-ossp extension
-echo "🔧 Installing uuid-ossp extension..."
-docker exec recallos_db psql -U recall_user -d recallos -c "CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";"
+# Verify extensions are installed
+echo "🔧 Verifying extensions..."
+docker exec recallos_db psql -U postgres -d recallos -c "SELECT extname FROM pg_extension WHERE extname IN ('uuid-ossp', 'vector');"
 
 # Generate Prisma client
 echo "🔨 Generating Prisma client..."
@@ -49,5 +45,5 @@ echo "🔗 Database connection:"
 echo "Host: localhost"
 echo "Port: 5432"
 echo "Database: recallos"
-echo "User: recall_user"
-echo "Password: securepassword"
+echo "User: postgres"
+echo "Password: postgres"

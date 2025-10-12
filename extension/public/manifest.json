@@ -14,15 +14,17 @@
     {
       "matches": ["<all_urls>"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": false,
+      "match_about_blank": false
     }
   ],
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "tabs",
-    "storage"
+  "permissions": ["activeTab", "scripting", "tabs", "storage", "webNavigation"],
+  "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": ["content.js"],
+      "matches": ["<all_urls>"]
+    }
   ]
 }
-
- 

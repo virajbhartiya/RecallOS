@@ -1,20 +1,39 @@
-import express from "express";
-import { 
-  captureMemory, 
-  getMemory, 
-  getUserMemories, 
-  getMemoryMesh, 
-  searchMemories, 
-  getRelatedMemories 
-} from "../controller/memory.controller";
+import { Router } from 'express';
 
-const router = express.Router();
+import { MemoryController } from '../controller/memory.controller';
 
-router.post("/", captureMemory());
-router.get("/:id", getMemory());
-router.get("/user/:wallet_address", getUserMemories());
-router.get("/mesh/:wallet_address", getMemoryMesh());
-router.get("/search/:wallet_address", searchMemories());
-router.get("/:id/related", getRelatedMemories());
+const router = Router();
+
+router.post('/process', MemoryController.processRawContent);
+router.post('/', MemoryController.storeMemory);
+router.post('/batch', MemoryController.storeMemoryBatch);
+router.get('/user/:userAddress', MemoryController.getUserMemories);
+router.get('/user/:userAddress/count', MemoryController.getUserMemoryCount);
+router.get('/user/:userAddress/memory/:index', MemoryController.getMemory);
+router.get('/user/:userAddress/recent', MemoryController.getRecentMemories);
+router.get('/user/:userAddress/by-url', MemoryController.getMemoriesByUrlHash);
+router.get(
+  '/user/:userAddress/by-timestamp',
+  MemoryController.getMemoriesByTimestampRange
+);
+router.get('/search', MemoryController.searchMemories);
+router.get('/insights', MemoryController.getMemoryInsights);
+router.get('/transactions', MemoryController.getMemoriesWithTransactionDetails);
+router.get(
+  '/transaction/:memoryId',
+  MemoryController.getMemoryTransactionStatus
+);
+router.post('/retry-failed', MemoryController.retryFailedTransactions);
+router.get('/mesh/:userAddress', MemoryController.getMemoryMesh);
+router.get('/relations/:memoryId', MemoryController.getMemoryWithRelations);
+router.get('/cluster/:memoryId', MemoryController.getMemoryCluster);
+router.get('/search-embeddings', MemoryController.searchMemoriesWithEmbeddings);
+router.post('/process-mesh/:memoryId', MemoryController.processMemoryForMesh);
+router.get('/hash/:hash', MemoryController.getMemoryByHash);
+router.get('/exists/:hash', MemoryController.isMemoryStored);
+router.get('/snapshots/:userAddress', MemoryController.getMemorySnapshots);
+router.get('/snapshot/:snapshotId', MemoryController.getMemorySnapshot);
+router.post('/backfill-snapshots', MemoryController.backfillMemorySnapshots);
+router.get('/health', MemoryController.healthCheck);
 
 export default router;

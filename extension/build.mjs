@@ -19,7 +19,7 @@ async function buildScripts(watch = false) {
     entryPoints: [
       resolve(srcDir, 'background.ts'),
       resolve(srcDir, 'content.ts'),
-      resolve(srcDir, 'popup.ts')
+      resolve(srcDir, 'popup.ts'),
     ],
     outdir: outDir,
     bundle: true,
@@ -28,7 +28,7 @@ async function buildScripts(watch = false) {
     sourcemap: true,
     target: ['chrome120'],
     minify: process.env.NODE_ENV === 'production',
-    splitting: false
+    splitting: false,
   };
 
   if (watch) {
@@ -49,15 +49,13 @@ async function main() {
     fsWatch(publicDir, { recursive: true }, (_eventType, _filename) => {
       copyPublic()
         .then(() => console.log('Public assets copied'))
-        .catch((err) => console.error('Copy public failed:', err));
+        .catch(err => console.error('Copy public failed:', err));
     });
   }
   console.log(`Built to ${outDir}`);
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(err);
   process.exit(1);
 });
-
- 
