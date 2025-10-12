@@ -10,6 +10,7 @@ interface MemoryMeshProps {
   expandNodeOnClick?: boolean
   particleTrailOnHover?: boolean
   userAddress?: string
+  onNodeClick?: (memoryId: string) => void
 }
 
 const nodeColors = {
@@ -87,6 +88,8 @@ const Node: React.FC<{
           onHover(false)
         }}
         style={{ cursor: 'pointer' }}
+        data-node-id={node.id}
+        className="memory-node"
       />
       
       {/* Type indicator */}
@@ -102,29 +105,116 @@ const Node: React.FC<{
         {node.type.charAt(0).toUpperCase()}
       </text>
       
-      {/* Label on hover */}
-      {(hovered || isActive) && (
-        <g>
-          <rect
-            x={node.x - 40}
-            y={node.y - finalSize - 25}
-            width={80}
-            height={20}
-            fill="rgba(0,0,0,0.8)"
-            rx={3}
-          />
-          <text
-            x={node.x}
-            y={node.y - finalSize - 10}
-            textAnchor="middle"
-            fontSize="9"
-            fill="#fff"
-            fontFamily="monospace"
-          >
-            {node.label}
-          </text>
-        </g>
-      )}
+       {/* Label on hover */}
+       {(hovered || isActive) && (
+         <g>
+           <rect
+             x={node.x - 80}
+             y={node.y - finalSize - (isActive ? 85 : 45)}
+             width={160}
+             height={isActive ? 80 : 40}
+             fill="rgba(0,0,0,0.9)"
+             rx={4}
+             stroke="rgba(255,255,255,0.2)"
+             strokeWidth={1}
+           />
+           <text
+             x={node.x}
+             y={node.y - finalSize - (isActive ? 70 : 30)}
+             textAnchor="middle"
+             fontSize="9"
+             fill="#fff"
+             fontFamily="monospace"
+             fontWeight="bold"
+           >
+             {node.label}
+           </text>
+           
+           {/* Show more details when active (clicked) */}
+           {isActive && (
+             <>
+               {node.title && (
+                 <text
+                   x={node.x}
+                   y={node.y - finalSize - 55}
+                   textAnchor="middle"
+                   fontSize="7"
+                   fill="#e0e0e0"
+                   fontFamily="monospace"
+                 >
+                   {node.title.length > 25 ? node.title.slice(0, 25) + '...' : node.title}
+                 </text>
+               )}
+               {node.importance_score && (
+                 <text
+                   x={node.x}
+                   y={node.y - finalSize - 40}
+                   textAnchor="middle"
+                   fontSize="7"
+                   fill="#4ade80"
+                   fontFamily="monospace"
+                 >
+                   Importance: {Math.round(node.importance_score * 100)}%
+                 </text>
+               )}
+               {node.summary && (
+                 <foreignObject
+                   x={node.x - 75}
+                   y={node.y - finalSize - 35}
+                   width={150}
+                   height={30}
+                 >
+                   <div className="text-xs text-gray-300 font-mono leading-tight overflow-hidden">
+                     {node.summary.length > 120 ? node.summary.slice(0, 120) + '...' : node.summary}
+                   </div>
+                 </foreignObject>
+               )}
+             </>
+           )}
+           
+           {/* Blockchain info */}
+           {node.tx_hash && (
+             <text
+               x={node.x}
+               y={node.y - finalSize - (isActive ? 25 : 15)}
+               textAnchor="middle"
+               fontSize="7"
+               fill="#60a5fa"
+               fontFamily="monospace"
+             >
+               {node.blockchain_network || 'ETH'}: {node.tx_hash.slice(0, 8)}...
+             </text>
+           )}
+           {node.block_number && (
+             <text
+               x={node.x}
+               y={node.y - finalSize - (isActive ? 15 : 5)}
+               textAnchor="middle"
+               fontSize="7"
+               fill="#fbbf24"
+               fontFamily="monospace"
+             >
+               Block: {node.block_number}
+             </text>
+           )}
+           
+           {/* Status indicator when active */}
+           {isActive && node.tx_status && (
+             <text
+               x={node.x}
+               y={node.y - finalSize - 5}
+               textAnchor="middle"
+               fontSize="7"
+               fill={node.tx_status === 'confirmed' ? '#4ade80' : 
+                     node.tx_status === 'pending' ? '#fbbf24' : '#f87171'}
+               fontFamily="monospace"
+               fontWeight="bold"
+             >
+               {node.tx_status.toUpperCase()}
+             </text>
+           )}
+         </g>
+       )}
     </g>
   )
 }
@@ -179,7 +269,8 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
   className = '',
   autoRotate = false,
   expandNodeOnClick = true,
-  userAddress
+  userAddress,
+  onNodeClick
 }) => {
   const [activeNode, setActiveNode] = useState<string | null>(null)
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
@@ -187,8 +278,6 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
   const [meshData, setMeshData] = useState<MemoryMesh | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedNodeDetails, setSelectedNodeDetails] = useState<MemoryMeshNode | null>(null)
-  const [showDetailsModal, setShowDetailsModal] = useState(false)
 
   // Fetch mesh data from API
   useEffect(() => {
@@ -215,8 +304,8 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
 
   // Force-directed layout algorithm
   const layoutNodes = (nodes: MemoryMeshNode[], edges: { source: string; target: string; relation_type?: string; similarity_score?: number }[]) => {
-    const width = 400
-    const height = 300
+    const width = 1200
+    const height = 800
     const iterations = 100
     const k = Math.sqrt((width * height) / nodes.length)
     
@@ -284,7 +373,13 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
       memory_id: node.memory_id,
       title: node.title,
       summary: node.summary,
+      content: node.content,
+      full_content: node.full_content,
       importance_score: node.importance_score,
+      tx_hash: node.tx_hash,
+      block_number: node.block_number,
+      blockchain_network: node.blockchain_network,
+      tx_status: node.tx_status,
       x: node.x,
       y: node.y
     }))
@@ -323,11 +418,21 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
       setActiveNode(activeNode === nodeId ? null : nodeId)
     }
     
-    // Show detailed view
-    const node = nodes.find(n => n.id === nodeId)
+    // Call the parent callback to open sidebar and select memory
+    if (onNodeClick) {
+      const node = nodes.find(n => n.id === nodeId)
+      if (node) {
+        onNodeClick(node.memory_id)
+      }
+    }
+    
+    // Add visual feedback - briefly highlight the node
+    const node = document.querySelector(`[data-node-id="${nodeId}"]`)
     if (node) {
-      setSelectedNodeDetails(node)
-      setShowDetailsModal(true)
+      node.classList.add('node-clicked')
+      setTimeout(() => {
+        node.classList.remove('node-clicked')
+      }, 300)
     }
   }
 
@@ -369,11 +474,22 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
 
   return (
     <div className={`w-full h-full ${className}`}>
+      <style dangerouslySetInnerHTML={{
+        __html: `
+          .memory-node {
+            transition: all 0.2s ease-out;
+          }
+          .memory-node.node-clicked {
+            transform: scale(1.2);
+            filter: brightness(1.3);
+          }
+        `
+      }} />
       <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200 relative overflow-hidden">
         <svg
           width="100%"
           height="100%"
-          viewBox="0 0 400 300"
+          viewBox="0 0 1200 800"
           style={{ 
             background: 'transparent',
             transform: autoRotate ? `rotate(${rotation * 0.1}deg)` : 'none',
@@ -462,115 +578,8 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
           </div>
         </div>
 
-        {/* Overlay text */}
-        <div className="absolute bottom-4 left-4 text-xs font-mono text-gray-500">
-          [FIG. 3] Live Memory Mesh ({nodes.length} nodes, {edges.length} connections)
-        </div>
       </div>
 
-      {/* Memory Details Modal */}
-      {showDetailsModal && selectedNodeDetails && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-light">Memory Details</h2>
-                <button
-                  onClick={() => setShowDetailsModal(false)}
-                  className="text-gray-500 hover:text-gray-700 text-2xl"
-                >
-                  ×
-                </button>
-              </div>
-              
-              <div className="space-y-4">
-                {/* Memory Type Badge */}
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono text-gray-600">Type:</span>
-                  <span 
-                    className="px-2 py-1 rounded text-xs font-mono text-white"
-                    style={{ backgroundColor: nodeColors[selectedNodeDetails.type] || '#666666' }}
-                  >
-                    {selectedNodeDetails.type.toUpperCase()}
-                  </span>
-                </div>
-
-                {/* Title */}
-                <div>
-                  <span className="text-sm font-mono text-gray-600 block mb-1">Title:</span>
-                  <h3 className="text-lg font-light">{selectedNodeDetails.title || 'Untitled Memory'}</h3>
-                </div>
-
-                {/* Summary */}
-                {selectedNodeDetails.summary && (
-                  <div>
-                    <span className="text-sm font-mono text-gray-600 block mb-1">Summary:</span>
-                    <p className="text-gray-800 leading-relaxed">{selectedNodeDetails.summary}</p>
-                  </div>
-                )}
-
-                {/* Memory ID */}
-                <div>
-                  <span className="text-sm font-mono text-gray-600 block mb-1">Memory ID:</span>
-                  <code className="text-xs bg-gray-100 px-2 py-1 rounded font-mono">
-                    {selectedNodeDetails.memory_id}
-                  </code>
-                </div>
-
-                {/* Importance Score */}
-                <div>
-                  <span className="text-sm font-mono text-gray-600 block mb-1">Importance Score:</span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-32 bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-blue-500 h-2 rounded-full" 
-                        style={{ width: `${(selectedNodeDetails.importance_score || 0) * 100}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-sm font-mono">
-                      {((selectedNodeDetails.importance_score || 0) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-
-                {/* Related Connections */}
-                <div>
-                  <span className="text-sm font-mono text-gray-600 block mb-2">Related Connections:</span>
-                  <div className="space-y-2">
-                    {edges
-                      .filter(edge => edge.source === selectedNodeDetails.id || edge.target === selectedNodeDetails.id)
-                      .map((edge, index) => {
-                        const relatedNode = nodes.find(n => 
-                          n.id === (edge.source === selectedNodeDetails.id ? edge.target : edge.source)
-                        )
-                        return (
-                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                            <div className="flex items-center gap-2">
-                              <div 
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: nodeColors[relatedNode?.type || 'manual'] || '#666666' }}
-                              ></div>
-                              <span className="text-sm font-mono">{relatedNode?.label || 'Unknown'}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">{edge.relation_type}</span>
-                              <span className="text-xs font-mono bg-blue-100 px-2 py-1 rounded">
-                                {((edge.similarity_score || 0) * 100).toFixed(1)}%
-                              </span>
-                            </div>
-                          </div>
-                        )
-                      })}
-                    {edges.filter(edge => edge.source === selectedNodeDetails.id || edge.target === selectedNodeDetails.id).length === 0 && (
-                      <p className="text-sm text-gray-500 italic">No connections found</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
