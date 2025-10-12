@@ -901,7 +901,7 @@ export class MemoryController {
 
         transactionStats[status] = (transactionStats[status] || 0) + 1;
       });
-      // Convert BigInt values to strings for JSON serialization
+
       const serializedMemories = memories.map((memory: any) => ({
         ...memory,
         timestamp: memory.timestamp ? memory.timestamp.toString() : null,
