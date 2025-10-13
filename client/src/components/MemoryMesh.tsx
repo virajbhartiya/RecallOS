@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react'
 import { MemoryService } from '../services/memoryService'
 import { LoadingSpinner, ErrorMessage } from './ui/loading-spinner'
-import type { MemoryMesh } from '../types/memory'
+import type { MemoryMesh, MemoryMeshEdge } from '../types/memory'
 import {
   ReactFlow,
   Background,
@@ -117,18 +117,42 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
 
   const rfEdges: RFEdge[] = useMemo(() => {
     if (!meshData?.edges?.length) return []
-    return meshData.edges.map((e, idx) => {
+
+    // Group edges by unordered node pair to avoid duplicates A->B and B->A
+    const groups = new Map<string, MemoryMeshEdge[]>()
+    meshData.edges.forEach((e: MemoryMeshEdge) => {
+      if (e.source === e.target) return // skip self loops
+      const [a, b] = e.source < e.target ? [e.source, e.target] : [e.target, e.source]
+      const key = `${a}__${b}`
+      const list = groups.get(key) || ([] as MemoryMeshEdge[])
+      list.push(e)
+      groups.set(key, list)
+    })
+
+    const result: RFEdge[] = []
+    groups.forEach((edgesForPair: MemoryMeshEdge[], key) => {
+      // pick the edge with highest similarity score or the first if undefined
+      const best = edgesForPair.reduce<MemoryMeshEdge | undefined>((prev, curr) => {
+        if (prev == null) return curr
+        const ps = typeof prev.similarity_score === 'number' ? prev.similarity_score : -Infinity
+        const cs = typeof curr.similarity_score === 'number' ? curr.similarity_score : -Infinity
+        return cs > ps ? curr : prev
+      }, edgesForPair[0]) as MemoryMeshEdge
+
       const style: React.CSSProperties = {}
-      if (e.relation_type === 'topical') style.strokeDasharray = '5 5'
-      if (e.relation_type === 'temporal') style.strokeDasharray = '2 2'
-      return {
-        id: `e-${e.source}-${e.target}-${idx}`,
-        source: e.source,
-        target: e.target,
+      if (best.relation_type === 'topical') style.strokeDasharray = '5 5'
+      if (best.relation_type === 'temporal') style.strokeDasharray = '2 2'
+
+      result.push({
+        id: `e-${key}`,
+        source: best.source,
+        target: best.target,
         animated: false,
         style
-      }
+      })
     })
+
+    return result
   }, [meshData])
 
   const [nodes, setNodes] = useState<RFNode[]>([])
