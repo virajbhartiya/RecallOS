@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Calculator,
   Calendar,
@@ -6,6 +7,8 @@ import {
   Settings,
   Smile,
   User,
+  Search,
+  Brain,
 } from 'lucide-react'
 
 import {
@@ -21,6 +24,7 @@ import {
 
 export const CommandMenu = () => {
   const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -28,11 +32,16 @@ export const CommandMenu = () => {
         e.preventDefault()
         setOpen((open) => !open)
       }
+      // Add search shortcut
+      if (e.key === 'f' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault()
+        navigate('/search')
+      }
     }
 
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
-  }, [])
+  }, [navigate])
 
   return (
     <>
@@ -40,18 +49,37 @@ export const CommandMenu = () => {
         <CommandInput placeholder="Type a command or search..." />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Suggestions">
-            <CommandItem>
+          <CommandGroup heading="Search">
+            <CommandItem onSelect={() => navigate('/search')}>
+              <Search className="mr-2 h-4 w-4" />
+              <span>Search Memories</span>
+              <CommandShortcut>⌘⇧F</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => navigate('/memories')}>
+              <Brain className="mr-2 h-4 w-4" />
+              <span>Memory Mesh</span>
+            </CommandItem>
+          </CommandGroup>
+          <CommandSeparator />
+          <CommandGroup heading="Navigation">
+            <CommandItem onSelect={() => navigate('/')}>
               <Calendar className="mr-2 h-4 w-4" />
-              <span>Calendar</span>
+              <span>Home</span>
+            </CommandItem>
+            <CommandItem onSelect={() => navigate('/memories')}>
+              <Brain className="mr-2 h-4 w-4" />
+              <span>Memories</span>
+            </CommandItem>
+          </CommandGroup>
+          <CommandSeparator />
+          <CommandGroup heading="Tools">
+            <CommandItem>
+              <Calculator className="mr-2 h-4 w-4" />
+              <span>Calculator</span>
             </CommandItem>
             <CommandItem>
               <Smile className="mr-2 h-4 w-4" />
               <span>Search Emoji</span>
-            </CommandItem>
-            <CommandItem>
-              <Calculator className="mr-2 h-4 w-4" />
-              <span>Calculator</span>
             </CommandItem>
           </CommandGroup>
           <CommandSeparator />

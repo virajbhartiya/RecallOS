@@ -1259,7 +1259,18 @@ export class MemoryController {
 
   static async searchMemoriesWithEmbeddings(req: Request, res: Response) {
     try {
-      const { userAddress, query, limit = 10 } = req.query;
+      const { 
+        userAddress, 
+        query, 
+        category,
+        topic,
+        sentiment,
+        tx_status,
+        source,
+        dateRange,
+        page = 1,
+        limit = 10 
+      } = req.query;
 
       if (!userAddress || !query) {
         return res.status(400).json({
@@ -1279,18 +1290,101 @@ export class MemoryController {
         });
       }
 
+      // Build filter conditions for pre-filtering memories
+      const whereConditions: any = {
+        user_id: user.id,
+      };
+
+      // Apply filters to narrow down the memory pool before semantic search
+      if (tx_status) {
+        whereConditions.tx_status = tx_status;
+      }
+
+      if (source) {
+        whereConditions.source = source;
+      }
+
+      if (dateRange) {
+        try {
+          const dateRangeObj = typeof dateRange === 'string' ? JSON.parse(dateRange) : dateRange;
+
+          if (dateRangeObj.start || dateRangeObj.end) {
+            whereConditions.created_at = {};
+
+            if (dateRangeObj.start) {
+              whereConditions.created_at.gte = new Date(dateRangeObj.start);
+            }
+            
+            if (dateRangeObj.end) {
+              whereConditions.created_at.lte = new Date(dateRangeObj.end);
+            }
+          }
+        } catch (error) {
+          console.log('Invalid dateRange format:', error);
+        }
+      }
+
+      // Get pre-filtered memories for semantic search
+      const preFilteredMemories = await prisma.memory.findMany({
+        where: whereConditions,
+        select: { id: true },
+      });
+
+      const preFilteredMemoryIds = preFilteredMemories.map(m => m.id);
+
+      // Perform semantic search on pre-filtered memories
       const searchResults = await memoryMeshService.searchMemories(
         user.id,
         query as string,
-        parseInt(limit as string)
+        parseInt(limit as string),
+        preFilteredMemoryIds
       );
+
+      // Apply metadata-based filters to results
+      let filteredResults = searchResults;
+
+      if (category || topic || sentiment) {
+        filteredResults = searchResults.filter((result: any) => {
+          const metadata = result.page_metadata as any;
+          
+          if (category && metadata?.categories && !metadata.categories.includes(category)) {
+            return false;
+          }
+          
+          if (topic && metadata?.topics && !metadata.topics.includes(topic)) {
+            return false;
+          }
+          
+          if (sentiment && metadata?.sentiment !== sentiment) {
+            return false;
+          }
+          
+          return true;
+        });
+      }
+
+      // Apply pagination
+      const skip = (Number(page) - 1) * Number(limit);
+      
+      const paginatedResults = filteredResults.slice(skip, skip + Number(limit));
 
       res.status(200).json({
         success: true,
         data: {
           query: query,
-          results: searchResults,
-          totalResults: searchResults.length,
+          results: paginatedResults,
+          totalResults: filteredResults.length,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(filteredResults.length / Number(limit)),
+          appliedFilters: {
+            category,
+            topic,
+            sentiment,
+            tx_status,
+            source,
+            dateRange
+          }
         },
       });
     } catch (error) {
@@ -1300,6 +1394,246 @@ export class MemoryController {
         error: 'Internal server error',
       });
     }
+  }
+
+  static async searchMemoriesHybrid(req: Request, res: Response) {
+    try {
+      const { 
+        userAddress, 
+        query, 
+        category,
+        topic,
+        sentiment,
+        tx_status,
+        source,
+        dateRange,
+        page = 1,
+        limit = 10 
+      } = req.query;
+
+      if (!userAddress || !query) {
+        return res.status(400).json({
+          success: false,
+          error: 'userAddress and query are required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { wallet_address: (userAddress as string).toLowerCase() },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+        });
+      }
+
+      // Build filter conditions
+      const whereConditions: any = {
+        user_id: user.id,
+      };
+
+      // Apply filters to narrow down the memory pool
+      if (tx_status) {
+        whereConditions.tx_status = tx_status;
+      }
+
+      if (source) {
+        whereConditions.source = source;
+      }
+
+      if (dateRange) {
+        try {
+          const dateRangeObj = typeof dateRange === 'string' ? JSON.parse(dateRange) : dateRange;
+          
+          if (dateRangeObj.start || dateRangeObj.end) {
+            whereConditions.created_at = {};
+
+            if (dateRangeObj.start) {
+              whereConditions.created_at.gte = new Date(dateRangeObj.start);
+            }
+
+            if (dateRangeObj.end) {
+              whereConditions.created_at.lte = new Date(dateRangeObj.end);
+            }
+          }
+        } catch (error) {
+          console.log('Invalid dateRange format:', error);
+        }
+      }
+
+      // Get pre-filtered memories
+      const preFilteredMemories = await prisma.memory.findMany({
+        where: whereConditions,
+        select: { id: true },
+      });
+
+      const preFilteredMemoryIds = preFilteredMemories.map(m => m.id);
+
+      // Perform both keyword and semantic search in parallel
+      const [keywordResults, semanticResults] = await Promise.all([
+        // Keyword search
+        prisma.memory.findMany({
+          where: {
+            ...whereConditions,
+            OR: [
+              { content: { contains: query as string, mode: 'insensitive' } },
+              { summary: { contains: query as string, mode: 'insensitive' } },
+              { title: { contains: query as string, mode: 'insensitive' } },
+            ],
+          },
+          take: parseInt(limit as string) * 2, // Get more results for blending
+        }),
+        // Semantic search
+        memoryMeshService.searchMemories(
+          user.id,
+          query as string,
+          parseInt(limit as string) * 2,
+          preFilteredMemoryIds
+        ),
+      ]);
+
+      // Apply metadata-based filters to keyword results
+      let filteredKeywordResults = keywordResults;
+      
+      if (category || topic || sentiment) {
+        filteredKeywordResults = keywordResults.filter((memory: any) => {
+          const metadata = memory.page_metadata as any;
+          
+          if (category && metadata?.categories && !metadata.categories.includes(category)) {
+            return false;
+          }
+          
+          if (topic && metadata?.topics && !metadata.topics.includes(topic)) {
+            return false;
+          }
+          
+          if (sentiment && metadata?.sentiment !== sentiment) {
+            return false;
+          }
+          
+          return true;
+        });
+      }
+
+      // Create a map to track results and their scores
+      const resultMap = new Map<string, any>();
+
+      // Add keyword results with keyword relevance score
+      filteredKeywordResults.forEach((memory: any) => {
+        const keywordScore = this.calculateKeywordRelevance(memory, query as string);
+
+        resultMap.set(memory.id, {
+          ...memory,
+          keyword_score: keywordScore,
+          semantic_score: 0,
+          search_type: 'keyword',
+        });
+      });
+
+      // Add semantic results with semantic relevance score
+      semanticResults.forEach((memory: any) => {
+        const existing = resultMap.get(memory.id);
+
+        if (existing) {
+          // Memory found in both searches - blend the scores
+          existing.semantic_score = memory.similarity_score || 0;
+          existing.search_type = 'hybrid';
+          existing.blended_score = (existing.keyword_score * 0.4) + (existing.semantic_score * 0.6);
+        } else {
+          // Memory only found in semantic search
+          resultMap.set(memory.id, {
+            ...memory,
+            keyword_score: 0,
+            semantic_score: memory.similarity_score || 0,
+            search_type: 'semantic',
+            blended_score: memory.similarity_score || 0,
+          });
+        }
+      });
+
+      // Calculate blended scores for keyword-only results
+      resultMap.forEach((result) => {
+        if (result.search_type === 'keyword') {
+          result.blended_score = result.keyword_score * 0.4;
+        }
+      });
+
+      // Convert to array and sort by blended score
+      const blendedResults = Array.from(resultMap.values())
+        .sort((a, b) => (b.blended_score || 0) - (a.blended_score || 0));
+
+      // Apply pagination
+      const skip = (Number(page) - 1) * Number(limit);
+
+      const paginatedResults = blendedResults.slice(skip, skip + Number(limit));
+
+      res.status(200).json({
+        success: true,
+        data: {
+          query: query,
+          results: paginatedResults,
+          totalResults: blendedResults.length,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(blendedResults.length / Number(limit)),
+          searchStats: {
+            keywordResults: filteredKeywordResults.length,
+            semanticResults: semanticResults.length,
+            blendedResults: blendedResults.length,
+          },
+          appliedFilters: {
+            category,
+            topic,
+            sentiment,
+            tx_status,
+            source,
+            dateRange
+          }
+        },
+      });
+    } catch (error) {
+      console.error('Error in hybrid search:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+      });
+    }
+  }
+
+  private static calculateKeywordRelevance(memory: any, query: string): number {
+    const queryLower = query.toLowerCase();
+
+    let score = 0;
+
+    // Title matches get highest score
+    if (memory.title && memory.title.toLowerCase().includes(queryLower)) {
+      score += 0.4;
+    }
+
+    // Summary matches get medium score
+    if (memory.summary && memory.summary.toLowerCase().includes(queryLower)) {
+      score += 0.3;
+    }
+
+    // Content matches get lower score
+    if (memory.content && memory.content.toLowerCase().includes(queryLower)) {
+      score += 0.2;
+    }
+
+    // Boost score for exact phrase matches
+    const exactPhraseRegex = new RegExp(`\\b${queryLower}\\b`, 'gi');
+
+    if (memory.title && exactPhraseRegex.test(memory.title)) {
+      score += 0.1;
+    }
+
+    if (memory.summary && exactPhraseRegex.test(memory.summary)) {
+      score += 0.1;
+    }
+
+    return Math.min(1, score);
   }
 
   static async processMemoryForMesh(req: Request, res: Response) {
