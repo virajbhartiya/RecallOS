@@ -20,6 +20,7 @@
     "@types/js-cookie": "^3.0.6",
     "@types/three": "^0.160.0",
     "@vitejs/plugin-react": "^4.2.1",
+    "@xyflow/react": "^12.8.6",
     "axios": "^1.6.8",
     "class-variance-authority": "^0.7.0",
     "cmdk": "^1.0.0",
