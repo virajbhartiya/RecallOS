@@ -8,6 +8,7 @@ interface MemorySearchProps {
   isLoading?: boolean
   resultCount?: number
   className?: string
+  compact?: boolean
 }
 
 export const MemorySearch: React.FC<MemorySearchProps> = ({
@@ -15,7 +16,8 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
   onClearFilters,
   isLoading = false,
   resultCount,
-  className = ''
+  className = '',
+  compact = false
 }) => {
   const [query, setQuery] = useState('')
   const [useSemantic, setUseSemantic] = useState(false)
@@ -49,27 +51,27 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
   const hasActiveFilters = Object.keys(filters).length > 0 || query.trim() !== ''
 
   return (
-    <div className={`bg-white border border-gray-200 p-6 ${className}`}>
-      <div className="text-sm font-mono text-gray-600 mb-4 uppercase tracking-wide">
+    <div className={`bg-white border border-gray-200 ${compact ? 'p-3' : 'p-4'} ${className}`}>
+      <div className={`font-mono text-gray-600 ${compact ? 'text-xs mb-2' : 'text-xs mb-3'} uppercase tracking-wide`}>
         [SEARCH & FILTER]
       </div>
 
       {/* Search Input */}
-      <div className="mb-4">
-        <div className="flex items-center space-x-2 mb-2">
+      <div className={compact ? 'mb-2' : 'mb-3'}>
+        <div className="flex flex-col space-y-2 mb-2">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyPress={handleKeyPress}
             placeholder="Search memories..."
-            className="flex-1 px-3 py-2 border border-gray-300 bg-white text-sm font-mono focus:outline-none focus:border-black"
+            className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
             disabled={isLoading}
           />
           <button
             onClick={handleSearch}
             disabled={isLoading || !query.trim()}
-            className="px-4 py-2 text-sm font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+            className="w-full px-2 py-1 text-xs font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
           >
             {isLoading ? (
               <>
@@ -83,7 +85,7 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
         </div>
 
         {/* Search Type Toggle */}
-        <div className="flex items-center space-x-4 text-xs font-mono text-gray-600">
+        <div className="flex flex-col space-y-2 text-xs font-mono text-gray-600">
           <label className="flex items-center space-x-2 cursor-pointer">
             <input
               type="radio"
@@ -106,7 +108,7 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
       </div>
 
       {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className={`grid grid-cols-1 gap-2 ${compact ? 'mb-2' : 'mb-3'}`}>
         {/* Category Filter */}
         <div>
           <label className="block text-xs font-mono text-gray-600 uppercase tracking-wide mb-1">
@@ -115,7 +117,7 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
           <select
             value={filters.category || ''}
             onChange={(e) => handleFilterChange('category', e.target.value || undefined)}
-            className="w-full px-3 py-2 border border-gray-300 bg-white text-sm font-mono focus:outline-none focus:border-black"
+            className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           >
             <option value="">All Categories</option>
             <option value="web">Web</option>
@@ -135,7 +137,7 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
           <select
             value={filters.sentiment || ''}
             onChange={(e) => handleFilterChange('sentiment', e.target.value || undefined)}
-            className="w-full px-3 py-2 border border-gray-300 bg-white text-sm font-mono focus:outline-none focus:border-black"
+            className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           >
             <option value="">All Sentiments</option>
             <option value="positive">Positive</option>
@@ -152,7 +154,7 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
           <select
             value={filters.tx_status || ''}
             onChange={(e) => handleFilterChange('tx_status', e.target.value || undefined)}
-            className="w-full px-3 py-2 border border-gray-300 bg-white text-sm font-mono focus:outline-none focus:border-black"
+            className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           >
             <option value="">All Status</option>
             <option value="confirmed">Confirmed</option>
@@ -169,7 +171,7 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
           <select
             value={filters.source || ''}
             onChange={(e) => handleFilterChange('source', e.target.value || undefined)}
-            className="w-full px-3 py-2 border border-gray-300 bg-white text-sm font-mono focus:outline-none focus:border-black"
+            className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           >
             <option value="">All Sources</option>
             <option value="browser">Browser</option>
@@ -181,7 +183,7 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
       </div>
 
       {/* Date Range Filter */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div className={`grid grid-cols-1 gap-2 ${compact ? 'mb-2' : 'mb-3'}`}>
         <div>
           <label className="block text-xs font-mono text-gray-600 uppercase tracking-wide mb-1">
             START DATE
@@ -193,7 +195,7 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
               ...filters.dateRange,
               start: e.target.value
             })}
-            className="w-full px-3 py-2 border border-gray-300 bg-white text-sm font-mono focus:outline-none focus:border-black"
+            className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           />
         </div>
         <div>
@@ -207,7 +209,7 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
               ...filters.dateRange,
               end: e.target.value
             })}
-            className="w-full px-3 py-2 border border-gray-300 bg-white text-sm font-mono focus:outline-none focus:border-black"
+            className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           />
         </div>
       </div>

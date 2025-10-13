@@ -16,7 +16,7 @@ export interface Memory {
     keywords?: string[]
     author?: string
     published_date?: string
-    [key: string]: any
+    [key: string]: string | string[] | number | boolean | undefined
   }
   importance_score?: number
   access_count: number
@@ -117,6 +117,10 @@ export interface SearchResult {
   memory: Memory
   similarity_score?: number
   relevance_score?: number
+  keyword_score?: number
+  semantic_score?: number
+  blended_score?: number
+  search_type?: 'keyword' | 'semantic' | 'hybrid'
 }
 
 export interface MemorySearchResponse {

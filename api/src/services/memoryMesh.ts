@@ -110,15 +110,26 @@ export class MemoryMeshService {
     queryVector: number[],
     userId: string,
     excludeMemoryId: string,
-    limit: number
+    limit: number,
+    preFilteredMemoryIds?: string[]
   ): Promise<any[]> {
     try {
+      const whereConditions: any = {
+        user_id: userId,
+        id: { not: excludeMemoryId },
+        embeddings: { some: { embedding_type: 'content' } },
+      };
+
+      // If pre-filtered memory IDs are provided, only search within those
+      if (preFilteredMemoryIds && preFilteredMemoryIds.length > 0) {
+        whereConditions.id = { 
+          in: preFilteredMemoryIds,
+          not: excludeMemoryId 
+        };
+      }
+
       const memories = await prisma.memory.findMany({
-        where: {
-          user_id: userId,
-          id: { not: excludeMemoryId },
-          embeddings: { some: { embedding_type: 'content' } },
-        },
+        where: whereConditions,
         include: {
           embeddings: {
             where: { embedding_type: 'content' },
@@ -613,7 +624,8 @@ export class MemoryMeshService {
   async searchMemories(
     userId: string,
     query: string,
-    limit: number = 10
+    limit: number = 10,
+    preFilteredMemoryIds?: string[]
   ): Promise<any[]> {
     try {
       const queryEmbedding = await geminiService.generateEmbedding(query);
@@ -622,7 +634,8 @@ export class MemoryMeshService {
         queryEmbedding,
         userId,
         '',
-        limit
+        limit,
+        preFilteredMemoryIds
       );
 
       return similarMemories;

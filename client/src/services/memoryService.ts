@@ -160,17 +160,61 @@ export class MemoryService {
   static async searchMemoriesWithEmbeddings(
     userAddress: string,
     query: string,
+    filters: SearchFilters = {},
+    page: number = 1,
     limit: number = 10
   ): Promise<MemorySearchResponse> {
     const normalizedAddress = this.normalizeAddress(userAddress)
     const params = new URLSearchParams({
       userAddress: normalizedAddress,
       query,
+      page: page.toString(),
       limit: limit.toString()
     })
 
+    // Add filters to params
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (typeof value === 'object') {
+          params.append(key, JSON.stringify(value))
+        } else {
+          params.append(key, value.toString())
+        }
+      }
+    })
+
     const response = await getRequest(`${this.baseUrl}/search-embeddings?${params.toString()}`)
-    return response.data || { results: [], total: 0, page: 1, limit, filters: {} }
+    return response.data || { results: [], total: 0, page, limit, filters }
+  }
+
+  static async searchMemoriesHybrid(
+    userAddress: string,
+    query: string,
+    filters: SearchFilters = {},
+    page: number = 1,
+    limit: number = 10
+  ): Promise<MemorySearchResponse> {
+    const normalizedAddress = this.normalizeAddress(userAddress)
+    const params = new URLSearchParams({
+      userAddress: normalizedAddress,
+      query,
+      page: page.toString(),
+      limit: limit.toString()
+    })
+
+    // Add filters to params
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        if (typeof value === 'object') {
+          params.append(key, JSON.stringify(value))
+        } else {
+          params.append(key, value.toString())
+        }
+      }
+    })
+
+    const response = await getRequest(`${this.baseUrl}/search-hybrid?${params.toString()}`)
+    return response.data || { results: [], total: 0, page, limit, filters }
   }
 
   static async getMemoryInsights(userAddress: string): Promise<MemoryInsights> {
