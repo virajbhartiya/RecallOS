@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect } from 'react'
 import { useWallet } from '../contexts/WalletContext'
 import { MemoryService } from '../services/memoryService'
 import { MemoryMesh } from '../components/MemoryMesh'
-import { MemorySearch } from '../components/MemorySearch'
 import type { Memory, MemoryInsights, SearchFilters, MemorySearchResponse } from '../types/memory'
 
 // Memory Card Component
@@ -16,67 +15,49 @@ const MemoryCard: React.FC<{
   }
 }> = ({ memory, isSelected, onSelect, searchResult }) => {
   return (
-        <button
+    <button
       onClick={() => onSelect(memory)}
-      className={`w-full text-left p-4 rounded-lg transition-all duration-200 group border ${
+      className={`w-full text-left p-2 rounded transition-all duration-200 group border ${
         isSelected
-          ? 'bg-blue-50 border-blue-200 shadow-sm'
-          : 'hover:bg-white border-gray-200 hover:border-gray-300 hover:shadow-sm bg-white'
+          ? 'bg-blue-50 border-blue-200'
+          : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300 bg-white'
       }`}
     >
-      <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors mb-1">
-                          {memory.title || 'Untitled Memory'}
-                        </h3>
-                        <p className="text-xs text-gray-500">
-                          {memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'No date'}
-                        </p>
-                      </div>
-        <div className="flex items-center gap-2 ml-3 flex-shrink-0">
-          {searchResult?.search_type && (
-            <span className={`text-xs px-2 py-1 rounded-full ${
-              searchResult.search_type === 'keyword' ? 'bg-blue-100 text-blue-700' :
-              searchResult.search_type === 'semantic' ? 'bg-purple-100 text-purple-700' :
-              'bg-indigo-100 text-indigo-700'
-            }`}>
-              {searchResult.search_type}
-            </span>
+      {/* Compact header */}
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-xs font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+          {memory.title || 'Untitled Memory'}
+        </h3>
+        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+          {memory.tx_status && (
+            <div className={`w-1.5 h-1.5 rounded-full ${
+              memory.tx_status === 'confirmed' ? 'bg-green-500' :
+              memory.tx_status === 'pending' ? 'bg-yellow-500' :
+              'bg-red-500'
+            }`} title={memory.tx_status}></div>
           )}
           {searchResult?.blended_score !== undefined && (
             <span className="text-xs text-gray-500 font-mono">
               {(searchResult.blended_score * 100).toFixed(0)}%
             </span>
           )}
-                        {memory.tx_status && (
-                          <div className={`w-2 h-2 rounded-full ${
-                            memory.tx_status === 'confirmed' ? 'bg-green-500' :
-                            memory.tx_status === 'pending' ? 'bg-yellow-500' :
-                            'bg-red-500'
-                          }`}></div>
-                        )}
-                        {memory.importance_score && (
-                          <div className="text-xs font-medium text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
-                            {Math.round(memory.importance_score * 100)}%
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {(memory.summary || memory.content) && (
-        <p className="text-xs text-gray-600 line-clamp-2 mb-3 leading-relaxed">
-                        {memory.summary || (memory.content && memory.content.slice(0, 100) + (memory.content.length > 100 ? '...' : ''))}
-                      </p>
-                    )}
-      <div className="flex items-center gap-2 text-xs text-gray-500">
-        <span className="uppercase font-mono">{memory.source}</span>
-        {memory.url && memory.url !== 'unknown' && (
-          <>
-            <span>•</span>
-            <span className="truncate max-w-[120px]">{memory.url}</span>
-          </>
-        )}
+        </div>
       </div>
-                  </button>
+      
+      {/* Metadata */}
+      <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+        <span>{memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'No date'}</span>
+        <span>•</span>
+        <span className="uppercase font-mono text-xs">{memory.source}</span>
+      </div>
+      
+      {/* Content preview */}
+      {(memory.summary || memory.content) && (
+        <p className="text-xs text-gray-600 line-clamp-1 leading-relaxed">
+          {memory.summary || (memory.content && memory.content.slice(0, 60) + (memory.content.length > 60 ? '...' : ''))}
+        </p>
+      )}
+    </button>
   )
 }
 
@@ -229,10 +210,10 @@ export const Memories: React.FC = () => {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [expandedContent, setExpandedContent] = useState(false)
   const [similarityThreshold, setSimilarityThreshold] = useState(0.3)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   
   // Search state
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
-  const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
 
@@ -279,7 +260,6 @@ export const Memories: React.FC = () => {
   ) => {
     if (!address) return
 
-    setIsSearching(true)
     setSearchError(null)
     setSearchResults(null)
     setIsSearchMode(true)
@@ -309,8 +289,6 @@ export const Memories: React.FC = () => {
     } catch (err) {
       setSearchError('Failed to search memories')
       console.error('Error searching memories:', err)
-    } finally {
-      setIsSearching(false)
     }
   }, [address])
 
@@ -392,67 +370,103 @@ export const Memories: React.FC = () => {
         />
       </div>
 
+        {/* Collapse/Expand Button */}
+        <button
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-200 border-r-0 rounded-l-lg px-2 py-4 hover:bg-gray-50 transition-all duration-200 shadow-sm"
+        >
+          <svg 
+            className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${isSidebarCollapsed ? 'rotate-180' : ''}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
         {/* Right Panel - Search & Memory List */}
-        <div className="w-[400px] border-l border-gray-200 bg-white flex flex-col">
-          {/* Similarity Threshold Control */}
-          <div className="border-b border-gray-200 bg-gray-50/50 flex-shrink-0 p-4">
+        <div className={`${isSidebarCollapsed ? 'w-0' : 'w-[320px]'} border-l border-gray-200 bg-white flex flex-col transition-all duration-300 overflow-hidden`}>
+          {/* Compact Controls */}
+          <div className="border-b border-gray-200 bg-gray-50/50 flex-shrink-0 p-3">
+            {/* Similarity Threshold */}
             <div className="mb-3">
-              <label className="text-xs font-mono text-gray-600 uppercase tracking-wide">
-                [SIMILARITY THRESHOLD]
-              </label>
-              <div className="mt-2 flex items-center gap-3">
-                <input
-                  type="range"
-                  min="0.1"
-                  max="0.9"
-                  step="0.1"
-                  value={similarityThreshold}
-                  onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
-                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                />
-                <span className="text-xs font-mono text-gray-700 min-w-[3rem]">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-mono text-gray-600 uppercase tracking-wide">
+                  [SIMILARITY]
+                </label>
+                <span className="text-xs font-mono text-gray-700">
                   {(similarityThreshold * 100).toFixed(0)}%
                 </span>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Higher values show only closely related memories
-              </p>
-            </div>
-          </div>
-          
-          {/* Search Section */}
-          <div className="border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
-            <div className="p-4">
-              <MemorySearch
-                onSearch={handleSearch}
-                onClearFilters={handleClearSearch}
-                isLoading={isSearching}
-                resultCount={searchResults?.total}
-                className="text-xs"
-                compact={true}
+              <input
+                type="range"
+                min="0.1"
+                max="0.9"
+                step="0.1"
+                value={similarityThreshold}
+                onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
+                className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
               />
+            </div>
+            
+            {/* Simple Search */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Search memories..."
+                className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    const query = (e.target as HTMLInputElement).value
+                    if (query.trim()) {
+                      handleSearch(query.trim(), {}, false)
+                    } else {
+                      handleClearSearch()
+                    }
+                  }
+                }}
+              />
+              <button
+                onClick={() => handleClearSearch()}
+                className="text-xs px-2 py-1.5 text-gray-500 hover:text-gray-700 border border-gray-200 rounded hover:bg-gray-50"
+              >
+                Clear
+              </button>
             </div>
           </div>
 
           {/* Memory List Header */}
-          <div className="px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
-            <h3 className="text-sm font-medium text-gray-700 mb-1">
-              {isSearchMode ? 'Search Results' : 'Memories'}
-            </h3>
-            <p className="text-xs text-gray-500">
-              {isSearchMode ? 
-                (searchResults ? `${searchResults.total} results` : 'No search performed') :
-                `${memories.length} total`
-              }
-            </p>
+          <div className="px-3 py-2 border-b border-gray-200 bg-white flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-medium text-gray-700">
+                  {isSearchMode ? 'Search Results' : 'Memories'}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {isSearchMode ? 
+                    (searchResults ? `${searchResults.total} results` : 'No search') :
+                    `${memories.length} total`
+                  }
+                </p>
+              </div>
+              {selectedMemory && (
+                <button
+                  onClick={() => setSelectedMemory(null)}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Memory List */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-2">
             {isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <div key={index} className="h-20 bg-gray-200 animate-pulse rounded-lg"></div>
+              <div className="space-y-1">
+                {Array.from({ length: 8 }).map((_, index) => (
+                  <div key={index} className="h-12 bg-gray-200 animate-pulse rounded"></div>
                 ))}
               </div>
             ) : error ? (
@@ -497,7 +511,7 @@ export const Memories: React.FC = () => {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {currentMemories.map((memory) => {
                   const searchResult = currentResults?.find(r => r.memory.id === memory.id)
                   return (
@@ -516,7 +530,7 @@ export const Memories: React.FC = () => {
         </div>
 
         {/* Memory Details Panel */}
-        {selectedMemory && (
+        {selectedMemory && !isSidebarCollapsed && (
           <div className="w-[500px] border-l border-gray-200 bg-white flex flex-col">
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
               <div className="flex items-center justify-between">
@@ -536,6 +550,32 @@ export const Memories: React.FC = () => {
         expandedContent={expandedContent}
         setExpandedContent={setExpandedContent}
       />
+          </div>
+        )}
+
+        {/* Floating Memory Details Panel (when sidebar is collapsed) */}
+        {selectedMemory && isSidebarCollapsed && (
+          <div className="fixed right-4 top-1/2 transform -translate-y-1/2 w-[400px] max-h-[80vh] bg-white border border-gray-200 rounded-lg shadow-xl z-50 flex flex-col">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0 rounded-t-lg">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-700">Memory Details</h3>
+                <button
+                  onClick={() => setSelectedMemory(null)}
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-all duration-200"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <MemoryDetails
+                memory={selectedMemory}
+                expandedContent={expandedContent}
+                setExpandedContent={setExpandedContent}
+              />
+            </div>
           </div>
         )}
       </div>
