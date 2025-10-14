@@ -1,0 +1,390 @@
+import React, { useState, useCallback } from 'react'
+import { useWallet } from '../contexts/WalletContext'
+import { MemorySearch } from '../components/MemorySearch'
+import { MemoryService } from '../services/memoryService'
+import { LoadingSpinner, LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
+import type { Memory, SearchFilters, MemorySearchResponse, SearchResult } from '../types/memory'
+
+const SearchResultCard: React.FC<{ 
+  result: SearchResult
+  onClick: (memory: Memory) => void 
+}> = ({ result, onClick }) => {
+  const memory = result.memory
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  const getScoreColor = (score?: number) => {
+    if (!score) return 'text-gray-500'
+    if (score >= 0.8) return 'text-green-600'
+    if (score >= 0.6) return 'text-yellow-600'
+    return 'text-red-600'
+  }
+
+  const getSearchTypeBadge = (type?: string) => {
+    switch (type) {
+      case 'keyword':
+        return <span className="text-xs font-mono bg-blue-100 text-blue-800 px-2 py-1 border border-blue-200">KEYWORD</span>
+      case 'semantic':
+        return <span className="text-xs font-mono bg-purple-100 text-purple-800 px-2 py-1 border border-purple-200">SEMANTIC</span>
+      case 'hybrid':
+        return <span className="text-xs font-mono bg-indigo-100 text-indigo-800 px-2 py-1 border border-indigo-200">HYBRID</span>
+      default:
+        return null
+    }
+  }
+
+  return (
+    <div 
+      className="bg-white border border-gray-200 p-4 hover:border-gray-400 transition-all duration-200 cursor-pointer"
+      onClick={() => onClick(memory)}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <h3 className="text-sm font-mono font-semibold text-gray-900 mb-1">
+            {memory.title || 'Untitled Memory'}
+          </h3>
+          <div className="flex items-center space-x-2 text-xs font-mono text-gray-500">
+            <span>{formatDate(memory.created_at)}</span>
+            <span>•</span>
+            <span className="uppercase">{memory.source}</span>
+            {memory.tx_status && (
+              <>
+                <span>•</span>
+                <span className={`uppercase ${
+                  memory.tx_status === 'confirmed' ? 'text-green-600' :
+                  memory.tx_status === 'pending' ? 'text-yellow-600' :
+                  'text-red-600'
+                }`}>
+                  {memory.tx_status}
+                </span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center space-x-2">
+          {getSearchTypeBadge(result.search_type)}
+          {result.blended_score && (
+            <span className={`text-xs font-mono ${getScoreColor(result.blended_score)}`}>
+              {(result.blended_score * 100).toFixed(0)}%
+            </span>
+          )}
+        </div>
+      </div>
+
+      {memory.summary && (
+        <p className="text-sm text-gray-700 mb-3 line-clamp-2">
+          {memory.summary}
+        </p>
+      )}
+
+      {memory.url && memory.url !== 'unknown' && (
+        <div className="flex items-center space-x-2 text-xs font-mono text-gray-500">
+          <span>[URL]</span>
+          <a 
+            href={memory.url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-black truncate"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {memory.url}
+          </a>
+        </div>
+      )}
+
+      {/* Show individual scores for hybrid results */}
+      {result.search_type === 'hybrid' && (
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center space-x-4 text-xs font-mono text-gray-500">
+            <span>Keyword: {(result.keyword_score || 0 * 100).toFixed(0)}%</span>
+            <span>Semantic: {(result.semantic_score || 0 * 100).toFixed(0)}%</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export const Search: React.FC = () => {
+  const { isConnected, address } = useWallet()
+  const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
+  const [isPopupOpen, setIsPopupOpen] = useState(false)
+
+  const handleSearch = useCallback(async (
+    query: string, 
+    filters: SearchFilters, 
+    useSemantic: boolean
+  ) => {
+    if (!address) return
+
+    setIsLoading(true)
+    setError(null)
+    setSearchResults(null)
+
+    try {
+      let response: MemorySearchResponse
+
+      if (useSemantic) {
+        response = await MemoryService.searchMemoriesWithEmbeddings(
+          address,
+          query,
+          filters,
+          1,
+          20
+        )
+      } else {
+        response = await MemoryService.searchMemories(
+          address,
+          query,
+          filters,
+          1,
+          20
+        )
+      }
+
+      setSearchResults(response)
+    } catch (err) {
+      setError('Failed to search memories')
+      console.error('Error searching memories:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [address])
+
+  const handleClearFilters = useCallback(() => {
+    setSearchResults(null)
+    setError(null)
+  }, [])
+
+  const handleSelectMemory = (memory: Memory) => {
+    setSelectedMemory(memory)
+    setIsPopupOpen(true)
+  }
+
+  const handleClosePopup = () => {
+    setIsPopupOpen(false)
+    setSelectedMemory(null)
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-mono font-bold text-gray-900 mb-4">
+            [CONNECTION REQUIRED]
+          </h2>
+          <p className="text-gray-600 font-mono">
+            Please connect your wallet to search memories
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-mono font-bold text-gray-900 mb-2">
+            [MEMORY SEARCH]
+          </h1>
+          <p className="text-gray-600 font-mono">
+            Search through your memories using keyword or semantic search
+          </p>
+        </div>
+
+        {/* Search Interface */}
+        <div className="mb-8">
+          <MemorySearch
+            onSearch={handleSearch}
+            onClearFilters={handleClearFilters}
+            isLoading={isLoading}
+            resultCount={searchResults?.total}
+            className="mb-6"
+          />
+        </div>
+
+        {/* Search Results */}
+        <div className="space-y-6">
+          {isLoading && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <LoadingCard key={i} />
+              ))}
+            </div>
+          )}
+
+          {error && (
+            <ErrorMessage 
+              message={error}
+              onRetry={() => setError(null)}
+            />
+          )}
+
+          {searchResults && searchResults.results.length === 0 && (
+            <EmptyState
+              title="No memories found"
+              description="Try adjusting your search query or filters"
+              action={{
+                label: "Clear Filters",
+                onClick: handleClearFilters
+              }}
+            />
+          )}
+
+          {searchResults && searchResults.results.length > 0 && (
+            <>
+              {/* Search Stats */}
+              <div className="bg-white border border-gray-200 p-4">
+                <div className="text-sm font-mono text-gray-600 mb-2">
+                  [SEARCH RESULTS]
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-mono text-gray-700">
+                    Found {searchResults.total} {searchResults.total === 1 ? 'result' : 'results'}
+                    {searchResults.page > 1 && ` (page ${searchResults.page})`}
+                  </div>
+                  {searchResults.appliedFilters && Object.keys(searchResults.appliedFilters).length > 0 && (
+                    <div className="text-xs font-mono text-gray-500">
+                      Filters applied: {Object.keys(searchResults.appliedFilters).length}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Results Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {searchResults.results.map((result) => (
+                  <SearchResultCard
+                    key={result.memory.id}
+                    result={result}
+                    onClick={handleSelectMemory}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Memory Detail Popup */}
+      {isPopupOpen && selectedMemory && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-mono font-bold text-gray-900">
+                  [MEMORY DETAILS]
+                </h2>
+                <button
+                  onClick={handleClosePopup}
+                  className="text-gray-500 hover:text-gray-700 font-mono text-sm"
+                >
+                  [CLOSE]
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Title */}
+                <div>
+                  <h3 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-2">
+                    [TITLE]
+                  </h3>
+                  <p className="text-lg font-mono text-gray-900">
+                    {selectedMemory.title || 'Untitled Memory'}
+                  </p>
+                </div>
+
+                {/* Summary */}
+                {selectedMemory.summary && (
+                  <div>
+                    <h3 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-2">
+                      [SUMMARY]
+                    </h3>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {selectedMemory.summary}
+                    </p>
+                  </div>
+                )}
+
+                {/* Content */}
+                {selectedMemory.content && (
+                  <div>
+                    <h3 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-2">
+                      [CONTENT]
+                    </h3>
+                    <div className="bg-gray-50 border border-gray-200 p-4 max-h-64 overflow-y-auto">
+                      <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                        {selectedMemory.content}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Metadata */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-2">
+                      [METADATA]
+                    </h3>
+                    <div className="space-y-2 text-sm font-mono">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Source:</span>
+                        <span className="text-gray-900 uppercase">{selectedMemory.source}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Created:</span>
+                        <span className="text-gray-900">
+                          {new Date(selectedMemory.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      {selectedMemory.tx_status && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Status:</span>
+                          <span className={`uppercase ${
+                            selectedMemory.tx_status === 'confirmed' ? 'text-green-600' :
+                            selectedMemory.tx_status === 'pending' ? 'text-yellow-600' :
+                            'text-red-600'
+                          }`}>
+                            {selectedMemory.tx_status}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {selectedMemory.url && selectedMemory.url !== 'unknown' && (
+                    <div>
+                      <h3 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-2">
+                        [URL]
+                      </h3>
+                      <a
+                        href={selectedMemory.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-mono text-blue-600 hover:text-black break-all"
+                      >
+                        {selectedMemory.url}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

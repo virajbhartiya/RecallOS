@@ -48,6 +48,7 @@ interface ContextData {
 let lastUrl = location.href;
 let lastContent = '';
 let lastTitle = '';
+let lastContentHash = '';
 let captureInterval: ReturnType<typeof setInterval> | null = null;
 let isActive = true;
 let activityLevel = 'normal';
@@ -56,6 +57,7 @@ let lastCaptureTime = 0;
 let hasUserActivity = false;
 const MIN_CAPTURE_INTERVAL = 10000;
 const ACTIVITY_TIMEOUT = 30000;
+const CONTENT_CHANGE_THRESHOLD = 0.1; // 10% content change required
 let privacyExtensionDetected = false;
 let privacyExtensionType = 'unknown';
 function detectPrivacyExtensions(): void {
@@ -762,19 +764,21 @@ function captureContext(): ContextData {
       'RecallOS: Error in captureContext, using minimal fallback:',
       error
     );
+    
+    // Try to get at least basic page information even with privacy extensions
+    const basicTitle = document.title || 'Untitled Page';
+    const basicUrl = window.location.href;
+    const basicContent = `Page: ${basicTitle} | URL: ${basicUrl}`;
+    
     return {
       source: 'extension',
-      url: window.location.href,
-      title: document.title || '',
-      content_snippet:
-        'Content extraction failed due to privacy extension conflicts',
+      url: basicUrl,
+      title: basicTitle,
+      content_snippet: basicContent,
       timestamp: Date.now(),
-      full_content:
-        'Content extraction failed due to privacy extension conflicts',
-      meaningful_content:
-        'Content extraction failed due to privacy extension conflicts',
-      content_summary:
-        'Content extraction failed due to privacy extension conflicts',
+      full_content: basicContent,
+      meaningful_content: basicContent,
+      content_summary: `Basic page information for ${basicTitle}`,
       content_type: 'web_page',
       key_topics: [],
       reading_time: 0,
@@ -783,7 +787,7 @@ function captureContext(): ContextData {
         keywords: '',
         author: '',
         viewport: '',
-        language: '',
+        language: document.documentElement.lang || '',
         published_date: '',
         modified_date: '',
         canonical_url: '',
@@ -802,7 +806,7 @@ function captureContext(): ContextData {
         interaction_count: 0,
       },
       content_quality: {
-        word_count: 0,
+        word_count: basicContent.split(' ').length,
         has_images: false,
         has_code: false,
         has_tables: false,
@@ -811,18 +815,53 @@ function captureContext(): ContextData {
     };
   }
 }
+function isLocalhost(): boolean {
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || 
+         hostname === '127.0.0.1' || 
+         hostname === '0.0.0.0' ||
+         hostname.startsWith('192.168.') ||
+         hostname.startsWith('10.') ||
+         hostname.endsWith('.local');
+}
+
 function sendContextToBackground() {
   try {
     if (!chrome.runtime?.id) {
       console.log('RecallOS: Extension context invalidated, skipping capture');
       return;
     }
+    
+    // Skip capture if on localhost or local development
+    if (isLocalhost()) {
+      console.log('RecallOS: Skipping capture - localhost detected');
+      return;
+    }
+    
     const now = Date.now();
     if (now - lastCaptureTime < MIN_CAPTURE_INTERVAL) {
       console.log('RecallOS: Skipping capture - too soon since last capture');
       return;
     }
     const contextData = captureContext();
+    
+    // Check if content capture was successful
+    const hasValidContent = contextData.content_snippet && 
+                           contextData.content_snippet.length > 50 && 
+                           !contextData.content_snippet.includes('Content extraction failed');
+    
+    // Don't send if privacy extensions are blocking content or content is invalid
+    if (privacyExtensionDetected && !hasValidContent) {
+      console.log('RecallOS: Privacy extension blocking content capture, skipping backend send');
+      return;
+    }
+    
+    // Don't send if content is too short or appears to be blocked
+    if (!hasValidContent) {
+      console.log('RecallOS: Insufficient content captured, skipping backend send');
+      return;
+    }
+    
     (contextData as any).privacy_extension_info = {
       detected: privacyExtensionDetected,
       type: privacyExtensionType,
@@ -856,11 +895,15 @@ function sendContextToBackground() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     hasUserActivity = true;
-    sendContextToBackground();
+    if (!isLocalhost()) {
+      sendContextToBackground();
+    }
   });
 } else {
   hasUserActivity = true;
-  sendContextToBackground();
+  if (!isLocalhost()) {
+    sendContextToBackground();
+  }
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
@@ -891,13 +934,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.type === 'CAPTURE_CONTEXT_NOW') {
     hasUserActivity = true;
-    sendContextToBackground();
-    sendResponse({ success: true });
+    if (!isLocalhost()) {
+      sendContextToBackground();
+      sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false, reason: 'localhost detected' });
+    }
     return true;
   }
   if (message.type === 'START_MONITORING') {
-    startContinuousMonitoring();
-    sendResponse({ success: true, activityLevel });
+    if (!isLocalhost()) {
+      startContinuousMonitoring();
+      sendResponse({ success: true, activityLevel });
+    } else {
+      sendResponse({ success: false, reason: 'localhost detected' });
+    }
     return true;
   }
   if (message.type === 'STOP_MONITORING') {
@@ -946,17 +997,62 @@ chrome.storage.sync.get(['wallet_address'], result => {
     console.log('RecallOS: No wallet address found in storage');
   }
 });
+function calculateContentHash(content: string): string {
+  // Simple hash function for content comparison
+  let hash = 0;
+  if (content.length === 0) return hash.toString();
+  for (let i = 0; i < content.length; i++) {
+    const char = content.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return hash.toString();
+}
+
+function calculateContentSimilarity(content1: string, content2: string): number {
+  if (!content1 || !content2) return 0;
+  
+  const words1 = content1.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  const words2 = content2.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  
+  if (words1.length === 0 || words2.length === 0) return 0;
+  
+  const set1 = new Set(words1);
+  const set2 = new Set(words2);
+  
+  const intersection = new Set([...set1].filter(x => set2.has(x)));
+  const union = new Set([...set1, ...set2]);
+  
+  return intersection.size / union.size;
+}
+
 function hasContentChanged(): boolean {
   const currentUrl = location.href;
   const currentTitle = document.title;
   const currentContent = extractVisibleText();
+  const currentContentHash = calculateContentHash(currentContent);
+  
   const urlChanged = currentUrl !== lastUrl;
   const titleChanged = currentTitle !== lastTitle;
-  const contentChanged =
-    currentContent !== lastContent &&
-    (Math.abs(currentContent.length - lastContent.length) > 100 ||
-      currentContent.substring(0, 200) !== lastContent.substring(0, 200));
-  return urlChanged || titleChanged || contentChanged;
+  
+  // Check if content hash changed (exact match)
+  const contentHashChanged = currentContentHash !== lastContentHash;
+  
+  // Check if content similarity is below threshold (significant change)
+  const contentSimilarity = calculateContentSimilarity(currentContent, lastContent);
+  const contentSignificantlyChanged = contentSimilarity < (1 - CONTENT_CHANGE_THRESHOLD);
+  
+  const shouldCapture = urlChanged || titleChanged || contentHashChanged || contentSignificantlyChanged;
+  
+  if (shouldCapture) {
+    // Update tracking variables
+    lastUrl = currentUrl;
+    lastTitle = currentTitle;
+    lastContent = currentContent;
+    lastContentHash = currentContentHash;
+  }
+  
+  return shouldCapture;
 }
 function shouldCaptureBasedOnActivity(): boolean {
   const now = Date.now();
@@ -992,6 +1088,12 @@ function updateActivityLevel() {
   }
 }
 function startContinuousMonitoring() {
+  // Don't start monitoring on localhost
+  if (isLocalhost()) {
+    console.log('RecallOS: Skipping continuous monitoring - localhost detected');
+    return;
+  }
+  
   if (captureInterval) {
     clearInterval(captureInterval);
   }
@@ -1011,6 +1113,7 @@ function startContinuousMonitoring() {
           lastUrl = location.href;
           lastTitle = document.title;
           lastContent = extractVisibleText();
+          lastContentHash = calculateContentHash(lastContent);
         }
       }
       const newInterval = getMonitoringInterval();
@@ -1031,7 +1134,9 @@ new MutationObserver(() => {
   const url = location.href;
   if (url !== lastUrl) {
     lastUrl = url;
-    setTimeout(sendContextToBackground, 1000);
+    if (!isLocalhost()) {
+      setTimeout(sendContextToBackground, 1000);
+    }
   }
 }).observe(document, { subtree: true, childList: true });
 document.addEventListener('visibilitychange', () => {

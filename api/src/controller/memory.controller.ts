@@ -44,13 +44,18 @@ export class MemoryController {
         });
       }
 
-      let user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress },
+      let user = await prisma.user.findFirst({
+        where: { 
+          wallet_address: {
+            equals: userAddress,
+            mode: 'insensitive'
+          }
+        },
       });
 
       if (!user) {
         user = await prisma.user.create({
-          data: { wallet_address: userAddress },
+          data: { wallet_address: userAddress.toLowerCase() },
         });
         console.log(`✅ Created new user: ${user.id}`);
       }
@@ -70,6 +75,42 @@ export class MemoryController {
       const urlHash = hashUrl(url || 'unknown');
 
       const timestamp = Math.floor(Date.now() / 1000);
+
+      // Check for duplicate memories
+      const existingMemory = await prisma.memory.findFirst({
+        where: {
+          user_id: user.id,
+          OR: [
+            { hash: memoryHash },
+            { 
+              AND: [
+                { url: url || 'unknown' },
+                { 
+                  created_at: {
+                    gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Within last 24 hours
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      });
+
+      if (existingMemory) {
+        console.log(`Duplicate memory detected for user ${user.id}, skipping creation`);
+
+        return res.status(200).json({
+          success: true,
+          message: 'Duplicate memory detected, skipping creation',
+          data: {
+            userAddress,
+            existingMemoryId: existingMemory.id,
+            memoryHash,
+            urlHash,
+            isDuplicate: true
+          },
+        });
+      }
 
       const memory = await prisma.memory.create({
         data: {
@@ -135,9 +176,8 @@ export class MemoryController {
       }
 
       setImmediate(async () => {
+        // Always create snapshot even if mesh processing fails
         try {
-          await memoryMeshService.processMemoryForMesh(memory.id, user.id);
-
           const summaryHash =
             '0x' + createHash('sha256').update(summary).digest('hex');
 
@@ -150,11 +190,14 @@ export class MemoryController {
             },
           });
           console.log(`Created memory snapshot for memory ${memory.id}`);
-        } catch (error) {
-          console.error(
-            `Error processing memory ${memory.id} for mesh:`,
-            error
-          );
+        } catch (snapshotError) {
+          console.error(`Error creating snapshot for memory ${memory.id}:`, snapshotError);
+        }
+
+        try {
+          await memoryMeshService.processMemoryForMesh(memory.id, user.id);
+        } catch (meshError) {
+          console.error(`Error processing memory ${memory.id} for mesh:`, meshError);
         }
       });
       res.status(200).json({
@@ -290,11 +333,18 @@ export class MemoryController {
 
       const memories = await getUserMemories(userAddress);
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp.toString(),
+        block_number: memory.block_number?.toString() || null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
           userAddress,
-          memories,
+          memories: serializedMemories,
           count: memories.length,
         },
       });
@@ -353,12 +403,19 @@ export class MemoryController {
 
       const memories = await getMemoriesByUrlHash(userAddress, urlHash);
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp.toString(),
+        block_number: memory.block_number?.toString() || null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
           userAddress,
           url,
-          memories,
+          memories: serializedMemories,
           count: memories.length,
         },
       });
@@ -390,13 +447,20 @@ export class MemoryController {
         parseInt(endTime as string)
       );
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp.toString(),
+        block_number: memory.block_number?.toString() || null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
           userAddress,
           startTime: parseInt(startTime as string),
           endTime: parseInt(endTime as string),
-          memories,
+          memories: serializedMemories,
           count: memories.length,
         },
       });
@@ -424,6 +488,54 @@ export class MemoryController {
 
       const limit = count ? parseInt(count as string) : 10;
 
+      const user = await prisma.user.findUnique({
+        where: { wallet_address: userAddress.toLowerCase() },
+      });
+
+      if (user) {
+        const memories = await prisma.memory.findMany({
+          where: { user_id: user.id },
+          select: {
+            id: true,
+            title: true,
+            url: true,
+            hash: true,
+            timestamp: true,
+            created_at: true,
+            tx_hash: true,
+            block_number: true,
+            gas_used: true,
+            tx_status: true,
+            blockchain_network: true,
+            confirmed_at: true,
+            summary: true,
+            content: true,
+            source: true,
+            page_metadata: true,
+          } as any,
+          orderBy: { created_at: 'desc' },
+          take: limit,
+        });
+
+        // Convert BigInt values to strings for JSON serialization
+        const serializedMemories = memories.map((memory: any) => ({
+          ...memory,
+          timestamp: memory.timestamp ? memory.timestamp.toString() : null,
+          block_number: memory.block_number ? memory.block_number.toString() : null,
+        }));
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            userAddress,
+            count: limit,
+            memories: serializedMemories,
+            actualCount: memories.length,
+          },
+        });
+      }
+
+      // Fallback to blockchain data if user not found in database
       const memories = await getRecentMemories(userAddress, limit);
 
       res.status(200).json({
@@ -455,11 +567,49 @@ export class MemoryController {
         });
       }
 
-      const memory = await getMemoryByHash(hash);
+      // First try to get full memory details from database
+      const memory = await prisma.memory.findUnique({
+        where: { hash: hash },
+        select: {
+          id: true,
+          title: true,
+          url: true,
+          hash: true,
+          timestamp: true,
+          created_at: true,
+          tx_hash: true,
+          block_number: true,
+          gas_used: true,
+          tx_status: true,
+          blockchain_network: true,
+          confirmed_at: true,
+          summary: true,
+          content: true,
+          source: true,
+          page_metadata: true,
+        } as any,
+      });
+
+      if (memory) {
+        // Convert BigInt values to strings for JSON serialization
+        const serializedMemory = {
+          ...memory,
+          timestamp: memory.timestamp ? memory.timestamp.toString() : null,
+          block_number: memory.block_number ? memory.block_number.toString() : null,
+        };
+
+        return res.status(200).json({
+          success: true,
+          data: serializedMemory,
+        });
+      }
+
+      // Fallback to blockchain data if not found in database
+      const blockchainMemory = await getMemoryByHash(hash);
 
       res.status(200).json({
         success: true,
-        data: memory,
+        data: blockchainMemory,
       });
     } catch (error) {
       console.error('Error getting memory by hash:', error);
@@ -478,6 +628,24 @@ export class MemoryController {
         return res.status(400).json({
           success: false,
           error: 'User address is required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { wallet_address: userAddress.toLowerCase() },
+      });
+
+      if (user) {
+        const count = await prisma.memory.count({
+          where: { user_id: user.id },
+        });
+
+        return res.status(200).json({
+          success: true,
+          data: {
+            userAddress,
+            memoryCount: count,
+          },
         });
       }
 
@@ -519,7 +687,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -534,11 +702,13 @@ export class MemoryController {
       };
 
       const searchQuery = query as string;
+      console.log(`Searching for: "${searchQuery}" for user: ${user.id}`);
 
       whereConditions.OR = [
         { content: { contains: searchQuery, mode: 'insensitive' } },
         { summary: { contains: searchQuery, mode: 'insensitive' } },
         { title: { contains: searchQuery, mode: 'insensitive' } },
+        { url: { contains: searchQuery, mode: 'insensitive' } },
       ];
 
       if (category) {
@@ -575,6 +745,8 @@ export class MemoryController {
         take: parseInt(limit as string),
       });
 
+      console.log(`Found ${memories.length} memories for query: "${searchQuery}"`);
+
       let searchableTerms: string[] = [];
 
       try {
@@ -591,13 +763,25 @@ export class MemoryController {
         console.log('Could not extract search terms from query:', error);
       }
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp.toString(),
+        block_number: memory.block_number?.toString() || null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
-          memories,
+          results: serializedMemories.map(memory => ({
+            memory,
+            search_type: 'keyword',
+            keyword_score: 1.0,
+            blended_score: 1.0
+          })),
+          total: memories.length,
           query: searchQuery,
           searchableTerms,
-          totalResults: memories.length,
         },
       });
     } catch (error) {
@@ -621,7 +805,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -637,6 +821,7 @@ export class MemoryController {
           page_metadata: true,
           timestamp: true,
           source: true,
+          tx_status: true,
         },
       });
 
@@ -647,6 +832,12 @@ export class MemoryController {
       const sentimentCounts: { [key: string]: number } = {};
 
       const sourceCounts: { [key: string]: number } = {};
+
+      const transactionStatusCounts: { [key: string]: number } = {
+        confirmed: 0,
+        pending: 0,
+        failed: 0
+      };
 
       let totalImportance = 0;
 
@@ -673,6 +864,14 @@ export class MemoryController {
         }
 
         sourceCounts[memory.source] = (sourceCounts[memory.source] || 0) + 1;
+
+        // Count transaction statuses
+        const txStatus = memory.tx_status || 'confirmed'; // Default to confirmed if no status
+        if (transactionStatusCounts.hasOwnProperty(txStatus)) {
+          transactionStatusCounts[txStatus]++;
+        } else {
+          transactionStatusCounts.confirmed++; // Default to confirmed for unknown statuses
+        }
 
         if (metadata?.importance) {
           totalImportance += metadata.importance;
@@ -701,6 +900,7 @@ export class MemoryController {
           topCategories,
           sentimentDistribution: sentimentCounts,
           sourceDistribution: sourceCounts,
+          transactionStatusDistribution: transactionStatusCounts,
           averageImportance: Math.round(averageImportance * 10) / 10,
           insights: {
             mostActiveCategory: topCategories[0]?.category || 'N/A',
@@ -732,8 +932,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+      const user = await prisma.user.findFirst({
+        where: { 
+          wallet_address: {
+            equals: userAddress as string,
+            mode: 'insensitive'
+          }
+        },
       });
 
       if (!user) {
@@ -767,6 +972,8 @@ export class MemoryController {
           blockchain_network: true,
           confirmed_at: true,
           summary: true,
+          content: true,
+          source: true,
           page_metadata: true,
         } as any,
         orderBy: { created_at: 'desc' },
@@ -785,10 +992,17 @@ export class MemoryController {
 
         transactionStats[status] = (transactionStats[status] || 0) + 1;
       });
+
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp ? memory.timestamp.toString() : null,
+        block_number: memory.block_number ? memory.block_number.toString() : null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
-          memories,
+          memories: serializedMemories,
           transactionStats,
           totalMemories: memories.length,
         },
@@ -874,7 +1088,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -977,7 +1191,7 @@ export class MemoryController {
     try {
       const { userAddress } = req.params;
 
-      const { limit = 50 } = req.query;
+      const { limit = 50, threshold = 0.3 } = req.query;
 
       if (!userAddress) {
         return res.status(400).json({
@@ -987,7 +1201,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress },
+        where: { wallet_address: userAddress.toLowerCase() },
       });
 
       if (!user) {
@@ -999,7 +1213,8 @@ export class MemoryController {
 
       const mesh = await memoryMeshService.getMemoryMesh(
         user.id,
-        parseInt(limit as string)
+        parseInt(limit as string),
+        parseFloat(threshold as string)
       );
 
       res.status(200).json({
@@ -1029,7 +1244,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1069,7 +1284,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1100,7 +1315,18 @@ export class MemoryController {
 
   static async searchMemoriesWithEmbeddings(req: Request, res: Response) {
     try {
-      const { userAddress, query, limit = 10 } = req.query;
+      const { 
+        userAddress, 
+        query, 
+        category,
+        topic,
+        sentiment,
+        tx_status,
+        source,
+        dateRange,
+        page = 1,
+        limit = 10 
+      } = req.query;
 
       if (!userAddress || !query) {
         return res.status(400).json({
@@ -1110,7 +1336,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1120,18 +1346,111 @@ export class MemoryController {
         });
       }
 
+      // Build filter conditions for pre-filtering memories
+      const whereConditions: any = {
+        user_id: user.id,
+      };
+
+      // Apply filters to narrow down the memory pool before semantic search
+      if (tx_status) {
+        whereConditions.tx_status = tx_status;
+      }
+
+      if (source) {
+        whereConditions.source = source;
+      }
+
+      if (dateRange) {
+        try {
+          const dateRangeObj = typeof dateRange === 'string' ? JSON.parse(dateRange) : dateRange;
+
+          if (dateRangeObj.start || dateRangeObj.end) {
+            whereConditions.created_at = {};
+
+            if (dateRangeObj.start) {
+              whereConditions.created_at.gte = new Date(dateRangeObj.start);
+            }
+            
+            if (dateRangeObj.end) {
+              whereConditions.created_at.lte = new Date(dateRangeObj.end);
+            }
+          }
+        } catch (error) {
+          console.log('Invalid dateRange format:', error);
+        }
+      }
+
+      // Get pre-filtered memories for semantic search
+      const preFilteredMemories = await prisma.memory.findMany({
+        where: whereConditions,
+        select: { id: true },
+      });
+
+      const preFilteredMemoryIds = preFilteredMemories.map(m => m.id);
+
+      // Perform semantic search on pre-filtered memories
       const searchResults = await memoryMeshService.searchMemories(
         user.id,
         query as string,
-        parseInt(limit as string)
+        parseInt(limit as string),
+        preFilteredMemoryIds
       );
+
+      // Apply metadata-based filters to results
+      let filteredResults = searchResults;
+
+      if (category || topic || sentiment) {
+        filteredResults = searchResults.filter((result: any) => {
+          const metadata = result.page_metadata as any;
+          
+          if (category && metadata?.categories && !metadata.categories.includes(category)) {
+            return false;
+          }
+          
+          if (topic && metadata?.topics && !metadata.topics.includes(topic)) {
+            return false;
+          }
+          
+          if (sentiment && metadata?.sentiment !== sentiment) {
+            return false;
+          }
+          
+          return true;
+        });
+      }
+
+      // Apply pagination
+      const skip = (Number(page) - 1) * Number(limit);
+      
+      const paginatedResults = filteredResults.slice(skip, skip + Number(limit));
+
+      // Convert BigInt values to strings for JSON serialization
+      const serializedResults = paginatedResults.map((result: any) => ({
+        ...result,
+        memory: {
+          ...result.memory,
+          timestamp: result.memory.timestamp.toString(),
+          block_number: result.memory.block_number?.toString() || null,
+        }
+      }));
 
       res.status(200).json({
         success: true,
         data: {
           query: query,
-          results: searchResults,
-          totalResults: searchResults.length,
+          results: serializedResults,
+          totalResults: filteredResults.length,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(filteredResults.length / Number(limit)),
+          appliedFilters: {
+            category,
+            topic,
+            sentiment,
+            tx_status,
+            source,
+            dateRange
+          }
         },
       });
     } catch (error) {
@@ -1141,6 +1460,257 @@ export class MemoryController {
         error: 'Internal server error',
       });
     }
+  }
+
+  static async searchMemoriesHybrid(req: Request, res: Response) {
+    try {
+      const { 
+        userAddress, 
+        query, 
+        category,
+        topic,
+        sentiment,
+        tx_status,
+        source,
+        dateRange,
+        page = 1,
+        limit = 10 
+      } = req.query;
+
+      if (!userAddress || !query) {
+        return res.status(400).json({
+          success: false,
+          error: 'userAddress and query are required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { wallet_address: (userAddress as string).toLowerCase() },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+        });
+      }
+
+      // Build filter conditions
+      const whereConditions: any = {
+        user_id: user.id,
+      };
+
+      // Apply filters to narrow down the memory pool
+      if (tx_status) {
+        whereConditions.tx_status = tx_status;
+      }
+
+      if (source) {
+        whereConditions.source = source;
+      }
+
+      if (dateRange) {
+        try {
+          const dateRangeObj = typeof dateRange === 'string' ? JSON.parse(dateRange) : dateRange;
+          
+          if (dateRangeObj.start || dateRangeObj.end) {
+            whereConditions.created_at = {};
+
+            if (dateRangeObj.start) {
+              whereConditions.created_at.gte = new Date(dateRangeObj.start);
+            }
+
+            if (dateRangeObj.end) {
+              whereConditions.created_at.lte = new Date(dateRangeObj.end);
+            }
+          }
+        } catch (error) {
+          console.log('Invalid dateRange format:', error);
+        }
+      }
+
+      // Get pre-filtered memories
+      const preFilteredMemories = await prisma.memory.findMany({
+        where: whereConditions,
+        select: { id: true },
+      });
+
+      const preFilteredMemoryIds = preFilteredMemories.map(m => m.id);
+
+      // Perform both keyword and semantic search in parallel
+      const [keywordResults, semanticResults] = await Promise.all([
+        // Keyword search
+        prisma.memory.findMany({
+          where: {
+            ...whereConditions,
+            OR: [
+              { content: { contains: query as string, mode: 'insensitive' } },
+              { summary: { contains: query as string, mode: 'insensitive' } },
+              { title: { contains: query as string, mode: 'insensitive' } },
+              { url: { contains: query as string, mode: 'insensitive' } },
+            ],
+          },
+          take: parseInt(limit as string) * 2, // Get more results for blending
+        }),
+        // Semantic search
+        memoryMeshService.searchMemories(
+          user.id,
+          query as string,
+          parseInt(limit as string) * 2,
+          preFilteredMemoryIds
+        ),
+      ]);
+
+      // Apply metadata-based filters to keyword results
+      let filteredKeywordResults = keywordResults;
+      
+      if (category || topic || sentiment) {
+        filteredKeywordResults = keywordResults.filter((memory: any) => {
+          const metadata = memory.page_metadata as any;
+          
+          if (category && metadata?.categories && !metadata.categories.includes(category)) {
+            return false;
+          }
+          
+          if (topic && metadata?.topics && !metadata.topics.includes(topic)) {
+            return false;
+          }
+          
+          if (sentiment && metadata?.sentiment !== sentiment) {
+            return false;
+          }
+          
+          return true;
+        });
+      }
+
+      // Create a map to track results and their scores
+      const resultMap = new Map<string, any>();
+
+      // Add keyword results with keyword relevance score
+      filteredKeywordResults.forEach((memory: any) => {
+        const keywordScore = this.calculateKeywordRelevance(memory, query as string);
+
+        resultMap.set(memory.id, {
+          ...memory,
+          keyword_score: keywordScore,
+          semantic_score: 0,
+          search_type: 'keyword',
+        });
+      });
+
+      // Add semantic results with semantic relevance score
+      semanticResults.forEach((memory: any) => {
+        const existing = resultMap.get(memory.id);
+
+        if (existing) {
+          // Memory found in both searches - blend the scores
+          existing.semantic_score = memory.similarity_score || 0;
+          existing.search_type = 'hybrid';
+          existing.blended_score = (existing.keyword_score * 0.4) + (existing.semantic_score * 0.6);
+        } else {
+          // Memory only found in semantic search
+          resultMap.set(memory.id, {
+            ...memory,
+            keyword_score: 0,
+            semantic_score: memory.similarity_score || 0,
+            search_type: 'semantic',
+            blended_score: memory.similarity_score || 0,
+          });
+        }
+      });
+
+      // Calculate blended scores for keyword-only results
+      resultMap.forEach((result) => {
+        if (result.search_type === 'keyword') {
+          result.blended_score = result.keyword_score * 0.4;
+        }
+      });
+
+      // Convert to array and sort by blended score
+      const blendedResults = Array.from(resultMap.values())
+        .sort((a, b) => (b.blended_score || 0) - (a.blended_score || 0));
+
+      // Apply pagination
+      const skip = (Number(page) - 1) * Number(limit);
+
+      const paginatedResults = blendedResults.slice(skip, skip + Number(limit));
+
+      // Convert BigInt values to strings for JSON serialization
+      const serializedResults = paginatedResults.map((result: any) => ({
+        ...result,
+        memory: {
+          ...result.memory,
+          timestamp: result.memory.timestamp.toString(),
+          block_number: result.memory.block_number?.toString() || null,
+        }
+      }));
+
+      res.status(200).json({
+        success: true,
+        data: {
+          query: query,
+          results: serializedResults,
+          totalResults: blendedResults.length,
+          page: Number(page),
+          limit: Number(limit),
+          totalPages: Math.ceil(blendedResults.length / Number(limit)),
+          searchStats: {
+            keywordResults: filteredKeywordResults.length,
+            semanticResults: semanticResults.length,
+            blendedResults: blendedResults.length,
+          },
+          appliedFilters: {
+            category,
+            topic,
+            sentiment,
+            tx_status,
+            source,
+            dateRange
+          }
+        },
+      });
+    } catch (error) {
+      console.error('Error in hybrid search:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+      });
+    }
+  }
+
+  private static calculateKeywordRelevance(memory: any, query: string): number {
+    const queryLower = query.toLowerCase();
+
+    let score = 0;
+
+    // Title matches get highest score
+    if (memory.title && memory.title.toLowerCase().includes(queryLower)) {
+      score += 0.4;
+    }
+
+    // Summary matches get medium score
+    if (memory.summary && memory.summary.toLowerCase().includes(queryLower)) {
+      score += 0.3;
+    }
+
+    // Content matches get lower score
+    if (memory.content && memory.content.toLowerCase().includes(queryLower)) {
+      score += 0.2;
+    }
+
+    // Boost score for exact phrase matches
+    const exactPhraseRegex = new RegExp(`\\b${queryLower}\\b`, 'gi');
+
+    if (memory.title && exactPhraseRegex.test(memory.title)) {
+      score += 0.1;
+    }
+
+    if (memory.summary && exactPhraseRegex.test(memory.summary)) {
+      score += 0.1;
+    }
+
+    return Math.min(1, score);
   }
 
   static async processMemoryForMesh(req: Request, res: Response) {
@@ -1157,7 +1727,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1213,7 +1783,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress },
+        where: { wallet_address: userAddress.toLowerCase() },
       });
 
       if (!user) {
@@ -1282,7 +1852,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1341,7 +1911,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress as string },
+        where: { wallet_address: (userAddress as string).toLowerCase() },
       });
 
       if (!user) {
@@ -1445,6 +2015,59 @@ export class MemoryController {
         success: false,
         error: 'Blockchain connection is not available',
         details: error.message,
+      });
+    }
+  }
+
+  static async debugMemories(req: Request, res: Response) {
+    try {
+      const { userAddress } = req.query;
+
+      if (!userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: 'userAddress is required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { wallet_address: (userAddress as string).toLowerCase() },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+        });
+      }
+
+      const memories = await prisma.memory.findMany({
+        where: { user_id: user.id },
+        select: {
+          id: true,
+          title: true,
+          url: true,
+          source: true,
+          tx_status: true,
+          created_at: true,
+        },
+        orderBy: { created_at: 'desc' },
+        take: 20,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          user_id: user.id,
+          total_memories: memories.length,
+          recent_memories: memories,
+        },
+      });
+    } catch (error) {
+      console.error('Debug memories error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Debug failed',
       });
     }
   }

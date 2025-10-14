@@ -28,6 +28,7 @@ router.get('/mesh/:userAddress', MemoryController.getMemoryMesh);
 router.get('/relations/:memoryId', MemoryController.getMemoryWithRelations);
 router.get('/cluster/:memoryId', MemoryController.getMemoryCluster);
 router.get('/search-embeddings', MemoryController.searchMemoriesWithEmbeddings);
+router.get('/search-hybrid', MemoryController.searchMemoriesHybrid);
 router.post('/process-mesh/:memoryId', MemoryController.processMemoryForMesh);
 router.get('/hash/:hash', MemoryController.getMemoryByHash);
 router.get('/exists/:hash', MemoryController.isMemoryStored);
@@ -35,5 +36,6 @@ router.get('/snapshots/:userAddress', MemoryController.getMemorySnapshots);
 router.get('/snapshot/:snapshotId', MemoryController.getMemorySnapshot);
 router.post('/backfill-snapshots', MemoryController.backfillMemorySnapshots);
 router.get('/health', MemoryController.healthCheck);
+router.get('/debug', MemoryController.debugMemories);
 
 export default router;
