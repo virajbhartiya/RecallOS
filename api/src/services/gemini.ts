@@ -1,5 +1,72 @@
 import { GoogleGenAI } from '@google/genai';
 
+// In-process rate limiter queue to avoid Gemini 429 (quota) errors
+type QueueTask<T> = () => Promise<T>;
+
+let isProcessingQueue = false;
+let nextAvailableAt = 0;
+const taskQueue: Array<{ run: QueueTask<any>; resolve: (v: any) => void; reject: (e: any) => void }> = [];
+
+// Default gap between requests; tuned for free-tier limits (~10 rpm). Adjust via Retry-After hints when returned
+let minIntervalMs = 7000;
+
+async function processQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+  try {
+    while (taskQueue.length > 0) {
+      const now = Date.now();
+      const waitMs = Math.max(0, nextAvailableAt - now);
+      if (waitMs > 0) {
+        await new Promise(r => setTimeout(r, waitMs));
+      }
+
+      const { run, resolve, reject } = taskQueue.shift()!;
+      try {
+        const result = await run();
+        resolve(result);
+        nextAvailableAt = Date.now() + minIntervalMs;
+      } catch (err: any) {
+        const retryDelayMs = extractRetryDelayMs(err) ?? minIntervalMs;
+        nextAvailableAt = Date.now() + retryDelayMs;
+        reject(err);
+      }
+    }
+  } finally {
+    isProcessingQueue = false;
+  }
+}
+
+function extractRetryDelayMs(err: any): number | null {
+  const details = err?.details;
+  if (Array.isArray(details)) {
+    for (const d of details) {
+      if (typeof d?.retryDelay === 'string') {
+        const m = d.retryDelay.match(/^(\d+)(?:\.(\d+))?s$/);
+        if (m) {
+          const seconds = Number(m[1]);
+          const frac = m[2] ? Number(`0.${m[2]}`) : 0;
+          return Math.max(Math.floor((seconds + frac) * 1000), 1000);
+        }
+      }
+    }
+  }
+  const msg: string | undefined = err?.message;
+  if (msg) {
+    const m = msg.match(/retry in\s+([0-9]+(?:\.[0-9]+)?)s/i);
+    if (m) return Math.max(Math.floor(parseFloat(m[1]) * 1000), 1000);
+  }
+  if (err?.status === 429) return 8000;
+  return null;
+}
+
+function runWithRateLimit<T>(task: QueueTask<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    taskQueue.push({ run: task, resolve, reject });
+    processQueue();
+  });
+}
+
 export class GeminiService {
   private ai: GoogleGenAI;
 
@@ -18,13 +85,36 @@ export class GeminiService {
       throw new Error('Gemini service not initialized. Set GEMINI_API_KEY.');
   }
 
+  get isInitialized(): boolean {
+    return !!this.ai;
+  }
+
+  async generateContent(prompt: string): Promise<string> {
+    this.ensureInit();
+    try {
+      const response = await runWithRateLimit(() =>
+        this.ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+        })
+      );
+      if (!response.text) throw new Error('No content generated from Gemini API');
+      return response.text;
+    } catch (err) {
+      console.error('Content generation error:', err);
+      throw err;
+    }
+  }
+
   async generateEmbedding(text: string): Promise<number[]> {
     this.ensureInit();
     try {
-      const response = await this.ai.models.embedContent({
-        model: 'text-embedding-004',
-        contents: text,
-      });
+      const response = await runWithRateLimit(() =>
+        this.ai.models.embedContent({
+          model: 'text-embedding-004',
+          contents: text,
+        })
+      );
       const values = response.embeddings?.[0]?.values;
       if (!values) throw new Error('No embedding generated from Gemini API');
       return values;
@@ -75,10 +165,12 @@ Raw Content: ${rawText}
 `;
 
     try {
-      const res = await this.ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
+      const res = await runWithRateLimit(() =>
+        this.ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+        })
+      );
       if (!res.text) throw new Error('No summary generated from Gemini API');
       return res.text.trim();
     } catch (err) {
@@ -131,10 +223,12 @@ Return valid JSON only.
 `;
 
     try {
-      const res = await this.ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
+      const res = await runWithRateLimit(() =>
+        this.ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+        })
+      );
       if (!res.text) throw new Error('No metadata response from Gemini API');
 
       const jsonMatch = res.text.match(/\{[\s\S]*\}/);
@@ -212,10 +306,12 @@ Be strict. Avoid weak or surface matches.
 `;
 
     try {
-      const res = await this.ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-      });
+      const res = await runWithRateLimit(() =>
+        this.ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: prompt,
+        })
+      );
       if (!res.text) throw new Error('No relationship data from Gemini');
 
       const jsonMatch = res.text.match(/\{[\s\S]*\}/);

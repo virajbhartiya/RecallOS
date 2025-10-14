@@ -176,9 +176,8 @@ export class MemoryController {
       }
 
       setImmediate(async () => {
+        // Always create snapshot even if mesh processing fails
         try {
-          await memoryMeshService.processMemoryForMesh(memory.id, user.id);
-
           const summaryHash =
             '0x' + createHash('sha256').update(summary).digest('hex');
 
@@ -191,11 +190,14 @@ export class MemoryController {
             },
           });
           console.log(`Created memory snapshot for memory ${memory.id}`);
-        } catch (error) {
-          console.error(
-            `Error processing memory ${memory.id} for mesh:`,
-            error
-          );
+        } catch (snapshotError) {
+          console.error(`Error creating snapshot for memory ${memory.id}:`, snapshotError);
+        }
+
+        try {
+          await memoryMeshService.processMemoryForMesh(memory.id, user.id);
+        } catch (meshError) {
+          console.error(`Error processing memory ${memory.id} for mesh:`, meshError);
         }
       });
       res.status(200).json({
