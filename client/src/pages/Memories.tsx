@@ -3,6 +3,10 @@ import { useWallet } from '@/contexts/WalletContext'
 import { MemoryService } from '@/services/memoryService'
 import { MemoryMesh } from '@/components/MemoryMesh'
 import { useBlockscout } from '@/hooks/useBlockscout'
+import { TransactionStatusIndicator } from '@/components/TransactionStatusIndicator'
+import { NetworkHealthIndicator } from '@/components/NetworkHealthIndicator'
+import { TransactionDetailsOverlay } from '@/components/TransactionDetailsOverlay'
+import { TransactionHistorySidebar } from '@/components/TransactionHistorySidebar'
 import type { Memory, MemoryInsights, SearchFilters, MemorySearchResponse } from '@/types/memory'
 
 // Memory Card Component
@@ -132,12 +136,19 @@ const MemoryDetails: React.FC<{
                 {memory.tx_status}
                       </span>
                       {memory.tx_hash && memory.tx_hash.startsWith('0x') && memory.tx_hash.length === 66 && onViewTransaction && (
-                        <button
-                          onClick={() => onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')}
-                          className="text-xs font-mono text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 border border-blue-200 hover:border-blue-300 transition-all duration-200"
-                        >
-                          [VIEW TX]
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')}
+                            className="text-xs font-mono text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 border border-blue-200 hover:border-blue-300 transition-all duration-200"
+                          >
+                            [VIEW TX]
+                          </button>
+                          <TransactionStatusIndicator 
+                            txHash={memory.tx_hash} 
+                            network={memory.blockchain_network || 'sepolia'}
+                            className="text-xs"
+                          />
+                        </div>
                       )}
                     </div>
                   )}
@@ -226,7 +237,7 @@ const MemoryDetails: React.FC<{
 
 export const Memories: React.FC = () => {
   const { isConnected, address } = useWallet()
-  const { showTransactionNotification, showTransactionHistory, showAllTransactions } = useBlockscout()
+  const { showTransactionNotification, showAllTransactions } = useBlockscout()
   const [memories, setMemories] = useState<Memory[]>([])
   const [insights, setInsights] = useState<MemoryInsights | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -235,6 +246,14 @@ export const Memories: React.FC = () => {
   const [expandedContent, setExpandedContent] = useState(false)
   const [similarityThreshold, setSimilarityThreshold] = useState(0.3)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  
+  // Transaction details overlay state
+  const [showTransactionDetails, setShowTransactionDetails] = useState(false)
+  const [selectedTxHash, setSelectedTxHash] = useState<string | null>(null)
+  const [selectedNetwork, setSelectedNetwork] = useState<string>('sepolia')
+  
+  // Transaction history sidebar state
+  const [showTransactionHistorySidebar, setShowTransactionHistorySidebar] = useState(false)
   
   // Search state
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
@@ -326,14 +345,26 @@ export const Memories: React.FC = () => {
   }, [])
 
   const handleViewTransaction = useCallback((txHash: string, network: string) => {
+    setSelectedTxHash(txHash)
+    setSelectedNetwork(network)
+    setShowTransactionDetails(true)
     showTransactionNotification(txHash, network)
   }, [showTransactionNotification])
 
+  const handleCloseTransactionDetails = useCallback(() => {
+    setShowTransactionDetails(false)
+    setSelectedTxHash(null)
+  }, [])
+
   const handleViewTransactionHistory = useCallback(() => {
     if (address) {
-      showTransactionHistory(address, 'sepolia')
+      setShowTransactionHistorySidebar(true)
     }
-  }, [address, showTransactionHistory])
+  }, [address])
+
+  const handleCloseTransactionHistory = useCallback(() => {
+    setShowTransactionHistorySidebar(false)
+  }, [])
 
   const handleViewAllTransactions = useCallback(() => {
     showAllTransactions('sepolia')
@@ -416,6 +447,7 @@ export const Memories: React.FC = () => {
             <div className="flex items-center space-x-4">
               {address && address.startsWith('0x') && address.length === 42 && (
                 <>
+                  <NetworkHealthIndicator network="sepolia" />
                   <button
                     onClick={handleViewTransactionHistory}
                     className="text-xs font-mono text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 border border-blue-200 hover:border-blue-300 transition-all duration-200"
@@ -686,6 +718,26 @@ export const Memories: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Transaction Details Overlay */}
+      {showTransactionDetails && selectedTxHash && (
+        <TransactionDetailsOverlay
+          txHash={selectedTxHash}
+          network={selectedNetwork}
+          isOpen={showTransactionDetails}
+          onClose={handleCloseTransactionDetails}
+        />
+      )}
+
+      {/* Transaction History Sidebar */}
+      {showTransactionHistorySidebar && address && (
+        <TransactionHistorySidebar
+          address={address}
+          network="sepolia"
+          isOpen={showTransactionHistorySidebar}
+          onClose={handleCloseTransactionHistory}
+        />
       )}
     </div>
   )
