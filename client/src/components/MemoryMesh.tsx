@@ -57,7 +57,7 @@ type NodeChange = unknown
 type EdgeChange = unknown
 type Connection = { source: string; target: string }
 
-const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, onNodeClick, similarityThreshold = 0.3 }) => {
+const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, onNodeClick, similarityThreshold = 0.4 }) => {
   const [meshData, setMeshData] = useState<MemoryMesh | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)

@@ -3,6 +3,22 @@ import { prisma } from '../lib/prisma';
 import { geminiService } from './gemini';
 
 export class MemoryMeshService {
+  private relationshipCache = new Map<string, any>();
+  private cacheExpiry = 24 * 60 * 60 * 1000; // 24 hours
+
+  constructor() {
+    // Clean cache every hour
+    setInterval(() => this.cleanCache(), 60 * 60 * 1000);
+  }
+
+  private cleanCache(): void {
+    const now = Date.now();
+    for (const [key, value] of this.relationshipCache.entries()) {
+      if (now - value.timestamp > this.cacheExpiry) {
+        this.relationshipCache.delete(key);
+      }
+    }
+  }
   async generateEmbeddingsForMemory(memoryId: string): Promise<void> {
     try {
       const memory = await prisma.memory.findUnique({
@@ -148,7 +164,7 @@ export class MemoryMeshService {
       });
 
       return similarities
-        .filter((item: any) => item.similarity > 0.4) // Increased threshold for better quality
+        .filter((item: any) => item.similarity > 0.5) // Higher threshold for semantic similarity
         .sort((a: any, b: any) => b.similarity - a.similarity)
         .slice(0, limit)
         .map((item: any) => ({
@@ -191,17 +207,24 @@ export class MemoryMeshService {
     try {
       const memory = await prisma.memory.findUnique({
         where: { id: memoryId },
+        include: { embeddings: true },
       });
 
       if (!memory) {
         throw new Error(`Memory ${memoryId} not found`);
       }
 
+      // Only process memories with embeddings and sufficient content
+      if (!memory.embeddings.length || !memory.content) {
+        console.log(`Skipping relation creation for memory ${memoryId} - insufficient content or embeddings`);
+        return;
+      }
+
       const [semanticRelations, topicalRelations, temporalRelations] =
         await Promise.all([
-          this.findSemanticRelations(memoryId, userId, 8),
-          this.findTopicalRelations(memoryId, userId, 5),
-          this.findTemporalRelations(memoryId, userId, 3),
+          this.findSemanticRelations(memoryId, userId, 12),
+          this.findTopicalRelations(memoryId, userId, 8),
+          this.findTemporalRelations(memoryId, userId, 5),
         ]);
 
       const allRelations = [
@@ -212,11 +235,14 @@ export class MemoryMeshService {
 
       const uniqueRelations = this.deduplicateRelations(allRelations);
 
+      // Enhanced filtering: Use AI to evaluate relationship relevance
+      const filteredRelations = await this.filterRelationsWithAI(memory, uniqueRelations);
+
       // Clean up existing relations with low similarity scores
       await this.cleanupLowQualityRelations(memoryId);
 
       // Process relations with proper race condition handling
-      const relationPromises = uniqueRelations.map(async relatedMemory => {
+      const relationPromises = filteredRelations.map(async relatedMemory => {
         try {
           // First try to find existing relation
           const existingRelation = await prisma.memoryRelation.findUnique({
@@ -276,7 +302,7 @@ export class MemoryMeshService {
 
       await Promise.all(relationPromises);
       console.log(
-        `Created ${uniqueRelations.length} memory relations for ${memoryId}`
+        `Created ${filteredRelations.length} memory relations for ${memoryId} (filtered from ${uniqueRelations.length} candidates)`
       );
     } catch (error) {
       console.error(`Error creating memory relations for ${memoryId}:`, error);
@@ -388,7 +414,7 @@ export class MemoryMeshService {
       });
 
       return topicalSimilarities
-        .filter(item => item.similarity_score > 0.25)
+        .filter(item => item.similarity_score > 0.35) // Higher threshold for topical similarity
         .sort((a, b) => b.similarity_score - a.similarity_score)
         .slice(0, limit);
     } catch (error) {
@@ -485,7 +511,7 @@ export class MemoryMeshService {
       );
 
       return temporalSimilarities
-        .filter(item => item.similarity_score > 0.15)
+        .filter(item => item.similarity_score > 0.25) // Higher threshold for temporal similarity
         .sort((a, b) => b.similarity_score - a.similarity_score)
         .slice(0, limit);
     } catch (error) {
@@ -510,15 +536,15 @@ export class MemoryMeshService {
       await prisma.memoryRelation.deleteMany({
         where: {
           memory_id: memoryId,
-          similarity_score: { lt: 0.2 }
+          similarity_score: { lt: 0.3 } // Higher threshold for cleanup
         }
       });
 
-      // Keep only the top 15 relations per memory to avoid clutter
+      // Keep only the top 10 relations per memory to avoid clutter
       const relations = await prisma.memoryRelation.findMany({
         where: { memory_id: memoryId },
         orderBy: { similarity_score: 'desc' },
-        skip: 15
+        skip: 10
       });
 
       if (relations.length > 0) {
@@ -528,6 +554,18 @@ export class MemoryMeshService {
           }
         });
       }
+
+      // Also clean up relations that are too old (older than 30 days) with low scores
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      await prisma.memoryRelation.deleteMany({
+        where: {
+          memory_id: memoryId,
+          similarity_score: { lt: 0.4 },
+          created_at: { lt: thirtyDaysAgo }
+        }
+      });
     } catch (error) {
       console.error('Error cleaning up low quality relations:', error);
     }
@@ -543,6 +581,248 @@ export class MemoryMeshService {
 
     return (typeHierarchy[newType] || 0) > (typeHierarchy[existingType] || 0);
   }
+  private async filterRelationsWithAI(memory: any, relations: any[]): Promise<any[]> {
+    try {
+      // Much more efficient approach: Only use AI for edge cases and high-value decisions
+      
+      // 1. First, apply strict mathematical filtering
+      const highConfidenceRelations = relations.filter(r => r.similarity_score >= 0.7);
+      const mediumConfidenceRelations = relations.filter(r => r.similarity_score >= 0.5 && r.similarity_score < 0.7);
+      const lowConfidenceRelations = relations.filter(r => r.similarity_score >= 0.4 && r.similarity_score < 0.5);
+
+      // 2. Always include high confidence relations (no AI needed)
+      const filteredRelations = [...highConfidenceRelations];
+
+      // 3. For medium confidence, use smart heuristics instead of AI
+      const heuristicFiltered = this.applySmartHeuristics(memory, mediumConfidenceRelations);
+      filteredRelations.push(...heuristicFiltered);
+
+      // 4. Only use AI for low confidence relations that might be valuable
+      const aiCandidates = lowConfidenceRelations
+        .filter(r => this.shouldEvaluateWithAI(memory, r))
+        .slice(0, 3); // Very limited AI evaluation
+
+      if (aiCandidates.length > 0) {
+        const aiEvaluated = await this.batchEvaluateWithAI(memory, aiCandidates);
+        filteredRelations.push(...aiEvaluated);
+      }
+
+      return filteredRelations
+        .sort((a, b) => b.similarity_score - a.similarity_score)
+        .slice(0, 8); // Limit final relations per memory
+    } catch (error) {
+      console.error('Error filtering relations with AI:', error);
+      // Fallback to high similarity threshold
+      return relations
+        .filter(r => r.similarity_score >= 0.6)
+        .sort((a, b) => b.similarity_score - a.similarity_score)
+        .slice(0, 6);
+    }
+  }
+
+  private applySmartHeuristics(memory: any, relations: any[]): any[] {
+    return relations.filter(relation => {
+      const memoryTopics = memory.page_metadata?.topics || [];
+      const memoryCategories = memory.page_metadata?.categories || [];
+      const relationTopics = relation.page_metadata?.topics || [];
+      const relationCategories = relation.page_metadata?.categories || [];
+
+      // Strong topic overlap
+      const topicOverlap = memoryTopics.filter(topic => relationTopics.includes(topic)).length;
+      const categoryOverlap = memoryCategories.filter(cat => relationCategories.includes(cat)).length;
+
+      // Same domain boost
+      let domainBoost = 0;
+      if (memory.url && relation.url) {
+        try {
+          const memoryDomain = new URL(memory.url).hostname;
+          const relationDomain = new URL(relation.url).hostname;
+          if (memoryDomain === relationDomain) {
+            domainBoost = 0.1;
+          }
+        } catch (e) {
+          // Invalid URLs, no boost
+        }
+      }
+
+      // Heuristic scoring
+      const heuristicScore = 
+        (topicOverlap / Math.max(memoryTopics.length, 1)) * 0.6 +
+        (categoryOverlap / Math.max(memoryCategories.length, 1)) * 0.3 +
+        domainBoost;
+
+      return heuristicScore >= 0.3;
+    });
+  }
+
+  private shouldEvaluateWithAI(memory: any, relation: any): boolean {
+    // Only evaluate with AI if:
+    // 1. Both memories have rich metadata
+    // 2. There's some topical overlap but unclear relationship
+    // 3. Similar creation time (might be related contextually)
+    
+    const memoryTopics = memory.page_metadata?.topics || [];
+    const relationTopics = relation.page_metadata?.topics || [];
+    const hasTopicOverlap = memoryTopics.some(topic => relationTopics.includes(topic));
+    
+    const timeDiff = Math.abs(
+      new Date(memory.created_at).getTime() - new Date(relation.created_at).getTime()
+    );
+    const isRecentPair = timeDiff < 7 * 24 * 60 * 60 * 1000; // Within a week
+
+    return hasTopicOverlap && isRecentPair && memoryTopics.length >= 3 && relationTopics.length >= 3;
+  }
+
+  private async batchEvaluateWithAI(memory: any, candidates: any[]): Promise<any[]> {
+    try {
+      // Batch evaluation to reduce API calls
+      const memoryA = {
+        title: memory.title,
+        summary: memory.summary,
+        topics: memory.page_metadata?.topics || [],
+        categories: memory.page_metadata?.categories || [],
+      };
+
+      const batchData = candidates.map(candidate => ({
+        id: candidate.id,
+        memoryB: {
+          title: candidate.title,
+          summary: candidate.summary,
+          topics: candidate.page_metadata?.topics || [],
+          categories: candidate.page_metadata?.categories || [],
+        }
+      }));
+
+      // Single API call to evaluate multiple relationships
+      const evaluations = await this.batchEvaluateRelationships(memoryA, batchData);
+      
+      return candidates.filter((candidate, index) => {
+        const evaluation = evaluations[index];
+        return evaluation && evaluation.isRelevant && evaluation.relevanceScore >= 0.3;
+      }).map((candidate, index) => ({
+        ...candidate,
+        similarity_score: Math.min(1, candidate.similarity_score * evaluations[index].relevanceScore),
+        relation_type: evaluations[index].relationshipType !== 'none' ? evaluations[index].relationshipType : candidate.relation_type,
+      }));
+    } catch (error) {
+      console.error('Error in batch AI evaluation:', error);
+      return [];
+    }
+  }
+
+  private async batchEvaluateRelationships(memoryA: any, batchData: any[]): Promise<any[]> {
+    if (!geminiService.ai) {
+      return batchData.map(() => ({ isRelevant: false, relevanceScore: 0, relationshipType: 'none', reasoning: 'AI not available' }));
+    }
+
+    try {
+      // Check cache first
+      const results = [];
+      const uncachedCandidates = [];
+      const uncachedIndices = [];
+
+      for (let i = 0; i < batchData.length; i++) {
+        const candidate = batchData[i];
+        const cacheKey = this.getCacheKey(memoryA, candidate);
+        const cached = this.relationshipCache.get(cacheKey);
+
+        if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+          results[i] = cached.evaluation;
+        } else {
+          uncachedCandidates.push(candidate);
+          uncachedIndices.push(i);
+        }
+      }
+
+      // Only call AI for uncached candidates
+      if (uncachedCandidates.length > 0) {
+        const aiResults = await this.callAIForBatch(memoryA, uncachedCandidates);
+        
+        // Store in cache and results
+        for (let i = 0; i < uncachedCandidates.length; i++) {
+          const candidate = uncachedCandidates[i];
+          const resultIndex = uncachedIndices[i];
+          const evaluation = aiResults[i];
+          
+          const cacheKey = this.getCacheKey(memoryA, candidate);
+          this.relationshipCache.set(cacheKey, {
+            evaluation,
+            timestamp: Date.now()
+          });
+          
+          results[resultIndex] = evaluation;
+        }
+      }
+
+      return results;
+    } catch (error) {
+      console.error('Error in batch relationship evaluation:', error);
+      return batchData.map(() => ({ isRelevant: false, relevanceScore: 0, relationshipType: 'none', reasoning: 'Evaluation failed' }));
+    }
+  }
+
+  private getCacheKey(memoryA: any, candidate: any): string {
+    // Create a stable cache key based on memory IDs and content hashes
+    const memoryAId = memoryA.id || 'unknown';
+    const candidateId = candidate.id || 'unknown';
+    const memoryATopics = (memoryA.topics || []).sort().join(',');
+    const candidateTopics = (candidate.memoryB?.topics || []).sort().join(',');
+    
+    return `${memoryAId}:${candidateId}:${memoryATopics}:${candidateTopics}`;
+  }
+
+  private async callAIForBatch(memoryA: any, batchData: any[]): Promise<any[]> {
+    try {
+      const prompt = `Evaluate relationships between a source memory and multiple candidate memories. Return a JSON array with evaluation results.
+
+Source Memory:
+Title: ${memoryA.title || 'N/A'}
+Summary: ${memoryA.summary || 'N/A'}
+Topics: ${memoryA.topics?.join(', ') || 'N/A'}
+Categories: ${memoryA.categories?.join(', ') || 'N/A'}
+
+Candidate Memories:
+${batchData.map((item, index) => `
+${index + 1}. Memory ID: ${item.id}
+   Title: ${item.memoryB.title || 'N/A'}
+   Summary: ${item.memoryB.summary || 'N/A'}
+   Topics: ${item.memoryB.topics?.join(', ') || 'N/A'}
+   Categories: ${item.memoryB.categories?.join(', ') || 'N/A'}
+`).join('')}
+
+Return a JSON array with one object per candidate memory:
+[
+  {
+    "isRelevant": boolean,
+    "relevanceScore": number (0-1),
+    "relationshipType": string,
+    "reasoning": string
+  }
+]
+
+Be strict about relevance - only mark as relevant if there's substantial conceptual or topical connection.`;
+
+      const response = await geminiService.ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+
+      if (!response.text) {
+        throw new Error('No batch evaluation generated from Gemini API');
+      }
+
+      const jsonMatch = response.text.match(/\[[\s\S]*\]/);
+      if (!jsonMatch) {
+        throw new Error('Invalid JSON array response from Gemini API');
+      }
+
+      return JSON.parse(jsonMatch[0]);
+    } catch (error) {
+      console.error('Error in AI batch evaluation:', error);
+      return batchData.map(() => ({ isRelevant: false, relevanceScore: 0, relationshipType: 'none', reasoning: 'Evaluation failed' }));
+    }
+  }
+
   private deduplicateRelations(relations: any[]): any[] {
     const seen = new Map<string, any>();
 
@@ -564,7 +844,7 @@ export class MemoryMeshService {
     });
   }
 
-  async getMemoryMesh(userId: string, limit: number = 50, similarityThreshold: number = 0.3): Promise<any> {
+  async getMemoryMesh(userId: string, limit: number = 50, similarityThreshold: number = 0.4): Promise<any> {
     try {
       const memories = await prisma.memory.findMany({
         where: { user_id: userId },

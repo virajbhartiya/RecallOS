@@ -2,124 +2,88 @@ import { GoogleGenAI } from '@google/genai';
 
 export class GeminiService {
   private ai: GoogleGenAI;
+
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
-
     if (!apiKey) {
-      console.warn(
-        'GEMINI_API_KEY environment variable is not set. Gemini service will be disabled.'
-      );
+      console.warn('GEMINI_API_KEY not set. Gemini service disabled.');
       this.ai = null as any;
-
       return;
     }
-
     this.ai = new GoogleGenAI({ apiKey });
   }
 
-  async generateEmbedding(text: string): Promise<number[]> {
-    if (!this.ai) {
-      throw new Error(
-        'Gemini service is not initialized. Please set GEMINI_API_KEY environment variable.'
-      );
-    }
+  private ensureInit() {
+    if (!this.ai)
+      throw new Error('Gemini service not initialized. Set GEMINI_API_KEY.');
+  }
 
+  async generateEmbedding(text: string): Promise<number[]> {
+    this.ensureInit();
     try {
       const response = await this.ai.models.embedContent({
         model: 'text-embedding-004',
         contents: text,
       });
-
-      if (!response.embeddings?.[0]?.values) {
-        throw new Error('No embedding generated from Gemini API');
-      }
-
-      return response.embeddings[0].values;
-    } catch (error) {
-      console.error('Error generating embedding:', error);
-      throw error;
+      const values = response.embeddings?.[0]?.values;
+      if (!values) throw new Error('No embedding generated from Gemini API');
+      return values;
+    } catch (err) {
+      console.error('Embedding error:', err);
+      throw err;
     }
   }
 
   async summarizeContent(rawText: string, metadata?: any): Promise<string> {
-    if (!this.ai) {
-      throw new Error(
-        'Gemini service is not initialized. Please set GEMINI_API_KEY environment variable.'
-      );
-    }
+    this.ensureInit();
+
+    const contentType = metadata?.content_type || 'web_page';
+    const title = metadata?.title || '';
+    const url = metadata?.url || '';
+    const contextSummary = metadata?.content_summary || '';
+    const keyTopics = metadata?.key_topics || [];
+
+    const baseContext = `
+RecallOS Web3 Memory Context:
+- This system captures, anchors, and reasons over user knowledge using Avail for verifiable cognition.
+- Each summary must preserve conceptual and factual signals that aid downstream embedding and memory linkage.
+- Focus on what this content teaches, why it matters, and how it connects to user knowledge evolution.
+`;
+
+    const prompts: Record<string, string> = {
+      blog_post: `Summarize this blog post for RecallOS memory storage. Extract conceptual essence, useful principles, and any links to blockchain, AI reasoning, or systems thinking. Limit to 200 words.`,
+      article: `Summarize this article emphasizing the knowledge kernel — ideas worth recalling in context of verifiable cognition. Capture main argument, supporting evidence, and conceptual contribution. 200 words max.`,
+      documentation: `Summarize this documentation for knowledge anchoring. Include system purpose, key methods, conceptual model, and when it's relevant. Preserve implementation-level cues for recall. 200 words.`,
+      tutorial: `Summarize this tutorial as a learning trace. Identify goal, key procedures, conceptual lessons, and result. Summaries must support future reasoning and contextual recall. 200 words.`,
+      news_article: `Summarize this news article for cognition memory. Focus on what happened, implications, and how it alters knowledge or perception. 200 words.`,
+      code_repository: `Summarize this repository for embedding into RecallOS. Include purpose, architecture, dependencies, and conceptual innovation. Avoid trivial descriptions. 200 words.`,
+      qa_thread: `Summarize this Q&A for recall. Capture the problem, reasoning behind the best answer, and generalizable lessons. 200 words.`,
+      video_content: `Summarize this video for conceptual retention. Capture teaching points, narrative logic, and actionable outcomes. 200 words.`,
+      social_media: `Summarize this post as an idea capsule. Focus on expressed insight, argument, and why it may shape user reasoning. 150 words.`,
+      default: `Summarize this content for RecallOS memory graph. Capture topic, insights, implications, and long-term relevance. 200 words.`,
+    };
+
+    const prompt = `
+${baseContext}
+Title: ${title}
+URL: ${url}
+Existing Summary: ${contextSummary}
+Topics: ${keyTopics.join(', ')}
+
+${prompts[contentType] || prompts.default}
+Raw Content: ${rawText}
+`;
 
     try {
-      const contentType = metadata?.content_type || 'web_page';
-
-      const contentSummary = metadata?.content_summary || '';
-
-      const keyTopics = metadata?.key_topics || [];
-
-      const url = metadata?.url || '';
-
-      const title = metadata?.title || '';
-
-      let prompt = '';
-
-      switch (contentType) {
-        case 'blog_post':
-        case 'article':
-          prompt = `Summarize this blog post/article concisely for a personal memory system. Focus on:\n\n- Main topic and key insights\n- Practical takeaways or actionable advice\n- Important facts or examples\n- Why this matters for future reference\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
-          break;
-        case 'documentation':
-          prompt = `Summarize this documentation concisely for a personal memory system. Focus on:\n\n- What it teaches and main concepts\n- Key procedures or methods\n- Important warnings or requirements\n- When to use this information\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
-          break;
-        case 'tutorial':
-        case 'guide':
-          prompt = `Summarize this tutorial/guide concisely for a personal memory system. Focus on:\n\n- What you'll learn and main steps\n- Key techniques or tools used\n- Important tips or warnings\n- Expected results or outcomes\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
-          break;
-        case 'news_article':
-          prompt = `Summarize this news article concisely for a personal memory system. Focus on:\n\n- What happened and when\n- Key facts and important details\n- Who's involved and their positions\n- Why this matters or future implications\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
-          break;
-        case 'code_repository':
-          prompt = `Summarize this code repository concisely for a personal memory system. Focus on:\n\n- What it does and main purpose\n- Key components or features\n- How to use or install it\n- Important dependencies or requirements\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
-          break;
-        case 'qa_thread':
-          prompt = `Summarize this Q&A thread concisely for a personal memory system. Focus on:\n\n- The main question or problem\n- Best solution or answer\n- Key technical details or code\n- When to use this solution\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
-          break;
-        case 'video_content':
-          prompt = `Summarize this video content concisely for a personal memory system. Focus on:\n\n- What it's about and main topics\n- Key learning points or skills\n- Practical applications or use cases\n- Important takeaways or next steps\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
-          break;
-        case 'social_media':
-          prompt = `Summarize this social media post concisely for a personal memory system. Focus on:\n\n- Main message or opinion shared\n- Key insights or predictions\n- Important context or background\n- Why this matters or implications\n\nKeep it under 150 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
-          break;
-        default:
-          prompt = `Summarize this web content concisely for a personal memory system. Focus on:\n\n- Main topic and key points\n- Important facts or insights\n- Practical value or applications\n- Why this matters for future reference\n\nKeep it under 200 words. Use plain text only, no markdown formatting. Content: ${rawText}`;
-      }
-
-      const contextInfo = [];
-
-      if (title) contextInfo.push(`Title: ${title}`);
-
-      if (url) contextInfo.push(`URL: ${url}`);
-
-      if (contentSummary) contextInfo.push(`Context: ${contentSummary}`);
-
-      if (keyTopics.length > 0)
-        contextInfo.push(`Topics: ${keyTopics.join(', ')}`);
-
-      if (contextInfo.length > 0) {
-        prompt = `${contextInfo.join('\n')}\n\n${prompt}`;
-      }
-
-      const response = await this.ai.models.generateContent({
+      const res = await this.ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
       });
-
-      if (!response.text) {
-        throw new Error('No summary generated from Gemini API');
-      }
-
-      return response.text;
-    } catch (error) {
-      console.error('Error calling Gemini API:', error);
-      throw error;
+      if (!res.text) throw new Error('No summary generated from Gemini API');
+      return res.text.trim();
+    } catch (err) {
+      console.error('Summarization error:', err);
+      throw err;
     }
   }
 
@@ -132,83 +96,150 @@ export class GeminiService {
     keyPoints: string[];
     sentiment: string;
     importance: number;
+    usefulness: number;
     searchableTerms: string[];
+    contextRelevance: string[];
   }> {
-    if (!this.ai) {
-      throw new Error(
-        'Gemini service is not initialized. Please set GEMINI_API_KEY environment variable.'
-      );
-    }
+    this.ensureInit();
 
-    try {
-      const contentType = metadata?.content_type || 'web_page';
+    const title = metadata?.title || '';
+    const url = metadata?.url || '';
+    const contentType = metadata?.content_type || 'web_page';
 
-      const title = metadata?.title || '';
+    const prompt = `
+RecallOS Context:
+- You are structuring content for verifiable personal cognition.
+- Metadata must improve future reasoning, search, and memory linking.
 
-      const url = metadata?.url || '';
+Return a JSON with:
+{
+  "topics": ["precise conceptual domains"],
+  "categories": ["broader knowledge classes"],
+  "keyPoints": ["concise factual or conceptual insights"],
+  "sentiment": "educational | technical | neutral | analytical",
+  "importance": 1-10 (based on cognitive and learning relevance),
+  "usefulness": 1-10 (based on applicability in user reasoning),
+  "searchableTerms": ["semantic anchors for retrieval"],
+  "contextRelevance": ["contexts where this memory helps reasoning"]
+}
 
-      const prompt = `Analyze this content and extract structured metadata for a personal memory system. Return a JSON object with the following fields:
-1. **topics**: Array of 5-10 specific topics/subjects this content covers
-2. **categories**: Array of 3-5 broader categories this content belongs to
-3. **keyPoints**: Array of 5-8 most important points or insights
-4. **sentiment**: Overall sentiment (positive, negative, neutral, informative)
-5. **importance**: Importance score from 1-10 (10 being most important for personal memory)
-6. **searchableTerms**: Array of 10-15 terms someone might search for to find this content
-Content Type: ${contentType}
 Title: ${title}
 URL: ${url}
-Content: ${rawText.substring(0, 4000)}
-Return only valid JSON, no additional text.`;
+Content Type: ${contentType}
+Text: ${rawText.substring(0, 4000)}
+Return valid JSON only.
+`;
 
-      const response = await this.ai.models.generateContent({
+    try {
+      const res = await this.ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
       });
+      if (!res.text) throw new Error('No metadata response from Gemini API');
 
-      if (!response.text) {
-        throw new Error('No metadata generated from Gemini API');
-      }
-
-      const jsonMatch = response.text.match(/\{[\s\S]*\}/);
-
-      if (!jsonMatch) {
-        throw new Error('Invalid JSON response from Gemini API');
-      }
-
-      const extractedMetadata = JSON.parse(jsonMatch[0]);
+      const jsonMatch = res.text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('Invalid JSON in Gemini response');
+      const data = JSON.parse(jsonMatch[0]);
 
       return {
-        topics: Array.isArray(extractedMetadata.topics)
-          ? extractedMetadata.topics.slice(0, 10)
-          : [],
-        categories: Array.isArray(extractedMetadata.categories)
-          ? extractedMetadata.categories.slice(0, 5)
-          : [],
-        keyPoints: Array.isArray(extractedMetadata.keyPoints)
-          ? extractedMetadata.keyPoints.slice(0, 8)
-          : [],
-        sentiment:
-          typeof extractedMetadata.sentiment === 'string'
-            ? extractedMetadata.sentiment
-            : 'neutral',
-        importance:
-          typeof extractedMetadata.importance === 'number'
-            ? Math.max(1, Math.min(10, extractedMetadata.importance))
-            : 5,
-        searchableTerms: Array.isArray(extractedMetadata.searchableTerms)
-          ? extractedMetadata.searchableTerms.slice(0, 15)
-          : [],
+        topics: data.topics?.slice(0, 10) || [],
+        categories: data.categories?.slice(0, 5) || [],
+        keyPoints: data.keyPoints?.slice(0, 8) || [],
+        sentiment: data.sentiment || 'neutral',
+        importance: Math.max(1, Math.min(10, data.importance || 5)),
+        usefulness: Math.max(1, Math.min(10, data.usefulness || 5)),
+        searchableTerms: data.searchableTerms?.slice(0, 15) || [],
+        contextRelevance: data.contextRelevance?.slice(0, 5) || [],
       };
-    } catch (error) {
-      console.error('Error extracting content metadata:', error);
-
+    } catch (err) {
+      console.error('Metadata extraction error:', err);
       return {
         topics: metadata?.key_topics?.slice(0, 5) || [],
         categories: [metadata?.content_type || 'web_page'],
         keyPoints: [],
         sentiment: 'neutral',
         importance: 5,
+        usefulness: 5,
         searchableTerms: [],
+        contextRelevance: [],
+      };
+    }
+  }
+
+  async evaluateMemoryRelationship(
+    memoryA: { title?: string; summary?: string; topics?: string[]; categories?: string[] },
+    memoryB: { title?: string; summary?: string; topics?: string[]; categories?: string[] }
+  ): Promise<{
+    isRelevant: boolean;
+    relevanceScore: number;
+    relationshipType: string;
+    reasoning: string;
+  }> {
+    this.ensureInit();
+
+    const prompt = `
+RecallOS Memory Relationship Evaluation
+- You are mapping conceptual and temporal relationships within a user's verifiable cognition graph.
+- Relationships exist when memories share conceptual, methodological, or contextual synergy useful for reasoning.
+
+Memory A:
+Title: ${memoryA.title || 'N/A'}
+Summary: ${memoryA.summary || 'N/A'}
+Topics: ${memoryA.topics?.join(', ') || 'N/A'}
+Categories: ${memoryA.categories?.join(', ') || 'N/A'}
+
+Memory B:
+Title: ${memoryB.title || 'N/A'}
+Summary: ${memoryB.summary || 'N/A'}
+Topics: ${memoryB.topics?.join(', ') || 'N/A'}
+Categories: ${memoryB.categories?.join(', ') || 'N/A'}
+
+Return valid JSON:
+{
+  "isRelevant": boolean,
+  "relevanceScore": 0–1,
+  "relationshipType": "conceptual" | "topical" | "contextual" | "temporal" | "causal" | "none",
+  "reasoning": "short explanation"
+}
+
+Criteria:
+- Conceptual: Shared frameworks or ideas (e.g. verifiable compute, cognition models)
+- Topical: Same field or recurring subject
+- Contextual: Appear in same temporal or thematic window
+- Temporal: Sequential evolution of user’s knowledge
+- Causal: One leads to insight in another
+Be strict. Avoid weak or surface matches.
+`;
+
+    try {
+      const res = await this.ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+      });
+      if (!res.text) throw new Error('No relationship data from Gemini');
+
+      const jsonMatch = res.text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('Invalid JSON response from Gemini');
+      const data = JSON.parse(jsonMatch[0]);
+
+      return {
+        isRelevant: !!data.isRelevant,
+        relevanceScore: Math.max(0, Math.min(1, data.relevanceScore || 0)),
+        relationshipType: data.relationshipType || 'none',
+        reasoning: data.reasoning || 'No reasoning provided',
+      };
+    } catch (err) {
+      console.error('Relationship eval error:', err);
+      const topicOverlap =
+        memoryA.topics?.some(t => memoryB.topics?.includes(t)) || false;
+      const categoryOverlap =
+        memoryA.categories?.some(c => memoryB.categories?.includes(c)) || false;
+      const score = topicOverlap && categoryOverlap ? 0.9 : topicOverlap ? 0.6 : categoryOverlap ? 0.4 : 0;
+      return {
+        isRelevant: score > 0,
+        relevanceScore: score,
+        relationshipType: topicOverlap ? 'topical' : categoryOverlap ? 'categorical' : 'none',
+        reasoning: score > 0 ? 'Topic/category overlap detected (fallback logic).' : 'No meaningful connection.',
       };
     }
   }
