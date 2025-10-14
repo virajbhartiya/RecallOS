@@ -216,6 +216,7 @@ export const Memories: React.FC = () => {
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
+  const [searchQuery, setSearchQuery] = useState<string>('')
 
   const fetchMemories = useCallback(async () => {
     if (!address) return
@@ -296,6 +297,7 @@ export const Memories: React.FC = () => {
     setSearchResults(null)
     setSearchError(null)
     setIsSearchMode(false)
+    setSearchQuery('')
   }, [])
 
   useEffect(() => {
@@ -367,6 +369,8 @@ export const Memories: React.FC = () => {
           className="w-full h-full"
           onNodeClick={handleNodeClick}
           similarityThreshold={similarityThreshold}
+          selectedMemoryId={selectedMemory?.id}
+          highlightedMemoryIds={isSearchMode && searchResults ? searchResults.results.map(r => r.memory.id) : []}
         />
       </div>
 
@@ -415,12 +419,13 @@ export const Memories: React.FC = () => {
               <input
                 type="text"
                 placeholder="Search memories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
                 onKeyPress={(e) => {
                   if (e.key === 'Enter') {
-                    const query = (e.target as HTMLInputElement).value
-                    if (query.trim()) {
-                      handleSearch(query.trim(), {}, false)
+                    if (searchQuery.trim()) {
+                      handleSearch(searchQuery.trim(), {}, false)
                     } else {
                       handleClearSearch()
                     }
@@ -428,7 +433,22 @@ export const Memories: React.FC = () => {
                 }}
               />
               <button
-                onClick={() => handleClearSearch()}
+                onClick={() => {
+                  if (searchQuery.trim()) {
+                    handleSearch(searchQuery.trim(), {}, false)
+                  } else {
+                    handleClearSearch()
+                  }
+                }}
+                className="text-xs px-2 py-1.5 text-blue-600 hover:text-blue-800 border border-blue-200 rounded hover:bg-blue-50"
+              >
+                Search
+              </button>
+              <button
+                onClick={() => {
+                  setSearchQuery('')
+                  handleClearSearch()
+                }}
                 className="text-xs px-2 py-1.5 text-gray-500 hover:text-gray-700 border border-gray-200 rounded hover:bg-gray-50"
               >
                 Clear
@@ -445,7 +465,7 @@ export const Memories: React.FC = () => {
                 </h3>
                 <p className="text-xs text-gray-500">
                   {isSearchMode ? 
-                    (searchResults ? `${searchResults.total} results` : 'No search') :
+                    (searchResults ? `${searchResults.total} results for "${searchQuery}"` : 'No search') :
                     `${memories.length} total`
                   }
                 </p>

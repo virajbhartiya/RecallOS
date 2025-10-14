@@ -203,24 +203,33 @@ RecallOS Context:
 - You are structuring content for verifiable personal cognition.
 - Metadata must improve future reasoning, search, and memory linking.
 
-Return a JSON with:
+IMPORTANT: Return ONLY valid JSON. No explanations, no markdown, no code blocks. Just the JSON object.
+
+Return a JSON object with this exact structure:
 {
   "topics": ["precise conceptual domains"],
   "categories": ["broader knowledge classes"],
   "keyPoints": ["concise factual or conceptual insights"],
-  "sentiment": "educational | technical | neutral | analytical",
-  "importance": 1-10 (based on cognitive and learning relevance),
-  "usefulness": 1-10 (based on applicability in user reasoning),
+  "sentiment": "educational",
+  "importance": 5,
+  "usefulness": 5,
   "searchableTerms": ["semantic anchors for retrieval"],
   "contextRelevance": ["contexts where this memory helps reasoning"]
 }
+
+Rules:
+- All strings must be in double quotes
+- No trailing commas
+- sentiment must be one of: "educational", "technical", "neutral", "analytical"
+- importance and usefulness must be numbers between 1-10
+- All arrays can be empty if no relevant items
 
 Title: ${title}
 URL: ${url}
 Content Type: ${contentType}
 Text: ${rawText.substring(0, 4000)}
-Return valid JSON only.
-`;
+
+Return ONLY the JSON object:`;
 
     try {
       const res = await runWithRateLimit(() =>
@@ -231,19 +240,78 @@ Return valid JSON only.
       );
       if (!res.text) throw new Error('No metadata response from Gemini API');
 
-      const jsonMatch = res.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('Invalid JSON in Gemini response');
-      const data = JSON.parse(jsonMatch[0]);
+      // Try multiple patterns to extract JSON
+      let jsonMatch = res.text.match(/\{[\s\S]*\}/);
+      
+      // If no match, try to find JSON between code blocks
+      if (!jsonMatch) {
+        jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (jsonMatch) {
+          jsonMatch[0] = jsonMatch[1]; // Use the captured group
+        }
+      }
+      
+      // If still no match, try to find any JSON-like structure
+      if (!jsonMatch) {
+        jsonMatch = res.text.match(/\{[\s\S]*?\}/);
+      }
+      
+      if (!jsonMatch) {
+        console.error('No JSON found in response:', res.text);
+        throw new Error('Invalid JSON in Gemini response');
+      }
+      
+      let data;
+      try {
+        data = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        console.error('JSON parse error:', parseError);
+        console.error('Raw response text:', res.text);
+        console.error('Extracted JSON:', jsonMatch[0]);
+        
+        // Try to fix common JSON issues
+        let fixedJson = jsonMatch[0];
+        
+        // Fix trailing commas
+        fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
+        
+        // Fix missing quotes around keys
+        fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+        
+        // Try parsing again
+        try {
+          data = JSON.parse(fixedJson);
+        } catch (secondError) {
+          console.error('Second JSON parse error:', secondError);
+          console.error('Fixed JSON:', fixedJson);
+          
+          // Return default metadata if all parsing fails
+          return {
+            topics: [],
+            categories: ['web_page'],
+            keyPoints: [],
+            sentiment: 'neutral',
+            importance: 5,
+            usefulness: 5,
+            searchableTerms: [],
+            contextRelevance: []
+          };
+        }
+      }
 
+      // Validate and sanitize the data
+      const validSentiments = ['educational', 'technical', 'neutral', 'analytical'];
+      const sentiment = validSentiments.includes(data.sentiment) ? data.sentiment : 'neutral';
+      
       return {
-        topics: data.topics?.slice(0, 10) || [],
-        categories: data.categories?.slice(0, 5) || [],
-        keyPoints: data.keyPoints?.slice(0, 8) || [],
-        sentiment: data.sentiment || 'neutral',
-        importance: Math.max(1, Math.min(10, data.importance || 5)),
-        usefulness: Math.max(1, Math.min(10, data.usefulness || 5)),
-        searchableTerms: data.searchableTerms?.slice(0, 15) || [],
-        contextRelevance: data.contextRelevance?.slice(0, 5) || [],
+        topics: Array.isArray(data.topics) ? data.topics.slice(0, 10) : [],
+        categories: Array.isArray(data.categories) ? data.categories.slice(0, 5) : ['web_page'],
+        keyPoints: Array.isArray(data.keyPoints) ? data.keyPoints.slice(0, 8) : [],
+        sentiment: sentiment,
+        importance: Math.max(1, Math.min(10, parseInt(data.importance) || 5)),
+        usefulness: Math.max(1, Math.min(10, parseInt(data.usefulness) || 5)),
+        searchableTerms: Array.isArray(data.searchableTerms) ? data.searchableTerms.slice(0, 15) : [],
+        contextRelevance: Array.isArray(data.contextRelevance) ? data.contextRelevance.slice(0, 5) : [],
       };
     } catch (err) {
       console.error('Metadata extraction error:', err);
@@ -288,13 +356,25 @@ Summary: ${memoryB.summary || 'N/A'}
 Topics: ${memoryB.topics?.join(', ') || 'N/A'}
 Categories: ${memoryB.categories?.join(', ') || 'N/A'}
 
-Return valid JSON:
+IMPORTANT: Return ONLY valid JSON. No explanations, no markdown, no code blocks. Just the JSON object.
+
+Return a JSON object with this exact structure:
 {
-  "isRelevant": boolean,
-  "relevanceScore": 0–1,
-  "relationshipType": "conceptual" | "topical" | "contextual" | "temporal" | "causal" | "none",
+  "isRelevant": true,
+  "relevanceScore": 0.5,
+  "relationshipType": "conceptual",
   "reasoning": "short explanation"
 }
+
+Rules:
+- All strings must be in double quotes
+- No trailing commas
+- isRelevant must be true or false
+- relevanceScore must be a number between 0 and 1
+- relationshipType must be one of: "conceptual", "topical", "contextual", "temporal", "causal", "none"
+- reasoning must be a string
+
+Return ONLY the JSON object:
 
 Criteria:
 - Conceptual: Shared frameworks or ideas (e.g. verifiable compute, cognition models)
@@ -314,9 +394,53 @@ Be strict. Avoid weak or surface matches.
       );
       if (!res.text) throw new Error('No relationship data from Gemini');
 
-      const jsonMatch = res.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('Invalid JSON response from Gemini');
-      const data = JSON.parse(jsonMatch[0]);
+      // Try multiple patterns to extract JSON
+      let jsonMatch = res.text.match(/\{[\s\S]*\}/);
+      
+      // If no match, try to find JSON between code blocks
+      if (!jsonMatch) {
+        jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+        if (jsonMatch) {
+          jsonMatch[0] = jsonMatch[1]; // Use the captured group
+        }
+      }
+      
+      // If still no match, try to find any JSON-like structure
+      if (!jsonMatch) {
+        jsonMatch = res.text.match(/\{[\s\S]*?\}/);
+      }
+      
+      if (!jsonMatch) {
+        console.error('No JSON found in relationship response:', res.text);
+        throw new Error('Invalid JSON response from Gemini');
+      }
+      
+      let data;
+      try {
+        data = JSON.parse(jsonMatch[0]);
+      } catch (parseError) {
+        console.error('JSON parse error in relationship eval:', parseError);
+        console.error('Raw response text:', res.text);
+        console.error('Extracted JSON:', jsonMatch[0]);
+        
+        // Try to fix common JSON issues
+        let fixedJson = jsonMatch[0];
+        fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
+        fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+        
+        try {
+          data = JSON.parse(fixedJson);
+        } catch (secondError) {
+          console.error('Second JSON parse error in relationship eval:', secondError);
+          // Return default relationship data
+          return {
+            isRelevant: false,
+            relevanceScore: 0,
+            relationshipType: 'none',
+            reasoning: 'JSON parsing failed, defaulting to no relationship'
+          };
+        }
+      }
 
       return {
         isRelevant: !!data.isRelevant,

@@ -333,11 +333,18 @@ export class MemoryController {
 
       const memories = await getUserMemories(userAddress);
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp.toString(),
+        block_number: memory.block_number?.toString() || null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
           userAddress,
-          memories,
+          memories: serializedMemories,
           count: memories.length,
         },
       });
@@ -396,12 +403,19 @@ export class MemoryController {
 
       const memories = await getMemoriesByUrlHash(userAddress, urlHash);
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp.toString(),
+        block_number: memory.block_number?.toString() || null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
           userAddress,
           url,
-          memories,
+          memories: serializedMemories,
           count: memories.length,
         },
       });
@@ -433,13 +447,20 @@ export class MemoryController {
         parseInt(endTime as string)
       );
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp.toString(),
+        block_number: memory.block_number?.toString() || null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
           userAddress,
           startTime: parseInt(startTime as string),
           endTime: parseInt(endTime as string),
-          memories,
+          memories: serializedMemories,
           count: memories.length,
         },
       });
@@ -738,13 +759,25 @@ export class MemoryController {
         console.log('Could not extract search terms from query:', error);
       }
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedMemories = memories.map((memory: any) => ({
+        ...memory,
+        timestamp: memory.timestamp.toString(),
+        block_number: memory.block_number?.toString() || null,
+      }));
+
       res.status(200).json({
         success: true,
         data: {
-          memories,
+          results: serializedMemories.map(memory => ({
+            memory,
+            search_type: 'keyword',
+            keyword_score: 1.0,
+            blended_score: 1.0
+          })),
+          total: memories.length,
           query: searchQuery,
           searchableTerms,
-          totalResults: memories.length,
         },
       });
     } catch (error) {
@@ -784,6 +817,7 @@ export class MemoryController {
           page_metadata: true,
           timestamp: true,
           source: true,
+          tx_status: true,
         },
       });
 
@@ -794,6 +828,12 @@ export class MemoryController {
       const sentimentCounts: { [key: string]: number } = {};
 
       const sourceCounts: { [key: string]: number } = {};
+
+      const transactionStatusCounts: { [key: string]: number } = {
+        confirmed: 0,
+        pending: 0,
+        failed: 0
+      };
 
       let totalImportance = 0;
 
@@ -820,6 +860,14 @@ export class MemoryController {
         }
 
         sourceCounts[memory.source] = (sourceCounts[memory.source] || 0) + 1;
+
+        // Count transaction statuses
+        const txStatus = memory.tx_status || 'confirmed'; // Default to confirmed if no status
+        if (transactionStatusCounts.hasOwnProperty(txStatus)) {
+          transactionStatusCounts[txStatus]++;
+        } else {
+          transactionStatusCounts.confirmed++; // Default to confirmed for unknown statuses
+        }
 
         if (metadata?.importance) {
           totalImportance += metadata.importance;
@@ -848,6 +896,7 @@ export class MemoryController {
           topCategories,
           sentimentDistribution: sentimentCounts,
           sourceDistribution: sourceCounts,
+          transactionStatusDistribution: transactionStatusCounts,
           averageImportance: Math.round(averageImportance * 10) / 10,
           insights: {
             mostActiveCategory: topCategories[0]?.category || 'N/A',
@@ -1371,11 +1420,21 @@ export class MemoryController {
       
       const paginatedResults = filteredResults.slice(skip, skip + Number(limit));
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedResults = paginatedResults.map((result: any) => ({
+        ...result,
+        memory: {
+          ...result.memory,
+          timestamp: result.memory.timestamp.toString(),
+          block_number: result.memory.block_number?.toString() || null,
+        }
+      }));
+
       res.status(200).json({
         success: true,
         data: {
           query: query,
-          results: paginatedResults,
+          results: serializedResults,
           totalResults: filteredResults.length,
           page: Number(page),
           limit: Number(limit),
@@ -1572,11 +1631,21 @@ export class MemoryController {
 
       const paginatedResults = blendedResults.slice(skip, skip + Number(limit));
 
+      // Convert BigInt values to strings for JSON serialization
+      const serializedResults = paginatedResults.map((result: any) => ({
+        ...result,
+        memory: {
+          ...result.memory,
+          timestamp: result.memory.timestamp.toString(),
+          block_number: result.memory.block_number?.toString() || null,
+        }
+      }));
+
       res.status(200).json({
         success: true,
         data: {
           query: query,
-          results: paginatedResults,
+          results: serializedResults,
           totalResults: blendedResults.length,
           page: Number(page),
           limit: Number(limit),

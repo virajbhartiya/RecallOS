@@ -135,26 +135,40 @@ export class MemoryService {
     page: number = 1,
     limit: number = 10
   ): Promise<MemorySearchResponse> {
-    const normalizedAddress = this.normalizeAddress(userAddress)
-    const params = new URLSearchParams({
-      userAddress: normalizedAddress,
-      query,
-      page: page.toString(),
-      limit: limit.toString()
-    })
+    try {
+      const normalizedAddress = this.normalizeAddress(userAddress)
+      const params = new URLSearchParams({
+        userAddress: normalizedAddress,
+        query,
+        page: page.toString(),
+        limit: limit.toString()
+      })
 
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (typeof value === 'object') {
-          params.append(key, JSON.stringify(value))
-        } else {
-          params.append(key, value.toString())
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (typeof value === 'object') {
+            params.append(key, JSON.stringify(value))
+          } else {
+            params.append(key, value.toString())
+          }
         }
-      }
-    })
+      })
 
-    const response = await getRequest(`${this.baseUrl}/search?${params.toString()}`)
-    return response.data || { results: [], total: 0, page, limit, filters }
+      const response = await getRequest(`${this.baseUrl}/search?${params.toString()}`)
+      
+      if (!response) {
+        throw new Error('No response received from server')
+      }
+      
+      if (response.status >= 400) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`)
+      }
+      
+      return response?.data?.data || { results: [], total: 0, page, limit, filters }
+    } catch (error) {
+      console.error('Error in searchMemories:', error)
+      return { results: [], total: 0, page, limit, filters }
+    }
   }
 
   static async searchMemoriesWithEmbeddings(
@@ -164,27 +178,41 @@ export class MemoryService {
     page: number = 1,
     limit: number = 10
   ): Promise<MemorySearchResponse> {
-    const normalizedAddress = this.normalizeAddress(userAddress)
-    const params = new URLSearchParams({
-      userAddress: normalizedAddress,
-      query,
-      page: page.toString(),
-      limit: limit.toString()
-    })
+    try {
+      const normalizedAddress = this.normalizeAddress(userAddress)
+      const params = new URLSearchParams({
+        userAddress: normalizedAddress,
+        query,
+        page: page.toString(),
+        limit: limit.toString()
+      })
 
-    // Add filters to params
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (typeof value === 'object') {
-          params.append(key, JSON.stringify(value))
-        } else {
-          params.append(key, value.toString())
+      // Add filters to params
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (typeof value === 'object') {
+            params.append(key, JSON.stringify(value))
+          } else {
+            params.append(key, value.toString())
+          }
         }
-      }
-    })
+      })
 
-    const response = await getRequest(`${this.baseUrl}/search-embeddings?${params.toString()}`)
-    return response.data || { results: [], total: 0, page, limit, filters }
+      const response = await getRequest(`${this.baseUrl}/search-embeddings?${params.toString()}`)
+      
+      if (!response) {
+        throw new Error('No response received from server')
+      }
+      
+      if (response.status >= 400) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`)
+      }
+      
+      return response?.data?.data || { results: [], total: 0, page, limit, filters }
+    } catch (error) {
+      console.error('Error in searchMemoriesWithEmbeddings:', error)
+      return { results: [], total: 0, page, limit, filters }
+    }
   }
 
   static async searchMemoriesHybrid(
@@ -194,27 +222,41 @@ export class MemoryService {
     page: number = 1,
     limit: number = 10
   ): Promise<MemorySearchResponse> {
-    const normalizedAddress = this.normalizeAddress(userAddress)
-    const params = new URLSearchParams({
-      userAddress: normalizedAddress,
-      query,
-      page: page.toString(),
-      limit: limit.toString()
-    })
+    try {
+      const normalizedAddress = this.normalizeAddress(userAddress)
+      const params = new URLSearchParams({
+        userAddress: normalizedAddress,
+        query,
+        page: page.toString(),
+        limit: limit.toString()
+      })
 
-    // Add filters to params
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (typeof value === 'object') {
-          params.append(key, JSON.stringify(value))
-        } else {
-          params.append(key, value.toString())
+      // Add filters to params
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          if (typeof value === 'object') {
+            params.append(key, JSON.stringify(value))
+          } else {
+            params.append(key, value.toString())
+          }
         }
-      }
-    })
+      })
 
-    const response = await getRequest(`${this.baseUrl}/search-hybrid?${params.toString()}`)
-    return response.data || { results: [], total: 0, page, limit, filters }
+      const response = await getRequest(`${this.baseUrl}/search-hybrid?${params.toString()}`)
+      
+      if (!response) {
+        throw new Error('No response received from server')
+      }
+      
+      if (response.status >= 400) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`)
+      }
+      
+      return response?.data?.data || { results: [], total: 0, page, limit, filters }
+    } catch (error) {
+      console.error('Error in searchMemoriesHybrid:', error)
+      return { results: [], total: 0, page, limit, filters }
+    }
   }
 
   static async getMemoryInsights(userAddress: string): Promise<MemoryInsights> {
@@ -235,10 +277,10 @@ export class MemoryService {
       if (data) {
         return {
           total_memories: data.totalMemories || 0,
-          total_transactions: 0,
-          confirmed_transactions: 0,
-          pending_transactions: 0,
-          failed_transactions: 0,
+          total_transactions: data.totalMemories || 0, // Total transactions = total memories
+          confirmed_transactions: data.transactionStatusDistribution?.confirmed || 0,
+          pending_transactions: data.transactionStatusDistribution?.pending || 0,
+          failed_transactions: data.transactionStatusDistribution?.failed || 0,
           categories: data.topCategories?.reduce((acc: Record<string, number>, cat: { category: string; count: number }) => {
             acc[cat.category] = cat.count
             return acc
@@ -275,10 +317,10 @@ export class MemoryService {
           if (retryData) {
             return {
               total_memories: retryData.totalMemories || 0,
-              total_transactions: 0,
-              confirmed_transactions: 0,
-              pending_transactions: 0,
-              failed_transactions: 0,
+              total_transactions: retryData.totalMemories || 0, // Total transactions = total memories
+              confirmed_transactions: retryData.transactionStatusDistribution?.confirmed || 0,
+              pending_transactions: retryData.transactionStatusDistribution?.pending || 0,
+              failed_transactions: retryData.transactionStatusDistribution?.failed || 0,
               categories: retryData.topCategories?.reduce((acc: Record<string, number>, cat: { category: string; count: number }) => {
                 acc[cat.category] = cat.count
                 return acc

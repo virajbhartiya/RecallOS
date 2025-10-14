@@ -19,6 +19,8 @@ interface MemoryMeshProps {
   userAddress?: string
   onNodeClick?: (memoryId: string) => void
   similarityThreshold?: number
+  selectedMemoryId?: string
+  highlightedMemoryIds?: string[]
 }
 
 const nodeColors = {
@@ -57,7 +59,14 @@ type NodeChange = unknown
 type EdgeChange = unknown
 type Connection = { source: string; target: string }
 
-const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, onNodeClick, similarityThreshold = 0.4 }) => {
+const MemoryMesh: React.FC<MemoryMeshProps> = ({ 
+  className = '', 
+  userAddress, 
+  onNodeClick, 
+  similarityThreshold = 0.4,
+  selectedMemoryId,
+  highlightedMemoryIds = []
+}) => {
   const [meshData, setMeshData] = useState<MemoryMesh | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,6 +108,8 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
     if (!meshData?.nodes?.length) return []
     return meshData.nodes.map((n, i) => {
       const color = (nodeColors as Record<string, string>)[n.type] || '#666666'
+      const isSelected = selectedMemoryId === n.memory_id
+      const isHighlighted = highlightedMemoryIds.includes(n.memory_id || '')
       
       // Create more useful labels based on available data
       let label = ''
@@ -125,33 +136,59 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
       
       const hasValidPos = Number.isFinite(n.x) && Number.isFinite(n.y) && !(n.x === 0 && n.y === 0)
       const position = hasValidPos ? { x: n.x as number, y: n.y as number } : computePosition(i, meshData.nodes.length)
+      
+      // Determine styling based on selection/highlight state
+      let nodeStyle: React.CSSProperties = {
+        background: '#fff',
+        color: '#111',
+        border: `2px solid ${color}`,
+        width: Math.max(28, label.length * 6 + 8),
+        height: 28,
+        fontSize: 9,
+        lineHeight: '24px',
+        padding: '0 4px',
+        borderRadius: 9999,
+        textAlign: 'center',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        transition: 'all 0.2s ease-in-out'
+      }
+      
+      // Apply highlighting styles
+      if (isSelected) {
+        nodeStyle = {
+          ...nodeStyle,
+          background: '#3B82F6',
+          color: '#fff',
+          border: '3px solid #1D4ED8',
+          boxShadow: '0 0 0 4px rgba(59, 130, 246, 0.3), 0 4px 8px rgba(0,0,0,0.15)',
+          zIndex: 10
+        }
+      } else if (isHighlighted) {
+        nodeStyle = {
+          ...nodeStyle,
+          background: '#FEF3C7',
+          color: '#92400E',
+          border: '2px solid #F59E0B',
+          boxShadow: '0 0 0 2px rgba(245, 158, 11, 0.3), 0 2px 4px rgba(0,0,0,0.1)',
+          zIndex: 5
+        }
+      }
+      
       return {
         id: n.id,
         position,
         data: { label, memory_id: n.memory_id, type: n.type },
         sourcePosition: Position.Bottom,
         targetPosition: Position.Top,
-        style: {
-          background: '#fff',
-          color: '#111',
-          border: `2px solid ${color}`,
-          width: Math.max(28, label.length * 6 + 8),
-          height: 28,
-          fontSize: 9,
-          lineHeight: '24px',
-          padding: '0 4px',
-          borderRadius: 9999,
-          textAlign: 'center',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden'
-        }
+        style: nodeStyle
       }
     })
-  }, [meshData])
+  }, [meshData, selectedMemoryId, highlightedMemoryIds])
 
   const rfEdges: RFEdge[] = useMemo(() => {
     if (!meshData?.edges?.length) return []
@@ -273,8 +310,17 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
             pannable
             zoomable
             style={{ background: '#f1f5f9', border: '1px solid #e5e7eb' }}
-            nodeColor={(n: { data?: { type?: string } }) => {
+            nodeColor={(n: { data?: { type?: string; memory_id?: string } }) => {
               const t = (n?.data?.type as string) || ''
+              const memoryId = n?.data?.memory_id
+              
+              // Check if this node is selected or highlighted
+              if (selectedMemoryId === memoryId) {
+                return '#3B82F6' // Blue for selected
+              } else if (highlightedMemoryIds.includes(memoryId || '')) {
+                return '#F59E0B' // Amber for highlighted
+              }
+              
               return (nodeColors as Record<string, string>)[t] || '#9ca3af'
             }}
             nodeStrokeColor="#111"
