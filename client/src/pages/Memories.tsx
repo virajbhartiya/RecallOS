@@ -1,19 +1,21 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
-import { useWallet } from '../contexts/WalletContext'
-import { MemoryService } from '../services/memoryService'
-import { MemoryMesh } from '../components/MemoryMesh'
-import type { Memory, MemoryInsights, SearchFilters, MemorySearchResponse } from '../types/memory'
+import { useWallet } from '@/contexts/WalletContext'
+import { MemoryService } from '@/services/memoryService'
+import { MemoryMesh } from '@/components/MemoryMesh'
+import { useBlockscout } from '@/hooks/useBlockscout'
+import type { Memory, MemoryInsights, SearchFilters, MemorySearchResponse } from '@/types/memory'
 
 // Memory Card Component
 const MemoryCard: React.FC<{
   memory: Memory
   isSelected: boolean
   onSelect: (memory: Memory) => void
+  onViewTransaction?: (txHash: string, network: string) => void
   searchResult?: {
     search_type?: 'keyword' | 'semantic' | 'hybrid'
     blended_score?: number
   }
-}> = ({ memory, isSelected, onSelect, searchResult }) => {
+}> = ({ memory, isSelected, onSelect, onViewTransaction, searchResult }) => {
   return (
     <button
       onClick={() => onSelect(memory)}
@@ -35,6 +37,18 @@ const MemoryCard: React.FC<{
               memory.tx_status === 'pending' ? 'bg-yellow-500' :
               'bg-red-500'
             }`} title={memory.tx_status}></div>
+          )}
+          {memory.tx_hash && memory.tx_hash.startsWith('0x') && memory.tx_hash.length === 66 && onViewTransaction && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')
+              }}
+              className="text-xs text-blue-600 hover:text-blue-800 font-mono"
+              title="View real transaction on Blockscout"
+            >
+              TX
+            </button>
           )}
           {searchResult?.blended_score !== undefined && (
             <span className="text-xs text-gray-500 font-mono">
@@ -66,7 +80,8 @@ const MemoryDetails: React.FC<{
   memory: Memory | null
   expandedContent: boolean
   setExpandedContent: (expanded: boolean) => void
-}> = ({ memory, expandedContent, setExpandedContent }) => {
+  onViewTransaction?: (txHash: string, network: string) => void
+}> = ({ memory, expandedContent, setExpandedContent, onViewTransaction }) => {
   if (!memory) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -116,6 +131,14 @@ const MemoryDetails: React.FC<{
                       }`}>
                 {memory.tx_status}
                       </span>
+                      {memory.tx_hash && memory.tx_hash.startsWith('0x') && memory.tx_hash.length === 66 && onViewTransaction && (
+                        <button
+                          onClick={() => onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')}
+                          className="text-xs font-mono text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 border border-blue-200 hover:border-blue-300 transition-all duration-200"
+                        >
+                          [VIEW TX]
+                        </button>
+                      )}
                     </div>
                   )}
           {memory.importance_score && (
@@ -203,6 +226,7 @@ const MemoryDetails: React.FC<{
 
 export const Memories: React.FC = () => {
   const { isConnected, address } = useWallet()
+  const { showTransactionNotification, showTransactionHistory, showAllTransactions } = useBlockscout()
   const [memories, setMemories] = useState<Memory[]>([])
   const [insights, setInsights] = useState<MemoryInsights | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -301,6 +325,20 @@ export const Memories: React.FC = () => {
     setSearchQuery('')
   }, [])
 
+  const handleViewTransaction = useCallback((txHash: string, network: string) => {
+    showTransactionNotification(txHash, network)
+  }, [showTransactionNotification])
+
+  const handleViewTransactionHistory = useCallback(() => {
+    if (address) {
+      showTransactionHistory(address, 'sepolia')
+    }
+  }, [address, showTransactionHistory])
+
+  const handleViewAllTransactions = useCallback(() => {
+    showAllTransactions('sepolia')
+  }, [showAllTransactions])
+
   // Debounced search effect
   useEffect(() => {
     // Clear existing timeout
@@ -376,11 +414,25 @@ export const Memories: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              {address && (
-                <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
-                </div>
+              {address && address.startsWith('0x') && address.length === 42 && (
+                <>
+                  <button
+                    onClick={handleViewTransactionHistory}
+                    className="text-xs font-mono text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 border border-blue-200 hover:border-blue-300 transition-all duration-200"
+                  >
+                    [TX HISTORY]
+                  </button>
+                  <button
+                    onClick={handleViewAllTransactions}
+                    className="text-xs font-mono text-gray-600 hover:text-gray-800 bg-gray-50 px-3 py-1 border border-gray-200 hover:border-gray-300 transition-all duration-200"
+                  >
+                    [ALL TX]
+                  </button>
+                  <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -546,6 +598,7 @@ export const Memories: React.FC = () => {
                       memory={memory}
                       isSelected={selectedMemory?.id === memory.id}
                       onSelect={handleSelectMemory}
+                      onViewTransaction={handleViewTransaction}
                       searchResult={searchResult}
                     />
                   )
@@ -573,9 +626,10 @@ export const Memories: React.FC = () => {
             </div>
             <MemoryDetails
               memory={selectedMemory}
-        expandedContent={expandedContent}
-        setExpandedContent={setExpandedContent}
-      />
+              expandedContent={expandedContent}
+              setExpandedContent={setExpandedContent}
+              onViewTransaction={handleViewTransaction}
+            />
           </div>
         )}
 
@@ -600,6 +654,7 @@ export const Memories: React.FC = () => {
                 memory={selectedMemory}
                 expandedContent={expandedContent}
                 setExpandedContent={setExpandedContent}
+                onViewTransaction={handleViewTransaction}
               />
             </div>
           </div>
