@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
-import { useWallet } from '../contexts/WalletContext'
+import { useWallet } from '@/contexts/WalletContext'
+import { useBlockscout } from '@/hooks/useBlockscout'
 
 interface WalletModalProps {
   isOpen: boolean
@@ -8,6 +9,7 @@ interface WalletModalProps {
 
 const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
   const { isConnected, address, chainId, balance, connect, disconnect } = useWallet()
+  const { showTransactionHistory } = useBlockscout()
   const [isConnecting, setIsConnecting] = useState(false)
 
   const handleConnect = async () => {
@@ -118,6 +120,16 @@ const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
               >
                 VIEW MEMORIES
               </button>
+              {address && address.startsWith('0x') && address.length === 42 && (
+                <button
+                  onClick={() => {
+                    showTransactionHistory(address, 'sepolia')
+                  }}
+                  className="flex-1 px-4 py-3 text-sm font-mono uppercase tracking-wide border border-blue-300 bg-white hover:bg-blue-50 hover:border-blue-500 text-blue-600 hover:text-blue-700 transition-all duration-200"
+                >
+                  TX HISTORY
+                </button>
+              )}
               <button
                 onClick={handleDisconnect}
                 className="flex-1 px-4 py-3 text-sm font-mono uppercase tracking-wide border border-red-300 bg-white hover:bg-red-50 hover:border-red-500 text-red-600 hover:text-red-700 transition-all duration-200"
