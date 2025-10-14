@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useWallet } from '../contexts/WalletContext'
 import { MemoryService } from '../services/memoryService'
 import { MemoryMesh } from '../components/MemoryMesh'
@@ -217,6 +217,7 @@ export const Memories: React.FC = () => {
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState<string>('')
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchMemories = useCallback(async () => {
     if (!address) return
@@ -299,6 +300,32 @@ export const Memories: React.FC = () => {
     setIsSearchMode(false)
     setSearchQuery('')
   }, [])
+
+  // Debounced search effect
+  useEffect(() => {
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current)
+    }
+
+    // If search query is empty, clear search immediately
+    if (!searchQuery.trim()) {
+      handleClearSearch()
+      return
+    }
+
+    // Set new timeout for debounced search
+    debounceTimeoutRef.current = setTimeout(() => {
+      handleSearch(searchQuery.trim(), {}, false)
+    }, 500) // 500ms debounce delay
+
+    // Cleanup function
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current)
+      }
+    }
+  }, [searchQuery, handleSearch, handleClearSearch])
 
   useEffect(() => {
     if (isConnected && address) {
@@ -414,36 +441,15 @@ export const Memories: React.FC = () => {
               />
             </div>
             
-            {/* Simple Search */}
+            {/* Auto-search Input */}
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Search memories..."
+                placeholder="Search memories... (auto-searches as you type)"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    if (searchQuery.trim()) {
-                      handleSearch(searchQuery.trim(), {}, false)
-                    } else {
-                      handleClearSearch()
-                    }
-                  }
-                }}
               />
-              <button
-                onClick={() => {
-                  if (searchQuery.trim()) {
-                    handleSearch(searchQuery.trim(), {}, false)
-                  } else {
-                    handleClearSearch()
-                  }
-                }}
-                className="text-xs px-2 py-1.5 text-blue-600 hover:text-blue-800 border border-blue-200 rounded hover:bg-blue-50"
-              >
-                Search
-              </button>
               <button
                 onClick={() => {
                   setSearchQuery('')

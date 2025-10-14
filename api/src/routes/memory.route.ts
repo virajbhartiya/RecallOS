@@ -36,5 +36,6 @@ router.get('/snapshots/:userAddress', MemoryController.getMemorySnapshots);
 router.get('/snapshot/:snapshotId', MemoryController.getMemorySnapshot);
 router.post('/backfill-snapshots', MemoryController.backfillMemorySnapshots);
 router.get('/health', MemoryController.healthCheck);
+router.get('/debug', MemoryController.debugMemories);
 
 export default router;

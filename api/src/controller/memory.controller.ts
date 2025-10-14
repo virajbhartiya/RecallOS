@@ -702,11 +702,13 @@ export class MemoryController {
       };
 
       const searchQuery = query as string;
+      console.log(`Searching for: "${searchQuery}" for user: ${user.id}`);
 
       whereConditions.OR = [
         { content: { contains: searchQuery, mode: 'insensitive' } },
         { summary: { contains: searchQuery, mode: 'insensitive' } },
         { title: { contains: searchQuery, mode: 'insensitive' } },
+        { url: { contains: searchQuery, mode: 'insensitive' } },
       ];
 
       if (category) {
@@ -742,6 +744,8 @@ export class MemoryController {
         orderBy: { timestamp: 'desc' },
         take: parseInt(limit as string),
       });
+
+      console.log(`Found ${memories.length} memories for query: "${searchQuery}"`);
 
       let searchableTerms: string[] = [];
 
@@ -1543,6 +1547,7 @@ export class MemoryController {
               { content: { contains: query as string, mode: 'insensitive' } },
               { summary: { contains: query as string, mode: 'insensitive' } },
               { title: { contains: query as string, mode: 'insensitive' } },
+              { url: { contains: query as string, mode: 'insensitive' } },
             ],
           },
           take: parseInt(limit as string) * 2, // Get more results for blending
@@ -2010,6 +2015,59 @@ export class MemoryController {
         success: false,
         error: 'Blockchain connection is not available',
         details: error.message,
+      });
+    }
+  }
+
+  static async debugMemories(req: Request, res: Response) {
+    try {
+      const { userAddress } = req.query;
+
+      if (!userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: 'userAddress is required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { wallet_address: (userAddress as string).toLowerCase() },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+        });
+      }
+
+      const memories = await prisma.memory.findMany({
+        where: { user_id: user.id },
+        select: {
+          id: true,
+          title: true,
+          url: true,
+          source: true,
+          tx_status: true,
+          created_at: true,
+        },
+        orderBy: { created_at: 'desc' },
+        take: 20,
+      });
+
+      res.status(200).json({
+        success: true,
+        data: {
+          user_id: user.id,
+          total_memories: memories.length,
+          recent_memories: memories,
+        },
+      });
+    } catch (error) {
+      console.error('Debug memories error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Debug failed',
       });
     }
   }
