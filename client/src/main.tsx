@@ -3,6 +3,10 @@ import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './styles/index.css' 
 import { ThemeProvider } from './components/theme-provider'
+import { suppressBlockscoutWarnings } from './utils/suppressWarnings'
+
+// Suppress known warnings from Blockscout SDK
+suppressBlockscoutWarnings()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
