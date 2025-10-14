@@ -815,12 +815,29 @@ function captureContext(): ContextData {
     };
   }
 }
+function isLocalhost(): boolean {
+  const hostname = window.location.hostname;
+  return hostname === 'localhost' || 
+         hostname === '127.0.0.1' || 
+         hostname === '0.0.0.0' ||
+         hostname.startsWith('192.168.') ||
+         hostname.startsWith('10.') ||
+         hostname.endsWith('.local');
+}
+
 function sendContextToBackground() {
   try {
     if (!chrome.runtime?.id) {
       console.log('RecallOS: Extension context invalidated, skipping capture');
       return;
     }
+    
+    // Skip capture if on localhost or local development
+    if (isLocalhost()) {
+      console.log('RecallOS: Skipping capture - localhost detected');
+      return;
+    }
+    
     const now = Date.now();
     if (now - lastCaptureTime < MIN_CAPTURE_INTERVAL) {
       console.log('RecallOS: Skipping capture - too soon since last capture');
@@ -878,11 +895,15 @@ function sendContextToBackground() {
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     hasUserActivity = true;
-    sendContextToBackground();
+    if (!isLocalhost()) {
+      sendContextToBackground();
+    }
   });
 } else {
   hasUserActivity = true;
-  sendContextToBackground();
+  if (!isLocalhost()) {
+    sendContextToBackground();
+  }
 }
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) {
@@ -913,13 +934,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   if (message.type === 'CAPTURE_CONTEXT_NOW') {
     hasUserActivity = true;
-    sendContextToBackground();
-    sendResponse({ success: true });
+    if (!isLocalhost()) {
+      sendContextToBackground();
+      sendResponse({ success: true });
+    } else {
+      sendResponse({ success: false, reason: 'localhost detected' });
+    }
     return true;
   }
   if (message.type === 'START_MONITORING') {
-    startContinuousMonitoring();
-    sendResponse({ success: true, activityLevel });
+    if (!isLocalhost()) {
+      startContinuousMonitoring();
+      sendResponse({ success: true, activityLevel });
+    } else {
+      sendResponse({ success: false, reason: 'localhost detected' });
+    }
     return true;
   }
   if (message.type === 'STOP_MONITORING') {
@@ -1059,6 +1088,12 @@ function updateActivityLevel() {
   }
 }
 function startContinuousMonitoring() {
+  // Don't start monitoring on localhost
+  if (isLocalhost()) {
+    console.log('RecallOS: Skipping continuous monitoring - localhost detected');
+    return;
+  }
+  
   if (captureInterval) {
     clearInterval(captureInterval);
   }
@@ -1099,7 +1134,9 @@ new MutationObserver(() => {
   const url = location.href;
   if (url !== lastUrl) {
     lastUrl = url;
-    setTimeout(sendContextToBackground, 1000);
+    if (!isLocalhost()) {
+      setTimeout(sendContextToBackground, 1000);
+    }
   }
 }).observe(document, { subtree: true, childList: true });
 document.addEventListener('visibilitychange', () => {

@@ -228,6 +228,7 @@ export const Memories: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [expandedContent, setExpandedContent] = useState(false)
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.3)
   
   // Search state
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
@@ -387,11 +388,38 @@ export const Memories: React.FC = () => {
           userAddress={address || undefined}
           className="w-full h-full"
           onNodeClick={handleNodeClick}
+          similarityThreshold={similarityThreshold}
         />
       </div>
 
         {/* Right Panel - Search & Memory List */}
         <div className="w-[400px] border-l border-gray-200 bg-white flex flex-col">
+          {/* Similarity Threshold Control */}
+          <div className="border-b border-gray-200 bg-gray-50/50 flex-shrink-0 p-4">
+            <div className="mb-3">
+              <label className="text-xs font-mono text-gray-600 uppercase tracking-wide">
+                [SIMILARITY THRESHOLD]
+              </label>
+              <div className="mt-2 flex items-center gap-3">
+                <input
+                  type="range"
+                  min="0.1"
+                  max="0.9"
+                  step="0.1"
+                  value={similarityThreshold}
+                  onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
+                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                />
+                <span className="text-xs font-mono text-gray-700 min-w-[3rem]">
+                  {(similarityThreshold * 100).toFixed(0)}%
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Higher values show only closely related memories
+              </p>
+            </div>
+          </div>
+          
           {/* Search Section */}
           <div className="border-b border-gray-200 bg-gray-50/50 flex-shrink-0">
             <div className="p-4">

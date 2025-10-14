@@ -215,41 +215,62 @@ export class MemoryMeshService {
       // Clean up existing relations with low similarity scores
       await this.cleanupLowQualityRelations(memoryId);
 
+      // Process relations with proper race condition handling
       const relationPromises = uniqueRelations.map(async relatedMemory => {
-        const existingRelation = await prisma.memoryRelation.findUnique({
-          where: {
-            memory_id_related_memory_id: {
-              memory_id: memoryId,
-              related_memory_id: relatedMemory.id,
-            },
-          },
-        });
-
-        if (!existingRelation) {
-          await prisma.memoryRelation.create({
-            data: {
-              memory_id: memoryId,
-              related_memory_id: relatedMemory.id,
-              similarity_score: relatedMemory.similarity_score,
-              relation_type: relatedMemory.relation_type,
+        try {
+          // First try to find existing relation
+          const existingRelation = await prisma.memoryRelation.findUnique({
+            where: {
+              memory_id_related_memory_id: {
+                memory_id: memoryId,
+                related_memory_id: relatedMemory.id,
+              },
             },
           });
-        } else {
-          // Update if new similarity is significantly better or if relation type is more specific
-          const shouldUpdate = 
-            relatedMemory.similarity_score > existingRelation.similarity_score + 0.05 ||
-            (relatedMemory.similarity_score > existingRelation.similarity_score && 
-             this.isMoreSpecificRelationType(relatedMemory.relation_type, existingRelation.relation_type));
 
-          if (shouldUpdate) {
-            await prisma.memoryRelation.update({
-              where: { id: existingRelation.id },
-              data: {
-                similarity_score: relatedMemory.similarity_score,
-                relation_type: relatedMemory.relation_type,
-              },
-            });
+          if (!existingRelation) {
+            // Create new relation with error handling for race conditions
+            try {
+              await prisma.memoryRelation.create({
+                data: {
+                  memory_id: memoryId,
+                  related_memory_id: relatedMemory.id,
+                  similarity_score: relatedMemory.similarity_score,
+                  relation_type: relatedMemory.relation_type,
+                },
+              });
+            } catch (createError) {
+              // If creation fails due to unique constraint, it means another process created it
+              if (createError.code === 'P2002') {
+                console.log(`Relation already exists between ${memoryId} and ${relatedMemory.id}, skipping creation...`);
+                return;
+              }
+              throw createError;
+            }
+          } else {
+            // Update existing relation if conditions are met
+            const shouldUpdate = 
+              relatedMemory.similarity_score > existingRelation.similarity_score + 0.05 ||
+              (relatedMemory.similarity_score > existingRelation.similarity_score && 
+               this.isMoreSpecificRelationType(relatedMemory.relation_type, existingRelation.relation_type));
+
+            if (shouldUpdate) {
+              await prisma.memoryRelation.update({
+                where: { id: existingRelation.id },
+                data: {
+                  similarity_score: relatedMemory.similarity_score,
+                  relation_type: relatedMemory.relation_type,
+                },
+              });
+            }
           }
+        } catch (error) {
+          // Handle any other errors
+          if (error.code === 'P2002') {
+            console.log(`Relation already exists between ${memoryId} and ${relatedMemory.id}, skipping...`);
+            return;
+          }
+          throw error;
         }
       });
 
@@ -543,13 +564,18 @@ export class MemoryMeshService {
     });
   }
 
-  async getMemoryMesh(userId: string, limit: number = 50): Promise<any> {
+  async getMemoryMesh(userId: string, limit: number = 50, similarityThreshold: number = 0.3): Promise<any> {
     try {
       const memories = await prisma.memory.findMany({
         where: { user_id: userId },
         include: {
           embeddings: true,
           related_memories: {
+            where: {
+              similarity_score: {
+                gte: similarityThreshold
+              }
+            },
             include: {
               related_memory: {
                 select: {
@@ -584,13 +610,15 @@ export class MemoryMeshService {
         y: 0, // Will be calculated by frontend
       }));
 
-      // Create edges from relationships
+      // Create edges from relationships - only include high-quality connections
       const edges: any[] = [];
       const nodeIds = new Set(nodes.map(n => n.id));
       
       memories.forEach((memory: any) => {
         memory.related_memories.forEach((relation: any) => {
-          if (nodeIds.has(relation.related_memory.id)) {
+          // Double-check similarity threshold and ensure both nodes exist
+          if (nodeIds.has(relation.related_memory.id) && 
+              relation.similarity_score >= similarityThreshold) {
             edges.push({
               source: memory.id,
               target: relation.related_memory.id,
@@ -610,10 +638,18 @@ export class MemoryMeshService {
         clusters[node.type].push(node.id);
       });
 
+      console.log(`Memory mesh generated: ${nodes.length} nodes, ${edges.length} edges (threshold: ${similarityThreshold})`);
+
       return {
         nodes,
         edges,
         clusters,
+        metadata: {
+          similarity_threshold: similarityThreshold,
+          total_nodes: nodes.length,
+          total_edges: edges.length,
+          average_connections: nodes.length > 0 ? edges.length / nodes.length : 0
+        }
       };
     } catch (error) {
       console.error(`Error getting memory mesh for user ${userId}:`, error);
