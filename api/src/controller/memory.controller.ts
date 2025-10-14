@@ -1136,7 +1136,7 @@ export class MemoryController {
     try {
       const { userAddress } = req.params;
 
-      const { limit = 50 } = req.query;
+      const { limit = 50, threshold = 0.3 } = req.query;
 
       if (!userAddress) {
         return res.status(400).json({
@@ -1158,7 +1158,8 @@ export class MemoryController {
 
       const mesh = await memoryMeshService.getMemoryMesh(
         user.id,
-        parseInt(limit as string)
+        parseInt(limit as string),
+        parseFloat(threshold as string)
       );
 
       res.status(200).json({

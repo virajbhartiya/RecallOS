@@ -9,7 +9,8 @@ import {
   MiniMap,
   applyNodeChanges,
   applyEdgeChanges,
-  addEdge
+  addEdge,
+  Position
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
@@ -17,6 +18,7 @@ interface MemoryMeshProps {
   className?: string
   userAddress?: string
   onNodeClick?: (memoryId: string) => void
+  similarityThreshold?: number
 }
 
 const nodeColors = {
@@ -38,6 +40,8 @@ type RFNode = {
   position: { x: number; y: number }
   data?: NodeData
   style?: React.CSSProperties
+  sourcePosition?: unknown
+  targetPosition?: unknown
 }
 
 type RFEdge = {
@@ -46,13 +50,14 @@ type RFEdge = {
   target: string
   animated?: boolean
   style?: React.CSSProperties
+  type?: string
 }
 
 type NodeChange = unknown
 type EdgeChange = unknown
 type Connection = { source: string; target: string }
 
-const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, onNodeClick }) => {
+const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, onNodeClick, similarityThreshold = 0.3 }) => {
   const [meshData, setMeshData] = useState<MemoryMesh | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -63,7 +68,7 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
       setIsLoading(true)
       setError(null)
       try {
-        const data = await MemoryService.getMemoryMesh(userAddress, 50)
+        const data = await MemoryService.getMemoryMesh(userAddress, 50, similarityThreshold)
         setMeshData(data)
       } catch (err) {
         setError('Failed to load memory mesh')
@@ -73,7 +78,7 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
       }
     }
     fetchMeshData()
-  }, [userAddress])
+  }, [userAddress, similarityThreshold])
 
   // simple radial layout to avoid overlapping when no positions are provided
   const computePosition = (index: number, total: number) => {
@@ -94,22 +99,55 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
     if (!meshData?.nodes?.length) return []
     return meshData.nodes.map((n, i) => {
       const color = (nodeColors as Record<string, string>)[n.type] || '#666666'
-      const label = (n.label || n.title || n.type || 'Node').slice(0, 24)
+      
+      // Create more useful labels based on available data
+      let label = ''
+      if (n.title && n.title.length > 0) {
+        // Use first 2-3 words of title, truncated
+        const words = n.title.split(' ').slice(0, 2)
+        label = words.join(' ').substring(0, 8)
+      } else if (n.summary && n.summary.length > 0) {
+        // Use first 2-3 words of summary, truncated
+        const words = n.summary.split(' ').slice(0, 2)
+        label = words.join(' ').substring(0, 8)
+      } else if (n.type) {
+        // Use type abbreviation
+        const typeMap: Record<string, string> = {
+          'manual': 'M',
+          'on_chain': 'C',
+          'browser': 'B',
+          'reasoning': 'R'
+        }
+        label = typeMap[n.type] || n.type.charAt(0).toUpperCase()
+      } else {
+        label = 'M'
+      }
+      
       const hasValidPos = Number.isFinite(n.x) && Number.isFinite(n.y) && !(n.x === 0 && n.y === 0)
       const position = hasValidPos ? { x: n.x as number, y: n.y as number } : computePosition(i, meshData.nodes.length)
       return {
         id: n.id,
         position,
         data: { label, memory_id: n.memory_id, type: n.type },
+        sourcePosition: Position.Bottom,
+        targetPosition: Position.Top,
         style: {
-          background: color,
-          color: '#fff',
-          border: '1px solid #111',
-          width: 160,
-          height: 36,
-          fontSize: 11,
-          padding: 6,
-          borderRadius: 6
+          background: '#fff',
+          color: '#111',
+          border: `2px solid ${color}`,
+          width: Math.max(28, label.length * 6 + 8),
+          height: 28,
+          fontSize: 9,
+          lineHeight: '24px',
+          padding: '0 4px',
+          borderRadius: 9999,
+          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden'
         }
       }
     })
@@ -118,6 +156,7 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
   const rfEdges: RFEdge[] = useMemo(() => {
     if (!meshData?.edges?.length) return []
 
+    // Backend already filters by similarity threshold, so we just need to deduplicate
     // Group edges by unordered node pair to avoid duplicates A->B and B->A
     const groups = new Map<string, MemoryMeshEdge[]>()
     meshData.edges.forEach((e: MemoryMeshEdge) => {
@@ -147,6 +186,9 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
         id: `e-${key}`,
         source: best.source,
         target: best.target,
+        // Use curved bezier edges for rounded connections
+        // local minimal typing
+        type: 'default',
         animated: false,
         style
       })
@@ -220,11 +262,24 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({ className = '', userAddress, on
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClickRF}
+          // Use bezier edges (rounded)
+          defaultEdgeOptions={{ type: 'default' }}
+          connectionLineType="bezier"
           fitView
           fitViewOptions={{ padding: 0.2 }}
         >
           <Background />
-          <MiniMap pannable zoomable />
+          <MiniMap
+            pannable
+            zoomable
+            style={{ background: '#f1f5f9', border: '1px solid #e5e7eb' }}
+            nodeColor={(n: { data?: { type?: string } }) => {
+              const t = (n?.data?.type as string) || ''
+              return (nodeColors as Record<string, string>)[t] || '#9ca3af'
+            }}
+            nodeStrokeColor="#111"
+            nodeBorderRadius={6}
+          />
           <Controls showFitView showInteractive />
         </ReactFlow>
       </div>

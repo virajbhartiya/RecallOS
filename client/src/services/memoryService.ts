@@ -122,9 +122,9 @@ export class MemoryService {
     return []
   }
 
-  static async getMemoryMesh(userAddress: string, limit: number = 50): Promise<MemoryMesh> {
+  static async getMemoryMesh(userAddress: string, limit: number = 50, threshold: number = 0.3): Promise<MemoryMesh> {
     const normalizedAddress = this.normalizeAddress(userAddress)
-    const response = await getRequest(`${this.baseUrl}/mesh/${normalizedAddress}?limit=${limit}`)
+    const response = await getRequest(`${this.baseUrl}/mesh/${normalizedAddress}?limit=${limit}&threshold=${threshold}`)
     return response.data?.data || { nodes: [], edges: [], clusters: {} }
   }
 
