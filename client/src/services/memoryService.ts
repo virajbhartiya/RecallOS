@@ -88,36 +88,7 @@ export class MemoryService {
       console.error('Error fetching memories from database:', error)
     }
     
-    // Fallback: Try to get recent memories from database first
-    try {
-      const response = await getRequest(`${this.baseUrl}/user/${normalizedAddress}/recent?count=${limit || 50}`)
-      const data = response.data?.data
-      console.log('Recent memories response:', response)
-      console.log('Recent memories data:', data)
-      
-      if (Array.isArray(data?.memories) && data.memories.length > 0) {
-        // The API now returns full memory details from database, so we can use them directly
-        return data.memories.map((mem: ApiMemoryResponse) => ({
-          id: mem.id || mem.hash,
-          hash: mem.hash,
-          timestamp: typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp,
-          created_at: mem.created_at || new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toISOString(),
-          title: mem.title || 'Memory',
-          summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
-          content: mem.content || '',
-          source: mem.source || 'on_chain',
-          user_id: userAddress,
-          url: mem.url,
-          tx_status: mem.tx_status || 'confirmed',
-          blockchain_network: mem.blockchain_network || 'sepolia',
-          page_metadata: mem.page_metadata,
-          access_count: mem.access_count || 0,
-          last_accessed: mem.last_accessed || new Date().toISOString()
-        } as Memory))
-      }
-    } catch (fallbackError) {
-      console.error('Fallback to recent memories also failed:', fallbackError)
-    }
+    // No fallback - return empty array if no transaction data found
     
     return []
   }
