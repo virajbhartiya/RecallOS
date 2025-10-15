@@ -237,25 +237,22 @@ const MemoryDetails: React.FC<{
 
 export const Memories: React.FC = () => {
   const { isConnected, address } = useWallet()
-  const { showTransactionNotification, showAllTransactions } = useBlockscout()
+  const { showTransactionNotification, showAllTransactions, prefetchTransaction } = useBlockscout()
   const [memories, setMemories] = useState<Memory[]>([])
   const [insights, setInsights] = useState<MemoryInsights | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [expandedContent, setExpandedContent] = useState(false)
-  const [similarityThreshold, setSimilarityThreshold] = useState(0.3)
+  const [similarityThreshold, ] = useState(0.3)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   
-  // Transaction details overlay state
   const [showTransactionDetails, setShowTransactionDetails] = useState(false)
   const [selectedTxHash, setSelectedTxHash] = useState<string | null>(null)
   const [selectedNetwork, setSelectedNetwork] = useState<string>('sepolia')
   
-  // Transaction history sidebar state
   const [showTransactionHistorySidebar, setShowTransactionHistorySidebar] = useState(false)
   
-  // Search state
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
@@ -276,13 +273,29 @@ export const Memories: React.FC = () => {
       
       setMemories(memoriesData)
       setInsights(insightsData)
+      
+      // Prefetch transaction data for memories with transaction hashes
+      const transactionsToPrefetch = memoriesData
+        .filter(memory => memory.tx_hash && memory.tx_hash.startsWith('0x'))
+        .map(memory => ({
+          txHash: memory.tx_hash!,
+          network: memory.blockchain_network || 'sepolia'
+        }))
+      
+      if (transactionsToPrefetch.length > 0) {
+        console.log(`Prefetching ${transactionsToPrefetch.length} transactions`)
+        // Trigger prefetch in background
+        transactionsToPrefetch.forEach(({ txHash, network }) => {
+          prefetchTransaction(txHash, network)
+        })
+      }
     } catch (err) {
       setError('Failed to fetch memories')
       console.error('Error fetching memories:', err)
     } finally {
       setIsLoading(false)
     }
-  }, [address])
+  }, [address, prefetchTransaction])
 
   const handleSelectMemory = (memory: Memory) => {
     setSelectedMemory(memory)
@@ -504,32 +517,12 @@ export const Memories: React.FC = () => {
         <div className={`${isSidebarCollapsed ? 'w-0' : 'w-[320px]'} border-l border-gray-200 bg-white flex flex-col transition-all duration-300 overflow-hidden`}>
           {/* Compact Controls */}
           <div className="border-b border-gray-200 bg-gray-50/50 flex-shrink-0 p-3">
-            {/* Similarity Threshold */}
-            <div className="mb-3">
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-mono text-gray-600 uppercase tracking-wide">
-                  [SIMILARITY]
-                </label>
-                <span className="text-xs font-mono text-gray-700">
-                  {(similarityThreshold * 100).toFixed(0)}%
-                </span>
-              </div>
-              <input
-                type="range"
-                min="0.1"
-                max="0.9"
-                step="0.1"
-                value={similarityThreshold}
-                onChange={(e) => setSimilarityThreshold(parseFloat(e.target.value))}
-                className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-            </div>
             
             {/* Auto-search Input */}
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Search memories... (auto-searches as you type)"
+                placeholder="Search memories..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-1 text-xs px-2 py-1.5 border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -694,7 +687,7 @@ export const Memories: React.FC = () => {
       </div>
 
       {/* Memory Stats Overlay */}
-      {insights && (
+      {insights && memories.length > 0 && (
         <div className="fixed bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-gray-200/60 shadow-lg rounded-xl p-4 z-40">
           <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
             [MEMORY STATS]
