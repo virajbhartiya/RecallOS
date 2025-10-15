@@ -1,0 +1,70 @@
+import { postRequest } from '../utility/generalServices'
+import type { Memory, MemorySearchResponse, SearchFilters, SearchResult } from '../types/memory'
+
+type ApiSearchResult = {
+  memory_id: string
+  summary: string | null
+  url: string | null
+  timestamp: number
+  avail_hash: string | null
+  related_memories: string[]
+}
+
+export class SearchService {
+  static async semanticSearch(
+    wallet: string,
+    query: string,
+    limit: number = 10
+  ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string }> {
+    const res = await postRequest('/search', { wallet, query, limit })
+    if (!res || res.status >= 400) throw new Error('Search request failed')
+    return res.data
+  }
+
+  static async semanticSearchMapped(
+    wallet: string,
+    query: string,
+    filters: SearchFilters = {},
+    page: number = 1,
+    limit: number = 10
+  ): Promise<MemorySearchResponse> {
+    const data = await this.semanticSearch(wallet, query, limit)
+    const results: SearchResult[] = (data.results || []).map((r) => {
+      const createdAtIso = new Date(r.timestamp * 1000).toISOString()
+      const memory: Memory = {
+        id: r.memory_id,
+        user_id: wallet,
+        source: 'browser',
+        url: r.url || undefined,
+        title: 'Memory',
+        content: '',
+        summary: r.summary || undefined,
+        hash: r.avail_hash || undefined,
+        timestamp: r.timestamp,
+        created_at: createdAtIso,
+        page_metadata: undefined,
+        importance_score: undefined,
+        access_count: 0,
+        last_accessed: createdAtIso,
+        tx_status: undefined,
+        blockchain_network: undefined,
+      }
+      return {
+        memory,
+        semantic_score: undefined,
+        blended_score: undefined,
+        search_type: 'semantic'
+      }
+    })
+
+    return {
+      results,
+      total: results.length,
+      page,
+      limit,
+      filters
+    }
+  }
+}
+
+
