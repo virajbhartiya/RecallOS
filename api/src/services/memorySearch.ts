@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { geminiService } from './gemini';
+import { setSearchJobResult } from './searchJob';
 
 type SearchResult = {
   memory_id: string;
@@ -26,13 +27,20 @@ function vectorToSqlArray(values: number[]): string {
   return `ARRAY[${clamped.join(',')}]::vector`;
 }
 
+async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('timeout')), ms);
+    p.then(v => { clearTimeout(t); resolve(v); }).catch(e => { clearTimeout(t); reject(e); });
+  });
+}
+
 export async function searchMemories(params: {
   wallet: string;
   query: string;
   limit?: number;
   enableReasoning?: boolean;
   enableAnchoring?: boolean;
-}): Promise<{ query: string; results: SearchResult[]; meta_summary?: string }>{
+}): Promise<{ query: string; results: SearchResult[]; meta_summary?: string; answer?: string }>{
   const { wallet, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING === 'true', enableAnchoring = process.env.SEARCH_ANCHOR_META === 'true' } = params;
 
   if (!geminiService.isInitialized) {
@@ -41,20 +49,23 @@ export async function searchMemories(params: {
 
   const normalized = normalizeText(query);
 
-  // Scope to user's memories using wallet -> user_id mapping
   const walletNorm = (wallet || '').toLowerCase();
   const user = await prisma.user.findFirst({ where: { wallet_address: walletNorm } });
   if (!user) {
     return { query: normalized, results: [], meta_summary: undefined };
   }
-  const embedding = await geminiService.generateEmbedding(normalized);
+
+  let embedding: number[];
+  try {
+    embedding = await withTimeout(geminiService.generateEmbedding(normalized), 1200);
+  } catch {
+    return { query: normalized, results: [], meta_summary: undefined, answer: undefined };
+  }
   const queryVecSql = vectorToSqlArray(embedding);
 
   const salt = process.env.SEARCH_EMBED_SALT || 'recallos';
   const embeddingHash = sha256Hex(JSON.stringify({ model: 'text-embedding-004', values: embedding.slice(0, 64), salt }));
 
-  // Vector search using pgvector cosine distance operator <=>
-  // score = 1 - distance
   const rows = await prisma.$queryRawUnsafe<Array<{ id: string; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; score: number }>>(`
     SELECT m.id, m.summary, m.url, m.timestamp, m.hash,
            GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}))) AS score
@@ -66,6 +77,21 @@ export async function searchMemories(params: {
   `);
 
   const memoryIds = rows.map(r => r.id);
+
+  // Fast-path: if no matches, persist minimal query event and return immediately
+  if (rows.length === 0) {
+    try {
+      await prisma.queryEvent.create({
+        data: {
+          wallet,
+          query: normalized,
+          embedding_hash: embeddingHash,
+          meta_summary: null,
+        },
+      });
+    } catch {}
+    return { query: normalized, results: [], meta_summary: undefined, answer: undefined };
+  }
 
   // Fetch related edges for mesh context
   const relations = memoryIds.length
@@ -82,25 +108,35 @@ export async function searchMemories(params: {
     if (arr) arr.push(rel.related_memory_id);
   }
 
-  // Optional reasoning meta-summary
   let metaSummary: string | undefined;
   if (enableReasoning) {
     const bullets = rows.map((r, i) => `#${i + 1} ${r.summary || ''}`.trim()).join('\n');
     const prompt = `You are RecallOS. A user asked: "${normalized}"\nTheir memories matched include concise summaries below. Write one-sentence meta-summary that links them causally/temporally without markdown.\n${bullets}`;
     try {
-      metaSummary = await geminiService.generateContent(prompt);
+      metaSummary = await withTimeout(geminiService.generateContent(prompt), 1500);
     } catch (e) {
       metaSummary = undefined;
     }
   }
 
-  // Persist QueryEvent and links
+  let answer: string | undefined;
+  try {
+    const bullets = rows.map((r, i) => {
+      const date = r.timestamp ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10) : '';
+      return `- [${i + 1}] ${date} ${r.summary || ''}`.trim();
+    }).join('\n');
+    const ansPrompt = `User query: "${normalized}"\nEvidence notes (ordered by relevance):\n${bullets}\n\nCompose a concise, direct answer (2-4 sentences) summarizing what the user was exploring and key takeaways. No markdown or lists; return plain prose.`;
+    answer = await withTimeout(geminiService.generateContent(ansPrompt), 1800);
+  } catch {
+    answer = undefined;
+  }
+
   const created = await prisma.queryEvent.create({
     data: {
       wallet,
       query: normalized,
       embedding_hash: embeddingHash,
-      meta_summary: metaSummary || null,
+      meta_summary: (answer || metaSummary) || null,
     },
   });
 
@@ -111,15 +147,16 @@ export async function searchMemories(params: {
     });
   }
 
-  // Optional anchoring of meta-summary
-  if (enableAnchoring && metaSummary) {
-    try {
-      const { anchorMetaSummary } = await import('./blockchainAnchor');
-      const availHash = await anchorMetaSummary(metaSummary);
-      await prisma.queryEvent.update({ where: { id: created.id }, data: { avail_hash: availHash } });
-    } catch {
-      // ignore anchoring failures
-    }
+  if (enableAnchoring && (answer || metaSummary)) {
+    setImmediate(async () => {
+      try {
+        const { anchorMetaSummary } = await import('./blockchainAnchor');
+        const availHash = await anchorMetaSummary(String(answer || metaSummary));
+        await prisma.queryEvent.update({ where: { id: created.id }, data: { avail_hash: availHash } });
+      } catch {
+        // ignore anchoring failures
+      }
+    });
   }
 
   const results: SearchResult[] = rows.map(r => ({
@@ -127,12 +164,19 @@ export async function searchMemories(params: {
     summary: r.summary,
     url: r.url,
     timestamp: Number(r.timestamp),
-    avail_hash: r.hash, // using memory.hash as on-chain content hash if present
+    avail_hash: r.hash,
     related_memories: relatedById.get(r.id) || [],
     score: r.score,
   }));
 
-  return { query: normalized, results, meta_summary: metaSummary };
+  try {
+    const jobId = (global as any).__currentSearchJobId as string | undefined;
+    if (jobId) {
+      await setSearchJobResult(jobId, { answer, meta_summary: metaSummary, status: 'completed' });
+      (global as any).__currentSearchJobId = undefined;
+    }
+  } catch {}
+  return { query: normalized, results, meta_summary: metaSummary, answer };
 }
 
 
