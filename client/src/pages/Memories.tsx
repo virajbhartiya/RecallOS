@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useWallet } from '@/contexts/WalletContext'
 import { MemoryService } from '@/services/memoryService'
+import { SearchService } from '@/services/search'
 import { MemoryMesh } from '@/components/MemoryMesh'
 import { useBlockscout } from '@/hooks/useBlockscout'
 import { TransactionStatusIndicator } from '@/components/TransactionStatusIndicator'
@@ -332,8 +333,8 @@ export const Memories: React.FC = () => {
   }, [])
 
   const handleSearch = useCallback(async (
-    query: string, 
-    filters: SearchFilters, 
+    query: string,
+    filters: SearchFilters,
     useSemantic: boolean
   ) => {
     if (!address) return
@@ -343,27 +344,25 @@ export const Memories: React.FC = () => {
     setIsSearchMode(true)
 
     try {
-      let response: MemorySearchResponse
+      let response: MemorySearchResponse | null = null
 
+      // 1) If explicit semantic requested, use it
       if (useSemantic) {
-        response = await MemoryService.searchMemoriesWithEmbeddings(
-          address,
-          query,
-          filters,
-          1,
-          50
-        )
+        response = await SearchService.semanticSearchMapped(address, query, filters, 1, 50)
       } else {
-        response = await MemoryService.searchMemories(
-          address,
-          query,
-          filters,
-          1,
-          50
-        )
+        // 2) Keyword search first
+        const keyword = await MemoryService.searchMemories(address, query, filters, 1, 50)
+        // 3) Fallback to semantic when no keyword hits or query is long/natural language
+        const looksNatural = query.trim().split(/\s+/).length >= 3 || /\?$/.test(query.trim())
+        if ((keyword?.results?.length || 0) === 0 && looksNatural) {
+          const semantic = await SearchService.semanticSearchMapped(address, query, filters, 1, 50)
+          response = semantic
+        } else {
+          response = keyword
+        }
       }
 
-      setSearchResults(response)
+      setSearchResults(response!)
     } catch (err) {
       setSearchError('Failed to search memories')
       console.error('Error searching memories:', err)
@@ -419,7 +418,7 @@ export const Memories: React.FC = () => {
     // Set new timeout for debounced search
     debounceTimeoutRef.current = setTimeout(() => {
       handleSearch(searchQuery.trim(), {}, false)
-    }, 500) // 500ms debounce delay
+    }, 500)
 
     // Cleanup function
     return () => {
