@@ -108,7 +108,7 @@ export const useBlockscout = () => {
     }
   }, [openPopup])
 
-  // Monitor transaction status
+  // Monitor transaction status with prefetching
   const monitorTransaction = useCallback(async (
     txHash: string,
     network: string = 'sepolia'
@@ -119,47 +119,44 @@ export const useBlockscout = () => {
     }
 
     try {
-      // Fetch real transaction data from Blockscout API
+      // Temporarily use direct Blockscout API until prefetching is set up
       const response = await fetch(`https://eth-sepolia.blockscout.com/api/v2/transactions/${txHash}`)
       
-      if (!response.ok) {
-        // If transaction not found, it might still be pending
+      if (response.ok) {
+        const txData = await response.json()
+        console.log('Transaction data from Blockscout:', txData)
+        
+        // Determine status based on transaction data
+        let status: TransactionStatus = 'pending'
+        if (txData.status === 'ok') {
+          status = 'confirmed'
+        } else if (txData.status === 'error') {
+          status = 'failed'
+        }
+        
         const txInfo: TransactionInfo = {
           hash: txHash,
-          status: 'pending',
+          status,
           network,
-          timestamp: Date.now()
+          blockNumber: txData.block ? parseInt(txData.block) : undefined,
+          gasUsed: txData.gas_used,
+          gasPrice: txData.gas_price,
+          timestamp: txData.timestamp ? new Date(txData.timestamp).getTime() : Date.now(),
+          from: txData.from?.hash,
+          to: txData.to?.hash,
+          value: txData.value
         }
+
         setTransactionStatuses(prev => new Map(prev.set(txHash, txInfo)))
         return txInfo
       }
 
-      const txData = await response.json()
-      
-      // Debug logging
-      console.log('Transaction data from Blockscout:', txData)
-      
-      // Determine status based on transaction data
-      let status: TransactionStatus = 'pending'
-      if (txData.status === 'ok') {
-        status = 'confirmed'
-      } else if (txData.status === 'error') {
-        status = 'failed'
-      }
-      
-      console.log('Determined transaction status:', status)
-
+      // If transaction not found, it might still be pending
       const txInfo: TransactionInfo = {
         hash: txHash,
-        status,
+        status: 'pending',
         network,
-        blockNumber: txData.block ? parseInt(txData.block) : undefined,
-        gasUsed: txData.gas_used,
-        gasPrice: txData.gas_price,
-        timestamp: txData.timestamp ? new Date(txData.timestamp).getTime() : Date.now(),
-        from: txData.from?.hash,
-        to: txData.to?.hash,
-        value: txData.value
+        timestamp: Date.now()
       }
 
       setTransactionStatuses(prev => new Map(prev.set(txHash, txInfo)))
@@ -213,6 +210,51 @@ export const useBlockscout = () => {
     return networkHealth.get(network) ?? true
   }, [networkHealth])
 
+  // Prefetch transaction data
+  const prefetchTransaction = useCallback(async (
+    txHash: string,
+    network: string = 'sepolia'
+  ): Promise<void> => {
+    if (!isValidTxHash(txHash)) {
+      console.error('Invalid transaction hash format:', txHash)
+      return
+    }
+
+    try {
+      const apiUrl = process.env.VITE_SERVER_URL || 'http://localhost:3000'
+      await fetch(`${apiUrl}/api/blockscout/prefetch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ txHash, network })
+      })
+      console.log(`Prefetch triggered for transaction: ${txHash}`)
+    } catch (error) {
+      console.error('Failed to trigger prefetch:', error)
+    }
+  }, [])
+
+  // Batch prefetch multiple transactions
+  const batchPrefetchTransactions = useCallback(async (
+    transactions: Array<{ txHash: string; network?: string }>
+  ): Promise<void> => {
+    try {
+      const apiUrl = process.env.VITE_SERVER_URL || 'http://localhost:3000'
+      await fetch(`${apiUrl}/api/blockscout/batch-prefetch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          transactions: transactions.map(tx => ({
+            txHash: tx.txHash,
+            network: tx.network || 'sepolia'
+          }))
+        })
+      })
+      console.log(`Batch prefetch triggered for ${transactions.length} transactions`)
+    } catch (error) {
+      console.error('Failed to trigger batch prefetch:', error)
+    }
+  }, [])
+
   return {
     showTransactionNotification,
     showTransactionHistory,
@@ -223,6 +265,8 @@ export const useBlockscout = () => {
     getNetworkName,
     getChainId,
     isNetworkHealthy,
+    prefetchTransaction,
+    batchPrefetchTransactions,
     CHAIN_IDS,
     NETWORK_NAMES
   }

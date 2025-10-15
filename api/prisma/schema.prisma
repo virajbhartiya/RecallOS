@@ -73,3 +73,25 @@ model MemorySnapshot {
   user                  User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
   @@map("memory_snapshots")
 }
+
+model BlockscoutTransaction {
+  id                    String   @id @default(uuid()) @db.Uuid
+  tx_hash               String   @unique
+  network               String
+  status                String   @default("pending")
+  block_number          BigInt?
+  gas_used              String?
+  gas_price             String?
+  from_address          String?
+  to_address            String?
+  value                 String?
+  timestamp             BigInt?
+  finality_reached      Boolean  @default(false)
+  finality_confirmed_at DateTime?
+  raw_data              Json?
+  created_at            DateTime @default(now())
+  updated_at            DateTime @updatedAt
+  last_checked_at       DateTime @default(now())
+  check_count           Int      @default(0)
+  @@map("blockscout_transactions")
+}

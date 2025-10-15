@@ -535,8 +535,8 @@ export class MemoryController {
         });
       }
 
-      // Fallback to blockchain data if user not found in database
-      const memories = await getRecentMemories(userAddress, limit);
+      // No fallback to blockchain data - return empty array if no database records
+      const memories: any[] = [];
 
       res.status(200).json({
         success: true,
