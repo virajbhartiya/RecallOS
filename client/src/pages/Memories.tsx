@@ -7,7 +7,8 @@ import { TransactionStatusIndicator } from '@/components/TransactionStatusIndica
 import { NetworkHealthIndicator } from '@/components/NetworkHealthIndicator'
 import { TransactionDetailsOverlay } from '@/components/TransactionDetailsOverlay'
 import { TransactionHistorySidebar } from '@/components/TransactionHistorySidebar'
-import type { Memory, MemoryInsights, SearchFilters, MemorySearchResponse } from '@/types/memory'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import type { Memory, MemoryInsights, SearchFilters, MemorySearchResponse, MemoryMesh as MemoryMeshType } from '@/types/memory'
 
 // Memory Card Component
 const MemoryCard: React.FC<{
@@ -20,6 +21,14 @@ const MemoryCard: React.FC<{
     blended_score?: number
   }
 }> = ({ memory, isSelected, onSelect, onViewTransaction, searchResult }) => {
+  const getSourceColorLocal = (source?: string) => {
+    const s = (source || '').toLowerCase()
+    if (s.includes('extension') || s.includes('browser')) return '#0ea5e9'
+    if (s.includes('on_chain') || s.includes('on-chain') || s.includes('onchain')) return '#22c55e'
+    if (s.includes('manual')) return '#8b5cf6'
+    if (s.includes('reason') || s.includes('ai')) return '#f59e0b'
+    return '#94a3b8'
+  }
   return (
     <button
       onClick={() => onSelect(memory)}
@@ -31,8 +40,9 @@ const MemoryCard: React.FC<{
     >
       {/* Compact header */}
       <div className="flex items-center justify-between mb-1">
-        <h3 className="text-xs font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-          {memory.title || 'Untitled Memory'}
+        <h3 className="text-xs font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors flex items-center gap-2">
+          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getSourceColorLocal(memory.source) }} />
+          <span className="truncate">{memory.title || 'Untitled Memory'}</span>
         </h3>
         <div className="flex items-center gap-1 ml-2 flex-shrink-0">
           {memory.tx_status && (
@@ -247,6 +257,9 @@ export const Memories: React.FC = () => {
   const [similarityThreshold, ] = useState(0.3)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   
+  const [isNodeModalOpen, setIsNodeModalOpen] = useState(false)
+  const [meshStats, setMeshStats] = useState<{ nodes: number; edges: number }>({ nodes: 0, edges: 0 })
+  
   const [showTransactionDetails, setShowTransactionDetails] = useState(false)
   const [selectedTxHash, setSelectedTxHash] = useState<string | null>(null)
   const [selectedNetwork, setSelectedNetwork] = useState<string>('sepolia')
@@ -308,8 +321,15 @@ export const Memories: React.FC = () => {
     if (memory) {
       setSelectedMemory(memory)
       setExpandedContent(false)
+      setIsNodeModalOpen(true)
     }
   }
+
+  const handleMeshLoad = useCallback((mesh: MemoryMeshType) => {
+    const nodeCount = Array.isArray(mesh.nodes) ? mesh.nodes.length : 0
+    const edgeCount = Array.isArray(mesh.edges) ? mesh.edges.length : 0
+    setMeshStats({ nodes: nodeCount, edges: edgeCount })
+  }, [])
 
   const handleSearch = useCallback(async (
     query: string, 
@@ -437,11 +457,12 @@ export const Memories: React.FC = () => {
     )
   }
 
-  const currentMemories = isSearchMode && searchResults ? searchResults.results.map(r => r.memory) : memories
+  let currentMemories = isSearchMode && searchResults ? searchResults.results.map(r => r.memory) : memories
   const currentResults = isSearchMode && searchResults ? searchResults.results : null
+  currentMemories = [...currentMemories].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-sky-50/30">
       {/* Header */}
       <header className="border-b border-gray-200 bg-white">
         <div className="max-w-7xl mx-auto px-8 py-4">
@@ -485,7 +506,7 @@ export const Memories: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <div className="flex h-[calc(100vh-73px)]">
+      <div className="flex h-[calc(100vh-73px-48px)]">
         {/* Left Panel - Memory Mesh */}
         <div className="flex-1 relative">
         <MemoryMesh 
@@ -495,6 +516,15 @@ export const Memories: React.FC = () => {
           similarityThreshold={similarityThreshold}
           selectedMemoryId={selectedMemory?.id}
           highlightedMemoryIds={isSearchMode && searchResults ? searchResults.results.map(r => r.memory.id) : []}
+          onMeshLoad={handleMeshLoad}
+          memorySources={{
+            ...Object.fromEntries(memories.map(m => [m.id, m.source || ''])),
+            ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.source || '']))
+          }}
+          memoryUrls={{
+            ...Object.fromEntries(memories.map(m => [m.id, m.url || ''])),
+            ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.url || '']))
+          }}
         />
       </div>
 
@@ -688,7 +718,7 @@ export const Memories: React.FC = () => {
 
       {/* Memory Stats Overlay */}
       {insights && memories.length > 0 && (
-        <div className="fixed bottom-4 left-4 bg-white/95 backdrop-blur-sm border border-gray-200/60 shadow-lg rounded-xl p-4 z-40">
+        <div className="fixed bottom-16 left-4 bg-white/95 backdrop-blur-sm border border-gray-200/60 shadow-lg rounded-xl p-4 z-40">
           <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
             [MEMORY STATS]
           </div>
@@ -713,6 +743,18 @@ export const Memories: React.FC = () => {
         </div>
       )}
 
+      {/* Bottom System Bar */}
+      {insights && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-gray-200 z-40">
+          <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-center gap-6 text-xs font-mono">
+            <span className="text-gray-700">[ Total Memories: <span className="text-sky-600">{insights.total_memories}</span> ]</span>
+            <span className="text-gray-700">[ Verified: <span className="text-emerald-600">{insights.confirmed_transactions}</span> ]</span>
+            <span className="text-gray-700">[ Relationships: <span className="text-violet-600">{meshStats.edges}</span> ]</span>
+            <span className="text-green-600">[ Embeddings Synced ]</span>
+          </div>
+        </div>
+      )}
+
       {/* Transaction Details Overlay */}
       {showTransactionDetails && selectedTxHash && (
         <TransactionDetailsOverlay
@@ -732,6 +774,23 @@ export const Memories: React.FC = () => {
           onClose={handleCloseTransactionHistory}
         />
       )}
+
+      {/* Node Detail Overlay */}
+      <Dialog open={isNodeModalOpen} onOpenChange={setIsNodeModalOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-sm tracking-wide">[MEMORY DETAILS]</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[70vh] overflow-y-auto">
+            <MemoryDetails
+              memory={selectedMemory}
+              expandedContent={expandedContent}
+              setExpandedContent={setExpandedContent}
+              onViewTransaction={handleViewTransaction}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
