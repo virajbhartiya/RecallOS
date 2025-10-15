@@ -1,4 +1,5 @@
 import { postRequest } from '../utility/generalServices'
+import axiosInstance from '../utility/axiosInterceptor'
 import type { Memory, MemorySearchResponse, SearchFilters, SearchResult } from '../types/memory'
 
 type ApiSearchResult = {
@@ -15,9 +16,14 @@ export class SearchService {
     wallet: string,
     query: string,
     limit: number = 10
-  ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string }> {
+  ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string; answer?: string; job_id?: string }> {
     const res = await postRequest('/search', { wallet, query, limit })
     if (!res || res.status >= 400) throw new Error('Search request failed')
+    return res.data
+  }
+
+  static async getJob(jobId: string): Promise<{ id: string; status: 'pending' | 'completed' | 'failed'; answer?: string; meta_summary?: string }> {
+    const res = await axiosInstance.get(`/search/job/${jobId}`)
     return res.data
   }
 
@@ -59,6 +65,8 @@ export class SearchService {
 
     return {
       results,
+      // include answer for UI display
+      // Note: MemorySearchResponse doesn't model 'answer', so we forward it separately by augmenting
       total: results.length,
       page,
       limit,

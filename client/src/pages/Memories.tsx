@@ -268,6 +268,8 @@ export const Memories: React.FC = () => {
   const [showTransactionHistorySidebar, setShowTransactionHistorySidebar] = useState(false)
   
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
+  const [searchAnswer, setSearchAnswer] = useState<string | null>(null)
+  const [searchJobId, setSearchJobId] = useState<string | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState<string>('')
@@ -342,21 +344,28 @@ export const Memories: React.FC = () => {
     setSearchError(null)
     setSearchResults(null)
     setIsSearchMode(true)
+    setSearchAnswer(null)
 
     try {
       let response: MemorySearchResponse | null = null
 
       // 1) If explicit semantic requested, use it
       if (useSemantic) {
+        const data = await SearchService.semanticSearch(address, query, 50)
         response = await SearchService.semanticSearchMapped(address, query, filters, 1, 50)
+        setSearchAnswer(data.answer || null)
+        if (data.job_id) setSearchJobId(data.job_id)
       } else {
         // 2) Keyword search first
         const keyword = await MemoryService.searchMemories(address, query, filters, 1, 50)
         // 3) Fallback to semantic when no keyword hits or query is long/natural language
         const looksNatural = query.trim().split(/\s+/).length >= 3 || /\?$/.test(query.trim())
         if ((keyword?.results?.length || 0) === 0 && looksNatural) {
+          const data = await SearchService.semanticSearch(address, query, 50)
           const semantic = await SearchService.semanticSearchMapped(address, query, filters, 1, 50)
           response = semantic
+          setSearchAnswer(data.answer || null)
+          if (data.job_id) setSearchJobId(data.job_id)
         } else {
           response = keyword
         }
@@ -371,10 +380,32 @@ export const Memories: React.FC = () => {
 
   const handleClearSearch = useCallback(() => {
     setSearchResults(null)
+    setSearchAnswer(null)
+    setSearchJobId(null)
     setSearchError(null)
     setIsSearchMode(false)
     setSearchQuery('')
   }, [])
+
+  // Poll for async LLM answer if job id present
+  useEffect(() => {
+    if (!searchJobId) return
+    let cancelled = false
+    const interval = setInterval(async () => {
+      try {
+        const status = await SearchService.getJob(searchJobId)
+        if (cancelled) return
+        if (status.status === 'completed') {
+          if (status.answer) setSearchAnswer(status.answer)
+          clearInterval(interval)
+          setSearchJobId(null)
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 1500)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [searchJobId])
 
   const handleViewTransaction = useCallback((txHash: string, network: string) => {
     setSelectedTxHash(txHash)
@@ -578,10 +609,11 @@ export const Memories: React.FC = () => {
                   {isSearchMode ? 'Search Results' : 'Memories'}
                 </h3>
                 <p className="text-xs text-gray-500">
-                  {isSearchMode ? 
-                    (searchResults ? `${searchResults.total} results for "${searchQuery}"` : 'No search') :
+                  {isSearchMode ? (
+                    searchJobId ? 'Generating answer…' : (searchResults ? `${searchResults.total} results for "${searchQuery}"` : 'No search')
+                  ) : (
                     `${memories.length} total`
-                  }
+                  )}
                 </p>
               </div>
               {selectedMemory && (
@@ -593,6 +625,11 @@ export const Memories: React.FC = () => {
                 </button>
               )}
             </div>
+            {isSearchMode && (searchJobId || searchAnswer) && (
+              <div className="mt-2 text-[11px] font-mono text-gray-800 bg-yellow-50 border border-yellow-200 p-2 rounded">
+                {searchAnswer || 'Generating answer…'}
+              </div>
+            )}
           </div>
 
           {/* Memory List */}
@@ -635,14 +672,25 @@ export const Memories: React.FC = () => {
               </div>
             ) : currentMemories.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.009-5.824-2.709M15 6.291A7.962 7.962 0 0012 5c-2.34 0-4.29 1.009-5.824 2.709" />
-                  </svg>
-                </div>
-                <p className="text-sm text-gray-500">
-                  {isSearchMode ? 'No memories found matching your search' : 'No memories found'}
-                </p>
+                {searchJobId ? (
+                  <>
+                    <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-6 h-6 text-yellow-600 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v4m0 8v4m8-8h-4M8 12H4m12.364-6.364l-2.828 2.828M8.464 15.536l-2.828 2.828m12.728 0l-2.828-2.828M8.464 8.464L5.636 5.636" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-gray-600">Generating answer…</p>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.009-5.824-2.709M15 6.291A7.962 7.962 0 0012 5c-2.34 0-4.29-1.009-5.824-2.709" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-gray-500">{isSearchMode ? 'No memories found matching your search' : 'No memories found'}</p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="space-y-1">
