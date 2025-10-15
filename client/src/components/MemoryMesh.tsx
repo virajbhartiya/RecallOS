@@ -10,7 +10,9 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   addEdge,
-  Position
+  Handle,
+  Position,
+  
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
@@ -44,6 +46,7 @@ type RFNode = {
   style?: React.CSSProperties
   sourcePosition?: unknown
   targetPosition?: unknown
+  type?: string
 }
 
 type RFEdge = {
@@ -70,6 +73,51 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
   const [meshData, setMeshData] = useState<MemoryMesh | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // custom minimalist glyph node (diamond/chevron-like)
+  interface GlyphNodeProps {
+    data: {
+      label: string
+      memory_id?: string
+      type: string
+      color: string
+      isSelected: boolean
+      isHighlighted: boolean
+    }
+  }
+  const GlyphNode: React.FC<GlyphNodeProps> = ({ data }) => {
+    const isSelected = Boolean(data?.isSelected)
+    const isHighlighted = Boolean(data?.isHighlighted)
+    const baseSize = 6
+    const size = isSelected ? 10 : isHighlighted ? 8 : baseSize
+    const fill = String(data?.color || '#9ca3af')
+    return (
+      <div style={{ position: 'relative', width: size, height: size }}>
+        <div style={{
+          width: size,
+          height: size,
+          background: fill,
+          borderRadius: 9999,
+          transition: 'all 120ms ease',
+          boxShadow: isSelected
+            ? '0 0 0 3px rgba(59,130,246,0.20), 0 1px 3px rgba(0,0,0,0.10)'
+            : isHighlighted
+            ? '0 0 0 2px rgba(245,158,11,0.20), 0 1px 2px rgba(0,0,0,0.08)'
+            : '0 1px 2px rgba(0,0,0,0.08)'
+        }} />
+        <Handle
+          type="target"
+          position={Position.Top}
+          style={{ opacity: 0, width: 0, height: 0, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
+        />
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          style={{ opacity: 0, width: 0, height: 0, left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
+        />
+      </div>
+    )
+  }
 
   useEffect(() => {
     const fetchMeshData = async () => {
@@ -111,80 +159,20 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
       const isSelected = selectedMemoryId === n.memory_id
       const isHighlighted = highlightedMemoryIds.includes(n.memory_id || '')
       
-      // Create more useful labels based on available data
-      let label = ''
-      if (n.title && n.title.length > 0) {
-        // Use first 2-3 words of title, truncated
-        const words = n.title.split(' ').slice(0, 2)
-        label = words.join(' ').substring(0, 8)
-      } else if (n.summary && n.summary.length > 0) {
-        // Use first 2-3 words of summary, truncated
-        const words = n.summary.split(' ').slice(0, 2)
-        label = words.join(' ').substring(0, 8)
-      } else if (n.type) {
-        // Use type abbreviation
-        const typeMap: Record<string, string> = {
-          'manual': 'M',
-          'on_chain': 'C',
-          'browser': 'B',
-          'reasoning': 'R'
-        }
-        label = typeMap[n.type] || n.type.charAt(0).toUpperCase()
-      } else {
-        label = 'M'
-      }
+      // Render as dots (no text label)
+      const label = ''
       
       const hasValidPos = Number.isFinite(n.x) && Number.isFinite(n.y) && !(n.x === 0 && n.y === 0)
       const position = hasValidPos ? { x: n.x as number, y: n.y as number } : computePosition(i, meshData.nodes.length)
       
-      // Determine styling based on selection/highlight state
-      let nodeStyle: React.CSSProperties = {
-        background: '#fff',
-        color: '#111',
-        border: `2px solid ${color}`,
-        width: Math.max(28, label.length * 6 + 8),
-        height: 28,
-        fontSize: 9,
-        lineHeight: '24px',
-        padding: '0 4px',
-        borderRadius: 9999,
-        textAlign: 'center',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        transition: 'all 0.2s ease-in-out'
-      }
-      
-      // Apply highlighting styles
-      if (isSelected) {
-        nodeStyle = {
-          ...nodeStyle,
-          background: '#3B82F6',
-          color: '#fff',
-          border: '3px solid #1D4ED8',
-          boxShadow: '0 0 0 4px rgba(59, 130, 246, 0.3), 0 4px 8px rgba(0,0,0,0.15)',
-          zIndex: 10
-        }
-      } else if (isHighlighted) {
-        nodeStyle = {
-          ...nodeStyle,
-          background: '#FEF3C7',
-          color: '#92400E',
-          border: '2px solid #F59E0B',
-          boxShadow: '0 0 0 2px rgba(245, 158, 11, 0.3), 0 2px 4px rgba(0,0,0,0.1)',
-          zIndex: 5
-        }
-      }
+      // Minimal wrapper box; visual is inside custom node component
+      const nodeStyle: React.CSSProperties = { background: 'transparent', width: 10, height: 10 }
       
       return {
         id: n.id,
         position,
-        data: { label, memory_id: n.memory_id, type: n.type },
-        sourcePosition: Position.Bottom,
-        targetPosition: Position.Top,
+        data: { label, memory_id: n.memory_id, type: n.type, color, isSelected, isHighlighted },
+        type: 'glyph',
         style: nodeStyle
       }
     })
@@ -223,9 +211,7 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
         id: `e-${key}`,
         source: best.source,
         target: best.target,
-        // Use curved bezier edges for rounded connections
-        // local minimal typing
-        type: 'default',
+        type: 'straight',
         animated: false,
         style
       })
@@ -299,9 +285,11 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClickRF}
-          // Use bezier edges (rounded)
-          defaultEdgeOptions={{ type: 'default' }}
-          connectionLineType="bezier"
+          defaultEdgeOptions={{ type: 'straight' }}
+          connectionLineType="straight"
+          nodesConnectable={false}
+          elementsSelectable={false}
+          nodeTypes={{ glyph: GlyphNode }}
           fitView
           fitViewOptions={{ padding: 0.2 }}
         >
@@ -324,7 +312,7 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
               return (nodeColors as Record<string, string>)[t] || '#9ca3af'
             }}
             nodeStrokeColor="#111"
-            nodeBorderRadius={6}
+            nodeBorderRadius={9999}
           />
           <Controls showFitView showInteractive />
         </ReactFlow>
