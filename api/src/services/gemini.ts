@@ -69,6 +69,14 @@ function runWithRateLimit<T>(task: QueueTask<T>): Promise<T> {
 
 export class GeminiService {
   private ai: GoogleGenAI;
+  private availableModels: string[] = [
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
+    'gemini-2.5-flash-lite'
+  ];
+  private currentModelIndex: number = 0;
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -89,39 +97,114 @@ export class GeminiService {
     return !!this.ai;
   }
 
+  private getCurrentModel(): string {
+    return this.availableModels[this.currentModelIndex];
+  }
+
+  private switchToNextModel(): boolean {
+    if (this.currentModelIndex < this.availableModels.length - 1) {
+      this.currentModelIndex++;
+      console.log(`Switching to model: ${this.getCurrentModel()}`);
+      return true;
+    }
+    return false;
+  }
+
+  private resetToFirstModel(): void {
+    this.currentModelIndex = 0;
+    console.log(`Reset to primary model: ${this.getCurrentModel()}`);
+  }
+
+  private isRateLimitError(err: any): boolean {
+    return err?.status === 429 || 
+           err?.message?.toLowerCase().includes('quota') ||
+           err?.message?.toLowerCase().includes('rate limit') ||
+           err?.message?.toLowerCase().includes('too many requests');
+  }
+
   async generateContent(prompt: string): Promise<string> {
     this.ensureInit();
-    try {
-      const response = await runWithRateLimit(() =>
-        this.ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-        })
-      );
-      if (!response.text) throw new Error('No content generated from Gemini API');
-      return response.text;
-    } catch (err) {
-      console.error('Content generation error:', err);
-      throw err;
+    
+    const enhancedPrompt = `${prompt}
+
+IMPORTANT: Return ONLY plain text. No markdown formatting, no bold text, no asterisks, no underscores, no code blocks, no special formatting. Just clean, readable plain text.`;
+
+    let lastError: any;
+    const originalModelIndex = this.currentModelIndex;
+
+    while (this.currentModelIndex < this.availableModels.length) {
+      try {
+        const response = await runWithRateLimit(() =>
+          this.ai.models.generateContent({
+            model: this.getCurrentModel(),
+            contents: enhancedPrompt,
+          })
+        );
+        if (!response.text) throw new Error('No content generated from Gemini API');
+        
+        // Reset to first model on success
+        this.resetToFirstModel();
+        return response.text;
+      } catch (err) {
+        lastError = err;
+        console.error(`Content generation error with ${this.getCurrentModel()}:`, err);
+        
+        if (this.isRateLimitError(err)) {
+          if (!this.switchToNextModel()) {
+            // No more models to try
+            break;
+          }
+        } else {
+          // Non-rate-limit error, don't try other models
+          break;
+        }
+      }
     }
+
+    // Reset to original model if all models failed
+    this.currentModelIndex = originalModelIndex;
+    throw lastError;
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
     this.ensureInit();
-    try {
-      const response = await runWithRateLimit(() =>
-        this.ai.models.embedContent({
-          model: 'text-embedding-004',
-          contents: text,
-        })
-      );
-      const values = response.embeddings?.[0]?.values;
-      if (!values) throw new Error('No embedding generated from Gemini API');
-      return values;
-    } catch (err) {
-      console.error('Embedding error:', err);
-      throw err;
+    
+    let lastError: any;
+    const originalModelIndex = this.currentModelIndex;
+
+    while (this.currentModelIndex < this.availableModels.length) {
+      try {
+        const response = await runWithRateLimit(() =>
+          this.ai.models.embedContent({
+            model: 'text-embedding-004',
+            contents: text,
+          })
+        );
+        const values = response.embeddings?.[0]?.values;
+        if (!values) throw new Error('No embedding generated from Gemini API');
+        
+        // Reset to first model on success
+        this.resetToFirstModel();
+        return values;
+      } catch (err) {
+        lastError = err;
+        console.error(`Embedding error with ${this.getCurrentModel()}:`, err);
+        
+        if (this.isRateLimitError(err)) {
+          if (!this.switchToNextModel()) {
+            // No more models to try
+            break;
+          }
+        } else {
+          // Non-rate-limit error, don't try other models
+          break;
+        }
+      }
     }
+
+    // Reset to original model if all models failed
+    this.currentModelIndex = originalModelIndex;
+    throw lastError;
   }
 
   async summarizeContent(rawText: string, metadata?: any): Promise<string> {
@@ -161,22 +244,47 @@ Existing Summary: ${contextSummary}
 Topics: ${keyTopics.join(', ')}
 
 ${prompts[contentType] || prompts.default}
+
+IMPORTANT: Return ONLY plain text. No markdown formatting, no bold text, no asterisks, no underscores, no code blocks, no special formatting. Just clean, readable plain text.
+
 Raw Content: ${rawText}
 `;
 
-    try {
-      const res = await runWithRateLimit(() =>
-        this.ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-        })
-      );
-      if (!res.text) throw new Error('No summary generated from Gemini API');
-      return res.text.trim();
-    } catch (err) {
-      console.error('Summarization error:', err);
-      throw err;
+    let lastError: any;
+    const originalModelIndex = this.currentModelIndex;
+
+    while (this.currentModelIndex < this.availableModels.length) {
+      try {
+        const res = await runWithRateLimit(() =>
+          this.ai.models.generateContent({
+            model: this.getCurrentModel(),
+            contents: prompt,
+          })
+        );
+        if (!res.text) throw new Error('No summary generated from Gemini API');
+        
+        // Reset to first model on success
+        this.resetToFirstModel();
+        return res.text.trim();
+      } catch (err) {
+        lastError = err;
+        console.error(`Summarization error with ${this.getCurrentModel()}:`, err);
+        
+        if (this.isRateLimitError(err)) {
+          if (!this.switchToNextModel()) {
+            // No more models to try
+            break;
+          }
+        } else {
+          // Non-rate-limit error, don't try other models
+          break;
+        }
+      }
     }
+
+    // Reset to original model if all models failed
+    this.currentModelIndex = originalModelIndex;
+    throw lastError;
   }
 
   async extractContentMetadata(
@@ -231,101 +339,123 @@ Text: ${rawText.substring(0, 4000)}
 
 Return ONLY the JSON object:`;
 
-    try {
-      const res = await runWithRateLimit(() =>
-        this.ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-        })
-      );
-      if (!res.text) throw new Error('No metadata response from Gemini API');
+    let lastError: any;
+    const originalModelIndex = this.currentModelIndex;
 
-      // Try multiple patterns to extract JSON
-      let jsonMatch = res.text.match(/\{[\s\S]*\}/);
-      
-      // If no match, try to find JSON between code blocks
-      if (!jsonMatch) {
-        jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-        if (jsonMatch) {
-          jsonMatch[0] = jsonMatch[1]; // Use the captured group
-        }
-      }
-      
-      // If still no match, try to find any JSON-like structure
-      if (!jsonMatch) {
-        jsonMatch = res.text.match(/\{[\s\S]*?\}/);
-      }
-      
-      if (!jsonMatch) {
-        console.error('No JSON found in response:', res.text);
-        throw new Error('Invalid JSON in Gemini response');
-      }
-      
-      let data;
+    while (this.currentModelIndex < this.availableModels.length) {
       try {
-        data = JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
-        console.error('JSON parse error:', parseError);
-        console.error('Raw response text:', res.text);
-        console.error('Extracted JSON:', jsonMatch[0]);
+        const res = await runWithRateLimit(() =>
+          this.ai.models.generateContent({
+            model: this.getCurrentModel(),
+            contents: prompt,
+          })
+        );
+        if (!res.text) throw new Error('No metadata response from Gemini API');
+
+        // Try multiple patterns to extract JSON
+        let jsonMatch = res.text.match(/\{[\s\S]*\}/);
         
-        // Try to fix common JSON issues
-        let fixedJson = jsonMatch[0];
+        // If no match, try to find JSON between code blocks
+        if (!jsonMatch) {
+          jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+          if (jsonMatch) {
+            jsonMatch[0] = jsonMatch[1]; // Use the captured group
+          }
+        }
         
-        // Fix trailing commas
-        fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
+        // If still no match, try to find any JSON-like structure
+        if (!jsonMatch) {
+          jsonMatch = res.text.match(/\{[\s\S]*?\}/);
+        }
         
-        // Fix missing quotes around keys
-        fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+        if (!jsonMatch) {
+          console.error('No JSON found in response:', res.text);
+          throw new Error('Invalid JSON in Gemini response');
+        }
         
-        // Try parsing again
+        let data;
         try {
-          data = JSON.parse(fixedJson);
-        } catch (secondError) {
-          console.error('Second JSON parse error:', secondError);
-          console.error('Fixed JSON:', fixedJson);
+          data = JSON.parse(jsonMatch[0]);
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError);
+          console.error('Raw response text:', res.text);
+          console.error('Extracted JSON:', jsonMatch[0]);
           
-          // Return default metadata if all parsing fails
-          return {
-            topics: [],
-            categories: ['web_page'],
-            keyPoints: [],
-            sentiment: 'neutral',
-            importance: 5,
-            usefulness: 5,
-            searchableTerms: [],
-            contextRelevance: []
-          };
+          // Try to fix common JSON issues
+          let fixedJson = jsonMatch[0];
+          
+          // Fix trailing commas
+          fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
+          
+          // Fix missing quotes around keys
+          fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+          
+          // Try parsing again
+          try {
+            data = JSON.parse(fixedJson);
+          } catch (secondError) {
+            console.error('Second JSON parse error:', secondError);
+            console.error('Fixed JSON:', fixedJson);
+            
+            // Return default metadata if all parsing fails
+            this.resetToFirstModel();
+            return {
+              topics: [],
+              categories: ['web_page'],
+              keyPoints: [],
+              sentiment: 'neutral',
+              importance: 5,
+              usefulness: 5,
+              searchableTerms: [],
+              contextRelevance: []
+            };
+          }
+        }
+
+        // Validate and sanitize the data
+        const validSentiments = ['educational', 'technical', 'neutral', 'analytical'];
+        const sentiment = validSentiments.includes(data.sentiment) ? data.sentiment : 'neutral';
+        
+        // Reset to first model on success
+        this.resetToFirstModel();
+        return {
+          topics: Array.isArray(data.topics) ? data.topics.slice(0, 10) : [],
+          categories: Array.isArray(data.categories) ? data.categories.slice(0, 5) : ['web_page'],
+          keyPoints: Array.isArray(data.keyPoints) ? data.keyPoints.slice(0, 8) : [],
+          sentiment: sentiment,
+          importance: Math.max(1, Math.min(10, parseInt(data.importance) || 5)),
+          usefulness: Math.max(1, Math.min(10, parseInt(data.usefulness) || 5)),
+          searchableTerms: Array.isArray(data.searchableTerms) ? data.searchableTerms.slice(0, 15) : [],
+          contextRelevance: Array.isArray(data.contextRelevance) ? data.contextRelevance.slice(0, 5) : [],
+        };
+      } catch (err) {
+        lastError = err;
+        console.error(`Metadata extraction error with ${this.getCurrentModel()}:`, err);
+        
+        if (this.isRateLimitError(err)) {
+          if (!this.switchToNextModel()) {
+            // No more models to try
+            break;
+          }
+        } else {
+          // Non-rate-limit error, don't try other models
+          break;
         }
       }
-
-      // Validate and sanitize the data
-      const validSentiments = ['educational', 'technical', 'neutral', 'analytical'];
-      const sentiment = validSentiments.includes(data.sentiment) ? data.sentiment : 'neutral';
-      
-      return {
-        topics: Array.isArray(data.topics) ? data.topics.slice(0, 10) : [],
-        categories: Array.isArray(data.categories) ? data.categories.slice(0, 5) : ['web_page'],
-        keyPoints: Array.isArray(data.keyPoints) ? data.keyPoints.slice(0, 8) : [],
-        sentiment: sentiment,
-        importance: Math.max(1, Math.min(10, parseInt(data.importance) || 5)),
-        usefulness: Math.max(1, Math.min(10, parseInt(data.usefulness) || 5)),
-        searchableTerms: Array.isArray(data.searchableTerms) ? data.searchableTerms.slice(0, 15) : [],
-        contextRelevance: Array.isArray(data.contextRelevance) ? data.contextRelevance.slice(0, 5) : [],
-      };
-    } catch (err) {
-      console.error('Metadata extraction error:', err);
-      return {
-        topics: metadata?.key_topics?.slice(0, 5) || [],
-        categories: [metadata?.content_type || 'web_page'],
-        keyPoints: [],
-        sentiment: 'neutral',
-        importance: 5,
-        usefulness: 5,
-        searchableTerms: [],
-        contextRelevance: [],
-      };
     }
+
+    // Reset to original model if all models failed
+    this.currentModelIndex = originalModelIndex;
+    return {
+      topics: metadata?.key_topics?.slice(0, 5) || [],
+      categories: [metadata?.content_type || 'web_page'],
+      keyPoints: [],
+      sentiment: 'neutral',
+      importance: 5,
+      usefulness: 5,
+      searchableTerms: [],
+      contextRelevance: [],
+    };
   }
 
   async evaluateMemoryRelationship(
@@ -385,83 +515,105 @@ Criteria:
 Be strict. Avoid weak or surface matches.
 `;
 
-    try {
-      const res = await runWithRateLimit(() =>
-        this.ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: prompt,
-        })
-      );
-      if (!res.text) throw new Error('No relationship data from Gemini');
+    let lastError: any;
+    const originalModelIndex = this.currentModelIndex;
 
-      // Try multiple patterns to extract JSON
-      let jsonMatch = res.text.match(/\{[\s\S]*\}/);
-      
-      // If no match, try to find JSON between code blocks
-      if (!jsonMatch) {
-        jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-        if (jsonMatch) {
-          jsonMatch[0] = jsonMatch[1]; // Use the captured group
-        }
-      }
-      
-      // If still no match, try to find any JSON-like structure
-      if (!jsonMatch) {
-        jsonMatch = res.text.match(/\{[\s\S]*?\}/);
-      }
-      
-      if (!jsonMatch) {
-        console.error('No JSON found in relationship response:', res.text);
-        throw new Error('Invalid JSON response from Gemini');
-      }
-      
-      let data;
+    while (this.currentModelIndex < this.availableModels.length) {
       try {
-        data = JSON.parse(jsonMatch[0]);
-      } catch (parseError) {
-        console.error('JSON parse error in relationship eval:', parseError);
-        console.error('Raw response text:', res.text);
-        console.error('Extracted JSON:', jsonMatch[0]);
+        const res = await runWithRateLimit(() =>
+          this.ai.models.generateContent({
+            model: this.getCurrentModel(),
+            contents: prompt,
+          })
+        );
+        if (!res.text) throw new Error('No relationship data from Gemini');
+
+        // Try multiple patterns to extract JSON
+        let jsonMatch = res.text.match(/\{[\s\S]*\}/);
         
-        // Try to fix common JSON issues
-        let fixedJson = jsonMatch[0];
-        fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
-        fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+        // If no match, try to find JSON between code blocks
+        if (!jsonMatch) {
+          jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+          if (jsonMatch) {
+            jsonMatch[0] = jsonMatch[1]; // Use the captured group
+          }
+        }
         
+        // If still no match, try to find any JSON-like structure
+        if (!jsonMatch) {
+          jsonMatch = res.text.match(/\{[\s\S]*?\}/);
+        }
+        
+        if (!jsonMatch) {
+          console.error('No JSON found in relationship response:', res.text);
+          throw new Error('Invalid JSON response from Gemini');
+        }
+        
+        let data;
         try {
-          data = JSON.parse(fixedJson);
-        } catch (secondError) {
-          console.error('Second JSON parse error in relationship eval:', secondError);
-          // Return default relationship data
-          return {
-            isRelevant: false,
-            relevanceScore: 0,
-            relationshipType: 'none',
-            reasoning: 'JSON parsing failed, defaulting to no relationship'
-          };
+          data = JSON.parse(jsonMatch[0]);
+        } catch (parseError) {
+          console.error('JSON parse error in relationship eval:', parseError);
+          console.error('Raw response text:', res.text);
+          console.error('Extracted JSON:', jsonMatch[0]);
+          
+          // Try to fix common JSON issues
+          let fixedJson = jsonMatch[0];
+          fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
+          fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+          
+          try {
+            data = JSON.parse(fixedJson);
+          } catch (secondError) {
+            console.error('Second JSON parse error in relationship eval:', secondError);
+            // Return default relationship data
+            this.resetToFirstModel();
+            return {
+              isRelevant: false,
+              relevanceScore: 0,
+              relationshipType: 'none',
+              reasoning: 'JSON parsing failed, defaulting to no relationship'
+            };
+          }
+        }
+
+        // Reset to first model on success
+        this.resetToFirstModel();
+        return {
+          isRelevant: !!data.isRelevant,
+          relevanceScore: Math.max(0, Math.min(1, data.relevanceScore || 0)),
+          relationshipType: data.relationshipType || 'none',
+          reasoning: data.reasoning || 'No reasoning provided',
+        };
+      } catch (err) {
+        lastError = err;
+        console.error(`Relationship eval error with ${this.getCurrentModel()}:`, err);
+        
+        if (this.isRateLimitError(err)) {
+          if (!this.switchToNextModel()) {
+            // No more models to try
+            break;
+          }
+        } else {
+          // Non-rate-limit error, don't try other models
+          break;
         }
       }
-
-      return {
-        isRelevant: !!data.isRelevant,
-        relevanceScore: Math.max(0, Math.min(1, data.relevanceScore || 0)),
-        relationshipType: data.relationshipType || 'none',
-        reasoning: data.reasoning || 'No reasoning provided',
-      };
-    } catch (err) {
-      console.error('Relationship eval error:', err);
-      const topicOverlap =
-        memoryA.topics?.some(t => memoryB.topics?.includes(t)) || false;
-      const categoryOverlap =
-        memoryA.categories?.some(c => memoryB.categories?.includes(c)) || false;
-      const score = topicOverlap && categoryOverlap ? 0.9 : topicOverlap ? 0.6 : categoryOverlap ? 0.4 : 0;
-      return {
-        isRelevant: score > 0,
-        relevanceScore: score,
-        relationshipType: topicOverlap ? 'topical' : categoryOverlap ? 'categorical' : 'none',
-        reasoning: score > 0 ? 'Topic/category overlap detected (fallback logic).' : 'No meaningful connection.',
-      };
     }
+
+    // Reset to original model if all models failed
+    this.currentModelIndex = originalModelIndex;
+    const topicOverlap =
+      memoryA.topics?.some(t => memoryB.topics?.includes(t)) || false;
+    const categoryOverlap =
+      memoryA.categories?.some(c => memoryB.categories?.includes(c)) || false;
+    const score = topicOverlap && categoryOverlap ? 0.9 : topicOverlap ? 0.6 : categoryOverlap ? 0.4 : 0;
+    return {
+      isRelevant: score > 0,
+      relevanceScore: score,
+      relationshipType: topicOverlap ? 'topical' : categoryOverlap ? 'categorical' : 'none',
+      reasoning: score > 0 ? 'Topic/category overlap detected (fallback logic).' : 'No meaningful connection.',
+    };
   }
 }
 
