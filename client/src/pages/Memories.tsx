@@ -254,7 +254,7 @@ export const Memories: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [expandedContent, setExpandedContent] = useState(false)
-  const [similarityThreshold, ] = useState(0.3)
+  const similarityThreshold = 0.3
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   
   const [isNodeModalOpen, setIsNodeModalOpen] = useState(false)
@@ -504,6 +504,8 @@ export const Memories: React.FC = () => {
           </div>
         </div>
       </header>
+
+      {/* Summary Toolbar removed to avoid duplication with bottom bar */}
 
       {/* Main Content */}
       <div className="flex h-[calc(100vh-73px-48px)]">
