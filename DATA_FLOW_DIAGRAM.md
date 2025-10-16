@@ -1,210 +1,226 @@
 # RecallOS Memory Data Flow
-## Data Flow Diagram
+## System-Level Diagram
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Browser       │───▶│   API Server     │───▶│   Gemini AI     │
-│   Extension     │    │   (Express.js)   │    │   Processing    │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                                │                         │
-                                ▼                         ▼
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Blockchain    │◀───│   PostgreSQL     │◀───│   Memory Mesh   │
-│   (Sepolia)     │    │   Database       │    │   Service       │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+┌──────────────────────┐     ┌──────────────────────┐     ┌─────────────────────-──┐
+│  Browser Extension   │────▶│   API (Express.js)   │────▶│   AI Provider (Hybrid) │
+│  and Client (Vite)   │     │  /api/content        │     │  Gemini or Ollama      │
+└──────────────────────┘     │  /api/memory         │     └──────────────────────-─┘
+                              │  /api/search         │                 │
+                              │  /api/blockscout     │                 ▼
+                              └──────────┬───────────┘       ┌───────────────────────┐
+                                         │                   │  Embeddings + Mesh    │
+                                         ▼                   │  Prisma + pgvector    │
+                               ┌──────────────────┐          └───────────────────────┘
+                               │  PostgreSQL      │◀──────────────┐
+                               │  (Prisma)        │               │
+                               └──────────────────┘               │
+                                         ▲                        │
+                                         │                        │
+                                         │                        ▼
+                               ┌──────────────────┐     ┌────────────────────────-───┐
+                               │  Sepolia (EVM)   │◀────│  Blockchain Anchor (Ethers)│
+                               │  Memory Registry │     └─────────────────────────-──┘
+                               └──────────────────┘
 ```
-## Detailed Data Structure
-### 1. Browser Extension Context Data
+
+## 1) Ingestion: Browser Extension → API
 ```
-ContextData {
-  source: "extension",
-  url: "https://example.com/page",
-  title: "Page Title",
-  content_snippet: "First 500 chars of content...",
-  timestamp: 1699123456789,
-  full_content: "Complete page content...",
-  meaningful_content: "Filtered meaningful content...",
-  content_summary: "Page description and headings...",
-  content_type: "blog_post|documentation|tutorial|news_article|...",
-  key_topics: ["topic1", "topic2", "topic3"],
-  reading_time: 5,
-  page_metadata: {
-    description: "Meta description",
-    keywords: "meta keywords",
-    author: "Page author",
-    viewport: "1920x1080",
-    language: "en",
-    published_date: "2023-01-01",
-    modified_date: "2023-01-02",
-    canonical_url: "https://example.com/page"
-  },
-  page_structure: {
-    headings: ["H1", "H2", "H3"],
-    links: ["link1", "link2"],
-    images: ["img1", "img2"],
-    forms: ["form1"],
-    code_blocks: ["code1"],
-    tables: ["table1"]
-  },
-  user_activity: {
-    scroll_position: 500,
-    window_size: { width: 1920, height: 1080 },
-    focused_element: "BODY",
-    time_on_page: 120000,
-    interaction_count: 15
-  },
-  content_quality: {
-    word_count: 1500,
-    has_images: true,
-    has_code: false,
-    has_tables: true,
-    readability_score: 85
+POST /api/memory/processRawContent
+Body:
+{
+  content: string,
+  url?: string,
+  title?: string,
+  userAddress: string,
+  metadata?: {
+    source?: 'extension' | string,
+    content_type?: string,
+    title?: string,
+    url?: string,
+    content_summary?: string,
+    // arbitrary additional fields from extension
   }
 }
 ```
-### 2. API Processing & Gemini AI Enhancement
-```
-1. Content Analysis via Gemini AI:
-   - Generate summary using gemini-2.5-flash model
-   - Extract metadata (topics, categories, key points, sentiment, importance)
-   - Generate embeddings using text-embedding-004 model
 
-2. Hash Generation:
-   - Create SHA256 hash from AI-generated summary
-   - Create Keccak256 hash from URL for URL-based queries
-   - Timestamp: Unix timestamp in seconds
-
-3. Database Storage (PostgreSQL):
-   - Store complete memory with all metadata
-   - Create embeddings for semantic search
-   - Establish memory relations for mesh network
+## 2) AI Processing (Hybrid Provider)
 ```
-### 3. On-Chain Storage (Sepolia Testnet)
-```
-RecallOSMemoryRegistry Smart Contract:
-├── userMemories[address] → Memory[]
-├── userMemoryCount[address] → uint256
-├── memoryExists[bytes32] → bool
-└── memoryOwner[bytes32] → address
+Provider selection: process.env.AI_PROVIDER ∈ { 'gemini', 'ollama', 'hybrid' } (default: hybrid)
 
-Memory Struct {
-  hash: bytes32,        // SHA256 of AI summary
-  urlHash: bytes32,     // Keccak256 of URL
-  timestamp: uint256    // Unix timestamp
+- summarizeContent(text, metadata) → summary
+- extractContentMetadata(text, metadata) → {
+    topics: string[],
+    categories: string[],
+    keyPoints: string[],
+    sentiment: string,
+    importance: number,
+    usefulness: number,
+    searchableTerms: string[],
+    contextRelevance: string[]
+  }
+- generateEmbedding(text) → number[]
+  - If Gemini unavailable and Ollama fails, fallback 768-dim deterministic embedding
+```
+
+## 3) Hashing and Timestamps
+```
+memory.hash = '0x' + sha256(summary)
+urlHash = keccak256(url || 'unknown')
+timestamp = Math.floor(Date.now() / 1000)
+```
+
+## 4) Database Storage (PostgreSQL via Prisma)
+```
+Table: memories
+- id (uuid)
+- user_id (uuid)
+- source (string)               // e.g., 'extension'
+- url (string | 'unknown')
+- title (string)
+- content (text)
+- full_content (text)
+- summary (text)
+- hash (string, 0xsha256)
+- timestamp (bigint seconds)
+- tx_hash, block_number, gas_used, tx_status, blockchain_network, confirmed_at
+- page_metadata (jsonb) with keys:
+  - extracted_metadata: {...}
+  - topics: string[]
+  - categories: string[]
+  - key_points: string[]        // note: stored as key_points
+  - sentiment: string
+  - importance: number
+  - searchable_terms: string[]  // note: stored as searchable_terms
+
+Table: embeddings
+- memory_id (uuid)
+- vector (float[])
+- model_name ('text-embedding-004')
+- embedding_type ('content' | 'summary' | 'title')
+
+Table: memory_embeddings (pgvector)
+- id (uuid)
+- memory_id (uuid)
+- embedding (vector)
+- dim (int)
+- model ('text-embedding-004')
+- created_at (timestamp)
+
+Table: memory_relations
+- memory_id, related_memory_id (uuid)
+- similarity_score (float)
+- relation_type ('semantic' | 'topical' | 'temporal')
+
+Table: memory_snapshots
+- user_id (uuid)
+- raw_text (text)
+- summary (text)
+- summary_hash ('0x' + sha256(summary))
+- created_at
+```
+
+## 5) On-Chain Anchoring (Sepolia)
+```
+Contract interface (ethers):
+- storeMemory(bytes32 hash, bytes32 urlHash, uint256 timestamp)
+- storeMemoryBatch(bytes32[] hashes, bytes32[] urlHashes, uint256[] timestamps)
+- isMemoryStored(bytes32 hash) → bool
+- getMemoryByHash(bytes32 hash) → (owner, urlHash, timestamp)
+- getRecentMemories(address user, uint256 count)
+- events: MemoryStored, MemoryBatchStored
+
+Write path:
+- Primary write during ingestion uses storeMemoryBatch([{ hash, urlHash, timestamp }])
+- Meta-summary anchoring may hash free-text and call storeMemory to produce txHash
+```
+
+## 6) Memory Mesh Generation
+```
+Semantic relations:
+- cosineSimilarity(content vector A, content vector B)
+- keep if similarity ≥ 0.3
+
+Topical relations:
+- weighted overlap of topics (0.4), categories (0.3), key_points (0.2), searchable_terms (0.1)
+- domain boost (+0.1 for same hostname)
+
+Temporal relations:
+- similarity via proximity: hour/day/week/month windows with decay
+
+Graph shaping:
+- prune with mutual kNN (k=3) and degree cap
+- force-directed layout with source clusters: extension/github/meet/on_chain
+```
+
+## 7) Search Pipeline
+```
+Endpoint: POST /api/search
+
+Steps:
+1) generateEmbedding(query) → vector
+2) vector similarity over memory_embeddings using pgvector distance
+3) optional meta_summary and short answer via AI with inline numeric citations
+4) persist queryEvent + queryRelatedMemory rows; optional on-chain anchor for meta summary
+
+Alternate endpoints (controller):
+- /api/memory/search        // keyword filters
+- /api/memory/search-embed  // embedding prefiltered
+- /api/memory/search-hybrid // blend keyword + semantic
+```
+
+## Example Payloads
+### Ingestion Request (extension → API)
+```json
+{
+  "content": "...full page text...",
+  "url": "https://example.com/page",
+  "title": "Page Title",
+  "userAddress": "0xabc...",
+  "metadata": {
+    "source": "extension",
+    "content_type": "documentation",
+    "content_summary": "H1/H2 headings..."
+  }
 }
-
-Events:
-- MemoryStored(address indexed user, bytes32 indexed hash, bytes32 urlHash, uint256 timestamp)
-- MemoryBatchStored(address indexed user, uint256 count)
 ```
-### 4. Memory Mesh Service
-```
-Memory Relations:
-├── Semantic Relations: Based on embedding similarity (cosine similarity > 0.3)
-├── Topical Relations: Based on topic/category overlap
-└── Temporal Relations: Based on time proximity (±1 week)
 
-Embedding Generation:
-- Content embeddings: Full page content
-- Summary embeddings: AI-generated summary
-- Title embeddings: Page title
-- Model: text-embedding-004 (768 dimensions)
-
-Memory Clustering:
-- Find related memories within 2 degrees of separation
-- Calculate similarity scores for each relation type
-- Store bidirectional relationships in database
-```
-## Example Memory Data
-### Browser Extension Context:
+### Stored Memory (normalized)
 ```json
 {
   "source": "extension",
-  "url": "https://ethereum.org/en/developers/docs/intro-to-ethereum/",
-  "title": "Introduction to Ethereum - Ethereum Developer Documentation",
-  "content_snippet": "Ethereum is a decentralized platform that runs smart contracts...",
-  "timestamp": 1699123456789,
-  "full_content": "Complete page content...",
-  "meaningful_content": "Filtered meaningful content...",
-  "content_summary": "Introduction to Ethereum | Ethereum Developer Documentation | Smart Contracts | DApps",
-  "content_type": "documentation",
-  "key_topics": ["blockchain", "smart contracts", "ethereum", "decentralized", "dapps"],
-  "reading_time": 8,
+  "url": "https://example.com/page",
+  "title": "Page Title",
+  "summary": "...",
+  "hash": "0xsha256(summary)",
+  "timestamp": 1699123456,
   "page_metadata": {
-    "description": "Learn about Ethereum, the decentralized platform that runs smart contracts",
-    "keywords": "ethereum, blockchain, smart contracts, dapps",
-    "author": "Ethereum Foundation",
-    "viewport": "1920x1080",
-    "language": "en"
-  },
-  "page_structure": {
-    "headings": ["Introduction", "Smart Contracts", "DApps", "Getting Started"],
-    "links": ["https://ethereum.org/whitepaper", "https://docs.soliditylang.org/"],
-    "images": ["ethereum-logo.png", "smart-contract-diagram.svg"]
-  },
-  "user_activity": {
-    "scroll_position": 1200,
-    "window_size": { "width": 1920, "height": 1080 },
-    "time_on_page": 120000,
-    "interaction_count": 15
-  },
-  "content_quality": {
-    "word_count": 2500,
-    "has_images": true,
-    "has_code": true,
-    "readability_score": 85
+    "topics": ["x","y"],
+    "categories": ["documentation"],
+    "key_points": ["..."],
+    "sentiment": "technical",
+    "importance": 7,
+    "searchable_terms": ["..."]
   }
 }
 ```
 
-### AI-Enhanced Memory:
-```json
-{
-  "summary": "User learned about blockchain technology and its applications in decentralized systems. Key concepts include distributed ledgers, consensus mechanisms, and smart contracts. The content covered Ethereum, Bitcoin, and various DeFi protocols.",
-  "extracted_metadata": {
-    "topics": ["blockchain", "smart contracts", "ethereum", "decentralized systems", "defi"],
-    "categories": ["technology", "programming", "blockchain"],
-    "keyPoints": ["Ethereum runs smart contracts", "Decentralized applications", "Consensus mechanisms"],
-    "sentiment": "informative",
-    "importance": 8,
-    "searchableTerms": ["ethereum", "blockchain", "smart contracts", "dapps", "defi"]
-  },
-  "hash": "0x8f4e2a1b3c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b",
-  "urlHash": "0x1234567890abcdef...",
-  "timestamp": 1699123456
-}
+## Reference Snippets
+```198:214:/Users/art3mis/Developer/RecallOS/api/src/controller/memory.controller.ts
+// Blockchain write during ingestion
+const blockchainResult = await storeMemoryBatch([memoryData]);
 ```
-## Data Flow Process
-### 1. Browser Extension Capture:
-- **Content Extraction**: Extract meaningful content, removing boilerplate
-- **Metadata Collection**: Gather page structure, user activity, content quality
-- **Privacy Detection**: Detect ad blockers and privacy extensions
-- **Context Packaging**: Create comprehensive context data object
 
-### 2. API Server Processing:
-- **User Management**: Create/find user by wallet address
-- **AI Processing**: Send content to Gemini AI for analysis
-- **Hash Generation**: Create SHA256 hash from AI summary
-- **Database Storage**: Store complete memory with metadata
-- **Blockchain Storage**: Store hash, URL hash, and timestamp on-chain
+```120:146:/Users/art3mis/Developer/RecallOS/api/src/services/blockchain.ts
+// Contract write call
+const tx = await contract.storeMemory(hash, urlHash, timestamp, { gasPrice, gasLimit });
+```
 
-### 3. Memory Mesh Integration:
-- **Embedding Generation**: Create vector embeddings for semantic search
-- **Relation Discovery**: Find semantic, topical, and temporal relations
-- **Mesh Building**: Establish bidirectional memory relationships
-- **Snapshot Creation**: Create memory snapshots for backup
+```1083:1199:/Users/art3mis/Developer/RecallOS/api/src/services/memoryMesh.ts
+// Mesh generation: nodes/edges, pruning, layout
+const edges = this.pruneEdgesMutualKNN(rawEdges, 3, similarityThreshold);
+```
 
-### 4. Verification & Retrieval:
-```javascript
-// Verify memory exists on-chain
-const isStored = await contract.isMemoryStored(hash);
-
-// Get memory details
-const memory = await contract.getMemoryByHash(hash);
-
-// Search memories by URL
-const urlHash = ethers.keccak256(ethers.toUtf8Bytes(url));
-const memories = await contract.getMemoriesByUrlHash(userAddress, urlHash);
-
-// Get recent memories
-const recent = await contract.getRecentMemories(userAddress, 10);
+```67:90:/Users/art3mis/Developer/RecallOS/api/src/services/memorySearch.ts
+// Semantic search over pgvector
+GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}::vector))) AS score
 ```
