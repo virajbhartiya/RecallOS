@@ -104,7 +104,8 @@ export class MemoryService {
     query: string,
     filters: SearchFilters = {},
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    signal?: AbortSignal
   ): Promise<MemorySearchResponse> {
     try {
       const normalizedAddress = this.normalizeAddress(userAddress)
@@ -125,7 +126,7 @@ export class MemoryService {
         }
       })
 
-      const response = await getRequest(`${this.baseUrl}/search?${params.toString()}`)
+      const response = await getRequest(`${this.baseUrl}/search?${params.toString()}`, undefined, signal)
       
       if (!response) {
         throw new Error('No response received from server')
@@ -135,7 +136,18 @@ export class MemoryService {
         throw new Error(`Server error: ${response.status} ${response.statusText}`)
       }
       
-      return response?.data?.data || { results: [], total: 0, page, limit, filters }
+      const responseData = response?.data
+      if (responseData && responseData.data) {
+        // Backend returns nested structure: { success: true, data: { total: 1, results: [...] } }
+        return {
+          results: responseData.data.results || [],
+          total: responseData.data.total || 0,
+          page,
+          limit,
+          filters
+        }
+      }
+      return { results: [], total: 0, page, limit, filters }
     } catch (error) {
       console.error('Error in searchMemories:', error)
       return { results: [], total: 0, page, limit, filters }
@@ -179,7 +191,18 @@ export class MemoryService {
         throw new Error(`Server error: ${response.status} ${response.statusText}`)
       }
       
-      return response?.data?.data || { results: [], total: 0, page, limit, filters }
+      const responseData = response?.data
+      if (responseData && responseData.data) {
+        // Backend returns nested structure: { success: true, data: { total: 1, results: [...] } }
+        return {
+          results: responseData.data.results || [],
+          total: responseData.data.total || 0,
+          page,
+          limit,
+          filters
+        }
+      }
+      return { results: [], total: 0, page, limit, filters }
     } catch (error) {
       console.error('Error in searchMemoriesWithEmbeddings:', error)
       return { results: [], total: 0, page, limit, filters }
@@ -223,7 +246,18 @@ export class MemoryService {
         throw new Error(`Server error: ${response.status} ${response.statusText}`)
       }
       
-      return response?.data?.data || { results: [], total: 0, page, limit, filters }
+      const responseData = response?.data
+      if (responseData && responseData.data) {
+        // Backend returns nested structure: { success: true, data: { total: 1, results: [...] } }
+        return {
+          results: responseData.data.results || [],
+          total: responseData.data.total || 0,
+          page,
+          limit,
+          filters
+        }
+      }
+      return { results: [], total: 0, page, limit, filters }
     } catch (error) {
       console.error('Error in searchMemoriesHybrid:', error)
       return { results: [], total: 0, page, limit, filters }

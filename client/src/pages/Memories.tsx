@@ -274,6 +274,7 @@ export const Memories: React.FC = () => {
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState<string>('')
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const fetchMemories = useCallback(async () => {
     if (!address) return
@@ -287,11 +288,11 @@ export const Memories: React.FC = () => {
         MemoryService.getMemoryInsights(address)
       ])
       
-      setMemories(memoriesData)
+      setMemories(memoriesData || [])
       setInsights(insightsData)
       
       // Prefetch transaction data for memories with transaction hashes
-      const transactionsToPrefetch = memoriesData
+      const transactionsToPrefetch = (memoriesData || [])
         .filter(memory => memory.tx_hash && memory.tx_hash.startsWith('0x'))
         .map(memory => ({
           txHash: memory.tx_hash!,
@@ -341,6 +342,14 @@ export const Memories: React.FC = () => {
   ) => {
     if (!address) return
 
+    // Cancel any previous search request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController()
+
     setSearchError(null)
     setSearchResults(null)
     setIsSearchMode(true)
@@ -349,30 +358,42 @@ export const Memories: React.FC = () => {
     try {
       let response: MemorySearchResponse | null = null
 
+      const signal = abortControllerRef.current?.signal
+
       // 1) If explicit semantic requested, use it
       if (useSemantic) {
-        const data = await SearchService.semanticSearch(address, query, 50)
-        response = await SearchService.semanticSearchMapped(address, query, filters, 1, 50)
+        const data = await SearchService.semanticSearch(address, query, 50, signal)
+        response = await SearchService.semanticSearchMapped(address, query, filters, 1, 50, signal)
         setSearchAnswer(data.answer || null)
         if (data.job_id) setSearchJobId(data.job_id)
       } else {
-        // 2) Keyword search first
-        const keyword = await MemoryService.searchMemories(address, query, filters, 1, 50)
-        // 3) Fallback to semantic when no keyword hits or query is long/natural language
-        const looksNatural = query.trim().split(/\s+/).length >= 3 || /\?$/.test(query.trim())
-        if ((keyword?.results?.length || 0) === 0 && looksNatural) {
-          const data = await SearchService.semanticSearch(address, query, 50)
-          const semantic = await SearchService.semanticSearchMapped(address, query, filters, 1, 50)
+        // 2) Use semantic search for natural language queries, keyword for simple terms
+        const looksNatural = query.trim().split(/\s+/).length >= 3 || /\?$/.test(query.trim()) || query.toLowerCase().includes('what') || query.toLowerCase().includes('how') || query.toLowerCase().includes('why')
+        
+        if (looksNatural) {
+          console.log('Using LLM-powered semantic search for natural language query:', query)
+          // Use LLM-powered semantic search for natural language queries
+          const data = await SearchService.semanticSearch(address, query, 50, signal)
+          const semantic = await SearchService.semanticSearchMapped(address, query, filters, 1, 50, signal)
+          console.log('Semantic search results:', semantic.results?.length, 'results')
           response = semantic
           setSearchAnswer(data.answer || null)
           if (data.job_id) setSearchJobId(data.job_id)
         } else {
+          console.log('Using keyword search for simple query:', query)
+          // Use keyword search for simple terms
+          const keyword = await MemoryService.searchMemories(address, query, filters, 1, 50, signal)
+          console.log('Keyword search results:', keyword.results?.length, 'results')
           response = keyword
         }
       }
 
       setSearchResults(response!)
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Search request was cancelled')
+        return
+      }
       setSearchError('Failed to search memories')
       console.error('Error searching memories:', err)
     }
@@ -456,6 +477,9 @@ export const Memories: React.FC = () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current)
       }
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
     }
   }, [searchQuery, handleSearch, handleClearSearch])
 
@@ -464,6 +488,15 @@ export const Memories: React.FC = () => {
       fetchMemories()
     }
   }, [isConnected, address, fetchMemories])
+
+  // Cleanup effect to cancel any pending requests when component unmounts
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort()
+      }
+    }
+  }, [])
 
   if (!isConnected) {
     return (
@@ -487,9 +520,9 @@ export const Memories: React.FC = () => {
     )
   }
 
-  let currentMemories = isSearchMode && searchResults ? searchResults.results.map(r => r.memory) : memories
-  const currentResults = isSearchMode && searchResults ? searchResults.results : null
-  currentMemories = [...currentMemories].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+  let currentMemories = isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory) : memories
+  const currentResults = isSearchMode && searchResults && searchResults.results ? searchResults.results : null
+  currentMemories = [...(currentMemories || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-sky-50/30">
@@ -547,7 +580,7 @@ export const Memories: React.FC = () => {
           onNodeClick={handleNodeClick}
           similarityThreshold={similarityThreshold}
           selectedMemoryId={selectedMemory?.id}
-          highlightedMemoryIds={isSearchMode && searchResults ? searchResults.results.map(r => r.memory.id) : []}
+          highlightedMemoryIds={isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory.id) : []}
           onMeshLoad={handleMeshLoad}
           memorySources={{
             ...Object.fromEntries(memories.map(m => [m.id, m.source || ''])),
@@ -612,7 +645,7 @@ export const Memories: React.FC = () => {
                   {isSearchMode ? (
                     searchJobId ? 'Generating answer…' : (searchResults ? `${searchResults.total} results for "${searchQuery}"` : 'No search')
                   ) : (
-                    `${memories.length} total`
+                    `${(memories || []).length} total`
                   )}
                 </p>
               </div>
@@ -670,7 +703,7 @@ export const Memories: React.FC = () => {
                   Clear Search
                 </button>
               </div>
-            ) : currentMemories.length === 0 ? (
+            ) : (currentMemories || []).length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
                 {searchJobId ? (
                   <>
@@ -694,7 +727,7 @@ export const Memories: React.FC = () => {
               </div>
             ) : (
               <div className="space-y-1">
-                {currentMemories.map((memory) => {
+                {(currentMemories || []).map((memory) => {
                   const searchResult = currentResults?.find(r => r.memory.id === memory.id)
                   return (
                     <MemoryCard
@@ -766,7 +799,7 @@ export const Memories: React.FC = () => {
       </div>
 
       {/* Memory Stats Overlay */}
-      {insights && memories.length > 0 && (
+      {/* {insights && (memories || []).length > 0 && (
         <div className="fixed bottom-16 left-4 bg-white/95 backdrop-blur-sm border border-gray-200/60 shadow-lg rounded-xl p-4 z-40">
           <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
             [MEMORY STATS]
@@ -790,7 +823,7 @@ export const Memories: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Bottom System Bar */}
       {insights && (
