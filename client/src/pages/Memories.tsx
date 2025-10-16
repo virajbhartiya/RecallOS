@@ -315,15 +315,21 @@ export const Memories: React.FC = () => {
   }, [address, prefetchTransaction])
 
   const handleSelectMemory = (memory: Memory) => {
-    setSelectedMemory(memory)
+    // If the selected item is from search results, it may be a slim object without full content/metadata.
+    // Prefer the fully loaded version from the main `memories` state when available.
+    const full = memories.find(m => m.id === memory.id)
+    setSelectedMemory(full || memory)
     setExpandedContent(false)
   }
 
   const handleNodeClick = (memoryId: string) => {
-    const memory = memories.find(m => m.id === memoryId) || 
-                   searchResults?.results.find(r => r.memory.id === memoryId)?.memory
-    if (memory) {
-      setSelectedMemory(memory)
+    const fromMemories = memories.find(m => m.id === memoryId)
+    const fromSearch = searchResults?.results.find(r => r.memory.id === memoryId)?.memory
+    const preferred = fromMemories || fromSearch
+    if (preferred) {
+      // Ensure we display the richest version if both exist
+      const full = fromMemories || preferred
+      setSelectedMemory(full)
       setExpandedContent(false)
       setIsNodeModalOpen(true)
     }

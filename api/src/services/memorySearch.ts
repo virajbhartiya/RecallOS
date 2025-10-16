@@ -68,12 +68,24 @@ export async function searchMemories(params: {
   const embeddingHash = sha256Hex(JSON.stringify({ model: 'text-embedding-004', values: embedding.slice(0, 64), salt }));
 
   const rows = await prisma.$queryRawUnsafe<Array<{ id: string; title: string | null; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; score: number }>>(`
-    SELECT m.id, m.title, m.summary, m.url, m.timestamp, m.hash,
-           GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}))) AS score
-    FROM memory_embeddings me
-    JOIN memories m ON m.id = me.memory_id
-    WHERE m.user_id = '${user.id}'
-    ORDER BY me.embedding <=> ${queryVecSql}
+    WITH ranked AS (
+      SELECT 
+        m.id,
+        m.title,
+        m.summary,
+        m.url,
+        m.timestamp,
+        m.hash,
+        GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}))) AS score,
+        ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY me.embedding <=> ${queryVecSql}) AS rn
+      FROM memory_embeddings me
+      JOIN memories m ON m.id = me.memory_id
+      WHERE m.user_id = '${user.id}'
+    )
+    SELECT id, title, summary, url, timestamp, hash, score
+    FROM ranked
+    WHERE rn = 1
+    ORDER BY (1 - score) ASC
     LIMIT ${Number(limit)}
   `);
 

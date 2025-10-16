@@ -78,15 +78,13 @@ export class MemoryMeshService {
         },
       });
 
-      // Also create MemoryEmbedding record for search functionality
-      if (type === 'content') {
-        const embeddingArray = `[${embedding.join(',')}]`;
-        await prisma.$executeRaw`
-          INSERT INTO memory_embeddings (id, memory_id, embedding, dim, model, created_at)
-          VALUES (gen_random_uuid(), ${memoryId}::uuid, ${embeddingArray}::vector, ${embedding.length}, 'text-embedding-004', NOW())
-        `;
-        console.log(`Created MemoryEmbedding for memory ${memoryId}`);
-      }
+      // Also create MemoryEmbedding record for search functionality for ALL types
+      const embeddingArray = `[${embedding.join(',')}]`;
+      await prisma.$executeRaw`
+        INSERT INTO memory_embeddings (id, memory_id, embedding, dim, model, created_at)
+        VALUES (gen_random_uuid(), ${memoryId}::uuid, ${embeddingArray}::vector, ${embedding.length}, 'text-embedding-004', NOW())
+      `;
+      console.log(`Created MemoryEmbedding for memory ${memoryId} (${type})`);
     } catch (error) {
       console.error(
         `Error creating ${type} embedding for memory ${memoryId}:`,
@@ -1222,12 +1220,19 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         // Use the semantic search with MemoryEmbedding table
         const queryVecSql = `[${queryEmbedding.join(',')}]`;
         const rows = await prisma.$queryRawUnsafe<Array<{ id: string; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; score: number }>>(`
-          SELECT m.id, m.summary, m.url, m.timestamp, m.hash,
-                 GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}::vector))) AS score
-          FROM memory_embeddings me
-          JOIN memories m ON m.id = me.memory_id
-          WHERE m.user_id = '${userId}'
-          ORDER BY me.embedding <=> ${queryVecSql}::vector
+          WITH ranked AS (
+            SELECT 
+              m.id, m.summary, m.url, m.timestamp, m.hash,
+              GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}::vector))) AS score,
+              ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY me.embedding <=> ${queryVecSql}::vector) AS rn
+            FROM memory_embeddings me
+            JOIN memories m ON m.id = me.memory_id
+            WHERE m.user_id = '${userId}'
+          )
+          SELECT id, summary, url, timestamp, hash, score
+          FROM ranked
+          WHERE rn = 1
+          ORDER BY (1 - score) ASC
           LIMIT ${limit}
         `);
         
