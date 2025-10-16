@@ -19,7 +19,7 @@ export class SearchService {
     query: string,
     limit: number = 10,
     signal?: AbortSignal
-  ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string; answer?: string; job_id?: string }> {
+  ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; job_id?: string }> {
     const res = await postRequest('/search', { wallet, query, limit }, undefined, signal)
     if (!res || res.status >= 400) throw new Error('Search request failed')
     return res.data

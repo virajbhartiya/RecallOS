@@ -41,7 +41,7 @@ export async function searchMemories(params: {
   limit?: number;
   enableReasoning?: boolean;
   enableAnchoring?: boolean;
-}): Promise<{ query: string; results: SearchResult[]; meta_summary?: string; answer?: string }>{
+}): Promise<{ query: string; results: SearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }> }>{
   const { wallet, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING === 'true', enableAnchoring = process.env.SEARCH_ANCHOR_META === 'true' } = params;
 
   if (!aiProvider.isInitialized) {
@@ -133,13 +133,34 @@ export async function searchMemories(params: {
   }
 
   let answer: string | undefined;
+  let citations: Array<{ label: number; memory_id: string; title: string | null; url: string | null }> = [];
   try {
     const bullets = rows.map((r, i) => {
       const date = r.timestamp ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10) : '';
       return `- [${i + 1}] ${date} ${r.summary || ''}`.trim();
     }).join('\n');
-    const ansPrompt = `User query: "${normalized}"\nEvidence notes (ordered by relevance):\n${bullets}\n\nCompose a concise, direct answer (2-4 sentences) summarizing what the user was exploring and key takeaways. No markdown or lists; return plain prose.`;
-    answer = await withTimeout(aiProvider.generateContent(ansPrompt), 1800);
+    const ansPrompt = `You are RecallOS. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.\n\nRules:\n- Use inline numeric citations like [1], [2].\n- Keep it concise (2-4 sentences).\n- Plain text only.\n\nUser query: "${normalized}"\nEvidence notes (ordered by relevance):\n${bullets}`;
+    answer = await withTimeout(aiProvider.generateContent(ansPrompt), 8000);
+    // Build citations map aligned with [n]
+    const allCitations = rows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
+    // Keep only citations actually referenced in the answer/meta text, preserve first-seen order
+    const pickOrderFrom = (text: string | undefined) => {
+      if (!text) return [] as number[];
+      const order: number[] = [];
+      const seen = new Set<number>();
+      const re = /\[(\d+)\]/g;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(text))) {
+        const n = Number(m[1]);
+        if (!seen.has(n)) { seen.add(n); order.push(n); }
+      }
+      return order;
+    };
+    const order = pickOrderFrom(answer);
+    const orderSet = new Set(order);
+    citations = order.length
+      ? order.map(n => allCitations.find(c => c.label === n)).filter((c): c is { label: number; memory_id: string; title: string | null; url: string | null } => Boolean(c))
+      : [];
   } catch {
     answer = undefined;
   }
@@ -190,7 +211,7 @@ export async function searchMemories(params: {
       (global as any).__currentSearchJobId = undefined;
     }
   } catch {}
-  return { query: normalized, results, meta_summary: metaSummary, answer };
+  return { query: normalized, results, meta_summary: metaSummary, answer, citations };
 }
 
 

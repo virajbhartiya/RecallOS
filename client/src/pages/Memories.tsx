@@ -269,7 +269,9 @@ export const Memories: React.FC = () => {
   
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
   const [searchAnswer, setSearchAnswer] = useState<string | null>(null)
+  const [searchMeta, setSearchMeta] = useState<string | null>(null)
   const [searchJobId, setSearchJobId] = useState<string | null>(null)
+  const [searchCitations, setSearchCitations] = useState<Array<{ label: number; memory_id: string; title: string | null; url: string | null }> | null>(null)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState<string>('')
@@ -335,6 +337,20 @@ export const Memories: React.FC = () => {
     }
   }
 
+  const handleCitationClick = (memoryId: string) => {
+    const fromMemories = memories.find(m => m.id === memoryId)
+    const fromSearch = searchResults?.results.find(r => r.memory.id === memoryId)?.memory
+    const chosen = fromMemories || fromSearch
+    if (chosen) {
+      setSelectedMemory(chosen)
+      setExpandedContent(false)
+      // If sidebar is collapsed, open the floating details; otherwise panel is already visible
+      if (isSidebarCollapsed) {
+        setIsNodeModalOpen(true)
+      }
+    }
+  }
+
   const handleMeshLoad = useCallback((mesh: MemoryMeshType) => {
     const nodeCount = Array.isArray(mesh.nodes) ? mesh.nodes.length : 0
     const edgeCount = Array.isArray(mesh.edges) ? mesh.edges.length : 0
@@ -371,6 +387,8 @@ export const Memories: React.FC = () => {
         const data = await SearchService.semanticSearch(address, query, 50, signal)
         response = await SearchService.semanticSearchMapped(address, query, filters, 1, 50, signal)
         setSearchAnswer(data.answer || null)
+        setSearchMeta(data.meta_summary || null)
+        setSearchCitations(data.citations || null)
         if (data.job_id) setSearchJobId(data.job_id)
       } else {
         // 2) Use semantic search for natural language queries, keyword for simple terms
@@ -384,6 +402,8 @@ export const Memories: React.FC = () => {
           console.log('Semantic search results:', semantic.results?.length, 'results')
           response = semantic
           setSearchAnswer(data.answer || null)
+          setSearchMeta(data.meta_summary || null)
+          setSearchCitations(data.citations || null)
           if (data.job_id) setSearchJobId(data.job_id)
         } else {
           console.log('Using keyword search for simple query:', query)
@@ -408,7 +428,9 @@ export const Memories: React.FC = () => {
   const handleClearSearch = useCallback(() => {
     setSearchResults(null)
     setSearchAnswer(null)
+    setSearchMeta(null)
     setSearchJobId(null)
+    setSearchCitations(null)
     setSearchError(null)
     setIsSearchMode(false)
     setSearchQuery('')
@@ -664,9 +686,25 @@ export const Memories: React.FC = () => {
                 </button>
               )}
             </div>
-            {isSearchMode && (searchJobId || searchAnswer) && (
+            {isSearchMode && (searchJobId || searchAnswer || searchMeta) && (
               <div className="mt-2 text-[11px] font-mono text-gray-800 bg-yellow-50 border border-yellow-200 p-2 rounded">
-                {searchAnswer || 'Generating answer…'}
+                <span>
+                  {searchAnswer || searchMeta || 'Generating answer…'}
+                </span>
+                {searchCitations && searchCitations.length > 0 && (
+                  <div className="mt-2 text-[11px] text-gray-700 gap-2 flex flex-wrap">
+                    {searchCitations.slice(0,6).map(c => (
+                      <button
+                        key={c.label}
+                        onClick={() => handleCitationClick(c.memory_id)}
+                        className="underline decoration-dotted hover:text-blue-700 text-left"
+                        title={c.title || c.url || ''}
+                      >
+                        [{c.label}] {c.title || 'Open memory'}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
