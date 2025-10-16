@@ -1,6 +1,6 @@
 import { contentQueue, ContentJobData } from '../lib/queue';
 
-import { geminiService } from '../services/gemini';
+import { aiProvider } from '../services/aiProvider';
 
 import { memoryMeshService } from '../services/memoryMesh';
 
@@ -21,14 +21,14 @@ export const startContentWorker = () => {
     try {
       console.log(`Processing content for user ${user_id}`);
 
-      const summary = await geminiService.summarizeContent(raw_text, metadata);
+      const summary = await aiProvider.summarizeContent(raw_text, metadata);
 
       if (metadata?.memory_id) {
         await prisma.memory.update({
           where: { id: metadata.memory_id },
           data: { summary: summary },
         });
-        console.log(`Updated memory ${metadata.memory_id} with Gemini summary`);
+        console.log(`Updated memory ${metadata.memory_id} with AI summary`);
         await memoryMeshService.generateEmbeddingsForMemory(metadata.memory_id);
         console.log(`Generated embeddings for memory ${metadata.memory_id}`);
         await memoryMeshService.createMemoryRelations(
