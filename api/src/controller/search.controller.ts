@@ -24,6 +24,11 @@ export const getSearchJobStatus = async (req: Request, res: Response, next: Next
     if (!id) return next(new AppError('job id required', 400))
     const job = await getSearchJob(id)
     if (!job) return next(new AppError('job not found', 404))
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.set('Pragma', 'no-cache')
+    res.set('Expires', '0')
+    res.set('Surrogate-Control', 'no-store')
+    res.set('ETag', `${Date.now()}`)
     res.status(200).json(job)
   } catch (err) {
     next(err)

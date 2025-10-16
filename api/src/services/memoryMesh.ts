@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
 
-import { geminiService } from './gemini';
+import { aiProvider } from './aiProvider';
 
 export class MemoryMeshService {
   private relationshipCache = new Map<string, any>();
@@ -66,8 +66,9 @@ export class MemoryMeshService {
     type: string
   ): Promise<void> {
     try {
-      const embedding = await geminiService.generateEmbedding(text);
+      const embedding = await aiProvider.generateEmbedding(text);
 
+      // Create regular embedding record
       await prisma.embedding.create({
         data: {
           memory_id: memoryId,
@@ -76,6 +77,16 @@ export class MemoryMeshService {
           embedding_type: type,
         },
       });
+
+      // Also create MemoryEmbedding record for search functionality
+      if (type === 'content') {
+        const embeddingArray = `[${embedding.join(',')}]`;
+        await prisma.$executeRaw`
+          INSERT INTO memory_embeddings (id, memory_id, embedding, dim, model, created_at)
+          VALUES (gen_random_uuid(), ${memoryId}::uuid, ${embeddingArray}::vector, ${embedding.length}, 'text-embedding-004', NOW())
+        `;
+        console.log(`Created MemoryEmbedding for memory ${memoryId}`);
+      }
     } catch (error) {
       console.error(
         `Error creating ${type} embedding for memory ${memoryId}:`,
@@ -769,7 +780,7 @@ export class MemoryMeshService {
   }
 
   private async batchEvaluateRelationships(memoryA: any, batchData: any[]): Promise<any[]> {
-    if (!geminiService.isInitialized) {
+    if (!aiProvider.isInitialized) {
       return batchData.map(() => ({ isRelevant: false, relevanceScore: 0, relationshipType: 'none', reasoning: 'AI not available' }));
     }
 
@@ -860,7 +871,7 @@ Return a JSON array with one object per candidate memory:
 
 Be strict about relevance - only mark as relevant if there's substantial conceptual or topical connection.`;
 
-      const response = await geminiService.generateContent(prompt);
+      const response = await aiProvider.generateContent(prompt);
 
       if (!response) {
         throw new Error('No batch evaluation generated from Gemini API');
@@ -1202,7 +1213,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     try {
       let queryEmbedding: number[] | null = null;
       try {
-        queryEmbedding = await geminiService.generateEmbedding(query);
+        queryEmbedding = await aiProvider.generateEmbedding(query);
       } catch (e) {
         console.warn('Embedding generation unavailable, falling back to metadata-based search');
       }

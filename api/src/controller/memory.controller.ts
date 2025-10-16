@@ -18,7 +18,7 @@ import {
 
 import { prisma } from '../lib/prisma';
 
-import { geminiService } from '../services/gemini';
+import { aiProvider } from '../services/aiProvider';
 
 import { memoryMeshService } from '../services/memoryMesh';
 
@@ -63,8 +63,8 @@ export class MemoryController {
       console.log(`Processing content through Gemini...`);
 
       const [summary, extractedMetadata] = await Promise.all([
-        geminiService.summarizeContent(content, metadata),
-        geminiService.extractContentMetadata(content, metadata),
+        aiProvider.summarizeContent(content, metadata),
+        aiProvider.extractContentMetadata(content, metadata),
       ]);
 
       console.log(`Extracted metadata:`, extractedMetadata);
@@ -750,7 +750,7 @@ export class MemoryController {
       let searchableTerms: string[] = [];
 
       try {
-        const queryMetadata = await geminiService.extractContentMetadata(
+        const queryMetadata = await aiProvider.extractContentMetadata(
           searchQuery,
           {
             content_type: 'search_query',

@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
-import { geminiService } from './gemini';
+import { aiProvider } from './aiProvider';
 import { setSearchJobResult } from './searchJob';
 
 type SearchResult = {
@@ -43,7 +43,7 @@ export async function searchMemories(params: {
 }): Promise<{ query: string; results: SearchResult[]; meta_summary?: string; answer?: string }>{
   const { wallet, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING === 'true', enableAnchoring = process.env.SEARCH_ANCHOR_META === 'true' } = params;
 
-  if (!geminiService.isInitialized) {
+  if (!aiProvider.isInitialized) {
     throw new Error('Gemini not configured. Set GEMINI_API_KEY.');
   }
 
@@ -57,7 +57,7 @@ export async function searchMemories(params: {
 
   let embedding: number[];
   try {
-    embedding = await withTimeout(geminiService.generateEmbedding(normalized), 1200);
+    embedding = await withTimeout(aiProvider.generateEmbedding(normalized), 1200);
   } catch {
     return { query: normalized, results: [], meta_summary: undefined, answer: undefined };
   }
@@ -113,7 +113,7 @@ export async function searchMemories(params: {
     const bullets = rows.map((r, i) => `#${i + 1} ${r.summary || ''}`.trim()).join('\n');
     const prompt = `You are RecallOS. A user asked: "${normalized}"\nTheir memories matched include concise summaries below. Write one-sentence meta-summary that links them causally/temporally without markdown.\n${bullets}`;
     try {
-      metaSummary = await withTimeout(geminiService.generateContent(prompt), 1500);
+      metaSummary = await withTimeout(aiProvider.generateContent(prompt), 1500);
     } catch (e) {
       metaSummary = undefined;
     }
@@ -126,7 +126,7 @@ export async function searchMemories(params: {
       return `- [${i + 1}] ${date} ${r.summary || ''}`.trim();
     }).join('\n');
     const ansPrompt = `User query: "${normalized}"\nEvidence notes (ordered by relevance):\n${bullets}\n\nCompose a concise, direct answer (2-4 sentences) summarizing what the user was exploring and key takeaways. No markdown or lists; return plain prose.`;
-    answer = await withTimeout(geminiService.generateContent(ansPrompt), 1800);
+    answer = await withTimeout(aiProvider.generateContent(ansPrompt), 1800);
   } catch {
     answer = undefined;
   }
