@@ -39,6 +39,8 @@ model Memory {
   embeddings      Embedding[]
   related_memories MemoryRelation[] @relation("MemoryRelations")
   related_to_memories MemoryRelation[] @relation("RelatedMemories")
+  memory_embeddings MemoryEmbedding[]
+  query_related_memories QueryRelatedMemory[]
   @@map("memories")
 }
 model Embedding {
@@ -94,4 +96,44 @@ model BlockscoutTransaction {
   last_checked_at       DateTime @default(now())
   check_count           Int      @default(0)
   @@map("blockscout_transactions")
+}
+
+/// Semantic search: pgvector-backed embeddings per memory
+model MemoryEmbedding {
+  id         String   @id @default(uuid()) @db.Uuid
+  memory_id  String   @db.Uuid
+  /// pgvector column (use Unsupported until Prisma adds native type)
+  embedding  Unsupported("vector")
+  dim        Int
+  model      String
+  created_at DateTime @default(now())
+  memory     Memory   @relation(fields: [memory_id], references: [id], onDelete: Cascade)
+  @@map("memory_embeddings")
+}
+
+/// Each search query event (stores only hashed embedding reference)
+model QueryEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  wallet         String
+  query          String
+  embedding_hash String
+  meta_summary   String?
+  avail_hash     String?
+  created_at     DateTime @default(now())
+  related        QueryRelatedMemory[]
+  @@map("query_events")
+}
+
+/// Links a query event to matching memories
+model QueryRelatedMemory {
+  id            String @id @default(uuid()) @db.Uuid
+  query_event_id String @db.Uuid
+  memory_id      String @db.Uuid
+  rank           Int
+  score          Float
+  created_at     DateTime @default(now())
+  query_event    QueryEvent @relation(fields: [query_event_id], references: [id], onDelete: Cascade)
+  memory         Memory     @relation(fields: [memory_id], references: [id], onDelete: Cascade)
+  @@unique([query_event_id, memory_id])
+  @@map("query_related_memories")
 }
