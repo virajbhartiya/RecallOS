@@ -22,7 +22,8 @@
     "docker:logs": "docker-compose logs -f",
     "setup": "npm run docker:up && sleep 10 && npm run db:setup",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "embeddings:backfill": "node -r ts-node/register src/scripts/backfill-embeddings.ts"
   },
   "keywords": [
     "Startup Marketplace"
@@ -53,6 +54,7 @@
     "keccak256": "^1.0.6",
     "merkletreejs": "^0.6.0",
     "morgan": "^1.10.0",
+    "node-fetch": "^3.3.2",
     "prisma": "^6.17.1",
     "ts-node": "^10.9.1",
     "typescript": "^5.4.5"
