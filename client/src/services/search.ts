@@ -4,6 +4,7 @@ import type { Memory, MemorySearchResponse, SearchFilters, SearchResult } from '
 
 type ApiSearchResult = {
   memory_id: string
+  title: string | null
   summary: string | null
   url: string | null
   timestamp: number
@@ -42,24 +43,24 @@ export class SearchService {
     const results: SearchResult[] = (data.results || [])
       .map((r) => {
         const createdAtIso = new Date(r.timestamp * 1000).toISOString()
-        const memory: Memory = {
-          id: r.memory_id,
-          user_id: wallet,
-          source: 'browser',
-          url: r.url || undefined,
-          title: 'Memory',
-          content: '',
-          summary: r.summary || undefined,
-          hash: r.avail_hash || undefined,
-          timestamp: r.timestamp,
-          created_at: createdAtIso,
-          page_metadata: undefined,
-          importance_score: undefined,
-          access_count: 0,
-          last_accessed: createdAtIso,
-          tx_status: undefined,
-          blockchain_network: undefined,
-        }
+            const memory: Memory = {
+              id: r.memory_id,
+              user_id: wallet,
+              source: 'browser',
+              url: r.url || undefined,
+              title: r.title || 'Untitled Memory',
+              content: '',
+              summary: r.summary || undefined,
+              hash: r.avail_hash || undefined,
+              timestamp: r.timestamp,
+              created_at: createdAtIso,
+              page_metadata: undefined,
+              importance_score: undefined,
+              access_count: 0,
+              last_accessed: createdAtIso,
+              tx_status: undefined,
+              blockchain_network: undefined,
+            }
         return {
           memory,
           semantic_score: r.score || 0,

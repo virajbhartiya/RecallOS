@@ -5,6 +5,7 @@ import { setSearchJobResult } from './searchJob';
 
 type SearchResult = {
   memory_id: string;
+  title: string | null;
   summary: string | null;
   url: string | null;
   timestamp: number;
@@ -66,8 +67,8 @@ export async function searchMemories(params: {
   const salt = process.env.SEARCH_EMBED_SALT || 'recallos';
   const embeddingHash = sha256Hex(JSON.stringify({ model: 'text-embedding-004', values: embedding.slice(0, 64), salt }));
 
-  const rows = await prisma.$queryRawUnsafe<Array<{ id: string; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; score: number }>>(`
-    SELECT m.id, m.summary, m.url, m.timestamp, m.hash,
+  const rows = await prisma.$queryRawUnsafe<Array<{ id: string; title: string | null; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; score: number }>>(`
+    SELECT m.id, m.title, m.summary, m.url, m.timestamp, m.hash,
            GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}))) AS score
     FROM memory_embeddings me
     JOIN memories m ON m.id = me.memory_id
@@ -161,6 +162,7 @@ export async function searchMemories(params: {
 
   const results: SearchResult[] = rows.map(r => ({
     memory_id: r.id,
+    title: r.title,
     summary: r.summary,
     url: r.url,
     timestamp: Number(r.timestamp),
