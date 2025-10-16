@@ -5,7 +5,7 @@ const baseURL = (import.meta.env.VITE_SERVER_URL || 'http://localhost:3000') + '
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
-  timeout: 5000,
+  timeout: 30000, // Increased to 30 seconds for search requests
 })
 
 axiosInstance.interceptors.request.use(

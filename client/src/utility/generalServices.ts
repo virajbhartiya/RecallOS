@@ -4,10 +4,14 @@ import { AxiosResponse } from 'axios'
 
 export const getRequest = async (
   route: string,
-  callback?: (res: AxiosResponse) => void
+  callback?: (res: AxiosResponse) => void,
+  signal?: AbortSignal
 ) => {
   try {
-    const res = await axiosInstance.get(route)
+    const res = await axiosInstance.get(route, { 
+      signal,
+      timeout: signal ? 0 : 30000 // Disable timeout if AbortSignal is provided
+    })
     if (callback) callback(res)
     return res
   } catch (err: any) {
@@ -19,10 +23,14 @@ export const getRequest = async (
 export const postRequest = async (
   route: string,
   data: any,
-  callback?: (res: AxiosResponse) => void
+  callback?: (res: AxiosResponse) => void,
+  signal?: AbortSignal
 ) => {
   try {
-    const res = await axiosInstance.post(route, data)
+    const res = await axiosInstance.post(route, data, { 
+      signal,
+      timeout: signal ? 0 : 30000 // Disable timeout if AbortSignal is provided
+    })
     if (callback) callback(res)
     return res
   } catch (err: any) {

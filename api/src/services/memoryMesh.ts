@@ -1219,14 +1219,22 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       }
 
       if (queryEmbedding) {
-        const similarMemories = await this.findSimilarMemories(
-          queryEmbedding,
-          userId,
-          '',
-          limit,
-          preFilteredMemoryIds
-        );
-        return similarMemories;
+        // Use the semantic search with MemoryEmbedding table
+        const queryVecSql = `[${queryEmbedding.join(',')}]`;
+        const rows = await prisma.$queryRawUnsafe<Array<{ id: string; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; score: number }>>(`
+          SELECT m.id, m.summary, m.url, m.timestamp, m.hash,
+                 GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}::vector))) AS score
+          FROM memory_embeddings me
+          JOIN memories m ON m.id = me.memory_id
+          WHERE m.user_id = '${userId}'
+          ORDER BY me.embedding <=> ${queryVecSql}::vector
+          LIMIT ${limit}
+        `);
+        
+        return rows.map(row => ({
+          ...row,
+          similarity_score: row.score
+        }));
       }
 
       // Fallback: keyword search on metadata/title/summary
