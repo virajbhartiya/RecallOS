@@ -15,7 +15,16 @@ type SearchResult = {
 };
 
 function normalizeText(text: string): string {
-  return text.trim().replace(/\s+/g, ' ').slice(0, 8000);
+  return text
+    .trim()
+    // Remove common punctuation that can confuse embeddings
+    .replace(/[?!.,;:()]/g, ' ')
+    // Normalize whitespace
+    .replace(/\s+/g, ' ')
+    // Remove extra spaces
+    .trim()
+    // Limit length
+    .slice(0, 8000);
 }
 
 function sha256Hex(input: string): string {
@@ -41,14 +50,16 @@ export async function searchMemories(params: {
   limit?: number;
   enableReasoning?: boolean;
   enableAnchoring?: boolean;
-}): Promise<{ query: string; results: SearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }> }>{
-  const { wallet, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING === 'true', enableAnchoring = process.env.SEARCH_ANCHOR_META === 'true' } = params;
+  contextOnly?: boolean;
+}): Promise<{ query: string; results: SearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string }>{
+  const { wallet, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', enableAnchoring = process.env.SEARCH_ANCHOR_META === 'true', contextOnly = false } = params;
 
   if (!aiProvider.isInitialized) {
     throw new Error('Gemini not configured. Set GEMINI_API_KEY.');
   }
 
   const normalized = normalizeText(query);
+  console.log(`Search query: "${query}" -> normalized: "${normalized}"`);
 
   const walletNorm = (wallet || '').toLowerCase();
   const user = await prisma.user.findFirst({ where: { wallet_address: walletNorm } });
@@ -84,8 +95,8 @@ export async function searchMemories(params: {
     )
     SELECT id, title, summary, url, timestamp, hash, score
     FROM ranked
-    WHERE rn = 1
-    ORDER BY (1 - score) ASC
+    WHERE rn = 1 AND score > 0.1
+    ORDER BY score DESC
     LIMIT ${Number(limit)}
   `);
 
@@ -103,7 +114,7 @@ export async function searchMemories(params: {
         },
       });
     } catch {}
-    return { query: normalized, results: [], meta_summary: undefined, answer: undefined };
+    return { query: normalized, results: [], meta_summary: undefined, answer: undefined, context: undefined };
   }
 
   // Fetch related edges for mesh context
@@ -124,7 +135,22 @@ export async function searchMemories(params: {
   let metaSummary: string | undefined;
   if (enableReasoning) {
     const bullets = rows.map((r, i) => `#${i + 1} ${r.summary || ''}`.trim()).join('\n');
-    const prompt = `You are RecallOS. A user asked: "${normalized}"\nTheir memories matched include concise summaries below. Write one-sentence meta-summary that links them causally/temporally without markdown.\n${bullets}`;
+    const prompt = `You are RecallOS. A user asked: "${normalized}"\nTheir memories matched include concise summaries below. Write one-sentence meta-summary that links them causally/temporally.
+
+CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
+- No asterisks (*) for bold or italic text
+- No underscores (_) for emphasis
+- No backticks for code blocks
+- No hash symbols (#) for headers
+- No brackets [] or parentheses () for links
+- No special characters for formatting
+- No bullet points with dashes or asterisks
+- No numbered lists with special formatting
+
+Return clean, readable plain text only.
+
+Memory summaries:
+${bullets}`;
     try {
       metaSummary = await withTimeout(aiProvider.generateContent(prompt), 1500);
     } catch (e) {
@@ -134,35 +160,73 @@ export async function searchMemories(params: {
 
   let answer: string | undefined;
   let citations: Array<{ label: number; memory_id: string; title: string | null; url: string | null }> = [];
-  try {
-    const bullets = rows.map((r, i) => {
+  let context: string | undefined;
+  
+  // Generate context for external AI tools (like ChatGPT)
+  if (contextOnly) {
+    context = rows.map((r, i) => {
       const date = r.timestamp ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10) : '';
-      return `- [${i + 1}] ${date} ${r.summary || ''}`.trim();
-    }).join('\n');
-    const ansPrompt = `You are RecallOS. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.\n\nRules:\n- Use inline numeric citations like [1], [2].\n- Keep it concise (2-4 sentences).\n- Plain text only.\n\nUser query: "${normalized}"\nEvidence notes (ordered by relevance):\n${bullets}`;
-    answer = await withTimeout(aiProvider.generateContent(ansPrompt), 8000);
-    // Build citations map aligned with [n]
-    const allCitations = rows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
-    // Keep only citations actually referenced in the answer/meta text, preserve first-seen order
-    const pickOrderFrom = (text: string | undefined) => {
-      if (!text) return [] as number[];
-      const order: number[] = [];
-      const seen = new Set<number>();
-      const re = /\[(\d+)\]/g;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(text))) {
-        const n = Number(m[1]);
-        if (!seen.has(n)) { seen.add(n); order.push(n); }
-      }
-      return order;
-    };
-    const order = pickOrderFrom(answer);
-    const orderSet = new Set(order);
-    citations = order.length
-      ? order.map(n => allCitations.find(c => c.label === n)).filter((c): c is { label: number; memory_id: string; title: string | null; url: string | null } => Boolean(c))
-      : [];
-  } catch {
-    answer = undefined;
+      const title = r.title ? `Title: ${r.title}` : '';
+      const url = r.url ? `URL: ${r.url}` : '';
+      const summary = r.summary || 'No summary available';
+      return `Memory ${i + 1} (${date}):
+${title ? title + '\n' : ''}${url ? url + '\n' : ''}Summary: ${summary}`;
+    }).join('\n\n');
+  } else {
+    // Generate AI answer only if not in context-only mode
+    try {
+      const bullets = rows.map((r, i) => {
+        const date = r.timestamp ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10) : '';
+        return `- [${i + 1}] ${date} ${r.summary || ''}`.trim();
+      }).join('\n');
+      const ansPrompt = `You are RecallOS. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
+
+Rules:
+- Use inline numeric citations like [1], [2].
+- Keep it concise (2-4 sentences).
+- Plain text only.
+
+CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
+- No asterisks (*) for bold or italic text
+- No underscores (_) for emphasis
+- No backticks for code blocks
+- No hash symbols (#) for headers
+- No brackets [] or parentheses () for links (except numeric citations [1], [2], etc.)
+- No special characters for formatting
+- No bullet points with dashes or asterisks
+- No numbered lists with special formatting
+
+Return clean, readable plain text only.
+
+User query: "${normalized}"
+Evidence notes (ordered by relevance):
+${bullets}`;
+      answer = await withTimeout(aiProvider.generateContent(ansPrompt), 8000);
+      // Build citations map aligned with [n]
+      const allCitations = rows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
+      // Keep only citations actually referenced in the answer/meta text, preserve first-seen order
+      const pickOrderFrom = (text: string | undefined) => {
+        if (!text) return [] as number[];
+        const order: number[] = [];
+        const seen = new Set<number>();
+        const re = /\[(\d+)\]/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(text))) {
+          const n = Number(m[1]);
+          if (!seen.has(n)) { seen.add(n); order.push(n); }
+        }
+        return order;
+      };
+      const order = pickOrderFrom(answer);
+      const orderSet = new Set(order);
+      citations = order.length
+        ? order.map(n => allCitations.find(c => c.label === n)).filter((c): c is { label: number; memory_id: string; title: string | null; url: string | null } => Boolean(c))
+        : [];
+    } catch (error) {
+      console.error('Error generating search answer:', error);
+      // Fallback: create a simple summary if AI generation fails
+      answer = `Found ${rows.length} relevant memories about "${normalized}". ${rows.slice(0, 3).map((r, i) => `[${i + 1}] ${r.title || 'Untitled'}`).join(', ')}${rows.length > 3 ? ' and more.' : '.'}`;
+    }
   }
 
   const created = await prisma.queryEvent.create({
@@ -211,7 +275,7 @@ export async function searchMemories(params: {
       (global as any).__currentSearchJobId = undefined;
     }
   } catch {}
-  return { query: normalized, results, meta_summary: metaSummary, answer, citations };
+  return { query: normalized, results, meta_summary: metaSummary, answer, citations, context };
 }
 
 

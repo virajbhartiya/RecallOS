@@ -842,6 +842,8 @@ export class MemoryMeshService {
     try {
       const prompt = `Evaluate relationships between a source memory and multiple candidate memories. Return a JSON array with evaluation results.
 
+CRITICAL: Return ONLY valid JSON. No explanations, no markdown formatting, no code blocks, no special characters. Just the JSON object.
+
 Source Memory:
 Title: ${memoryA.title || 'N/A'}
 Summary: ${memoryA.summary || 'N/A'}
