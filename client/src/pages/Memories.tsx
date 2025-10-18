@@ -384,7 +384,7 @@ export const Memories: React.FC = () => {
 
       // 1) If explicit semantic requested, use it
       if (useSemantic) {
-        const data = await SearchService.semanticSearch(address, query, 50, signal)
+        const data = await SearchService.semanticSearch(address, query, 50, false, signal)
         response = await SearchService.semanticSearchMapped(address, query, filters, 1, 50, signal)
         setSearchAnswer(data.answer || null)
         setSearchMeta(data.meta_summary || null)
@@ -397,7 +397,7 @@ export const Memories: React.FC = () => {
         if (looksNatural) {
           console.log('Using LLM-powered semantic search for natural language query:', query)
           // Use LLM-powered semantic search for natural language queries
-          const data = await SearchService.semanticSearch(address, query, 50, signal)
+          const data = await SearchService.semanticSearch(address, query, 50, false, signal)
           const semantic = await SearchService.semanticSearchMapped(address, query, filters, 1, 50, signal)
           console.log('Semantic search results:', semantic.results?.length, 'results')
           response = semantic
@@ -411,6 +411,10 @@ export const Memories: React.FC = () => {
           const keyword = await MemoryService.searchMemories(address, query, filters, 1, 50, signal)
           console.log('Keyword search results:', keyword.results?.length, 'results')
           response = keyword
+          // Set search answer and meta summary from keyword search response
+          setSearchAnswer(keyword.answer || null)
+          setSearchMeta(keyword.meta_summary || null)
+          setSearchCitations(keyword.citations || null)
         }
       }
 

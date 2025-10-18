@@ -59,7 +59,6 @@ export async function searchMemories(params: {
   }
 
   const normalized = normalizeText(query);
-  console.log(`Search query: "${query}" -> normalized: "${normalized}"`);
 
   const walletNorm = (wallet || '').toLowerCase();
   const user = await prisma.user.findFirst({ where: { wallet_address: walletNorm } });
@@ -95,15 +94,31 @@ export async function searchMemories(params: {
     )
     SELECT id, title, summary, url, timestamp, hash, score
     FROM ranked
-    WHERE rn = 1 AND score > 0.1
+    WHERE rn = 1 AND score > 0.3
     ORDER BY score DESC
     LIMIT ${Number(limit)}
   `);
 
-  const memoryIds = rows.map(r => r.id);
+  
+  // Additional relevance filtering based on content analysis
+  const queryKeywords = normalized.toLowerCase().split(/\s+/).filter(word => word.length > 2);
+  const filteredRows = rows.filter(row => {
+    const title = (row.title || '').toLowerCase();
+    const summary = (row.summary || '').toLowerCase();
+    const content = title + ' ' + summary;
+    
+    // Check if the content actually contains relevant keywords
+    const hasRelevantKeywords = queryKeywords.some(keyword => 
+      content.includes(keyword.toLowerCase())
+    );
+    
+    return hasRelevantKeywords;
+  });
+  
+  const memoryIds = filteredRows.map(r => r.id);
 
   // Fast-path: if no matches, persist minimal query event and return immediately
-  if (rows.length === 0) {
+  if (filteredRows.length === 0) {
     try {
       await prisma.queryEvent.create({
         data: {
@@ -134,7 +149,7 @@ export async function searchMemories(params: {
 
   let metaSummary: string | undefined;
   if (enableReasoning) {
-    const bullets = rows.map((r, i) => `#${i + 1} ${r.summary || ''}`.trim()).join('\n');
+    const bullets = filteredRows.map((r, i) => `#${i + 1} ${r.summary || ''}`.trim()).join('\n');
     const prompt = `You are RecallOS. A user asked: "${normalized}"\nTheir memories matched include concise summaries below. Write one-sentence meta-summary that links them causally/temporally.
 
 CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
@@ -164,7 +179,7 @@ ${bullets}`;
   
   // Generate context for external AI tools (like ChatGPT)
   if (contextOnly) {
-    context = rows.map((r, i) => {
+    context = filteredRows.map((r, i) => {
       const date = r.timestamp ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10) : '';
       const title = r.title ? `Title: ${r.title}` : '';
       const url = r.url ? `URL: ${r.url}` : '';
@@ -175,7 +190,7 @@ ${title ? title + '\n' : ''}${url ? url + '\n' : ''}Summary: ${summary}`;
   } else {
     // Generate AI answer only if not in context-only mode
     try {
-      const bullets = rows.map((r, i) => {
+      const bullets = filteredRows.map((r, i) => {
         const date = r.timestamp ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10) : '';
         return `- [${i + 1}] ${date} ${r.summary || ''}`.trim();
       }).join('\n');
@@ -203,7 +218,7 @@ Evidence notes (ordered by relevance):
 ${bullets}`;
       answer = await withTimeout(aiProvider.generateContent(ansPrompt), 8000);
       // Build citations map aligned with [n]
-      const allCitations = rows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
+      const allCitations = filteredRows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
       // Keep only citations actually referenced in the answer/meta text, preserve first-seen order
       const pickOrderFrom = (text: string | undefined) => {
         if (!text) return [] as number[];
@@ -225,7 +240,7 @@ ${bullets}`;
     } catch (error) {
       console.error('Error generating search answer:', error);
       // Fallback: create a simple summary if AI generation fails
-      answer = `Found ${rows.length} relevant memories about "${normalized}". ${rows.slice(0, 3).map((r, i) => `[${i + 1}] ${r.title || 'Untitled'}`).join(', ')}${rows.length > 3 ? ' and more.' : '.'}`;
+      answer = `Found ${filteredRows.length} relevant memories about "${normalized}". ${filteredRows.slice(0, 3).map((r, i) => `[${i + 1}] ${r.title || 'Untitled'}`).join(', ')}${filteredRows.length > 3 ? ' and more.' : '.'}`;
     }
   }
 
@@ -238,9 +253,9 @@ ${bullets}`;
     },
   });
 
-  if (rows.length) {
+  if (filteredRows.length) {
     await prisma.queryRelatedMemory.createMany({
-      data: rows.map((r, idx) => ({ query_event_id: created.id, memory_id: r.id, rank: idx + 1, score: r.score })),
+      data: filteredRows.map((r, idx) => ({ query_event_id: created.id, memory_id: r.id, rank: idx + 1, score: r.score })),
       skipDuplicates: true,
     });
   }
@@ -257,7 +272,7 @@ ${bullets}`;
     });
   }
 
-  const results: SearchResult[] = rows.map(r => ({
+  const results: SearchResult[] = filteredRows.map(r => ({
     memory_id: r.id,
     title: r.title,
     summary: r.summary,
