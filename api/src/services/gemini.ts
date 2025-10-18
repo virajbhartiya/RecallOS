@@ -8,7 +8,7 @@ let nextAvailableAt = 0;
 const taskQueue: Array<{ run: QueueTask<any>; resolve: (v: any) => void; reject: (e: any) => void }> = [];
 
 // Default gap between requests; tuned for free-tier limits (~10 rpm). Adjust via Retry-After hints when returned
-let minIntervalMs = 7000;
+let minIntervalMs = 3000; // Reduced from 7000ms to 3000ms for faster processing
 
 async function processQueue() {
   if (isProcessingQueue) return;
@@ -85,7 +85,13 @@ export class GeminiService {
       this.ai = null as any;
       return;
     }
-    this.ai = new GoogleGenAI({ apiKey });
+    try {
+      this.ai = new GoogleGenAI({ apiKey });
+      console.log('Gemini service initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize Gemini service:', error);
+      this.ai = null as any;
+    }
   }
 
   private ensureInit() {
@@ -179,11 +185,14 @@ Return clean, readable plain text only.`;
   async generateEmbedding(text: string): Promise<number[]> {
     this.ensureInit();
     
+    console.log('Generating embedding for text:', text.substring(0, 100) + '...');
+    
     let lastError: any;
     const originalModelIndex = this.currentModelIndex;
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
+        console.log(`Attempting embedding generation with model: ${this.getCurrentModel()}`);
         const response = await runWithRateLimit(() =>
           this.ai.models.embedContent({
             model: 'text-embedding-004',
@@ -193,6 +202,7 @@ Return clean, readable plain text only.`;
         const values = response.embeddings?.[0]?.values;
         if (!values) throw new Error('No embedding generated from Gemini API');
         
+        console.log('Embedding generated successfully, length:', values.length);
         // Reset to first model on success
         this.resetToFirstModel();
         return values;
@@ -214,6 +224,7 @@ Return clean, readable plain text only.`;
 
     // Reset to original model if all models failed
     this.currentModelIndex = originalModelIndex;
+    console.error('All embedding generation attempts failed:', lastError);
     throw lastError;
   }
 

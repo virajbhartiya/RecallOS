@@ -4,6 +4,7 @@ import { geminiService } from './gemini'
 type Provider = 'gemini' | 'ollama' | 'hybrid'
 
 const provider: Provider = (process.env.AI_PROVIDER as Provider) || 'hybrid'
+console.log('AI Provider configured as:', provider)
 
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
 const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'mxbai-embed-large:latest'
@@ -11,7 +12,13 @@ const OLLAMA_GEN_MODEL = process.env.OLLAMA_GEN_MODEL || 'llama3.1:8b'
 
 export const aiProvider = {
   get isInitialized(): boolean {
-    if (provider === 'gemini') return geminiService.isInitialized
+    if (provider === 'gemini') {
+      const isInit = geminiService.isInitialized;
+      if (!isInit) {
+        console.warn('Gemini service not initialized. Check GEMINI_API_KEY environment variable.');
+      }
+      return isInit;
+    }
     return true
   },
 
