@@ -221,7 +221,7 @@ export const useBlockscout = () => {
     }
 
     try {
-      const apiUrl = process.env.VITE_SERVER_URL || 'http://localhost:3000'
+      const apiUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000'
       await fetch(`${apiUrl}/api/blockscout/prefetch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -238,7 +238,7 @@ export const useBlockscout = () => {
     transactions: Array<{ txHash: string; network?: string }>
   ): Promise<void> => {
     try {
-      const apiUrl = process.env.VITE_SERVER_URL || 'http://localhost:3000'
+      const apiUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3000'
       await fetch(`${apiUrl}/api/blockscout/batch-prefetch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

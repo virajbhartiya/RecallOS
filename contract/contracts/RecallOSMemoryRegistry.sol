@@ -17,8 +17,22 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
     mapping(bytes32 => bool) public memoryExists;               
     mapping(bytes32 => address) public memoryOwner;            
 
+    // Gas deposit management
+    mapping(address => uint256) public userGasDeposits;
+    mapping(address => bool) public authorizedRelayers;
+    uint256 public constant GAS_BUFFER_PERCENT = 120; // 20% buffer
+    uint256 public constant MIN_DEPOSIT = 0.001 ether;
+    uint256 public constant MAX_WITHDRAWAL_PER_DAY = 1 ether;
+    
+    mapping(address => uint256) public lastWithdrawalTime;
+    mapping(address => uint256) public dailyWithdrawalAmount;
+
     event MemoryStored(address indexed user, bytes32 indexed hash, bytes32 urlHash, uint256 timestamp);
     event MemoryBatchStored(address indexed user, uint256 count);
+    event GasDeposited(address indexed user, uint256 amount, uint256 newBalance);
+    event GasDeducted(address indexed user, uint256 amount, uint256 remainingBalance);
+    event GasWithdrawn(address indexed user, uint256 amount, uint256 newBalance);
+    event RelayerAuthorized(address indexed relayer, bool authorized);
 
     function initialize() public initializer {
         __Ownable_init(msg.sender);
@@ -26,8 +40,63 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    // Gas deposit management functions
+    function depositGas() external payable {
+        require(msg.value >= MIN_DEPOSIT, "Deposit amount too small");
+        userGasDeposits[msg.sender] += msg.value;
+        emit GasDeposited(msg.sender, msg.value, userGasDeposits[msg.sender]);
+    }
+
+    function withdrawGas(uint256 amount) external {
+        require(amount > 0, "Amount must be greater than 0");
+        require(userGasDeposits[msg.sender] >= amount, "Insufficient balance");
+        
+        // Check daily withdrawal limit
+        uint256 currentTime = block.timestamp;
+        uint256 dayStart = (currentTime / 1 days) * 1 days;
+        
+        if (lastWithdrawalTime[msg.sender] < dayStart) {
+            dailyWithdrawalAmount[msg.sender] = 0;
+        }
+        
+        require(dailyWithdrawalAmount[msg.sender] + amount <= MAX_WITHDRAWAL_PER_DAY, "Daily withdrawal limit exceeded");
+        
+        userGasDeposits[msg.sender] -= amount;
+        dailyWithdrawalAmount[msg.sender] += amount;
+        lastWithdrawalTime[msg.sender] = currentTime;
+        
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "Withdrawal failed");
+        
+        emit GasWithdrawn(msg.sender, amount, userGasDeposits[msg.sender]);
+    }
+
+    function getUserGasBalance(address user) external view returns (uint256) {
+        return userGasDeposits[user];
+    }
+
+    function authorizeRelayer(address relayer, bool authorized) external onlyOwner {
+        authorizedRelayers[relayer] = authorized;
+        emit RelayerAuthorized(relayer, authorized);
+    }
+
+    function isAuthorizedRelayer(address relayer) external view returns (bool) {
+        return authorizedRelayers[relayer];
+    }
+
+    // Internal function to deduct gas from user's deposit
+    function _deductGas(address user, uint256 gasCost) internal {
+        require(userGasDeposits[user] >= gasCost, "Insufficient gas deposit");
+        userGasDeposits[user] -= gasCost;
+        emit GasDeducted(user, gasCost, userGasDeposits[user]);
+    }
+
     function storeMemory(bytes32 _hash, bytes32 _urlHash, uint256 _timestamp) external {
         require(!memoryExists[_hash], "Memory already exists");
+        require(authorizedRelayers[msg.sender], "Unauthorized relayer");
+        
+        // Store gas start for calculation
+        uint256 gasStart = gasleft();
         
         Memory memory newMemory = Memory({
             hash: _hash,
@@ -35,13 +104,18 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
             timestamp: _timestamp
         });
         
-        userMemories[msg.sender].push(newMemory);
-        userMemoryCount[msg.sender]++;
+        userMemories[tx.origin].push(newMemory);
+        userMemoryCount[tx.origin]++;
         
         memoryExists[_hash] = true;
-        memoryOwner[_hash] = msg.sender;
+        memoryOwner[_hash] = tx.origin;
         
-        emit MemoryStored(msg.sender, _hash, _urlHash, _timestamp);
+        // Calculate actual gas used and deduct from user's deposit
+        uint256 gasUsed = gasStart - gasleft() + 21000; // Add base transaction cost
+        uint256 gasCost = tx.gasprice * gasUsed * GAS_BUFFER_PERCENT / 100;
+        _deductGas(tx.origin, gasCost);
+        
+        emit MemoryStored(tx.origin, _hash, _urlHash, _timestamp);
     }
 
     function storeMemoryBatch(
@@ -51,6 +125,10 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
     ) external {
         require(_hashes.length == _urlHashes.length && _urlHashes.length == _timestamps.length, "Array lengths must match");
         require(_hashes.length > 0, "Must store at least one memory");
+        require(authorizedRelayers[msg.sender], "Unauthorized relayer");
+        
+        // Store gas start for calculation
+        uint256 gasStart = gasleft();
         
         for (uint256 i = 0; i < _hashes.length; i++) {
             require(!memoryExists[_hashes[i]], "Memory already exists");
@@ -61,16 +139,21 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
                 timestamp: _timestamps[i]
             });
             
-            userMemories[msg.sender].push(newMemory);
-            userMemoryCount[msg.sender]++;
+            userMemories[tx.origin].push(newMemory);
+            userMemoryCount[tx.origin]++;
             
             memoryExists[_hashes[i]] = true;
-            memoryOwner[_hashes[i]] = msg.sender;
+            memoryOwner[_hashes[i]] = tx.origin;
             
-            emit MemoryStored(msg.sender, _hashes[i], _urlHashes[i], _timestamps[i]);
+            emit MemoryStored(tx.origin, _hashes[i], _urlHashes[i], _timestamps[i]);
         }
         
-        emit MemoryBatchStored(msg.sender, _hashes.length);
+        // Calculate actual gas used and deduct from user's deposit
+        uint256 gasUsed = gasStart - gasleft() + 21000; // Add base transaction cost
+        uint256 gasCost = tx.gasprice * gasUsed * GAS_BUFFER_PERCENT / 100;
+        _deductGas(tx.origin, gasCost);
+        
+        emit MemoryBatchStored(tx.origin, _hashes.length);
     }
 
     function getMemory(address _user, uint256 _index) external view returns (bytes32 hash, bytes32 urlHash, uint256 timestamp) {

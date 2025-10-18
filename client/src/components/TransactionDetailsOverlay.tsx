@@ -15,7 +15,7 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
   isOpen,
   onClose
 }) => {
-  const { getTransactionStatus, getNetworkName, monitorTransaction } = useBlockscout()
+  const { getNetworkName, monitorTransaction } = useBlockscout()
   const [txInfo, setTxInfo] = useState<TransactionInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -33,23 +33,17 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
         }
       }
       
-      // Load initial data
       loadTransactionInfo()
-      
-      // Set up polling for real-time updates (every 5 seconds)
       const interval = setInterval(loadTransactionInfo, 5000)
-      
       return () => clearInterval(interval)
     }
   }, [isOpen, txHash, network, monitorTransaction])
 
   if (!isOpen) return null
-
   const networkName = getNetworkName(network)
 
   const formatValue = (value?: string) => {
     if (!value) return 'N/A'
-    // Convert wei to ETH (assuming 18 decimals)
     const ethValue = parseFloat(value) / Math.pow(10, 18)
     return `${ethValue.toFixed(6)} ETH`
   }
@@ -63,7 +57,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
             <h3 className="text-lg font-medium text-gray-900">Transaction Details</h3>
@@ -96,7 +89,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
           </div>
         </div>
 
-        {/* Content */}
         <div className="p-6">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
@@ -105,7 +97,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
             </div>
           ) : txInfo ? (
             <div className="space-y-6">
-              {/* Transaction Hash */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Transaction Hash
@@ -117,7 +108,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
                 </div>
               </div>
 
-              {/* Status */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Status
@@ -135,7 +125,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
                 </div>
               </div>
 
-              {/* Block Number */}
               {txInfo.blockNumber && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -149,7 +138,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
                 </div>
               )}
 
-              {/* Gas Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {txInfo.gasUsed && (
                   <div>
@@ -177,7 +165,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
                 )}
               </div>
 
-              {/* Addresses */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {txInfo.from && (
                   <div>
@@ -205,7 +192,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
                 )}
               </div>
 
-              {/* Value */}
               {txInfo.value && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -219,7 +205,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
                 </div>
               )}
 
-              {/* Timestamp */}
               {txInfo.timestamp && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -233,7 +218,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
                 </div>
               )}
 
-              {/* Failure Analysis */}
               {txInfo.status === 'failed' && (
                 <TransactionFailureAnalysis
                   txHash={txHash}
@@ -254,7 +238,6 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex justify-end p-6 border-t border-gray-200">
           <button
             onClick={onClose}

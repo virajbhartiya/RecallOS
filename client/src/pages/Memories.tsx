@@ -11,7 +11,6 @@ import { TransactionHistorySidebar } from '@/components/TransactionHistorySideba
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { Memory, MemoryInsights, SearchFilters, MemorySearchResponse, MemoryMesh as MemoryMeshType } from '@/types/memory'
 
-// Memory Card Component
 const MemoryCard: React.FC<{
   memory: Memory
   isSelected: boolean
@@ -39,7 +38,6 @@ const MemoryCard: React.FC<{
           : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300 bg-white'
       }`}
     >
-      {/* Compact header */}
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-xs font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors flex items-center gap-2">
           <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getSourceColorLocal(memory.source) }} />
@@ -54,16 +52,16 @@ const MemoryCard: React.FC<{
             }`} title={memory.tx_status}></div>
           )}
           {memory.tx_hash && memory.tx_hash.startsWith('0x') && memory.tx_hash.length === 66 && onViewTransaction && (
-            <button
+            <span
               onClick={(e) => {
                 e.stopPropagation()
                 onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')
               }}
-              className="text-xs text-blue-600 hover:text-blue-800 font-mono"
+              className="text-xs text-blue-600 hover:text-blue-800 font-mono cursor-pointer"
               title="View real transaction on Blockscout"
             >
               TX
-            </button>
+            </span>
           )}
           {searchResult?.blended_score !== undefined && (
             <span className="text-xs text-gray-500 font-mono">
@@ -73,14 +71,12 @@ const MemoryCard: React.FC<{
         </div>
       </div>
       
-      {/* Metadata */}
       <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
         <span>{memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'No date'}</span>
         <span>•</span>
         <span className="uppercase font-mono text-xs">{memory.source}</span>
       </div>
       
-      {/* Content preview */}
       {(memory.summary || memory.content) && (
         <p className="text-xs text-gray-600 line-clamp-1 leading-relaxed">
           {memory.summary || (memory.content && memory.content.slice(0, 60) + (memory.content.length > 60 ? '...' : ''))}
@@ -90,7 +86,6 @@ const MemoryCard: React.FC<{
   )
 }
 
-// Memory Details Panel
 const MemoryDetails: React.FC<{
   memory: Memory | null
   expandedContent: boolean
@@ -116,7 +111,6 @@ const MemoryDetails: React.FC<{
   return (
     <div className="flex-1 overflow-y-auto">
               <div className="p-6">
-                {/* Header */}
                 <div className="mb-6">
                   <h3 className="text-lg font-light text-gray-900 mb-2 leading-tight">
             {memory.title || 'Untitled Memory'}
@@ -134,7 +128,6 @@ const MemoryDetails: React.FC<{
                   </div>
                 </div>
 
-                {/* Status & Importance */}
                 <div className="flex items-center gap-4 mb-6">
           {memory.tx_status && (
                     <div className="flex items-center gap-2">
@@ -181,7 +174,6 @@ const MemoryDetails: React.FC<{
                   )}
                 </div>
 
-                {/* Summary */}
         {memory.summary && (
                   <div className="mb-6">
                     <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SUMMARY]</h4>
@@ -193,7 +185,6 @@ const MemoryDetails: React.FC<{
                   </div>
                 )}
 
-                {/* Full Content */}
         {memory.content && (
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-3">
@@ -213,7 +204,6 @@ const MemoryDetails: React.FC<{
                   </div>
                 )}
 
-                {/* URL */}
         {memory.url && memory.url !== 'unknown' && (
                   <div className="mb-6">
                     <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SOURCE URL]</h4>
@@ -230,7 +220,6 @@ const MemoryDetails: React.FC<{
                   </div>
                 )}
 
-        {/* Metadata */}
         {memory.page_metadata && (
           <div className="mb-6">
             <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[METADATA]</h4>
@@ -247,7 +236,7 @@ const MemoryDetails: React.FC<{
 }
 
 export const Memories: React.FC = () => {
-  const { isConnected, address } = useWallet()
+  const { isConnected, address, gasBalance } = useWallet()
   const { showTransactionNotification, showAllTransactions, prefetchTransaction } = useBlockscout()
   const [memories, setMemories] = useState<Memory[]>([])
   const [insights, setInsights] = useState<MemoryInsights | null>(null)
@@ -295,7 +284,6 @@ export const Memories: React.FC = () => {
       setMemories(memoriesData || [])
       setInsights(insightsData)
       
-      // Prefetch transaction data for memories with transaction hashes
       const transactionsToPrefetch = (memoriesData || [])
         .filter(memory => memory.tx_hash && memory.tx_hash.startsWith('0x'))
         .map(memory => ({
@@ -305,7 +293,6 @@ export const Memories: React.FC = () => {
       
       if (transactionsToPrefetch.length > 0) {
         console.log(`Prefetching ${transactionsToPrefetch.length} transactions`)
-        // Trigger prefetch in background
         transactionsToPrefetch.forEach(({ txHash, network }) => {
           prefetchTransaction(txHash, network)
         })
@@ -319,8 +306,6 @@ export const Memories: React.FC = () => {
   }, [address, prefetchTransaction])
 
   const handleSelectMemory = (memory: Memory) => {
-    // If the selected item is from search results, it may be a slim object without full content/metadata.
-    // Prefer the fully loaded version from the main `memories` state when available.
     const full = memories.find(m => m.id === memory.id)
     setSelectedMemory(full || memory)
     setExpandedContent(false)
@@ -331,7 +316,6 @@ export const Memories: React.FC = () => {
     const fromSearch = searchResults?.results.find(r => r.memory.id === memoryId)?.memory
     const preferred = fromMemories || fromSearch
     if (preferred) {
-      // Ensure we display the richest version if both exist
       const full = fromMemories || preferred
       setSelectedMemory(full)
       setExpandedContent(false)
@@ -346,7 +330,6 @@ export const Memories: React.FC = () => {
     if (chosen) {
       setSelectedMemory(chosen)
       setExpandedContent(false)
-      // If sidebar is collapsed, open the floating details; otherwise panel is already visible
       if (isSidebarCollapsed) {
         setIsNodeModalOpen(true)
       }
@@ -365,12 +348,10 @@ export const Memories: React.FC = () => {
   ) => {
     if (!address) return
 
-    // Cancel any previous search request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
 
-    // Create new AbortController for this request
     abortControllerRef.current = new AbortController()
 
     setSearchError(null)
@@ -592,9 +573,22 @@ export const Memories: React.FC = () => {
                   >
                     [ALL TX]
                   </button>
-                  <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
+                    </div>
+                    {gasBalance && (
+                      <div className="flex items-center space-x-1 text-xs font-mono">
+                        <span className="text-gray-600">Gas:</span>
+                        <span className={`${parseFloat(gasBalance) < 0.005 ? 'text-yellow-600' : 'text-gray-900'}`}>
+                          {gasBalance} ETH
+                        </span>
+                        {parseFloat(gasBalance) < 0.005 && (
+                          <span className="text-yellow-600">⚠️</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -602,8 +596,6 @@ export const Memories: React.FC = () => {
           </div>
         </div>
       </header>
-
-      {/* Summary Toolbar removed to avoid duplication with bottom bar */}
 
       {/* Main Content */}
       <div className="flex h-[calc(100vh-73px-48px)]">
@@ -971,6 +963,35 @@ export const Memories: React.FC = () => {
           isOpen={showTransactionHistorySidebar}
           onClose={handleCloseTransactionHistory}
         />
+      )}
+
+      {/* Gas Deposit Section */}
+      {isConnected && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-w-sm">
+            <h3 className="text-sm font-semibold mb-2">Gas Balance</h3>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-600">Current:</span>
+              <span className={`text-sm font-mono ${parseFloat(gasBalance || '0') < 0.005 ? 'text-yellow-600' : 'text-gray-900'}`}>
+                {gasBalance || '0.0000'} ETH
+              </span>
+            </div>
+            {parseFloat(gasBalance || '0') < 0.005 && (
+              <div className="text-xs text-yellow-600 mb-2">
+                ⚠️ Low balance - deposit more gas
+              </div>
+            )}
+            <button
+              onClick={() => {
+                // Navigate to landing page where DepositManager is properly wrapped
+                window.location.href = '/'
+              }}
+              className="w-full px-3 py-2 text-xs font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
+            >
+              [DEPOSIT GAS]
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Node Detail Overlay */}
