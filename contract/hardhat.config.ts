@@ -5,12 +5,6 @@ import { configVariable } from "hardhat/config";
 
 const config: HardhatUserConfig = {
   plugins: [hardhatToolboxViemPlugin],
-  testRunner: {
-    name: "node",
-    options: {
-      files: ["test/**/*.test.ts"],
-    },
-  },
   solidity: {
     profiles: {
       default: {

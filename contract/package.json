@@ -15,6 +15,10 @@
     "upgrade:sepolia": "hardhat run scripts/upgrade.ts --network sepolia",
     "upgrade:mainnet": "hardhat run scripts/upgrade.ts --network mainnet",
     "upgrade:op": "hardhat run scripts/upgrade.ts --network opMainnet",
+    "verify": "hardhat run scripts/verify.ts --network hardhatMainnet",
+    "verify:sepolia": "hardhat run scripts/verify.ts --network sepolia",
+    "verify:mainnet": "hardhat run scripts/verify.ts --network mainnet",
+    "verify:op": "hardhat run scripts/verify.ts --network opMainnet",
     "compile": "hardhat compile",
     "clean": "hardhat clean"
   },
