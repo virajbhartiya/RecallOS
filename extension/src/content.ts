@@ -1,4 +1,6 @@
-/// <reference types="chrome" />
+
+// Chrome extension types
+declare const chrome: any;
 
 interface ContextData {
   source: string;
@@ -57,7 +59,7 @@ let lastCaptureTime = 0;
 let hasUserActivity = false;
 const MIN_CAPTURE_INTERVAL = 10000;
 const ACTIVITY_TIMEOUT = 30000;
-const CONTENT_CHANGE_THRESHOLD = 0.1; // 10% content change required
+const CONTENT_CHANGE_THRESHOLD = 0.1; 
 let privacyExtensionDetected = false;
 let privacyExtensionType = 'unknown';
 function detectPrivacyExtensions(): void {
@@ -765,7 +767,6 @@ function captureContext(): ContextData {
       error
     );
     
-    // Try to get at least basic page information even with privacy extensions
     const basicTitle = document.title || 'Untitled Page';
     const basicUrl = window.location.href;
     const basicContent = `Page: ${basicTitle} | URL: ${basicUrl}`;
@@ -832,7 +833,6 @@ function sendContextToBackground() {
       return;
     }
     
-    // Skip capture if on localhost or local development
     if (isLocalhost()) {
       console.log('RecallOS: Skipping capture - localhost detected');
       return;
@@ -845,18 +845,15 @@ function sendContextToBackground() {
     }
     const contextData = captureContext();
     
-    // Check if content capture was successful
     const hasValidContent = contextData.content_snippet && 
                            contextData.content_snippet.length > 50 && 
                            !contextData.content_snippet.includes('Content extraction failed');
     
-    // Don't send if privacy extensions are blocking content or content is invalid
     if (privacyExtensionDetected && !hasValidContent) {
       console.log('RecallOS: Privacy extension blocking content capture, skipping backend send');
       return;
     }
     
-    // Don't send if content is too short or appears to be blocked
     if (!hasValidContent) {
       console.log('RecallOS: Insufficient content captured, skipping backend send');
       return;
@@ -998,13 +995,12 @@ chrome.storage.sync.get(['wallet_address'], result => {
   }
 });
 function calculateContentHash(content: string): string {
-  // Simple hash function for content comparison
   let hash = 0;
   if (content.length === 0) return hash.toString();
   for (let i = 0; i < content.length; i++) {
     const char = content.charCodeAt(i);
     hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
+    hash = hash & hash; 
   }
   return hash.toString();
 }
@@ -1035,17 +1031,14 @@ function hasContentChanged(): boolean {
   const urlChanged = currentUrl !== lastUrl;
   const titleChanged = currentTitle !== lastTitle;
   
-  // Check if content hash changed (exact match)
   const contentHashChanged = currentContentHash !== lastContentHash;
   
-  // Check if content similarity is below threshold (significant change)
   const contentSimilarity = calculateContentSimilarity(currentContent, lastContent);
   const contentSignificantlyChanged = contentSimilarity < (1 - CONTENT_CHANGE_THRESHOLD);
   
   const shouldCapture = urlChanged || titleChanged || contentHashChanged || contentSignificantlyChanged;
   
   if (shouldCapture) {
-    // Update tracking variables
     lastUrl = currentUrl;
     lastTitle = currentTitle;
     lastContent = currentContent;
@@ -1088,7 +1081,6 @@ function updateActivityLevel() {
   }
 }
 function startContinuousMonitoring() {
-  // Don't start monitoring on localhost
   if (isLocalhost()) {
     console.log('RecallOS: Skipping continuous monitoring - localhost detected');
     return;
@@ -1188,7 +1180,6 @@ document.addEventListener('mousemove', () => {
   }, 3000);
 });
 
-// ChatGPT Integration
 let isChatGPT = false;
 let chatGPTInput: HTMLTextAreaElement | null = null;
 let chatGPTSendButton: HTMLButtonElement | null = null;
@@ -1204,50 +1195,124 @@ function detectChatGPT(): boolean {
   return hostname.includes('chatgpt.com') || hostname.includes('openai.com');
 }
 
-async function getMemorySummary(query: string): Promise<string | null> {
+async function pollSearchJob(jobId: string): Promise<string | null> {
   try {
-    const walletAddress = await getWalletAddressFromStorage();
-    if (!walletAddress) {
-      console.log('RecallOS: No wallet address found for memory search');
-      return null;
-    }
-
-    const apiEndpoint = await getApiEndpointForMemory();
-    const searchEndpoint = apiEndpoint.replace('/memory/process', '/search');
-    
-    const response = await fetch(searchEndpoint, {
-      method: 'POST',
+    const response = await fetch(`http://localhost:3000/api/search/job/${jobId}`, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
-      body: JSON.stringify({
-        wallet: walletAddress,
-        query: query,
-        limit: 5
-      }),
     });
-
+    
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      console.error('RecallOS: Job polling failed:', response.status, response.statusText);
+      return null;
     }
 
     const result = await response.json();
     
-    if (result.answer) {
+    if (result.status === 'completed' && result.answer) {
       return result.answer;
-    } else if (result.meta_summary) {
-      return result.meta_summary;
-    } else if (result.results && result.results.length > 0) {
-      const summaries = result.results
-        .slice(0, 3)
-        .map((r: any, i: number) => `${i + 1}. ${r.summary || r.title || 'Memory'}`)
-        .join('\n');
-      return `Based on your memories:\n${summaries}`;
+    } else if (result.status === 'failed') {
+      console.error('RecallOS: Search job failed');
+      return null;
     }
     
-    return null;
+    return null; // Still pending
   } catch (error) {
-    console.error('RecallOS: Error getting memory summary:', error);
+    console.error('RecallOS: Error polling search job:', error);
+    return null;
+  }
+}
+
+async function getMemorySummary(query: string): Promise<string | null> {
+  try {
+    const walletAddress = await getWalletAddressFromStorage();
+    if (!walletAddress) {
+      return null;
+    }
+
+    // Extension needs full URL since it's not running on the same domain
+    const searchEndpoint = 'http://localhost:3000/api/search';
+    
+    const requestBody = {
+      wallet: walletAddress.toLowerCase(),
+      query: query,
+      limit: 5,
+      contextOnly: false
+    };
+        
+    const response = await fetch(searchEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+    
+    if (!response.ok) {
+      console.error('RecallOS: Search request failed:', response.status, response.statusText);
+      return null;
+    }
+
+    const responseText = await response.text();
+    
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('RecallOS: Failed to parse search response:', parseError);
+      return null;
+    }
+    
+    // Handle response structure exactly like client-side
+    let summaryParts: string[] = [];
+    
+    if (result.answer) {
+      summaryParts.push(result.answer);
+    } else if (result.meta_summary) {
+      summaryParts.push(result.meta_summary);
+    } else if (result.results && result.results.length > 0) {
+      summaryParts.push(`Found ${result.results.length} relevant memories about "${query}".`);
+    }
+    
+    if (result.citations && result.citations.length > 0) {
+      const citationTexts = result.citations
+        .slice(0, 6)
+        .map((c: any) => `[${c.label}] ${c.title || 'Open memory'}`);
+      summaryParts.push(citationTexts.join('\n'));
+    }
+    
+    // If we have a job_id but no immediate answer, poll for the result
+    if (result.job_id && !result.answer) {
+      console.log('RecallOS: Polling for async search result...');
+      
+      // Poll for up to 10 seconds (6 attempts with 1.5s intervals)
+      for (let i = 0; i < 6; i++) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        const jobResult = await pollSearchJob(result.job_id);
+        
+        if (jobResult) {
+          summaryParts = [jobResult];
+          if (result.citations && result.citations.length > 0) {
+            const citationTexts = result.citations
+              .slice(0, 6)
+              .map((c: any) => `[${c.label}] ${c.title || 'Open memory'}`);
+            summaryParts.push(citationTexts.join('\n'));
+          }
+          break;
+        }
+      }
+    }
+    
+    if (summaryParts.length === 0) {
+      return null;
+    }
+    
+    return summaryParts.join('\n\n');
+  } catch (error) {
+    console.error('RecallOS: Error in getMemorySummary:', error);
     return null;
   }
 }
@@ -1279,12 +1344,10 @@ function injectMemorySummary(summary: string, originalMessage: string): void {
   
   if (chatGPTInput.tagName === 'TEXTAREA') {
     (chatGPTInput as HTMLTextAreaElement).value = combinedMessage;
-    // Trigger input event to update ChatGPT's state
     const inputEvent = new Event('input', { bubbles: true });
     chatGPTInput.dispatchEvent(inputEvent);
   } else if (chatGPTInput.contentEditable === 'true') {
     chatGPTInput.textContent = combinedMessage;
-    // Trigger input event for contenteditable
     const inputEvent = new Event('input', { bubbles: true });
     chatGPTInput.dispatchEvent(inputEvent);
   }
@@ -1293,13 +1356,11 @@ function injectMemorySummary(summary: string, originalMessage: string): void {
 async function autoInjectMemories(userText: string): Promise<void> {
   if (isAutoInjecting || !userText || userText.length < 3) return;
   
-  // Don't inject if text already contains our markers
   if (userText.includes('[RecallOS Memory Context]')) return;
   
   isAutoInjecting = true;
   
   try {
-    // Update icon to show processing
     if (recallOSIcon) {
       recallOSIcon.style.color = '#f59e0b';
       recallOSIcon.style.animation = 'pulse 1s infinite';
@@ -1308,13 +1369,11 @@ async function autoInjectMemories(userText: string): Promise<void> {
     const memorySummary = await getMemorySummary(userText);
     
     if (memorySummary) {
-      // Check if user is still typing the same text
       const currentText = getCurrentInputText();
       if (currentText === userText) {
         injectMemorySummary(memorySummary, userText);
         console.log('RecallOS: Memories injected successfully');
         
-        // Update icon to show success
         if (recallOSIcon) {
           recallOSIcon.style.color = '#10a37f';
           recallOSIcon.style.animation = 'none';
@@ -1328,7 +1387,6 @@ async function autoInjectMemories(userText: string): Promise<void> {
       }
     } else {
       console.log('RecallOS: No memories found');
-      // No memory found
       if (recallOSIcon) {
         recallOSIcon.style.color = '#8e8ea0';
         recallOSIcon.style.animation = 'none';
@@ -1342,7 +1400,6 @@ async function autoInjectMemories(userText: string): Promise<void> {
     }
   } finally {
     isAutoInjecting = false;
-    // Reset icon color after delay
     setTimeout(() => {
       if (recallOSIcon) {
         recallOSIcon.style.color = '#8e8ea0';
@@ -1368,29 +1425,26 @@ function handleTyping(): void {
   
   const currentText = getCurrentInputText();
   
-  // Don't process if text contains our markers (already processed)
   if (currentText.includes('[RecallOS Memory Context]')) return;
   
-  // Clear previous timeout
   if (typingTimeout) {
     clearTimeout(typingTimeout);
   }
   
-  // Set new timeout for debouncing
   typingTimeout = setTimeout(async () => {
     if (currentText && currentText.length >= 3 && currentText !== lastTypedText) {
       console.log('RecallOS: Auto-injecting memories for:', currentText);
       lastTypedText = currentText;
       await autoInjectMemories(currentText);
     }
-  }, 1500); // 1.5 second debounce
+  }, 1500); 
 }
 
 function createRecallOSIcon(): HTMLElement {
   const icon = document.createElement('div');
   icon.id = 'recallos-extension-icon';
   icon.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http:
       <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" fill="currentColor"/>
       <path d="M19 15L19.5 17.5L22 18L19.5 18.5L19 21L18.5 18.5L16 18L18.5 17.5L19 15Z" fill="currentColor"/>
       <path d="M5 15L5.5 17.5L8 18L5.5 18.5L5 21L4.5 18.5L2 18L4.5 17.5L5 15Z" fill="currentColor"/>
@@ -1421,7 +1475,6 @@ function createRecallOSIcon(): HTMLElement {
     pointer-events: auto !important;
   `;
   
-  // Add hover effects
   icon.addEventListener('mouseenter', () => {
     icon.style.color = '#10a37f';
     icon.style.backgroundColor = 'rgba(16, 163, 127, 0.1)';
@@ -1434,7 +1487,6 @@ function createRecallOSIcon(): HTMLElement {
     icon.style.transform = 'translateY(-50%) scale(1)';
   });
   
-  // Add click handler to show status
   icon.addEventListener('click', async () => {
     await showRecallOSStatus();
   });
@@ -1444,9 +1496,8 @@ function createRecallOSIcon(): HTMLElement {
 
 async function checkApiHealth(): Promise<boolean> {
   try {
-    const apiEndpoint = await getApiEndpointForMemory();
-    // Try the search endpoint as a health check since it's lightweight
-    const healthEndpoint = apiEndpoint.replace('/memory/process', '/search');
+    // Extension needs full URL since it's not running on the same domain
+    const healthEndpoint = 'http://localhost:3000/api/search';
     
     const response = await fetch(healthEndpoint, {
       method: 'POST',
@@ -1456,30 +1507,27 @@ async function checkApiHealth(): Promise<boolean> {
       body: JSON.stringify({
         wallet: 'health-check',
         query: 'test',
-        limit: 1
+        limit: 1,
+        contextOnly: false
       }),
     });
     
-    // Consider it healthy if we get any response (even 400 is ok, means server is up)
     return response.status < 500;
   } catch (error) {
-    console.error('RecallOS: API health check failed:', error);
+    console.error('RecallOS: Health check failed:', error);
     return false;
   }
 }
 
 async function getWalletAddressFromStorage(): Promise<string | null> {
   try {
-    // Try chrome storage first
     const result = await chrome.storage.sync.get(['wallet_address']);
     if (result.wallet_address) {
       return result.wallet_address;
     }
     
-    // Fallback to localStorage
     const localWallet = localStorage.getItem('wallet_address');
     if (localWallet) {
-      // Sync to chrome storage
       await chrome.storage.sync.set({ wallet_address: localWallet });
       return localWallet;
     }
@@ -1492,7 +1540,6 @@ async function getWalletAddressFromStorage(): Promise<string | null> {
 }
 
 async function showRecallOSStatus(): Promise<void> {
-  // Create a temporary status tooltip
   const tooltip = document.createElement('div');
   tooltip.style.cssText = `
     position: fixed;
@@ -1510,7 +1557,6 @@ async function showRecallOSStatus(): Promise<void> {
     border: 1px solid #565869;
   `;
   
-  // Show loading state
   tooltip.innerHTML = `
     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
       <div style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; animation: pulse 1s infinite;"></div>
@@ -1524,7 +1570,6 @@ async function showRecallOSStatus(): Promise<void> {
   document.body.appendChild(tooltip);
   
   try {
-    // Check wallet address and API health
     const [walletAddress, apiHealthy] = await Promise.all([
       getWalletAddressFromStorage(),
       checkApiHealth()
@@ -1562,7 +1607,6 @@ async function showRecallOSStatus(): Promise<void> {
     `;
   }
   
-  // Remove tooltip after 6 seconds
   setTimeout(() => {
     if (tooltip.parentNode) {
       tooltip.parentNode.removeChild(tooltip);
@@ -1571,7 +1615,6 @@ async function showRecallOSStatus(): Promise<void> {
 }
 
 function findChatGPTElements(): void {
-  // Try multiple approaches to find the input
   const inputSelectors = [
     'div[contenteditable="true"]',
     'textarea[placeholder*="Ask anything"]',
@@ -1591,7 +1634,6 @@ function findChatGPTElements(): void {
     }
   }
 
-  // Try multiple approaches to find the send button
   const buttonSelectors = [
     'button[data-testid*="send"]',
     'button[aria-label*="Send"]',
@@ -1616,7 +1658,6 @@ function findChatGPTElements(): void {
 function setupChatGPTIntegration(): void {
   if (!isChatGPT) return;
   
-  // Prevent multiple setups
   if (originalSendHandler) {
     console.log('RecallOS: Integration already set up, skipping');
     return;
@@ -1624,11 +1665,9 @@ function setupChatGPTIntegration(): void {
   
   findChatGPTElements();
   
-  // Add RecallOS icon to input area
   if (chatGPTInput && !recallOSIcon) {
     console.log('RecallOS: Attempting to add icon to input area');
     
-    // Try multiple container strategies
     const containerSelectors = [
       'div[class*="input"]',
       'div[class*="chat"]',
@@ -1650,20 +1689,17 @@ function setupChatGPTIntegration(): void {
       }
     }
     
-    // Fallback to parent element
     if (!inputContainer) {
       inputContainer = chatGPTInput.parentElement;
       console.log('RecallOS: Using parent element as container');
     }
     
     if (inputContainer) {
-      // Make sure the container has relative positioning
       const containerStyle = window.getComputedStyle(inputContainer);
       if (containerStyle.position === 'static') {
         (inputContainer as HTMLElement).style.position = 'relative';
       }
       
-      // Remove any existing icon first
       const existingIcon = document.getElementById('recallos-extension-icon');
       if (existingIcon) {
         existingIcon.remove();
@@ -1673,16 +1709,13 @@ function setupChatGPTIntegration(): void {
       inputContainer.appendChild(recallOSIcon);
       console.log('RecallOS: Icon added to ChatGPT input container');
       
-      // Add a more aggressive check to ensure icon stays visible
       const ensureIconVisible = () => {
         if (!recallOSIcon || !document.body.contains(recallOSIcon)) {
           console.log('RecallOS: Icon missing, attempting to recreate');
           
-          // Try to find the input again
           findChatGPTElements();
           
           if (chatGPTInput) {
-            // Find container again
             let newContainer: Element | null = null;
             const containerSelectors = [
               'div[class*="input"]',
@@ -1708,13 +1741,11 @@ function setupChatGPTIntegration(): void {
             }
             
             if (newContainer && document.body.contains(newContainer)) {
-              // Remove any existing icon first
               const existingIcon = document.getElementById('recallos-extension-icon');
               if (existingIcon) {
                 existingIcon.remove();
               }
               
-              // Create new icon
               recallOSIcon = createRecallOSIcon();
               newContainer.appendChild(recallOSIcon);
               console.log('RecallOS: Icon recreated and added');
@@ -1723,10 +1754,8 @@ function setupChatGPTIntegration(): void {
         }
       };
       
-      // Check every 1 second to ensure icon stays visible
       setInterval(ensureIconVisible, 1000);
       
-      // Add mutation observer to detect when icon is removed
       const iconObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           if (mutation.type === 'childList') {
@@ -1748,7 +1777,6 @@ function setupChatGPTIntegration(): void {
         });
       });
       
-      // Observe the container for changes
       if (inputContainer) {
         iconObserver.observe(inputContainer, {
           childList: true,
@@ -1770,7 +1798,6 @@ function setupChatGPTIntegration(): void {
     console.log('RecallOS: Input tag:', chatGPTInput.tagName);
     console.log('RecallOS: Input contentEditable:', chatGPTInput.contentEditable);
     
-    // Add typing event listeners for auto-injection
     const inputHandler = (e) => {
       console.log('RecallOS: Input event triggered on', e.target);
       handleTyping();
@@ -1783,7 +1810,6 @@ function setupChatGPTIntegration(): void {
     
     const pasteHandler = (e) => {
       console.log('RecallOS: Paste event triggered on', e.target);
-      // Handle paste with a slight delay
       setTimeout(handleTyping, 100);
     };
     
@@ -1791,7 +1817,6 @@ function setupChatGPTIntegration(): void {
     chatGPTInput.addEventListener('keyup', keyupHandler, true);
     chatGPTInput.addEventListener('paste', pasteHandler, true);
     
-    // Also try adding to the document for contenteditable elements
     if (chatGPTInput.contentEditable === 'true') {
       document.addEventListener('input', (e) => {
         if (e.target === chatGPTInput) {
@@ -1800,7 +1825,6 @@ function setupChatGPTIntegration(): void {
         }
       }, true);
       
-      // Add MutationObserver for contenteditable changes
       const contentObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           if (mutation.type === 'childList' || mutation.type === 'characterData') {
@@ -1821,8 +1845,7 @@ function setupChatGPTIntegration(): void {
     
     console.log('RecallOS: Event listeners added successfully');
     
-    // Mark as set up
-    originalSendHandler = () => {}; // Dummy function to mark as set up
+    originalSendHandler = () => {}; 
   } else if (!chatGPTInput) {
     console.log('RecallOS: No input element found for auto-injection setup');
   } else if (originalSendHandler) {
@@ -1830,7 +1853,6 @@ function setupChatGPTIntegration(): void {
   }
 }
 
-// Add CSS animations for the icon
 function addRecallOSStyles(): void {
   if (document.getElementById('recallos-styles')) return;
   
@@ -1853,7 +1875,6 @@ function addRecallOSStyles(): void {
   document.head.appendChild(style);
 }
 
-// Wait for ChatGPT to be fully loaded
 function waitForChatGPTReady(): Promise<void> {
   return new Promise((resolve) => {
     let attempts = 0;
@@ -1862,7 +1883,6 @@ function waitForChatGPTReady(): Promise<void> {
     const checkReady = () => {
       attempts++;
       
-      // Check if ChatGPT's main components are loaded
       const hasInput = document.querySelector('div[contenteditable="true"]') || document.querySelector('textarea');
       const hasSendButton = document.querySelector('button[data-testid*="send"], button[aria-label*="Send"], button[title*="Send"]');
       
@@ -1875,17 +1895,14 @@ function waitForChatGPTReady(): Promise<void> {
       }
     };
     
-    // Start checking after a short delay to let initial DOM settle
     setTimeout(checkReady, 1000);
   });
 }
 
-// Simple setup that tries immediately and retries
 function trySetupImmediately(): void {
   console.log('RecallOS: Attempting immediate setup');
   setupChatGPTIntegration();
   
-  // If setup failed, try again after delays
   if (!recallOSIcon) {
     setTimeout(() => {
       console.log('RecallOS: Retry setup after 3 seconds');
@@ -1899,7 +1916,6 @@ function trySetupImmediately(): void {
   }
 }
 
-// Initialize ChatGPT detection and integration
 function initChatGPTIntegration(): void {
   isChatGPT = detectChatGPT();
   
@@ -1907,26 +1923,21 @@ function initChatGPTIntegration(): void {
     console.log('RecallOS: ChatGPT detected');
     addRecallOSStyles();
     
-    // Try immediate setup first
     trySetupImmediately();
     
-    // Also try the ready detection approach
     waitForChatGPTReady().then(() => {
       console.log('RecallOS: ChatGPT is ready, setting up integration');
       setupChatGPTIntegration();
     });
     
-    // Re-setup when new messages are added (ChatGPT is dynamic)
     let setupTimeout: ReturnType<typeof setTimeout> | null = null;
     let isWaitingForReady = true;
     
     const observer = new MutationObserver((mutations) => {
-      // Only process if we haven't set up integration yet and we're not waiting for initial ready
       if (originalSendHandler || isWaitingForReady) return;
       
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          // Check if new chat elements were added
           const hasNewChatElements = Array.from(mutation.addedNodes).some(node => {
             if (node.nodeType === Node.ELEMENT_NODE) {
               const element = node as Element;
@@ -1952,7 +1963,6 @@ function initChatGPTIntegration(): void {
       });
     });
     
-    // Start observing after initial ready check
     waitForChatGPTReady().then(() => {
       isWaitingForReady = false;
       observer.observe(document.body, {
@@ -1961,7 +1971,6 @@ function initChatGPTIntegration(): void {
       });
     });
     
-    // Also try to set up integration multiple times with delays (only after ChatGPT is ready)
     let retryCount = 0;
     const maxRetries = 3;
     const retrySetup = () => {
@@ -1975,12 +1984,10 @@ function initChatGPTIntegration(): void {
       }
     };
     
-    // Start retry attempts after ChatGPT is ready
     waitForChatGPTReady().then(() => {
       setTimeout(retrySetup, 2000);
     });
     
-    // Add continuous monitoring to ensure icon stays visible
     const continuousIconMonitor = () => {
       if (!recallOSIcon && isChatGPT) {
         console.log('RecallOS: Continuous monitor - icon missing, attempting setup');
@@ -1988,12 +1995,10 @@ function initChatGPTIntegration(): void {
       }
     };
     
-    // Check every 5 seconds if icon is missing
     setInterval(continuousIconMonitor, 5000);
   }
 }
 
-// Debug function to help troubleshoot icon visibility
 function debugChatGPTElements(): void {
   console.log('RecallOS: Debug - ChatGPT elements found:');
   console.log('- Input element:', chatGPTInput);
@@ -2014,10 +2019,8 @@ function debugChatGPTElements(): void {
   }
 }
 
-// Add debug function to window for manual testing
 (window as any).debugRecallOS = debugChatGPTElements;
 
-// Add manual trigger function for testing
 (window as any).triggerRecallOS = async () => {
   console.log('RecallOS: Manual trigger activated');
   const currentText = getCurrentInputText();
@@ -2029,7 +2032,6 @@ function debugChatGPTElements(): void {
   }
 };
 
-// Add function to manually set up event listeners
 (window as any).setupRecallOSListeners = () => {
   console.log('RecallOS: Manually setting up event listeners');
   findChatGPTElements();
@@ -2051,7 +2053,6 @@ function debugChatGPTElements(): void {
   }
 };
 
-// Add function to test memory injection with current input text
 (window as any).testMemoryInjection = async () => {
   console.log('RecallOS: Testing memory injection with current input text');
   const currentText = getCurrentInputText();
@@ -2062,13 +2063,33 @@ function debugChatGPTElements(): void {
     console.log('RecallOS: No text in input field to test with');
   }
 };
+(window as any).testRecallOSSearch = async (query = 'server boilerplates') => {
+  try {
+    const result = await getMemorySummary(query);
+    return result;
+  } catch (error) {
+    return null;
+  }
+};
 
-// Initialize ChatGPT integration
+(window as any).checkRecallOSStatus = async () => {
+  const walletAddress = await getWalletAddressFromStorage();
+  const apiHealthy = await checkApiHealth();
+  const apiEndpoint = await getApiEndpointForMemory();
+  
+  return {
+    walletAddress,
+    apiEndpoint,
+    apiHealthy,
+    isChatGPT,
+    chatGPTInput: !!chatGPTInput,
+    recallOSIcon: !!recallOSIcon
+  };
+};
+
 initChatGPTIntegration();
 
-// Add global event listener as backup
 document.addEventListener('input', (e) => {
-  // Check if this is a ChatGPT input element
   const target = e.target as HTMLElement;
   if (target && (
     target.contentEditable === 'true' || 
@@ -2077,7 +2098,6 @@ document.addEventListener('input', (e) => {
     target.closest('div[contenteditable="true"]')
   )) {
     console.log('RecallOS: Typing detected in ChatGPT input');
-    // Update our input reference
     if (!chatGPTInput || !document.body.contains(chatGPTInput)) {
       chatGPTInput = target as any;
     }
@@ -2085,7 +2105,6 @@ document.addEventListener('input', (e) => {
   }
 }, true);
 
-// Also add keyup listener globally
 document.addEventListener('keyup', (e) => {
   const target = e.target as HTMLElement;
   if (target && (
