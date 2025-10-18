@@ -21,7 +21,7 @@ async function main() {
     chainType: chainType,
   });
   
-  console.log('Viem client methods:', Object.getOwnPropertyNames(viem).filter(name => typeof viem[name] === 'function'));
+  console.log('Viem client methods:', Object.getOwnPropertyNames(viem).filter(name => typeof (viem as any)[name] === 'function'));
 
   console.log('Deploying RecallOSMemoryRegistry...');
 
@@ -52,30 +52,38 @@ async function main() {
   
   console.log('Initialize data:', initializeData);
   
-  // Deploy RecallOSProxy with initialization data
+  // Deploy RecallOSProxy with initialization data and admin
   const proxy = await viem.deployContract('RecallOSProxy', [
     implementationAddress,
+    owner, // Admin address
     initializeData
   ]);
   const proxyAddress = proxy.address;
   console.log('Proxy deployed at:', proxyAddress);
-  
-  // Get contract instance through proxy
-  const registry = await viem.getContractAt('RecallOSMemoryRegistry', proxyAddress);
+  console.log('Admin set to:', owner);
   
   // Wait for deployment to be mined
   console.log('Waiting for deployment to be mined...');
   await new Promise(resolve => setTimeout(resolve, 3000));
   
+  // Get contract instance through proxy
+  const registry = await viem.getContractAt('RecallOSMemoryRegistry', proxyAddress);
+  
   // Verify deployment
   const contractOwner = await registry.read.owner();
   console.log('Contract owner:', contractOwner);
+  
+  // Get proxy instance to verify admin
+  const proxyContract = await viem.getContractAt('RecallOSProxy', proxyAddress);
+  const adminAddress = await proxyContract.read.admin();
+  console.log('Proxy admin:', adminAddress);
   
   // Save deployment info
   console.log('\nDeployment Summary:');
   console.log('==================');
   console.log('Proxy Address:', proxyAddress);
   console.log('Implementation Address:', implementationAddress);
+  console.log('Admin:', adminAddress);
   console.log('Owner:', contractOwner);
   console.log('Network:', networkName);
   console.log('\nNote: This is a proxy deployment. The proxy address is the main contract address to use.');
