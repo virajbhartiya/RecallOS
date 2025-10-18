@@ -70,7 +70,7 @@ export async function searchMemories(params: {
   let embedding: number[];
   try {
     // Increase timeout for Gemini API calls - they can take longer
-    embedding = await withTimeout(aiProvider.generateEmbedding(normalized), 10000);
+    embedding = await withTimeout(aiProvider.generateEmbedding(normalized), 300000);
   } catch (error) {
     console.error('Error generating embedding:', error);
     // Update search job status to failed if there's a job
