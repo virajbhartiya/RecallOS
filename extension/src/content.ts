@@ -1187,3 +1187,641 @@ document.addEventListener('mousemove', () => {
     mouseMoveTimeout = null;
   }, 3000);
 });
+
+// ChatGPT Integration
+let isChatGPT = false;
+let chatGPTInput: HTMLTextAreaElement | null = null;
+let chatGPTSendButton: HTMLButtonElement | null = null;
+let originalSendHandler: ((event: Event) => void) | null = null;
+let isProcessingMemory = false;
+let recallOSIcon: HTMLElement | null = null;
+
+function detectChatGPT(): boolean {
+  const hostname = window.location.hostname;
+  return hostname.includes('chatgpt.com') || hostname.includes('openai.com');
+}
+
+async function getMemorySummary(query: string): Promise<string | null> {
+  try {
+    const walletAddress = await getWalletAddressForMemory();
+    if (!walletAddress) {
+      console.log('RecallOS: No wallet address found for memory search');
+      return null;
+    }
+
+    const apiEndpoint = await getApiEndpointForMemory();
+    const searchEndpoint = apiEndpoint.replace('/memory/process', '/search');
+    
+    const response = await fetch(searchEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        wallet: walletAddress,
+        query: query,
+        limit: 5
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+    
+    if (result.answer) {
+      return result.answer;
+    } else if (result.meta_summary) {
+      return result.meta_summary;
+    } else if (result.results && result.results.length > 0) {
+      const summaries = result.results
+        .slice(0, 3)
+        .map((r: any, i: number) => `${i + 1}. ${r.summary || r.title || 'Memory'}`)
+        .join('\n');
+      return `Based on your memories:\n${summaries}`;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('RecallOS: Error getting memory summary:', error);
+    return null;
+  }
+}
+
+async function getWalletAddressForMemory(): Promise<string | null> {
+  try {
+    const result = await chrome.storage.sync.get(['wallet_address']);
+    return result.wallet_address || null;
+  } catch (error) {
+    console.error('RecallOS: Error getting wallet address:', error);
+    return null;
+  }
+}
+
+async function getApiEndpointForMemory(): Promise<string> {
+  try {
+    const result = await chrome.storage.sync.get(['apiEndpoint']);
+    return result.apiEndpoint || 'http://localhost:3000/api/memory/process';
+  } catch (error) {
+    console.error('RecallOS: Error getting API endpoint:', error);
+    return 'http://localhost:3000/api/memory/process';
+  }
+}
+
+function injectMemorySummary(summary: string, originalMessage: string): void {
+  if (!chatGPTInput) return;
+  
+  const combinedMessage = `[RecallOS Memory Context]\n${summary}\n\n[Your Question]\n${originalMessage}`;
+  
+  if (chatGPTInput.tagName === 'TEXTAREA') {
+    (chatGPTInput as HTMLTextAreaElement).value = combinedMessage;
+    // Trigger input event to update ChatGPT's state
+    const inputEvent = new Event('input', { bubbles: true });
+    chatGPTInput.dispatchEvent(inputEvent);
+  } else if (chatGPTInput.contentEditable === 'true') {
+    chatGPTInput.textContent = combinedMessage;
+    // Trigger input event for contenteditable
+    const inputEvent = new Event('input', { bubbles: true });
+    chatGPTInput.dispatchEvent(inputEvent);
+  }
+}
+
+function createRecallOSIcon(): HTMLElement {
+  const icon = document.createElement('div');
+  icon.id = 'recallos-extension-icon';
+  icon.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" fill="currentColor"/>
+      <path d="M19 15L19.5 17.5L22 18L19.5 18.5L19 21L18.5 18.5L16 18L18.5 17.5L19 15Z" fill="currentColor"/>
+      <path d="M5 15L5.5 17.5L8 18L5.5 18.5L5 21L4.5 18.5L2 18L4.5 17.5L5 15Z" fill="currentColor"/>
+    </svg>
+  `;
+  
+  icon.style.cssText = `
+    position: absolute;
+    right: 60px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #8e8ea0;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    z-index: 9999;
+    background: rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    visibility: visible;
+    opacity: 1;
+  `;
+  
+  // Add hover effects
+  icon.addEventListener('mouseenter', () => {
+    icon.style.color = '#10a37f';
+    icon.style.backgroundColor = 'rgba(16, 163, 127, 0.1)';
+    icon.style.transform = 'translateY(-50%) scale(1.1)';
+  });
+  
+  icon.addEventListener('mouseleave', () => {
+    icon.style.color = '#8e8ea0';
+    icon.style.backgroundColor = 'transparent';
+    icon.style.transform = 'translateY(-50%) scale(1)';
+  });
+  
+  // Add click handler to show status
+  icon.addEventListener('click', () => {
+    showRecallOSStatus();
+  });
+  
+  return icon;
+}
+
+function showRecallOSStatus(): void {
+  // Create a temporary status tooltip
+  const tooltip = document.createElement('div');
+  tooltip.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #343541;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    max-width: 300px;
+    border: 1px solid #565869;
+  `;
+  
+  const walletAddress = localStorage.getItem('wallet_address');
+  const status = walletAddress ? 'Connected' : 'Not Connected';
+  const statusColor = walletAddress ? '#10a37f' : '#ef4444';
+  
+  tooltip.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+      <div style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColor};"></div>
+      <strong>RecallOS Extension</strong>
+    </div>
+    <div style="font-size: 12px; color: #c5c5d2;">
+      Status: ${status}<br>
+      ${walletAddress ? `Wallet: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : 'No wallet connected'}
+    </div>
+    <div style="font-size: 11px; color: #8e8ea0; margin-top: 8px;">
+      Click the icon to see this status. Your memories will be automatically included in ChatGPT conversations.
+    </div>
+  `;
+  
+  document.body.appendChild(tooltip);
+  
+  // Remove tooltip after 4 seconds
+  setTimeout(() => {
+    if (tooltip.parentNode) {
+      tooltip.parentNode.removeChild(tooltip);
+    }
+  }, 4000);
+}
+
+function findChatGPTElements(): void {
+  console.log('RecallOS: Searching for ChatGPT elements...');
+  
+  // Try multiple approaches to find the input
+  const inputSelectors = [
+    'div[contenteditable="true"]',
+    'textarea[placeholder*="Ask anything"]',
+    'textarea[placeholder*="Message"]',
+    'textarea[placeholder*="Send a message"]',
+    'textarea[placeholder*="Type a message"]',
+    'textarea[role="textbox"]',
+    'textarea',
+    'input[type="text"]'
+  ];
+  
+  for (const selector of inputSelectors) {
+    const element = document.querySelector(selector) as HTMLElement;
+    if (element) {
+      console.log(`RecallOS: Found input element with selector: ${selector}`);
+      console.log('- Element visible:', element.offsetParent !== null);
+      console.log('- Element tag:', element.tagName);
+      console.log('- Element contentEditable:', element.contentEditable);
+      
+      if (element.offsetParent !== null) {
+        chatGPTInput = element as any;
+        console.log('RecallOS: Using this input element');
+        break;
+      }
+    }
+  }
+
+  // Try multiple approaches to find the send button
+  const buttonSelectors = [
+    'button[data-testid*="send"]',
+    'button[aria-label*="Send"]',
+    'button[title*="Send"]',
+    'button[aria-label*="Submit"]',
+    'button[type="submit"]',
+    'button:has(svg)',
+    'button[class*="send"]',
+    'button[class*="submit"]',
+    'button'
+  ];
+  
+  for (const selector of buttonSelectors) {
+    const element = document.querySelector(selector) as HTMLButtonElement;
+    if (element) {
+      console.log(`RecallOS: Found button element with selector: ${selector}`);
+      console.log('- Button visible:', element.offsetParent !== null);
+      console.log('- Button text:', element.textContent?.trim());
+      
+      if (element.offsetParent !== null) {
+        chatGPTSendButton = element;
+        console.log('RecallOS: Using this button element');
+        break;
+      }
+    }
+  }
+  
+  console.log('RecallOS: Element search complete');
+  console.log('- Input found:', !!chatGPTInput);
+  console.log('- Button found:', !!chatGPTSendButton);
+}
+
+function setupChatGPTIntegration(): void {
+  if (!isChatGPT) return;
+  
+  // Prevent multiple setups
+  if (originalSendHandler) {
+    console.log('RecallOS: Integration already set up, skipping');
+    return;
+  }
+  
+  findChatGPTElements();
+  
+  // Add RecallOS icon to input area
+  if (chatGPTInput && !recallOSIcon) {
+    console.log('RecallOS: Attempting to add icon to input area');
+    
+    // Try multiple container strategies
+    const containerSelectors = [
+      'div[class*="input"]',
+      'div[class*="chat"]',
+      'div[class*="message"]',
+      'div[class*="form"]',
+      'div[class*="composer"]',
+      'div[class*="prompt"]',
+      'div[class*="textbox"]',
+      'div'
+    ];
+    
+    let inputContainer: Element | null = null;
+    for (const selector of containerSelectors) {
+      const container = chatGPTInput.closest(selector);
+      if (container) {
+        inputContainer = container;
+        console.log(`RecallOS: Found container with selector: ${selector}`);
+        break;
+      }
+    }
+    
+    // Fallback to parent element
+    if (!inputContainer) {
+      inputContainer = chatGPTInput.parentElement;
+      console.log('RecallOS: Using parent element as container');
+    }
+    
+    if (inputContainer) {
+      // Make sure the container has relative positioning
+      const containerStyle = window.getComputedStyle(inputContainer);
+      if (containerStyle.position === 'static') {
+        (inputContainer as HTMLElement).style.position = 'relative';
+      }
+      
+      // Remove any existing icon first
+      const existingIcon = document.getElementById('recallos-extension-icon');
+      if (existingIcon) {
+        existingIcon.remove();
+      }
+      
+      recallOSIcon = createRecallOSIcon();
+      inputContainer.appendChild(recallOSIcon);
+      console.log('RecallOS: Icon added to ChatGPT input container');
+      
+      // Add a check to ensure icon stays visible
+      const ensureIconVisible = () => {
+        if (recallOSIcon && !document.body.contains(recallOSIcon)) {
+          console.log('RecallOS: Icon was removed, re-adding it');
+          if (inputContainer && document.body.contains(inputContainer)) {
+            inputContainer.appendChild(recallOSIcon);
+          }
+        }
+      };
+      
+      // Check every 2 seconds to ensure icon stays visible
+      setInterval(ensureIconVisible, 2000);
+    } else {
+      console.log('RecallOS: Could not find any suitable container for icon');
+    }
+  } else if (!chatGPTInput) {
+    console.log('RecallOS: No input element found, cannot add icon');
+  } else if (recallOSIcon) {
+    console.log('RecallOS: Icon already exists, skipping');
+  }
+  
+  if (chatGPTInput && chatGPTSendButton && !originalSendHandler) {
+    console.log('RecallOS: Setting up ChatGPT integration');
+    
+    // Store original click handler
+    originalSendHandler = chatGPTSendButton.onclick as ((event: Event) => void) || null;
+    
+    // Override send button click
+    chatGPTSendButton.addEventListener('click', async (event) => {
+      if (isProcessingMemory) {
+        event.preventDefault();
+        return;
+      }
+      
+      // Handle both textarea and contenteditable inputs
+      let message = '';
+      if (chatGPTInput?.tagName === 'TEXTAREA') {
+        message = (chatGPTInput as HTMLTextAreaElement).value?.trim() || '';
+      } else if (chatGPTInput?.contentEditable === 'true') {
+        message = chatGPTInput.textContent?.trim() || '';
+      }
+      
+      if (!message || message.length < 3) {
+        return;
+      }
+      
+      // Check if this is already a processed message (contains our markers)
+      if (message.includes('[RecallOS Memory Context]')) {
+        return;
+      }
+      
+      event.preventDefault();
+      event.stopPropagation();
+      
+      isProcessingMemory = true;
+      
+        // Show processing indicator
+        const originalButtonText = chatGPTSendButton?.textContent || '';
+        if (chatGPTSendButton) {
+          chatGPTSendButton.textContent = 'Getting memories...';
+          chatGPTSendButton.disabled = true;
+        }
+        
+        // Update icon to show processing state
+        if (recallOSIcon) {
+          recallOSIcon.style.color = '#f59e0b';
+          recallOSIcon.style.animation = 'pulse 1s infinite';
+        }
+      
+      try {
+        const memorySummary = await getMemorySummary(message);
+        
+        if (memorySummary) {
+          injectMemorySummary(memorySummary, message);
+          
+          // Update icon to show success state
+          if (recallOSIcon) {
+            recallOSIcon.style.color = '#10a37f';
+            recallOSIcon.style.animation = 'none';
+          }
+          
+          // Wait a moment for the input to update, then send
+          setTimeout(() => {
+            if (chatGPTSendButton) {
+              chatGPTSendButton.disabled = false;
+              chatGPTSendButton.textContent = originalButtonText;
+              chatGPTSendButton.click();
+            }
+          }, 500);
+        } else {
+          // No memory found, send original message
+          if (recallOSIcon) {
+            recallOSIcon.style.color = '#8e8ea0';
+            recallOSIcon.style.animation = 'none';
+          }
+          if (chatGPTSendButton) {
+            chatGPTSendButton.disabled = false;
+            chatGPTSendButton.textContent = originalButtonText;
+            chatGPTSendButton.click();
+          }
+        }
+      } catch (error) {
+        console.error('RecallOS: Error processing memory:', error);
+        // Update icon to show error state
+        if (recallOSIcon) {
+          recallOSIcon.style.color = '#ef4444';
+          recallOSIcon.style.animation = 'none';
+        }
+        // Fallback: send original message
+        if (chatGPTSendButton) {
+          chatGPTSendButton.disabled = false;
+          chatGPTSendButton.textContent = originalButtonText;
+          chatGPTSendButton.click();
+        }
+      } finally {
+        isProcessingMemory = false;
+        // Reset icon color after a delay
+        setTimeout(() => {
+          if (recallOSIcon) {
+            recallOSIcon.style.color = '#8e8ea0';
+          }
+        }, 2000);
+      }
+    }, true);
+  }
+}
+
+// Add CSS animations for the icon
+function addRecallOSStyles(): void {
+  if (document.getElementById('recallos-styles')) return;
+  
+  const style = document.createElement('style');
+  style.id = 'recallos-styles';
+  style.textContent = `
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    #recallos-extension-icon {
+      transition: all 0.2s ease;
+    }
+    
+    #recallos-extension-icon:hover {
+      transform: translateY(-50%) scale(1.1) !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+// Wait for ChatGPT to be fully loaded
+function waitForChatGPTReady(): Promise<void> {
+  return new Promise((resolve) => {
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    const checkReady = () => {
+      attempts++;
+      
+      // Check if ChatGPT's main components are loaded
+      const hasInput = document.querySelector('div[contenteditable="true"]') || document.querySelector('textarea');
+      const hasSendButton = document.querySelector('button[data-testid*="send"], button[aria-label*="Send"], button[title*="Send"]');
+      
+      console.log(`RecallOS: Check attempt ${attempts}/${maxAttempts}`);
+      console.log('- Has input:', !!hasInput);
+      console.log('- Has send button:', !!hasSendButton);
+      
+      if (hasInput && hasSendButton) {
+        console.log('RecallOS: ChatGPT appears to be fully loaded');
+        resolve();
+      } else if (attempts >= maxAttempts) {
+        console.log('RecallOS: Max attempts reached, proceeding anyway');
+        resolve();
+      } else {
+        console.log('RecallOS: Waiting for ChatGPT to fully load...');
+        setTimeout(checkReady, 1000);
+      }
+    };
+    
+    // Start checking after a short delay to let initial DOM settle
+    setTimeout(checkReady, 1000);
+  });
+}
+
+// Simple setup that tries immediately and retries
+function trySetupImmediately(): void {
+  console.log('RecallOS: Attempting immediate setup');
+  setupChatGPTIntegration();
+  
+  // If setup failed, try again after delays
+  if (!recallOSIcon) {
+    setTimeout(() => {
+      console.log('RecallOS: Retry setup after 3 seconds');
+      setupChatGPTIntegration();
+    }, 3000);
+    
+    setTimeout(() => {
+      console.log('RecallOS: Final retry setup after 6 seconds');
+      setupChatGPTIntegration();
+    }, 6000);
+  }
+}
+
+// Initialize ChatGPT detection and integration
+function initChatGPTIntegration(): void {
+  isChatGPT = detectChatGPT();
+  
+  if (isChatGPT) {
+    console.log('RecallOS: ChatGPT detected');
+    addRecallOSStyles();
+    
+    // Try immediate setup first
+    trySetupImmediately();
+    
+    // Also try the ready detection approach
+    waitForChatGPTReady().then(() => {
+      console.log('RecallOS: ChatGPT is ready, setting up integration');
+      setupChatGPTIntegration();
+    });
+    
+    // Re-setup when new messages are added (ChatGPT is dynamic)
+    let setupTimeout: ReturnType<typeof setTimeout> | null = null;
+    let isWaitingForReady = true;
+    
+    const observer = new MutationObserver((mutations) => {
+      // Only process if we haven't set up integration yet and we're not waiting for initial ready
+      if (originalSendHandler || isWaitingForReady) return;
+      
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          // Check if new chat elements were added
+          const hasNewChatElements = Array.from(mutation.addedNodes).some(node => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              const element = node as Element;
+              return element.querySelector && (
+                element.querySelector('div[contenteditable="true"]') ||
+                element.querySelector('textarea') ||
+                element.querySelector('button[data-testid*="send"]') ||
+                element.tagName === 'TEXTAREA' ||
+                element.tagName === 'BUTTON'
+              );
+            }
+            return false;
+          });
+          
+          if (hasNewChatElements && !setupTimeout) {
+            console.log('RecallOS: New chat elements detected, scheduling setup');
+            setupTimeout = setTimeout(() => {
+              setupChatGPTIntegration();
+              setupTimeout = null;
+            }, 1000);
+          }
+        }
+      });
+    });
+    
+    // Start observing after initial ready check
+    waitForChatGPTReady().then(() => {
+      isWaitingForReady = false;
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+    });
+    
+    // Also try to set up integration multiple times with delays (only after ChatGPT is ready)
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retrySetup = () => {
+      if (!recallOSIcon && !originalSendHandler && retryCount < maxRetries) {
+        retryCount++;
+        console.log(`RecallOS: Retrying setup (attempt ${retryCount}/${maxRetries})...`);
+        setupChatGPTIntegration();
+        setTimeout(retrySetup, 3000);
+      } else if (retryCount >= maxRetries) {
+        console.log('RecallOS: Max retry attempts reached, stopping retries');
+      }
+    };
+    
+    // Start retry attempts after ChatGPT is ready
+    waitForChatGPTReady().then(() => {
+      setTimeout(retrySetup, 2000);
+    });
+  }
+}
+
+// Debug function to help troubleshoot icon visibility
+function debugChatGPTElements(): void {
+  console.log('RecallOS: Debug - ChatGPT elements found:');
+  console.log('- Input element:', chatGPTInput);
+  console.log('- Send button:', chatGPTSendButton);
+  console.log('- Icon element:', recallOSIcon);
+  console.log('- Is ChatGPT detected:', isChatGPT);
+  
+  if (chatGPTInput) {
+    console.log('- Input container:', chatGPTInput.parentElement);
+    console.log('- Input position:', window.getComputedStyle(chatGPTInput).position);
+    console.log('- Input visibility:', chatGPTInput.offsetParent !== null);
+  }
+  
+  if (recallOSIcon) {
+    console.log('- Icon position:', window.getComputedStyle(recallOSIcon).position);
+    console.log('- Icon visibility:', recallOSIcon.offsetParent !== null);
+    console.log('- Icon display:', window.getComputedStyle(recallOSIcon).display);
+  }
+}
+
+// Add debug function to window for manual testing
+(window as any).debugRecallOS = debugChatGPTElements;
+
+// Initialize ChatGPT integration
+initChatGPTIntegration();
