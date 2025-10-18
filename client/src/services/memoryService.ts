@@ -110,8 +110,8 @@ export class MemoryService {
     try {
       const normalizedAddress = this.normalizeAddress(userAddress)
       
-      // Use the working /api/search endpoint (POST)
-      const response = await postRequest('/api/search', {
+      // Use the working /search endpoint (POST)
+      const response = await postRequest('/search', {
         wallet: normalizedAddress,
         query,
         limit,
@@ -129,8 +129,69 @@ export class MemoryService {
       const responseData = response?.data
       if (responseData) {
         // Backend returns: { query, results, meta_summary, answer, citations, job_id }
+        // Transform backend results to match frontend SearchResult interface
+        const transformedResults = (responseData.results || []).map((result: {
+          memory_id: string;
+          user_id?: string;
+          source?: string;
+          url?: string;
+          title?: string;
+          content?: string;
+          summary?: string;
+          avail_hash?: string;
+          timestamp: number;
+          created_at?: string;
+          full_content?: string;
+          page_metadata?: {
+            title?: string;
+            description?: string;
+            keywords?: string[];
+            author?: string;
+            published_date?: string;
+            [key: string]: string | string[] | number | boolean | undefined;
+          };
+          importance_score?: number;
+          access_count?: number;
+          last_accessed?: string;
+          tx_hash?: string;
+          block_number?: number;
+          gas_used?: string;
+          tx_status?: 'pending' | 'confirmed' | 'failed';
+          blockchain_network?: string;
+          confirmed_at?: string;
+          score: number;
+        }) => ({
+          memory: {
+            id: result.memory_id,
+            user_id: result.user_id || '',
+            source: result.source || 'unknown',
+            url: result.url,
+            title: result.title,
+            content: result.content || result.summary || '',
+            summary: result.summary,
+            hash: result.avail_hash,
+            timestamp: result.timestamp,
+            created_at: result.created_at || new Date(result.timestamp * 1000).toISOString(),
+            full_content: result.full_content,
+            page_metadata: result.page_metadata,
+            importance_score: result.importance_score,
+            access_count: result.access_count || 0,
+            last_accessed: result.last_accessed || new Date().toISOString(),
+            tx_hash: result.tx_hash,
+            block_number: result.block_number,
+            gas_used: result.gas_used,
+            tx_status: result.tx_status,
+            blockchain_network: result.blockchain_network,
+            confirmed_at: result.confirmed_at
+          },
+          similarity_score: result.score,
+          relevance_score: result.score,
+          semantic_score: result.score,
+          search_type: 'semantic' as const
+        }))
+        
         return {
-          results: responseData.results || [],
+          results: transformedResults,
           total: responseData.results?.length || 0,
           page,
           limit,
@@ -159,8 +220,8 @@ export class MemoryService {
     try {
       const normalizedAddress = this.normalizeAddress(userAddress)
       
-      // Use the working /api/search endpoint (POST) - same as searchMemories
-      const response = await postRequest('/api/search', {
+      // Use the working /search endpoint (POST) - same as searchMemories
+      const response = await postRequest('/search', {
         wallet: normalizedAddress,
         query,
         limit,
@@ -178,8 +239,69 @@ export class MemoryService {
       const responseData = response?.data
       if (responseData) {
         // Backend returns: { query, results, meta_summary, answer, citations, job_id }
+        // Transform backend results to match frontend SearchResult interface
+        const transformedResults = (responseData.results || []).map((result: {
+          memory_id: string;
+          user_id?: string;
+          source?: string;
+          url?: string;
+          title?: string;
+          content?: string;
+          summary?: string;
+          avail_hash?: string;
+          timestamp: number;
+          created_at?: string;
+          full_content?: string;
+          page_metadata?: {
+            title?: string;
+            description?: string;
+            keywords?: string[];
+            author?: string;
+            published_date?: string;
+            [key: string]: string | string[] | number | boolean | undefined;
+          };
+          importance_score?: number;
+          access_count?: number;
+          last_accessed?: string;
+          tx_hash?: string;
+          block_number?: number;
+          gas_used?: string;
+          tx_status?: 'pending' | 'confirmed' | 'failed';
+          blockchain_network?: string;
+          confirmed_at?: string;
+          score: number;
+        }) => ({
+          memory: {
+            id: result.memory_id,
+            user_id: result.user_id || '',
+            source: result.source || 'unknown',
+            url: result.url,
+            title: result.title,
+            content: result.content || result.summary || '',
+            summary: result.summary,
+            hash: result.avail_hash,
+            timestamp: result.timestamp,
+            created_at: result.created_at || new Date(result.timestamp * 1000).toISOString(),
+            full_content: result.full_content,
+            page_metadata: result.page_metadata,
+            importance_score: result.importance_score,
+            access_count: result.access_count || 0,
+            last_accessed: result.last_accessed || new Date().toISOString(),
+            tx_hash: result.tx_hash,
+            block_number: result.block_number,
+            gas_used: result.gas_used,
+            tx_status: result.tx_status,
+            blockchain_network: result.blockchain_network,
+            confirmed_at: result.confirmed_at
+          },
+          similarity_score: result.score,
+          relevance_score: result.score,
+          semantic_score: result.score,
+          search_type: 'semantic' as const
+        }))
+        
         return {
-          results: responseData.results || [],
+          results: transformedResults,
           total: responseData.results?.length || 0,
           page,
           limit,
