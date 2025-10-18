@@ -1,0 +1,35 @@
+{
+  "name": "contract",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "hardhat test",
+    "test:solidity": "hardhat test solidity",
+    "test:typescript": "hardhat test --test-runner node",
+    "test:deployment": "hardhat run scripts/test-deployment.ts --network hardhatMainnet",
+    "deploy": "hardhat run scripts/deploy.ts --network hardhatMainnet",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia",
+    "deploy:mainnet": "hardhat run scripts/deploy.ts --network mainnet",
+    "deploy:op": "hardhat run scripts/deploy.ts --network opMainnet",
+    "upgrade": "hardhat run scripts/upgrade.ts --network hardhatMainnet",
+    "upgrade:sepolia": "hardhat run scripts/upgrade.ts --network sepolia",
+    "upgrade:mainnet": "hardhat run scripts/upgrade.ts --network mainnet",
+    "upgrade:op": "hardhat run scripts/upgrade.ts --network opMainnet",
+    "compile": "hardhat compile",
+    "clean": "hardhat clean"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ignition": "^3.0.3",
+    "@nomicfoundation/hardhat-toolbox-viem": "^5.0.0",
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.0",
+    "@types/node": "^22.18.11",
+    "forge-std": "github:foundry-rs/forge-std#v1.9.4",
+    "hardhat": "^3.0.7",
+    "typescript": "~5.8.0",
+    "viem": "^2.38.3"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3"
+  }
+}
