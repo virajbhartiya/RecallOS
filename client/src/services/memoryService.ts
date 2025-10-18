@@ -144,7 +144,11 @@ export class MemoryService {
           total: responseData.data.total || 0,
           page,
           limit,
-          filters
+          filters,
+          // Include search answer and meta summary if available
+          answer: responseData.data.answer,
+          meta_summary: responseData.data.meta_summary,
+          citations: responseData.data.citations
         }
       }
       return { results: [], total: 0, page, limit, filters }
