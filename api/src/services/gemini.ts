@@ -8,7 +8,7 @@ let nextAvailableAt = 0;
 const taskQueue: Array<{ run: QueueTask<any>; resolve: (v: any) => void; reject: (e: any) => void }> = [];
 
 // Default gap between requests; tuned for free-tier limits (~10 rpm). Adjust via Retry-After hints when returned
-let minIntervalMs = 7000;
+let minIntervalMs = 3000; // Reduced from 7000ms to 3000ms for faster processing
 
 async function processQueue() {
   if (isProcessingQueue) return;
@@ -85,7 +85,13 @@ export class GeminiService {
       this.ai = null as any;
       return;
     }
-    this.ai = new GoogleGenAI({ apiKey });
+    try {
+      this.ai = new GoogleGenAI({ apiKey });
+      console.log('Gemini service initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize Gemini service:', error);
+      this.ai = null as any;
+    }
   }
 
   private ensureInit() {
@@ -127,7 +133,17 @@ export class GeminiService {
     
     const enhancedPrompt = `${prompt}
 
-IMPORTANT: Return ONLY plain text. No markdown formatting, no bold text, no asterisks, no underscores, no code blocks, no special formatting. Just clean, readable plain text.`;
+CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
+- No asterisks (*) for bold or italic text
+- No underscores (_) for emphasis
+- No backticks for code blocks
+- No hash symbols (#) for headers
+- No brackets [] or parentheses () for links
+- No special characters for formatting
+- No bullet points with dashes or asterisks
+- No numbered lists with special formatting
+
+Return clean, readable plain text only.`;
 
     let lastError: any;
     const originalModelIndex = this.currentModelIndex;
@@ -169,11 +185,14 @@ IMPORTANT: Return ONLY plain text. No markdown formatting, no bold text, no aste
   async generateEmbedding(text: string): Promise<number[]> {
     this.ensureInit();
     
+    console.log('Generating embedding for text:', text.substring(0, 100) + '...');
+    
     let lastError: any;
     const originalModelIndex = this.currentModelIndex;
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
+        console.log(`Attempting embedding generation with model: ${this.getCurrentModel()}`);
         const response = await runWithRateLimit(() =>
           this.ai.models.embedContent({
             model: 'text-embedding-004',
@@ -183,6 +202,7 @@ IMPORTANT: Return ONLY plain text. No markdown formatting, no bold text, no aste
         const values = response.embeddings?.[0]?.values;
         if (!values) throw new Error('No embedding generated from Gemini API');
         
+        console.log('Embedding generated successfully, length:', values.length);
         // Reset to first model on success
         this.resetToFirstModel();
         return values;
@@ -204,6 +224,7 @@ IMPORTANT: Return ONLY plain text. No markdown formatting, no bold text, no aste
 
     // Reset to original model if all models failed
     this.currentModelIndex = originalModelIndex;
+    console.error('All embedding generation attempts failed:', lastError);
     throw lastError;
   }
 
@@ -245,7 +266,17 @@ Topics: ${keyTopics.join(', ')}
 
 ${prompts[contentType] || prompts.default}
 
-IMPORTANT: Return ONLY plain text. No markdown formatting, no bold text, no asterisks, no underscores, no code blocks, no special formatting. Just clean, readable plain text.
+CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
+- No asterisks (*) for bold or italic text
+- No underscores (_) for emphasis
+- No backticks for code blocks
+- No hash symbols (#) for headers
+- No brackets [] or parentheses () for links
+- No special characters for formatting
+- No bullet points with dashes or asterisks
+- No numbered lists with special formatting
+
+Return clean, readable plain text only.
 
 Raw Content: ${rawText}
 `;
@@ -311,7 +342,7 @@ RecallOS Context:
 - You are structuring content for verifiable personal cognition.
 - Metadata must improve future reasoning, search, and memory linking.
 
-IMPORTANT: Return ONLY valid JSON. No explanations, no markdown, no code blocks. Just the JSON object.
+CRITICAL: Return ONLY valid JSON. No explanations, no markdown formatting, no code blocks, no special characters. Just the JSON object.
 
 Return a JSON object with this exact structure:
 {
@@ -486,7 +517,7 @@ Summary: ${memoryB.summary || 'N/A'}
 Topics: ${memoryB.topics?.join(', ') || 'N/A'}
 Categories: ${memoryB.categories?.join(', ') || 'N/A'}
 
-IMPORTANT: Return ONLY valid JSON. No explanations, no markdown, no code blocks. Just the JSON object.
+CRITICAL: Return ONLY valid JSON. No explanations, no markdown formatting, no code blocks, no special characters. Just the JSON object.
 
 Return a JSON object with this exact structure:
 {
