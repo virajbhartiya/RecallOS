@@ -119,7 +119,7 @@ export const Search: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
-  const [showOnlyCited, setShowOnlyCited] = useState(false)
+  const [showOnlyCited, setShowOnlyCited] = useState(true)
 
   const handleSearch = useCallback(async (
     query: string, 
@@ -247,7 +247,7 @@ export const Search: React.FC = () => {
                     className="border-gray-300"
                   />
                   <span className="text-sm font-mono text-gray-700">
-                    Show only memories used in summary ({searchResults.citations.length} cited)
+                    Show only cited memories ({searchResults.citations.length} cited)
                   </span>
                 </label>
               </div>
@@ -324,12 +324,12 @@ export const Search: React.FC = () => {
                   <div className="text-sm font-mono text-gray-700">
                     {showOnlyCited ? (
                       <>
-                        Showing {getFilteredResults().length} of {searchResults.total} results
-                        {getFilteredResults().length !== searchResults.total && ' (cited memories only)'}
+                        Showing {getFilteredResults().length} cited memories
+                        {getFilteredResults().length !== searchResults.total && ` (of ${searchResults.total} total results)`}
                       </>
                     ) : (
                       <>
-                        Found {searchResults.total} {searchResults.total === 1 ? 'result' : 'results'}
+                        Showing all {searchResults.total} {searchResults.total === 1 ? 'result' : 'results'}
                         {searchResults.page > 1 && ` (page ${searchResults.page})`}
                       </>
                     )}

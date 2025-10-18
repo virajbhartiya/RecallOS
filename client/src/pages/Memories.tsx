@@ -275,6 +275,7 @@ export const Memories: React.FC = () => {
   const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [searchQuery, setSearchQuery] = useState<string>('')
+  const [showOnlyCited, setShowOnlyCited] = useState(true)
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -482,6 +483,25 @@ export const Memories: React.FC = () => {
     setShowTransactionHistorySidebar(false)
   }, [])
 
+  // Filter results to show only cited memories
+  const getFilteredMemories = () => {
+    if (!isSearchMode || !searchResults || !searchResults.results) {
+      return memories
+    }
+    
+    if (!showOnlyCited || !searchCitations || searchCitations.length === 0) {
+      return searchResults.results.map(r => r.memory)
+    }
+    
+    // Get memory IDs from citations
+    const citedMemoryIds = searchCitations.map(citation => citation.memory_id)
+    
+    // Filter results to only include cited memories
+    return searchResults.results
+      .filter(result => citedMemoryIds.includes(result.memory.id))
+      .map(result => result.memory)
+  }
+
   const handleViewAllTransactions = useCallback(() => {
     showAllTransactions('sepolia')
   }, [showAllTransactions])
@@ -552,7 +572,7 @@ export const Memories: React.FC = () => {
     )
   }
 
-  let currentMemories = isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory) : memories
+  let currentMemories = getFilteredMemories()
   const currentResults = isSearchMode && searchResults && searchResults.results ? searchResults.results : null
   currentMemories = [...(currentMemories || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
@@ -675,7 +695,11 @@ export const Memories: React.FC = () => {
                 </h3>
                 <p className="text-xs text-gray-500">
                   {isSearchMode ? (
-                    searchJobId ? 'Generating answer…' : (searchResults ? `${searchResults.total} results for "${searchQuery}"` : 'No search')
+                    searchJobId ? 'Generating answer…' : (searchResults ? (
+                      showOnlyCited && searchCitations && searchCitations.length > 0 ? 
+                        `Showing ${currentMemories.length} cited memories (of ${searchResults.total} total) for "${searchQuery}"` :
+                        `${searchResults.total} results for "${searchQuery}"`
+                    ) : 'No search')
                   ) : (
                     `${(memories || []).length} total`
                   )}
@@ -709,6 +733,23 @@ export const Memories: React.FC = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+            
+            {/* Show Only Cited Memories Toggle */}
+            {isSearchMode && searchCitations && searchCitations.length > 0 && (
+              <div className="mt-2">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyCited}
+                    onChange={(e) => setShowOnlyCited(e.target.checked)}
+                    className="border-gray-300"
+                  />
+                  <span className="text-[11px] font-mono text-gray-700">
+                    Show only cited memories ({searchCitations.length} cited)
+                  </span>
+                </label>
               </div>
             )}
           </div>
