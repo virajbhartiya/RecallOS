@@ -4,6 +4,7 @@ import { useWallet } from '../contexts/WalletContext'
 import WalletModal from '../components/WalletModal'
 import { MemoryService } from '../services/memoryService'
 import { LoadingCard } from '../components/ui/loading-spinner'
+import { DepositManager } from '../components/DepositManager'
 import type { Memory } from '../types/memory'
 
 const ConsoleButton: React.FC<{
@@ -96,8 +97,9 @@ const MemoryPreviewCard: React.FC<{ memory: Memory }> = ({ memory }) => {
 }
 
 export const Landing = () => {
-  const { isConnected, address } = useWallet()
+  const { isConnected, address, gasBalance } = useWallet()
   const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
   const [recentMemories, setRecentMemories] = useState<Memory[]>([])
   const [memoryCount, setMemoryCount] = useState(0)
   const [isLoadingMemories, setIsLoadingMemories] = useState(false)
@@ -205,9 +207,27 @@ export const Landing = () => {
                 </button>
               )}
               {isConnected && (
-                <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>{address?.slice(0, 6)}...{address?.slice(-4)}</span>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span>{address?.slice(0, 6)}...{address?.slice(-4)}</span>
+                  </div>
+                  {gasBalance && (
+                    <button 
+                      className="flex items-center space-x-1 text-xs font-mono hover:bg-gray-50 px-2 py-1 rounded transition-colors"
+                      onClick={() => {
+                        setIsDepositModalOpen(true)
+                      }}
+                    >
+                      <span className="text-gray-600">Gas:</span>
+                      <span className={`${parseFloat(gasBalance) < 0.005 ? 'text-yellow-600' : 'text-gray-900'}`}>
+                        {parseFloat(gasBalance).toFixed(6)} ETH
+                      </span>
+                      {parseFloat(gasBalance) < 0.005 && (
+                        <span className="text-yellow-600">⚠️</span>
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
               <button 
@@ -499,10 +519,29 @@ export const Landing = () => {
         </Section>
       )}
 
+
       <WalletModal 
         isOpen={isWalletModalOpen} 
         onClose={() => setIsWalletModalOpen(false)} 
       />
+
+      {/* Deposit Modal */}
+      {isDepositModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white border border-gray-200 p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-light">Gas Deposit Manager</h2>
+              <button 
+                onClick={() => setIsDepositModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl font-mono"
+              >
+                ×
+              </button>
+            </div>
+            <DepositManager onClose={() => setIsDepositModalOpen(false)} />
+          </div>
+        </div>
+      )}
 
     </div>
   )
