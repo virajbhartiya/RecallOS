@@ -109,24 +109,14 @@ export class MemoryService {
   ): Promise<MemorySearchResponse> {
     try {
       const normalizedAddress = this.normalizeAddress(userAddress)
-      const params = new URLSearchParams({
-        userAddress: normalizedAddress,
+      
+      // Use the working /api/search endpoint (POST)
+      const response = await postRequest('/api/search', {
+        wallet: normalizedAddress,
         query,
-        page: page.toString(),
-        limit: limit.toString()
-      })
-
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          if (typeof value === 'object') {
-            params.append(key, JSON.stringify(value))
-          } else {
-            params.append(key, value.toString())
-          }
-        }
-      })
-
-      const response = await getRequest(`${this.baseUrl}/search?${params.toString()}`, undefined, signal)
+        limit,
+        contextOnly: false
+      }, undefined, signal)
       
       if (!response) {
         throw new Error('No response received from server')
@@ -137,18 +127,19 @@ export class MemoryService {
       }
       
       const responseData = response?.data
-      if (responseData && responseData.data) {
-        // Backend returns nested structure: { success: true, data: { total: 1, results: [...] } }
+      if (responseData) {
+        // Backend returns: { query, results, meta_summary, answer, citations, job_id }
         return {
-          results: responseData.data.results || [],
-          total: responseData.data.total || 0,
+          results: responseData.results || [],
+          total: responseData.results?.length || 0,
           page,
           limit,
           filters,
           // Include search answer and meta summary if available
-          answer: responseData.data.answer,
-          meta_summary: responseData.data.meta_summary,
-          citations: responseData.data.citations
+          answer: responseData.answer,
+          meta_summary: responseData.meta_summary,
+          citations: responseData.citations,
+          job_id: responseData.job_id
         }
       }
       return { results: [], total: 0, page, limit, filters }
@@ -167,25 +158,14 @@ export class MemoryService {
   ): Promise<MemorySearchResponse> {
     try {
       const normalizedAddress = this.normalizeAddress(userAddress)
-      const params = new URLSearchParams({
-        userAddress: normalizedAddress,
+      
+      // Use the working /api/search endpoint (POST) - same as searchMemories
+      const response = await postRequest('/api/search', {
+        wallet: normalizedAddress,
         query,
-        page: page.toString(),
-        limit: limit.toString()
+        limit,
+        contextOnly: false
       })
-
-      // Add filters to params
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          if (typeof value === 'object') {
-            params.append(key, JSON.stringify(value))
-          } else {
-            params.append(key, value.toString())
-          }
-        }
-      })
-
-      const response = await getRequest(`${this.baseUrl}/search-embeddings?${params.toString()}`)
       
       if (!response) {
         throw new Error('No response received from server')
@@ -196,14 +176,19 @@ export class MemoryService {
       }
       
       const responseData = response?.data
-      if (responseData && responseData.data) {
-        // Backend returns nested structure: { success: true, data: { total: 1, results: [...] } }
+      if (responseData) {
+        // Backend returns: { query, results, meta_summary, answer, citations, job_id }
         return {
-          results: responseData.data.results || [],
-          total: responseData.data.total || 0,
+          results: responseData.results || [],
+          total: responseData.results?.length || 0,
           page,
           limit,
-          filters
+          filters,
+          // Include search answer and meta summary if available
+          answer: responseData.answer,
+          meta_summary: responseData.meta_summary,
+          citations: responseData.citations,
+          job_id: responseData.job_id
         }
       }
       return { results: [], total: 0, page, limit, filters }

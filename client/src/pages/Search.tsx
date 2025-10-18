@@ -119,6 +119,7 @@ export const Search: React.FC = () => {
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
+  const [showOnlyCited, setShowOnlyCited] = useState(false)
 
   const handleSearch = useCallback(async (
     query: string, 
@@ -176,6 +177,23 @@ export const Search: React.FC = () => {
     setSelectedMemory(null)
   }
 
+  // Filter results to show only cited memories
+  const getFilteredResults = () => {
+    if (!searchResults) return []
+    
+    if (!showOnlyCited || !searchResults.citations) {
+      return searchResults.results
+    }
+    
+    // Get memory IDs from citations
+    const citedMemoryIds = searchResults.citations.map(citation => citation.memory_id)
+    
+    // Filter results to only include cited memories
+    return searchResults.results.filter(result => 
+      citedMemoryIds.includes(result.memory.id)
+    )
+  }
+
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -213,6 +231,28 @@ export const Search: React.FC = () => {
             resultCount={searchResults?.total}
             className="mb-6"
           />
+          
+          {/* Show Only Cited Memories Toggle */}
+          {searchResults && searchResults.citations && searchResults.citations.length > 0 && (
+            <div className="bg-white border border-gray-200 p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-mono text-gray-600">
+                  [DISPLAY OPTIONS]
+                </div>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showOnlyCited}
+                    onChange={(e) => setShowOnlyCited(e.target.checked)}
+                    className="border-gray-300"
+                  />
+                  <span className="text-sm font-mono text-gray-700">
+                    Show only memories used in summary ({searchResults.citations.length} cited)
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Search Results */}
@@ -245,6 +285,36 @@ export const Search: React.FC = () => {
 
           {searchResults && searchResults.results.length > 0 && (
             <>
+              {/* AI-Generated Summary */}
+              {searchResults.answer && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4">
+                  <div className="text-sm font-mono text-gray-600 mb-2">
+                    [AI SUMMARY]
+                  </div>
+                  <div className="text-sm text-gray-800 mb-3">
+                    {searchResults.answer}
+                  </div>
+                  {searchResults.citations && searchResults.citations.length > 0 && (
+                    <div className="text-xs text-gray-600">
+                      <span className="font-mono">Citations:</span>{' '}
+                      {searchResults.citations.map((citation, index) => (
+                        <span key={citation.memory_id}>
+                          <a 
+                            href={citation.url || '#'} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 underline"
+                          >
+                            [{citation.label}] {citation.title}
+                          </a>
+                          {index < searchResults.citations!.length - 1 && ', '}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Search Stats */}
               <div className="bg-white border border-gray-200 p-4">
                 <div className="text-sm font-mono text-gray-600 mb-2">
@@ -252,8 +322,17 @@ export const Search: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-mono text-gray-700">
-                    Found {searchResults.total} {searchResults.total === 1 ? 'result' : 'results'}
-                    {searchResults.page > 1 && ` (page ${searchResults.page})`}
+                    {showOnlyCited ? (
+                      <>
+                        Showing {getFilteredResults().length} of {searchResults.total} results
+                        {getFilteredResults().length !== searchResults.total && ' (cited memories only)'}
+                      </>
+                    ) : (
+                      <>
+                        Found {searchResults.total} {searchResults.total === 1 ? 'result' : 'results'}
+                        {searchResults.page > 1 && ` (page ${searchResults.page})`}
+                      </>
+                    )}
                   </div>
                   {searchResults.appliedFilters && Object.keys(searchResults.appliedFilters).length > 0 && (
                     <div className="text-xs font-mono text-gray-500">
@@ -265,7 +344,7 @@ export const Search: React.FC = () => {
 
               {/* Results Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {searchResults.results.map((result) => (
+                {getFilteredResults().map((result) => (
                   <SearchResultCard
                     key={result.memory.id}
                     result={result}

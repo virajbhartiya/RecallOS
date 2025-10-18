@@ -8,11 +8,14 @@ export const postSearch = async (req: Request, res: Response, next: NextFunction
     const { wallet, query, limit, contextOnly } = req.body || {};
     if (!wallet || !query) return next(new AppError('wallet and query are required', 400));
     
+    console.log('Search request:', { wallet, query, limit, contextOnly });
+    
     // Only create job for async answer delivery if not in context-only mode
     let job = null;
     if (!contextOnly) {
       job = createSearchJob();
       ;(global as any).__currentSearchJobId = job.id;
+      console.log('Created search job:', job.id);
     }
     
     const data = await searchMemories({ wallet, query, limit, contextOnly });
@@ -29,10 +32,23 @@ export const postSearch = async (req: Request, res: Response, next: NextFunction
     
     if (job) {
       response.job_id = job.id;
+      console.log('Search completed, job ID:', job.id);
     }
     
     res.status(200).json(response);
   } catch (err) {
+    console.error('Error in postSearch:', err);
+    // Update search job status to failed if there's a job
+    try {
+      const jobId = (global as any).__currentSearchJobId as string | undefined;
+      if (jobId) {
+        const { setSearchJobResult } = await import('../services/searchJob');
+        await setSearchJobResult(jobId, { status: 'failed' });
+        (global as any).__currentSearchJobId = undefined;
+      }
+    } catch (jobError) {
+      console.error('Error updating search job status in controller:', jobError);
+    }
     next(err);
   }
 };

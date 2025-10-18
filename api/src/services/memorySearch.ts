@@ -55,7 +55,8 @@ export async function searchMemories(params: {
   const { wallet, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', enableAnchoring = process.env.SEARCH_ANCHOR_META === 'true', contextOnly = false } = params;
 
   if (!aiProvider.isInitialized) {
-    throw new Error('Gemini not configured. Set GEMINI_API_KEY.');
+    console.error('AI Provider not initialized. Check GEMINI_API_KEY or AI_PROVIDER configuration.');
+    throw new Error('AI Provider not configured. Set GEMINI_API_KEY or configure AI_PROVIDER.');
   }
 
   const normalized = normalizeText(query);
@@ -68,8 +69,21 @@ export async function searchMemories(params: {
 
   let embedding: number[];
   try {
-    embedding = await withTimeout(aiProvider.generateEmbedding(normalized), 1200);
-  } catch {
+    // Increase timeout for Gemini API calls - they can take longer
+    embedding = await withTimeout(aiProvider.generateEmbedding(normalized), 10000);
+  } catch (error) {
+    console.error('Error generating embedding:', error);
+    // Update search job status to failed if there's a job
+    try {
+      const jobId = (global as any).__currentSearchJobId as string | undefined;
+      if (jobId) {
+        console.log('Updating search job status to failed due to embedding timeout:', jobId);
+        await setSearchJobResult(jobId, { status: 'failed' });
+        (global as any).__currentSearchJobId = undefined;
+      }
+    } catch (jobError) {
+      console.error('Error updating search job status:', jobError);
+    }
     return { query: normalized, results: [], meta_summary: undefined, answer: undefined };
   }
   const queryVecSql = vectorToSqlArray(embedding);
@@ -90,11 +104,11 @@ export async function searchMemories(params: {
         ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY me.embedding <=> ${queryVecSql}) AS rn
       FROM memory_embeddings me
       JOIN memories m ON m.id = me.memory_id
-      WHERE m.user_id = '${user.id}'
+      WHERE m.user_id = '${user.id}'::uuid
     )
     SELECT id, title, summary, url, timestamp, hash, score
     FROM ranked
-    WHERE rn = 1 AND score > 0.3
+    WHERE rn = 1 AND score > 0.01
     ORDER BY score DESC
     LIMIT ${Number(limit)}
   `);
@@ -107,12 +121,17 @@ export async function searchMemories(params: {
     const summary = (row.summary || '').toLowerCase();
     const content = title + ' ' + summary;
     
-    // Check if the content actually contains relevant keywords
-    const hasRelevantKeywords = queryKeywords.some(keyword => 
-      content.includes(keyword.toLowerCase())
-    );
+    // For semantic search, be more lenient with keyword matching
+    // Only filter out results if they have very low semantic scores AND no keyword matches
+    if (row.score < 0.02) {
+      const hasRelevantKeywords = queryKeywords.some(keyword => 
+        content.includes(keyword.toLowerCase())
+      );
+      return hasRelevantKeywords;
+    }
     
-    return hasRelevantKeywords;
+    // For higher semantic scores, trust the semantic similarity
+    return true;
   });
   
   const memoryIds = filteredRows.map(r => r.id);
@@ -167,8 +186,9 @@ Return clean, readable plain text only.
 Memory summaries:
 ${bullets}`;
     try {
-      metaSummary = await withTimeout(aiProvider.generateContent(prompt), 1500);
+      metaSummary = await withTimeout(aiProvider.generateContent(prompt), 10000);
     } catch (e) {
+      console.error('Error generating meta summary:', e);
       metaSummary = undefined;
     }
   }
@@ -216,7 +236,7 @@ Return clean, readable plain text only.
 User query: "${normalized}"
 Evidence notes (ordered by relevance):
 ${bullets}`;
-      answer = await withTimeout(aiProvider.generateContent(ansPrompt), 8000);
+      answer = await withTimeout(aiProvider.generateContent(ansPrompt), 15000);
       // Build citations map aligned with [n]
       const allCitations = filteredRows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
       // Keep only citations actually referenced in the answer/meta text, preserve first-seen order
@@ -239,6 +259,16 @@ ${bullets}`;
         : [];
     } catch (error) {
       console.error('Error generating search answer:', error);
+      // Update search job status to failed if there's a job
+      try {
+        const jobId = (global as any).__currentSearchJobId as string | undefined;
+        if (jobId) {
+          await setSearchJobResult(jobId, { status: 'failed' });
+          (global as any).__currentSearchJobId = undefined;
+        }
+      } catch (jobError) {
+        console.error('Error updating search job status:', jobError);
+      }
       // Fallback: create a simple summary if AI generation fails
       answer = `Found ${filteredRows.length} relevant memories about "${normalized}". ${filteredRows.slice(0, 3).map((r, i) => `[${i + 1}] ${r.title || 'Untitled'}`).join(', ')}${filteredRows.length > 3 ? ' and more.' : '.'}`;
     }
@@ -283,13 +313,24 @@ ${bullets}`;
     score: r.score,
   }));
 
+  console.log('About to update search job status. Results count:', results.length);
+  
   try {
     const jobId = (global as any).__currentSearchJobId as string | undefined;
+    console.log('Search job ID from global:', jobId);
     if (jobId) {
+      console.log('Updating search job result:', jobId, { hasAnswer: !!answer, hasMetaSummary: !!metaSummary, resultsCount: results.length });
       await setSearchJobResult(jobId, { answer, meta_summary: metaSummary, status: 'completed' });
       (global as any).__currentSearchJobId = undefined;
+      console.log('Search job completed successfully:', jobId);
+    } else {
+      console.log('No job ID found, skipping job status update');
     }
-  } catch {}
+  } catch (error) {
+    console.error('Error updating search job result:', error);
+  }
+  
+  console.log('Returning search results:', { query: normalized, resultsCount: results.length, hasAnswer: !!answer, hasMetaSummary: !!metaSummary });
   return { query: normalized, results, meta_summary: metaSummary, answer, citations, context };
 }
 
