@@ -842,6 +842,8 @@ export class MemoryMeshService {
     try {
       const prompt = `Evaluate relationships between a source memory and multiple candidate memories. Return a JSON array with evaluation results.
 
+CRITICAL: Return ONLY valid JSON. No explanations, no markdown formatting, no code blocks, no special characters. Just the JSON object.
+
 Source Memory:
 Title: ${memoryA.title || 'N/A'}
 Summary: ${memoryA.summary || 'N/A'}
@@ -1218,28 +1220,37 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
       if (queryEmbedding) {
         // Use the semantic search with MemoryEmbedding table
-        const queryVecSql = `[${queryEmbedding.join(',')}]`;
+        const queryVecSql = `ARRAY[${queryEmbedding.join(',')}]::vector`;
         const rows = await prisma.$queryRawUnsafe<Array<{ id: string; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; score: number }>>(`
           WITH ranked AS (
             SELECT 
               m.id, m.summary, m.url, m.timestamp, m.hash,
-              GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}::vector))) AS score,
-              ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY me.embedding <=> ${queryVecSql}::vector) AS rn
+              GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}))) AS score,
+              ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY me.embedding <=> ${queryVecSql}) AS rn
             FROM memory_embeddings me
             JOIN memories m ON m.id = me.memory_id
-            WHERE m.user_id = '${userId}'
+            WHERE m.user_id = '${userId}'::uuid
           )
           SELECT id, summary, url, timestamp, hash, score
           FROM ranked
-          WHERE rn = 1
-          ORDER BY (1 - score) ASC
+          WHERE rn = 1 AND score > 0.01
+          ORDER BY score DESC
           LIMIT ${limit}
         `);
         
-        return rows.map(row => ({
-          ...row,
-          similarity_score: row.score
-        }));
+        // Get full memory objects for the results
+        const memoryIds = rows.map(row => row.id);
+        const fullMemories = await prisma.memory.findMany({
+          where: { id: { in: memoryIds } }
+        });
+        
+        return rows.map(row => {
+          const fullMemory = fullMemories.find(m => m.id === row.id);
+          return {
+            ...fullMemory,
+            similarity_score: row.score
+          };
+        });
       }
 
       // Fallback: keyword search on metadata/title/summary

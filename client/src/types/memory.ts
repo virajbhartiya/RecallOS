@@ -129,6 +129,10 @@ export interface MemorySearchResponse {
   page: number
   limit: number
   filters: SearchFilters
+  answer?: string
+  meta_summary?: string
+  citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>
+  job_id?: string
 }
 
 export interface MemoryWithRelations extends Memory {

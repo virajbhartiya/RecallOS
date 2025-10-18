@@ -21,6 +21,7 @@ import { prisma } from '../lib/prisma';
 import { aiProvider } from '../services/aiProvider';
 
 import { memoryMeshService } from '../services/memoryMesh';
+import { searchMemories } from '../services/memorySearch';
 
 import { createHash } from 'crypto';
 
@@ -686,102 +687,55 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      console.log(`Memory search for: "${query}" for user: ${userAddress}`);
+
+      // Use the semantic search functionality
+      const searchResults = await searchMemories({
+        wallet: userAddress as string,
+        query: query as string,
+        limit: parseInt(limit as string),
+        enableReasoning: true,
+        enableAnchoring: false,
+        contextOnly: false
       });
 
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: 'User not found',
-        });
-      }
-
-      const whereConditions: any = {
-        user_id: user.id,
-      };
-
-      const searchQuery = query as string;
-      console.log(`Searching for: "${searchQuery}" for user: ${user.id}`);
-
-      whereConditions.OR = [
-        { content: { contains: searchQuery, mode: 'insensitive' } },
-        { summary: { contains: searchQuery, mode: 'insensitive' } },
-        { title: { contains: searchQuery, mode: 'insensitive' } },
-        { url: { contains: searchQuery, mode: 'insensitive' } },
-      ];
-
-      if (category) {
-        whereConditions.page_metadata = {
-          ...whereConditions.page_metadata,
-          categories: { has: category },
-        };
-      }
-
-      if (topic) {
-        whereConditions.page_metadata = {
-          ...whereConditions.page_metadata,
-          topics: { has: topic },
-        };
-      }
-
-      if (importance) {
-        whereConditions.page_metadata = {
-          ...whereConditions.page_metadata,
-          importance: { gte: parseInt(importance as string) },
-        };
-      }
-
-      if (sentiment) {
-        whereConditions.page_metadata = {
-          ...whereConditions.page_metadata,
-          sentiment: sentiment,
-        };
-      }
-
-      const memories = await prisma.memory.findMany({
-        where: whereConditions,
-        orderBy: { timestamp: 'desc' },
-        take: parseInt(limit as string),
-      });
-
-      console.log(`Found ${memories.length} memories for query: "${searchQuery}"`);
-
-      let searchableTerms: string[] = [];
-
-      try {
-        const queryMetadata = await aiProvider.extractContentMetadata(
-          searchQuery,
-          {
-            content_type: 'search_query',
-            title: 'Search Query',
-          }
-        );
-
-        searchableTerms = queryMetadata.searchableTerms;
-      } catch (error) {
-        console.log('Could not extract search terms from query:', error);
-      }
-
-      // Convert BigInt values to strings for JSON serialization
-      const serializedMemories = memories.map((memory: any) => ({
-        ...memory,
-        timestamp: memory.timestamp.toString(),
-        block_number: memory.block_number?.toString() || null,
+      // Convert search results to the expected format
+      const memories = searchResults.results.map(result => ({
+        id: result.memory_id,
+        title: result.title,
+        summary: result.summary,
+        url: result.url,
+        timestamp: result.timestamp,
+        hash: result.avail_hash,
+        content: result.summary, // Use summary as content for display
+        source: 'browser',
+        user_id: userAddress,
+        created_at: new Date(result.timestamp * 1000).toISOString(),
+        page_metadata: {
+          topics: [] as string[],
+          categories: ['web_page'],
+          sentiment: 'neutral',
+          importance: 5
+        }
       }));
+
+      console.log(`Found ${memories.length} memories for query: "${query}"`);
 
       res.status(200).json({
         success: true,
         data: {
-          results: serializedMemories.map(memory => ({
-            memory,
-            search_type: 'keyword',
-            keyword_score: 1.0,
-            blended_score: 1.0
-          })),
           total: memories.length,
-          query: searchQuery,
-          searchableTerms,
+          results: memories.map(memory => ({
+            memory,
+            search_type: 'semantic',
+            semantic_score: searchResults.results.find(r => r.memory_id === memory.id)?.score || 0,
+            blended_score: searchResults.results.find(r => r.memory_id === memory.id)?.score || 0
+          })),
+          query: searchResults.query,
+          // Include the search answer and meta summary
+          answer: searchResults.answer,
+          meta_summary: searchResults.meta_summary,
+          citations: searchResults.citations
         },
       });
     } catch (error) {

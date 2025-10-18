@@ -18,9 +18,10 @@ export class SearchService {
     wallet: string,
     query: string,
     limit: number = 10,
+    contextOnly: boolean = false,
     signal?: AbortSignal
-  ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; job_id?: string }> {
-    const res = await postRequest('/search', { wallet, query, limit }, undefined, signal)
+  ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string; job_id?: string }> {
+    const res = await postRequest('/search', { wallet, query, limit, contextOnly }, undefined, signal)
     if (!res || res.status >= 400) throw new Error('Search request failed')
     return res.data
   }
@@ -28,6 +29,43 @@ export class SearchService {
   static async getJob(jobId: string): Promise<{ id: string; status: 'pending' | 'completed' | 'failed'; answer?: string; meta_summary?: string }> {
     const res = await axiosInstance.get(`/search/job/${jobId}`)
     return res.data
+  }
+
+  /**
+   * Get memory context for external AI tools (like ChatGPT)
+   * Returns raw memory content without AI-generated answers
+   * 
+   * @param wallet - User's wallet address
+   * @param query - Search query
+   * @param limit - Maximum number of memories to return (default: 10)
+   * @param signal - Abort signal for request cancellation
+   * @returns Promise with query, context string, and raw results
+   * 
+   * @example
+   * ```typescript
+   * const context = await SearchService.getContextForAI(
+   *   '0x123...', 
+   *   'machine learning projects', 
+   *   5
+   * );
+   * 
+   * // Use context.context to provide to ChatGPT:
+   * // "Based on my memories: " + context.context
+   * ```
+   */
+  static async getContextForAI(
+    wallet: string,
+    query: string,
+    limit: number = 10,
+    signal?: AbortSignal
+  ): Promise<{ query: string; context: string; results: ApiSearchResult[] }> {
+    const res = await postRequest('/search', { wallet, query, limit, contextOnly: true }, undefined, signal)
+    if (!res || res.status >= 400) throw new Error('Context search request failed')
+    return {
+      query: res.data.query,
+      context: res.data.context || 'No relevant memories found.',
+      results: res.data.results || []
+    }
   }
 
   static async semanticSearchMapped(
@@ -38,7 +76,7 @@ export class SearchService {
     limit: number = 10,
     signal?: AbortSignal
   ): Promise<MemorySearchResponse> {
-    const data = await this.semanticSearch(wallet, query, limit, signal)
+    const data = await this.semanticSearch(wallet, query, limit, false, signal)
     console.log('Semantic search results:', data.results?.map(r => ({ id: r.memory_id, score: r.score, summary: r.summary?.substring(0, 100) })))
     const results: SearchResult[] = (data.results || [])
       .map((r) => {
