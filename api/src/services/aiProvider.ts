@@ -264,7 +264,26 @@ export const aiProvider = {
     const title = metadata?.title || ''
     const url = metadata?.url || ''
     const contextSummary = metadata?.content_summary || ''
-    const prompt = `Summarize the following ${contentType} for storage in a personal memory graph. Be concise (<=200 words), capture key ideas, why it matters, and any actionable takeaways. Title: ${title}\nURL: ${url}\nExisting Summary: ${contextSummary}\n\nText:\n${rawText}`
+    const prompt = `Summarize the following ${contentType} for storage in a personal memory graph. Be concise (<=200 words), capture key ideas, why it matters, and any actionable takeaways.
+
+CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
+- No asterisks (*) for bold or italic text
+- No underscores (_) for emphasis
+- No backticks for code blocks
+- No hash symbols (#) for headers
+- No brackets [] or parentheses () for links
+- No special characters for formatting
+- No bullet points with dashes or asterisks
+- No numbered lists with special formatting
+
+Return clean, readable plain text only.
+
+Title: ${title}
+URL: ${url}
+Existing Summary: ${contextSummary}
+
+Text:
+${rawText}`
     return this.generateContent(prompt)
   },
 
@@ -281,7 +300,9 @@ export const aiProvider = {
     if (provider === 'gemini') return geminiService.extractContentMetadata(rawText, metadata)
     const title = metadata?.title || ''
     const contentType = metadata?.content_type || 'web_page'
-    const jsonPrompt = `Extract metadata from this content. Respond with ONLY a valid JSON object, no explanations or text before/after:
+    const jsonPrompt = `Extract metadata from this content. Respond with ONLY a valid JSON object, no explanations or text before/after.
+
+CRITICAL: Return ONLY valid JSON. No explanations, no markdown formatting, no code blocks, no special characters. Just the JSON object.
 
 Title: ${title}
 Content: ${rawText.substring(0, 2000)}
