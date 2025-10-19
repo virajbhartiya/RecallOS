@@ -1,12 +1,15 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 
 interface WalletContextType {
   isConnected: boolean
   address: string | null
   chainId: number | null
   balance: string | null
+  gasBalance: string | null
   connect: () => void
   disconnect: () => void
+  depositGas: (amount: string) => Promise<void>
+  fetchGasBalance: () => Promise<void>
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
@@ -28,6 +31,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [address, setAddress] = useState<string | null>(null)
   const [chainId, setChainId] = useState<number | null>(null)
   const [balance, setBalance] = useState<string | null>(null)
+  const [gasBalance, setGasBalance] = useState<string | null>(null)
 
   const fetchBalance = async (walletAddress: string) => {
     if (typeof window !== 'undefined' && window.ethereum) {
@@ -36,7 +40,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           method: 'eth_getBalance',
           params: [walletAddress, 'latest']
         }) as string
-        // Convert from wei to ETH
         const ethBalance = (parseInt(balance, 16) / Math.pow(10, 18)).toFixed(4)
         setBalance(ethBalance)
       } catch (error) {
@@ -46,8 +49,86 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }
   }
 
+  const fetchGasBalance = useCallback(async () => {
+    if (!address) return
+    
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/deposit/balance/${address}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success) {
+          setGasBalance(data.data.balance)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching gas balance:', error)
+      setGasBalance(null)
+    }
+  }, [address])
+
+  const depositGas = async (amount: string) => {
+    if (!address || !window.ethereum) {
+      throw new Error('Wallet not connected')
+    }
+
+    try {
+      // Get contract address
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/deposit/address`)
+      const data = await response.json()
+      
+      if (!data.success) {
+        throw new Error('Failed to get contract address')
+      }
+
+      const contractAddress = data.data.contractAddress
+      const amountWei = (parseFloat(amount) * Math.pow(10, 18)).toString(16)
+      
+      const depositGasFunctionSelector = '0xae9bb692'
+      
+      const txHash = await window.ethereum.request({
+        method: 'eth_sendTransaction',
+        params: [{
+          from: address,
+          to: contractAddress,
+          value: `0x${amountWei}`,
+          data: depositGasFunctionSelector,
+          gas: '0xea60'
+        }]
+      })
+
+      await new Promise((resolve, reject) => {
+        const checkTransaction = async () => {
+          try {
+            const receipt = await window.ethereum!.request({
+              method: 'eth_getTransactionReceipt',
+              params: [txHash]
+            }) as { status: string }
+            
+            if (receipt) {
+              if (receipt.status === '0x1') {
+                resolve(receipt)
+              } else {
+                console.error('Transaction failed with receipt:', receipt)
+                reject(new Error(`Transaction failed: ${receipt.status}`))
+              }
+            } else {
+              setTimeout(checkTransaction, 2000)
+            }
+          } catch (error) {
+            reject(error)
+          }
+        }
+        checkTransaction()
+      })
+
+      await fetchGasBalance()
+    } catch (error) {
+      console.error('Error depositing gas:', error)
+      throw error
+    }
+  }
+
   useEffect(() => {
-    // Check if wallet is already connected
     const checkConnection = async () => {
       if (typeof window !== 'undefined' && window.ethereum) {
         try {
@@ -58,6 +139,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
             const chainId = await window.ethereum.request({ method: 'eth_chainId' }) as string
             setChainId(parseInt(chainId, 16))
             await fetchBalance(accounts[0])
+            await fetchGasBalance()
           }
         } catch (error) {
           console.error('Error checking wallet connection:', error)
@@ -74,11 +156,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           setIsConnected(true)
           setAddress(accounts[0])
           await fetchBalance(accounts[0])
+          await fetchGasBalance()
         } else {
           setIsConnected(false)
           setAddress(null)
           setChainId(null)
           setBalance(null)
+          setGasBalance(null)
         }
       })
 
@@ -94,7 +178,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         window.ethereum.removeAllListeners('chainChanged')
       }
     }
-  }, [])
+  }, [fetchGasBalance])
 
   const connect = async () => {
     if (typeof window !== 'undefined' && window.ethereum) {
@@ -108,6 +192,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           const chainId = await window.ethereum.request({ method: 'eth_chainId' }) as string
           setChainId(parseInt(chainId, 16))
           await fetchBalance(accounts[0])
+          await fetchGasBalance()
         }
       } catch (error) {
         console.error('Error connecting wallet:', error)
@@ -123,6 +208,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     setAddress(null)
     setChainId(null)
     setBalance(null)
+    setGasBalance(null)
   }
 
   const value: WalletContextType = {
@@ -130,8 +216,11 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     address,
     chainId,
     balance,
+    gasBalance,
     connect,
-    disconnect
+    disconnect,
+    depositGas,
+    fetchGasBalance
   }
 
   return (
@@ -141,7 +230,6 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   )
 }
 
-// Extend Window interface for TypeScript
 declare global {
   interface Window {
     ethereum?: {

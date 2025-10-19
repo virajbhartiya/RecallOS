@@ -16,8 +16,17 @@ const CONTRACT_ABI = [
   'function getMemoriesByTimestampRange(address user, uint256 startTime, uint256 endTime) external view returns (tuple(bytes32 hash, bytes32 urlHash, uint256 timestamp)[] memory)',
   'function getRecentMemories(address user, uint256 count) external view returns (tuple(bytes32 hash, bytes32 urlHash, uint256 timestamp)[] memory)',
   'function getMemoryByHash(bytes32 hash) external view returns (address owner, bytes32 urlHash, uint256 timestamp)',
+  'function getUserGasBalance(address user) external view returns (uint256)',
+  'function depositGas() external payable',
+  'function withdrawGas(uint256 amount) external',
+  'function authorizeRelayer(address relayer, bool authorized) external',
+  'function isAuthorizedRelayer(address relayer) external view returns (bool)',
   'event MemoryStored(address indexed user, bytes32 indexed hash, bytes32 urlHash, uint256 timestamp)',
   'event MemoryBatchStored(address indexed user, uint256 count)',
+  'event GasDeposited(address indexed user, uint256 amount, uint256 newBalance)',
+  'event GasDeducted(address indexed user, uint256 amount, uint256 remainingBalance)',
+  'event GasWithdrawn(address indexed user, uint256 amount, uint256 newBalance)',
+  'event RelayerAuthorized(address indexed relayer, bool authorized)',
 ];
 
 let provider: ethers.JsonRpcProvider;
@@ -29,21 +38,21 @@ let contract: ethers.Contract;
 function initializeBlockchain() {
   const rpcUrl = process.env.SEPOLIA_RPC_URL;
 
-  const privateKey = process.env.DEPLOYER_PRIVATE_KEY;
+  const privateKey = process.env.RELAYER_PRIVATE_KEY || process.env.DEPLOYER_PRIVATE_KEY;
 
   const contractAddress = process.env.MEMORY_REGISTRY_CONTRACT_ADDRESS;
 
   if (!rpcUrl || !privateKey || !contractAddress) {
     throw new Error(`Missing required environment variables for blockchain connection:
       SEPOLIA_RPC_URL: ${rpcUrl ? 'SET' : 'NOT SET'}
-      DEPLOYER_PRIVATE_KEY: ${privateKey ? 'SET' : 'NOT SET'}
+      RELAYER_PRIVATE_KEY: ${privateKey ? 'SET' : 'NOT SET'}
       MEMORY_REGISTRY_CONTRACT_ADDRESS: ${contractAddress ? 'SET' : 'NOT SET'}`);
   }
 
   provider = new ethers.JsonRpcProvider(rpcUrl);
   wallet = new ethers.Wallet(privateKey, provider);
   contract = new ethers.Contract(contractAddress, CONTRACT_ABI, wallet);
-  console.log('Blockchain initialized successfully');
+  console.log('Blockchain initialized successfully with relayer wallet:', wallet.address);
 }
 
 try {
@@ -77,14 +86,18 @@ export function hashUrl(url: string): string {
 export async function storeMemory(
   hash: string,
   url: string,
-  timestamp: number
+  timestamp: number,
+  userAddress: string
 ) {
   if (!contract) {
     throw new Error('Blockchain not initialized. Check environment variables.');
   }
 
-  const maxRetries = 3;
+  // Check user's gas balance first
+  const userBalance = await contract.getUserGasBalance(userAddress);
+  console.log(`User ${userAddress} gas balance: ${ethers.formatEther(userBalance)} ETH`);
 
+  const maxRetries = 3;
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -92,13 +105,11 @@ export async function storeMemory(
       const urlHash = hashUrl(url);
 
       console.log(
-        `Storing memory: hash=${hash}, urlHash=${urlHash}, timestamp=${timestamp} (attempt ${attempt}/${maxRetries})`
+        `Storing memory for user ${userAddress}: hash=${hash}, urlHash=${urlHash}, timestamp=${timestamp} (attempt ${attempt}/${maxRetries})`
       );
 
       const gasPrice = await provider.getFeeData();
-
       const bufferMultiplier = 100 + attempt * 20;
-
       const gasPriceWithBuffer = gasPrice.gasPrice
         ? (gasPrice.gasPrice * BigInt(bufferMultiplier)) / BigInt(100)
         : undefined;
@@ -122,9 +133,19 @@ export async function storeMemory(
         gasLimit = BigInt(200000);
       }
 
+      // Calculate estimated gas cost
+      const estimatedGasCost = gasPriceWithBuffer && gasLimit 
+        ? gasPriceWithBuffer * gasLimit 
+        : BigInt(0);
+
       console.log(
-        `Using gas price: ${gasPriceWithBuffer?.toString()}, gas limit: ${gasLimit?.toString()}`
+        `Using gas price: ${gasPriceWithBuffer?.toString()}, gas limit: ${gasLimit?.toString()}, estimated cost: ${ethers.formatEther(estimatedGasCost)} ETH`
       );
+
+      // Check if user has sufficient balance
+      if (userBalance < estimatedGasCost) {
+        throw new Error(`Insufficient gas deposit. Required: ${ethers.formatEther(estimatedGasCost)} ETH, Available: ${ethers.formatEther(userBalance)} ETH`);
+      }
 
       const tx = await contract.storeMemory(hash, urlHash, timestamp, {
         gasPrice: gasPriceWithBuffer,
@@ -133,13 +154,19 @@ export async function storeMemory(
 
       const receipt = await tx.wait();
 
+      // Get updated user balance after transaction
+      const updatedBalance = await contract.getUserGasBalance(userAddress);
+
       console.log(`Memory stored successfully: ${tx.hash}`);
+      console.log(`User balance after transaction: ${ethers.formatEther(updatedBalance)} ETH`);
 
       return {
         success: true,
         txHash: tx.hash,
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed?.toString(),
+        userBalance: ethers.formatEther(updatedBalance),
+        estimatedCost: ethers.formatEther(estimatedGasCost),
       };
     } catch (error: any) {
       lastError = error;
@@ -175,7 +202,7 @@ export async function storeMemory(
   );
 }
 
-export async function storeMemoryBatch(memories: MemoryData[]) {
+export async function storeMemoryBatch(memories: MemoryData[], userAddress: string) {
   if (!contract) {
     throw new Error('Blockchain not initialized. Check environment variables.');
   }
@@ -184,26 +211,24 @@ export async function storeMemoryBatch(memories: MemoryData[]) {
     throw new Error('Memories array cannot be empty');
   }
 
-  const maxRetries = 3;
+  const userBalance = await contract.getUserGasBalance(userAddress);
+  console.log(`User ${userAddress} gas balance: ${ethers.formatEther(userBalance)} ETH`);
 
+  const maxRetries = 3;
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       console.log(
-        `Storing batch of ${memories.length} memories (attempt ${attempt}/${maxRetries})`
+        `Storing batch of ${memories.length} memories for user ${userAddress} (attempt ${attempt}/${maxRetries})`
       );
 
       const hashes = memories.map(m => m.hash);
-
       const urlHashes = memories.map(m => m.urlHash);
-
       const timestamps = memories.map(m => m.timestamp);
 
       const gasPrice = await provider.getFeeData();
-
       const bufferMultiplier = 100 + attempt * 20;
-
       const gasPriceWithBuffer = gasPrice.gasPrice
         ? (gasPrice.gasPrice * BigInt(bufferMultiplier)) / BigInt(100)
         : undefined;
@@ -227,9 +252,18 @@ export async function storeMemoryBatch(memories: MemoryData[]) {
         gasLimit = BigInt(500000);
       }
 
+      // Calculate estimated gas cost
+      const estimatedGasCost = gasPriceWithBuffer && gasLimit 
+        ? gasPriceWithBuffer * gasLimit 
+        : BigInt(0);
+
       console.log(
-        `Using gas price: ${gasPriceWithBuffer?.toString()}, gas limit: ${gasLimit?.toString()}`
+        `Using gas price: ${gasPriceWithBuffer?.toString()}, gas limit: ${gasLimit?.toString()}, estimated cost: ${ethers.formatEther(estimatedGasCost)} ETH`
       );
+
+      if (userBalance < estimatedGasCost) {
+        throw new Error(`Insufficient gas deposit. Required: ${ethers.formatEther(estimatedGasCost)} ETH, Available: ${ethers.formatEther(userBalance)} ETH`);
+      }
 
       const tx = await contract.storeMemoryBatch(
         hashes,
@@ -243,7 +277,11 @@ export async function storeMemoryBatch(memories: MemoryData[]) {
 
       const receipt = await tx.wait();
 
+      // Get updated user balance after transaction
+      const updatedBalance = await contract.getUserGasBalance(userAddress);
+
       console.log(`Memory batch stored successfully: ${tx.hash}`);
+      console.log(`User balance after transaction: ${ethers.formatEther(updatedBalance)} ETH`);
 
       return {
         success: true,
@@ -251,6 +289,8 @@ export async function storeMemoryBatch(memories: MemoryData[]) {
         blockNumber: receipt.blockNumber,
         gasUsed: receipt.gasUsed?.toString(),
         memoryCount: memories.length,
+        userBalance: ethers.formatEther(updatedBalance),
+        estimatedCost: ethers.formatEther(estimatedGasCost),
       };
     } catch (error: any) {
       lastError = error;
@@ -476,5 +516,75 @@ export async function getMemoryByHash(hash: string) {
   } catch (error) {
     console.error('Error getting memory by hash:', error);
     throw new Error(`Failed to get memory by hash: ${error.message}`);
+  }
+}
+
+export async function getUserGasBalance(userAddress: string) {
+  if (!contract) {
+    throw new Error('Blockchain not initialized. Check environment variables.');
+  }
+
+  try {
+    const checksummedAddress = ethers.getAddress(userAddress.toLowerCase());
+    const balance = await contract.getUserGasBalance(checksummedAddress);
+    return {
+      balance: ethers.formatEther(balance),
+      balanceWei: balance.toString(),
+    };
+  } catch (error) {
+    console.error('Error getting user gas balance:', error);
+    throw new Error(`Failed to get user gas balance: ${error.message}`);
+  }
+}
+
+export async function getEstimatedGasCost(memoryCount: number = 1) {
+  if (!contract) {
+    throw new Error('Blockchain not initialized. Check environment variables.');
+  }
+
+  try {
+    const gasPrice = await provider.getFeeData();
+    const gasPriceGwei = gasPrice.gasPrice ? ethers.formatUnits(gasPrice.gasPrice, 'gwei') : '0';
+    
+    const estimatedGas = memoryCount === 1 ? BigInt(200000) : BigInt(500000);
+    const estimatedCost = gasPrice.gasPrice ? gasPrice.gasPrice * estimatedGas : BigInt(0);
+    
+    return {
+      gasPrice: gasPriceGwei,
+      estimatedGas: estimatedGas.toString(),
+      estimatedCost: ethers.formatEther(estimatedCost),
+      estimatedCostWei: estimatedCost.toString(),
+    };
+  } catch (error) {
+    console.error('Error getting estimated gas cost:', error);
+    throw new Error(`Failed to get estimated gas cost: ${error.message}`);
+  }
+}
+
+export async function getContractAddress() {
+  if (!contract) {
+    throw new Error('Blockchain not initialized. Check environment variables.');
+  }
+
+  return contract.target;
+}
+
+export async function authorizeRelayer(relayerAddress: string, authorized: boolean) {
+  if (!contract) {
+    throw new Error('Blockchain not initialized. Check environment variables.');
+  }
+
+  try {
+    const tx = await contract.authorizeRelayer(relayerAddress, authorized);
+    const receipt = await tx.wait();
+    
+    return {
+      success: true,
+      txHash: tx.hash,
+      blockNumber: receipt.blockNumber,
+    };
+  } catch (error) {
+    console.error('Error authorizing relayer:', error);
+    throw new Error(`Failed to authorize relayer: ${error.message}`);
   }
 }
