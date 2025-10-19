@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useWallet } from '@/contexts/WalletContext'
+import { WalletStatus } from '@/components/WalletStatus'
+import { WalletConnectionFlow } from '@/components/WalletConnectionFlow'
+import { WalletStatusBar } from '@/components/WalletStatusBar'
 import { MemoryService } from '@/services/memoryService'
 import { SearchService } from '@/services/search'
 import { MemoryMesh } from '@/components/MemoryMesh'
@@ -517,20 +520,8 @@ export const Memories: React.FC = () => {
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 border border-gray-200 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <h2 className="text-lg font-light text-gray-900 mb-2">[WALLET NOT CONNECTED]</h2>
-          <p className="text-sm font-mono text-gray-500 mb-4">Connect your wallet to view your memories</p>
-          <button
-            onClick={() => window.location.href = '/'}
-            className="px-4 py-2 text-sm font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
-          >
-            [CONNECT WALLET]
-          </button>
+        <div className="max-w-md w-full mx-4">
+          <WalletConnectionFlow />
         </div>
       </div>
     )
@@ -573,23 +564,7 @@ export const Memories: React.FC = () => {
                   >
                     [ALL TX]
                   </button>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                      <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
-                    </div>
-                    {gasBalance && (
-                      <div className="flex items-center space-x-1 text-xs font-mono">
-                        <span className="text-gray-600">Gas:</span>
-                        <span className={`${parseFloat(gasBalance) < 0.005 ? 'text-yellow-600' : 'text-gray-900'}`}>
-                          {gasBalance} ETH
-                        </span>
-                        {parseFloat(gasBalance) < 0.005 && (
-                          <span className="text-yellow-600">⚠️</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  <WalletStatus variant="compact" showActions={false} />
                 </>
               )}
             </div>
@@ -934,16 +909,19 @@ export const Memories: React.FC = () => {
       )} */}
 
       {/* Bottom System Bar */}
-      {insights && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-gray-200 z-40">
-          <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-center gap-6 text-xs font-mono">
-            <span className="text-gray-700">[ Total Memories: <span className="text-sky-600">{insights.total_memories}</span> ]</span>
-            <span className="text-gray-700">[ Verified: <span className="text-emerald-600">{insights.confirmed_transactions}</span> ]</span>
-            <span className="text-gray-700">[ Relationships: <span className="text-violet-600">{meshStats.edges}</span> ]</span>
-            <span className="text-green-600">[ Embeddings Synced ]</span>
+      <div className="fixed bottom-0 left-0 right-0 z-40">
+        {insights && (
+          <div className="bg-white/95 border-t border-gray-200">
+            <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-center gap-6 text-xs font-mono">
+              <span className="text-gray-700">[ Total Memories: <span className="text-sky-600">{insights.total_memories}</span> ]</span>
+              <span className="text-gray-700">[ Verified: <span className="text-emerald-600">{insights.confirmed_transactions}</span> ]</span>
+              <span className="text-gray-700">[ Relationships: <span className="text-violet-600">{meshStats.edges}</span> ]</span>
+              <span className="text-green-600">[ Embeddings Synced ]</span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+        <WalletStatusBar />
+      </div>
 
       {/* Transaction Details Overlay */}
       {showTransactionDetails && selectedTxHash && (
@@ -966,31 +944,9 @@ export const Memories: React.FC = () => {
       )}
 
       {/* Gas Deposit Section */}
-      {isConnected && (
+      {isConnected && gasBalance && parseFloat(gasBalance) < 0.005 && (
         <div className="fixed bottom-4 right-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-4 max-w-sm">
-            <h3 className="text-sm font-semibold mb-2">Gas Balance</h3>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-600">Current:</span>
-              <span className={`text-sm font-mono ${parseFloat(gasBalance || '0') < 0.005 ? 'text-yellow-600' : 'text-gray-900'}`}>
-                {gasBalance || '0.0000'} ETH
-              </span>
-            </div>
-            {parseFloat(gasBalance || '0') < 0.005 && (
-              <div className="text-xs text-yellow-600 mb-2">
-                ⚠️ Low balance - deposit more gas
-              </div>
-            )}
-            <button
-              onClick={() => {
-                // Navigate to landing page where DepositManager is properly wrapped
-                window.location.href = '/'
-              }}
-              className="w-full px-3 py-2 text-xs font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
-            >
-              [DEPOSIT GAS]
-            </button>
-          </div>
+          <WalletStatus variant="expanded" showActions={true} className="max-w-sm" />
         </div>
       )}
 

@@ -153,38 +153,33 @@ export const aiProvider = {
         value += Math.sin(wordHashes[wordIndex] + i) * 0.1 * Math.log(freq + 1)
       }
       
-      // Semantic cluster features (next 256 dimensions) - enhanced
       if (i >= 256 && i < 512) {
         const clusterIndex = (i - 256) % semanticClusters.length
         value += Math.sin(semanticClusters[clusterIndex] + i) * 0.2
       }
       
-      // Character-based features (last 256 dimensions) - improved
       if (i >= 512) {
         const charCode = text.charCodeAt(i % text.length) || 0
         value += Math.sin(charCode + i) * 0.08
       }
       
-      // Add some randomness based on text hash
       value += Math.sin(textHash + i * 7) * 0.03
       
       embedding[i] = value
     }
     
-    // Normalize the embedding
     const magnitude = Math.sqrt(embedding.reduce((sum, val) => sum + val * val, 0))
     if (magnitude > 0) {
       for (let i = 0; i < 768; i++) {
         embedding[i] = embedding[i] / magnitude
       }
     }
-    
-    console.log('Generated improved fallback embedding for text:', text.substring(0, 50) + '...')
+
     return embedding
   },
 
   getSemanticClusters(text: string): number[] {
-    // Create semantic clusters based on common concepts
+
     const clusters = []
     const lowerText = text.toLowerCase()
     

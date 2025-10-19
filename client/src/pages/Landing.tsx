@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { useWallet } from '../contexts/WalletContext'
-import WalletModal from '../components/WalletModal'
+import { WalletStatus } from '../components/WalletStatus'
 import { MemoryService } from '../services/memoryService'
 import { LoadingCard } from '../components/ui/loading-spinner'
-import { DepositManager } from '../components/DepositManager'
 import type { Memory } from '../types/memory'
 import { 
   Section, 
@@ -62,9 +61,7 @@ const MemoryPreviewCard: React.FC<{ memory: Memory }> = ({ memory }) => {
 }
 
 export const Landing = () => {
-  const { isConnected, address, gasBalance } = useWallet()
-  const [isWalletModalOpen, setIsWalletModalOpen] = useState(false)
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
+  const { isConnected, address } = useWallet()
   const [recentMemories, setRecentMemories] = useState<Memory[]>([])
   const [memoryCount, setMemoryCount] = useState(0)
   const [isLoadingMemories, setIsLoadingMemories] = useState(false)
@@ -124,7 +121,11 @@ export const Landing = () => {
           }
           break
         case 'w': {
-          setIsWalletModalOpen(true)
+          // Trigger wallet modal through WalletStatus component
+          const walletButton = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement
+          if (walletButton) {
+            walletButton.click()
+          }
           break
         }
       }
@@ -139,7 +140,7 @@ export const Landing = () => {
       <header className="border-b border-gray-200 bg-white">
         <div className="max-w-7xl mx-auto px-8 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-8">
+            <div className="flex items-center flex-wrap gap-4 sm:gap-8">
               <button 
                 className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
                 onClick={() => window.open('/docs', '_blank')}
@@ -156,7 +157,7 @@ export const Landing = () => {
                 [TESTNET]
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center flex-wrap gap-2 sm:gap-4">
               <button 
                 className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
                 onClick={() => window.open('/console', '_blank')}
@@ -171,36 +172,7 @@ export const Landing = () => {
                   [M] MEMORIES
                 </button>
               )}
-              {isConnected && (
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>{address?.slice(0, 6)}...{address?.slice(-4)}</span>
-                  </div>
-                  {gasBalance && (
-                    <button 
-                      className="flex items-center space-x-1 text-xs font-mono hover:bg-gray-50 px-2 py-1 rounded transition-colors"
-                      onClick={() => {
-                        setIsDepositModalOpen(true)
-                      }}
-                    >
-                      <span className="text-gray-600">Gas:</span>
-                      <span className={`${parseFloat(gasBalance) < 0.005 ? 'text-yellow-600' : 'text-gray-900'}`}>
-                        {parseFloat(gasBalance).toFixed(6)} ETH
-                      </span>
-                      {parseFloat(gasBalance) < 0.005 && (
-                        <span className="text-yellow-600">⚠️</span>
-                      )}
-                    </button>
-                  )}
-                </div>
-              )}
-              <button 
-                className="px-3 py-1 text-xs font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
-                onClick={() => setIsWalletModalOpen(true)}
-              >
-                [W] {isConnected ? 'WALLET' : 'CONNECT WALLET'}
-              </button>
+              <WalletStatus variant="compact" showActions={true} />
             </div>
           </div>
         </div>
@@ -216,7 +188,7 @@ export const Landing = () => {
         }} />
       </div>
       {/* Hero Section */}
-      <Section className="min-h-screen bg-white relative overflow-hidden">
+      <Section className="min-h-screen bg-white relative overflow-hidden py-16 lg:py-24">
         {/* Animated Geometric Background */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Floating geometric shapes */}
@@ -238,9 +210,9 @@ export const Landing = () => {
         </div>
 
         <div className="max-w-7xl mx-auto px-8 relative z-10 h-full flex items-center">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center w-full">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 xl:gap-16 items-center w-full">
             {/* Left Column - Main Content */}
-            <div className="space-y-6">
+            <div className="space-y-10 max-w-2xl">
               {/* Enhanced headline with better value proposition */}
               <h1 className="text-5xl lg:text-7xl font-light leading-tight font-editorial">
                 <span className="block">Browser Extension</span>
@@ -261,152 +233,69 @@ export const Landing = () => {
                 </p>
               </div>
 
-              {/* Key features highlight */}
-              <div className="grid grid-cols-2 gap-4 mt-6">
-                <div className="flex items-center space-x-2 text-sm font-mono text-gray-600">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                  <span>BROWSER MONITORING</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm font-mono text-gray-600">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{animationDelay: '0.5s'}}></div>
-                  <span>MEMORY GRAPH</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm font-mono text-gray-600">
-                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '1s'}}></div>
-                  <span>ANY LLM AGENT</span>
-                </div>
-                <div className="flex items-center space-x-2 text-sm font-mono text-gray-600">
-                  <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '1.5s'}}></div>
-                  <span>BLOCKCHAIN PROOF</span>
-                </div>
-              </div>
+              {/* Simplified: removed feature chips for cleaner layout */}
               
-              <div className="flex flex-col sm:flex-row gap-4 mt-8">
+              <div className="mt-8 flex flex-col sm:flex-row sm:flex-wrap gap-4">
                 <ConsoleButton 
                   variant="console_key" 
                   className="group relative overflow-hidden"
                   onClick={() => window.open('https://github.com/virajbhartiya/RecallOS/releases/latest', '_blank')}
                 >
-                  <span className="relative z-10">[E] DOWNLOAD EXTENSION</span>
+                  <span className="relative z-10 whitespace-nowrap">[E] DOWNLOAD EXTENSION</span>
                   <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
                 </ConsoleButton>
-                <ConsoleButton 
-                  variant="outlined" 
+                <ConsoleButton
+                  variant="outlined"
                   className="group relative overflow-hidden"
-                  onClick={() => window.open('/docs', '_blank')}
+                  onClick={() => {
+                    if (isConnected) {
+                      window.location.href = '/memories'
+                    } else {
+                      const walletButton = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement
+                      if (walletButton) {
+                        walletButton.click()
+                      }
+                    }
+                  }}
                 >
-                  <span className="relative z-10">[D] READ DOCS</span>
+                  <span className="relative z-10 whitespace-nowrap">[M] VIEW MEMORIES</span>
                   <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
                 </ConsoleButton>
               </div>
               
-              {/* Installation Instructions */}
-              <div className="mt-6 p-4 bg-gray-50 border border-gray-200">
-                <div className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[INSTALLATION STEPS]</div>
-                <div className="space-y-2 text-sm text-gray-700">
-                  <div className="flex items-start space-x-2">
-                    <span className="text-gray-500 font-mono">1.</span>
-                    <span>Download the extension .zip file from GitHub releases</span>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <span className="text-gray-500 font-mono">2.</span>
-                    <span>Extract the zip file to a folder on your computer</span>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <span className="text-gray-500 font-mono">3.</span>
-                    <span>Open Chrome/Edge → Extensions → Developer mode → Load unpacked</span>
-                  </div>
-                  <div className="flex items-start space-x-2">
-                    <span className="text-gray-500 font-mono">4.</span>
-                    <span>Select the extracted folder and click "Select Folder"</span>
-                  </div>
-                </div>
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <button 
-                    className="text-xs font-mono text-blue-600 hover:text-blue-800 transition-colors"
-                    onClick={() => window.open('https://github.com/virajbhartiya/RecallOS/blob/main/extension/INSTALLATION.md', '_blank')}
-                  >
-                    [VIEW DETAILED INSTALLATION GUIDE]
-                  </button>
-                </div>
-              </div>
+              {/* Installation section removed to reduce clutter */}
             </div>
-
-            {/* Right Column - Interactive Demo & Stats */}
-            <div className="space-y-6">
-              {/* Interactive demo preview */}
-              <div className="bg-gray-50 border border-gray-200 p-6 relative group hover:border-black transition-all duration-300">
-                <div className="absolute top-2 right-2 text-xs font-mono text-gray-400 group-hover:text-black transition-colors">+</div>
-                <div className="text-sm font-mono text-gray-600 mb-2">[LIVE DEMO]</div>
-                <div className="text-lg font-light mb-4">Extension Monitoring Flow</div>
-                <div className="flex flex-wrap items-center gap-3 text-sm font-mono text-gray-600">
-                  <span className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                    <span>MONITOR</span>
-                  </span>
-                  <span className="text-gray-400">→</span>
-                  <span className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" style={{animationDelay: '0.3s'}}></div>
-                    <span>GRAPH</span>
-                  </span>
-                  <span className="text-gray-400">→</span>
-                  <span className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" style={{animationDelay: '0.6s'}}></div>
-                    <span>LLM AGENT</span>
-                  </span>
-                  <span className="text-gray-400">→</span>
-                  <span className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" style={{animationDelay: '0.9s'}}></div>
-                    <span>BLOCKCHAIN</span>
-                  </span>
-                  <span className="text-gray-400">→</span>
-                  <span className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" style={{animationDelay: '1.2s'}}></div>
-                    <span>MEMORY</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Stats/Features Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white border border-gray-200 p-4 hover:border-black transition-all duration-300">
-                  <div className="text-2xl font-light font-mono text-gray-800">∞</div>
-                  <div className="text-sm font-mono text-gray-600 mt-1">ACTIVITIES</div>
-                  <div className="text-xs text-gray-500 mt-1">Monitored & stored</div>
-                </div>
-                <div className="bg-white border border-gray-200 p-4 hover:border-black transition-all duration-300">
-                  <div className="text-2xl font-light font-mono text-gray-800">24/7</div>
-                  <div className="text-sm font-mono text-gray-600 mt-1">MONITORING</div>
-                  <div className="text-xs text-gray-500 mt-1">Background tracking</div>
-                </div>
-                <div className="bg-white border border-gray-200 p-4 hover:border-black transition-all duration-300">
-                  <div className="text-2xl font-light font-mono text-gray-800">ANY</div>
-                  <div className="text-sm font-mono text-gray-600 mt-1">LLM AGENT</div>
-                  <div className="text-xs text-gray-500 mt-1">Universal compatibility</div>
-                </div>
-                <div className="bg-white border border-gray-200 p-4 hover:border-black transition-all duration-300">
-                  <div className="text-2xl font-light font-mono text-gray-800">GRAPH</div>
-                  <div className="text-sm font-mono text-gray-600 mt-1">MEMORY</div>
-                  <div className="text-xs text-gray-500 mt-1">Visual connections</div>
-                </div>
-              </div>
-
-              {/* Quick Start Steps */}
-              <div className="bg-white border border-gray-200 p-4">
-                <div className="text-sm font-mono text-gray-600 mb-3">[QUICK START]</div>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border border-gray-300 flex items-center justify-center text-xs font-mono">1</div>
-                    <span className="text-gray-700">Install browser extension</span>
+            {/* Right Column - Visual Panel */}
+            <div className="w-full">
+              <div className="relative bg-white border border-gray-200 overflow-hidden">
+                {/* Top status bar */}
+                <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
+                  <div className="text-xs font-mono text-gray-600 uppercase tracking-wide">[Preview]</div>
+                  <div className="flex items-center gap-2 text-xs font-mono text-gray-600">
+                    <span className="px-1 py-0.5 border border-green-200 bg-green-50 text-green-700">LIVE</span>
+                    <span className="hidden sm:inline">MEMORY FEED</span>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border border-gray-300 flex items-center justify-center text-xs font-mono">2</div>
-                    <span className="text-gray-700">Connect your wallet</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border border-gray-300 flex items-center justify-center text-xs font-mono">3</div>
-                    <span className="text-gray-700">Start building memories</span>
-                  </div>
+                </div>
+
+                {/* Content */}
+                <div className="p-4 sm:p-6">
+                  {isConnected && recentMemories.length > 0 ? (
+                    <div className="space-y-3">
+                      {recentMemories.map((memory) => (
+                        <MemoryPreviewCard key={memory.id} memory={memory} />
+                      ))}
+                      <div className="mt-4 text-xs font-mono text-gray-500">[Showing latest 3 memories]</div>
+                    </div>
+                  ) : (
+                    <div className="relative h-64 sm:h-72 md:h-80 border border-dashed border-gray-300 grid place-items-center bg-gradient-to-br from-gray-50 to-gray-100">
+                      <div className="text-center">
+                        <div className="text-5xl mb-2">🧠</div>
+                        <div className="text-sm font-mono text-gray-600">INSTALL EXTENSION TO SEE LIVE MEMORIES</div>
+                      </div>
+                      {/* Decorative dots */}
+                      <div className="pointer-events-none absolute inset-0 opacity-30" style={{backgroundImage: `radial-gradient(#000 1px, transparent 1px)`, backgroundSize: '12px 12px'}} />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -576,28 +465,6 @@ export const Landing = () => {
       )}
 
 
-      <WalletModal 
-        isOpen={isWalletModalOpen} 
-        onClose={() => setIsWalletModalOpen(false)} 
-      />
-
-      {/* Deposit Modal */}
-      {isDepositModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white border border-gray-200 p-6 max-w-md w-full mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-light">Gas Deposit Manager</h2>
-              <button 
-                onClick={() => setIsDepositModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl font-mono"
-              >
-                ×
-              </button>
-            </div>
-            <DepositManager onClose={() => setIsDepositModalOpen(false)} />
-          </div>
-        </div>
-      )}
 
     </div>
   )
