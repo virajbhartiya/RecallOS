@@ -7,7 +7,7 @@ const provider: Provider = (process.env.AI_PROVIDER as Provider) || 'hybrid'
 console.log('AI Provider configured as:', provider)
 
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
-const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'mxbai-embed-large:latest'
+const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'all-minilm:l6-v2'
 const OLLAMA_GEN_MODEL = process.env.OLLAMA_GEN_MODEL || 'llama3.1:8b'
 
 export const aiProvider = {
@@ -31,6 +31,12 @@ export const aiProvider = {
       return this.generateHybridEmbedding(text)
     }
     
+    // Since Ollama embedding models are not working properly, use fallback directly
+    console.log('Using fallback embedding method due to Ollama embedding issues')
+    return this.generateFallbackEmbedding(text)
+    
+    // Keep the original Ollama code commented out for future reference
+    /*
     try {
       const res = await fetch(`${OLLAMA_BASE}/api/embeddings`, {
         method: 'POST',
@@ -65,15 +71,16 @@ export const aiProvider = {
       // Generate a simple hash-based embedding as fallback
       return this.generateFallbackEmbedding(text)
     }
+    */
   },
 
   async generateHybridEmbedding(text: string): Promise<number[]> {
-    // Try multiple embedding methods in order of preference
     const methods = [
-      () => this.tryOllamaEmbedding(text, 'mxbai-embed-large:latest'),
-      () => this.tryOllamaEmbedding(text, 'nomic-embed-text:latest'),
+      () => this.generateFallbackEmbedding(text),
       () => this.tryOllamaEmbedding(text, 'all-minilm:l6-v2'),
-      () => this.generateFallbackEmbedding(text)
+      () => this.tryOllamaEmbedding(text, 'bge-large:latest'),
+      () => this.tryOllamaEmbedding(text, 'mxbai-embed-large:latest'),
+      () => this.tryOllamaEmbedding(text, 'nomic-embed-text:latest')
     ]
     
     for (const method of methods) {
@@ -323,7 +330,7 @@ Rules:
 - topics: 2-4 relevant keywords from content
 - keyPoints: 2-3 main points (max 80 chars each)
 - searchableTerms: 5-8 important words
-- contextRelevance: educational, news, tutorial, general
+- contextRelevance: array of relevant types from: educational, current_events, analysis, code_review, code_repository, issue_tracking, technical_documentation, devops, security, performance, general
 
 JSON ONLY:`
     const out = await this.generateContent(jsonPrompt)
@@ -466,15 +473,38 @@ JSON ONLY:`
     
     // Context relevance
     const contextRelevance: string[] = []
-    if (text.includes('tutorial') || text.includes('guide') || text.includes('how to')) {
+    const lowerText = text.toLowerCase()
+    if (lowerText.includes('tutorial') || lowerText.includes('guide') || lowerText.includes('how to') || lowerText.includes('learn') || lowerText.includes('documentation')) {
       contextRelevance.push('educational')
     }
-    if (text.includes('news') || text.includes('update') || text.includes('latest')) {
+    if (lowerText.includes('news') || lowerText.includes('update') || lowerText.includes('latest') || lowerText.includes('announcement')) {
       contextRelevance.push('current_events')
     }
-    if (text.includes('review') || text.includes('opinion') || text.includes('analysis')) {
+    if (lowerText.includes('review') || lowerText.includes('opinion') || lowerText.includes('analysis') || lowerText.includes('feedback')) {
       contextRelevance.push('analysis')
     }
+    if (lowerText.includes('pull request') || lowerText.includes('pr #') || lowerText.includes('merge request') || lowerText.includes('code review')) {
+      contextRelevance.push('code_review')
+    }
+    if (lowerText.includes('github.com') || lowerText.includes('gitlab.com') || lowerText.includes('bitbucket') || lowerText.includes('repository') || lowerText.includes('repo')) {
+      contextRelevance.push('code_repository')
+    }
+    if (lowerText.includes('issue') || lowerText.includes('bug') || lowerText.includes('feature request') || lowerText.includes('enhancement')) {
+      contextRelevance.push('issue_tracking')
+    }
+    if (lowerText.includes('api') || lowerText.includes('endpoint') || lowerText.includes('rest') || lowerText.includes('graphql')) {
+      contextRelevance.push('technical_documentation')
+    }
+    if (lowerText.includes('deployment') || lowerText.includes('ci/cd') || lowerText.includes('pipeline') || lowerText.includes('build')) {
+      contextRelevance.push('devops')
+    }
+    if (lowerText.includes('security') || lowerText.includes('vulnerability') || lowerText.includes('cve') || lowerText.includes('exploit')) {
+      contextRelevance.push('security')
+    }
+    if (lowerText.includes('performance') || lowerText.includes('optimization') || lowerText.includes('benchmark') || lowerText.includes('metrics')) {
+      contextRelevance.push('performance')
+    }
+    
     
     return {
       topics: topics.length > 0 ? topics : ['general'],

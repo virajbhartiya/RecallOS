@@ -341,7 +341,7 @@ function extractMeaningfulContent(): string {
         meaningfulContent = extractVisibleText();
       }
     }
-    return cleanText(meaningfulContent).substring(0, 10000);
+    return cleanText(meaningfulContent).substring(0, 50000);
   } catch (error) {
     console.log(
       'RecallOS: Error in extractMeaningfulContent, using fallback:',

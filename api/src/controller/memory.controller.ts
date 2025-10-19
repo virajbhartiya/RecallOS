@@ -61,7 +61,7 @@ export class MemoryController {
         console.log(`✅ Created new user: ${user.id}`);
       }
 
-      console.log(`Processing content through Gemini...`);
+      console.log(`Processing content through AI provider...`);
 
       const [summary, extractedMetadata] = await Promise.all([
         aiProvider.summarizeContent(content, metadata),
