@@ -5,59 +5,56 @@ import { InfoCard } from './InfoCard'
 const components = [
   {
     name: 'BROWSER EXTENSION',
-    description: 'Content capture & monitoring',
+    description: 'Captures what you read',
     color: 'blue'
   },
   {
-    name: 'API SERVER',
-    description: 'Express.js + Prisma',
+    name: 'AI PROCESSING',
+    description: 'Understands content',
     color: 'green'
   },
   {
-    name: 'AI PROVIDER',
-    description: 'Gemini + Ollama',
+    name: 'MEMORY STORAGE',
+    description: 'Saves everything',
     color: 'purple'
   },
   {
-    name: 'POSTGRESQL + PGVECTOR',
-    description: 'Memory storage & embeddings',
+    name: 'BLOCKCHAIN',
+    description: 'Permanent records',
     color: 'orange'
   },
   {
-    name: 'SEPOLIA BLOCKCHAIN',
-    description: 'Memory Registry Contract',
+    name: 'SEARCH ENGINE',
+    description: 'Finds anything',
     color: 'red'
   },
   {
-    name: 'SEARCH ENGINE',
-    description: 'Hybrid + LLM answers',
+    name: 'AI INTEGRATION',
+    description: 'Works with ChatGPT',
     color: 'indigo'
   }
 ]
 
 const connections = [
-  { from: 'Extension', to: 'API', description: 'Content ingestion' },
-  { from: 'API', to: 'AI Provider', description: 'Processing requests' },
-  { from: 'AI', to: 'Database', description: 'Storage & embeddings' },
-  { from: 'Database', to: 'Blockchain', description: 'Hash anchoring' },
-  { from: 'API', to: 'Search', description: 'Query processing' },
-  { from: 'Search', to: 'Database', description: 'Vector similarity' }
+  { from: 'Extension', to: 'AI', description: 'Sends content' },
+  { from: 'AI', to: 'Storage', description: 'Saves memories' },
+  { from: 'Storage', to: 'Blockchain', description: 'Permanent proof' },
+  { from: 'Storage', to: 'Search', description: 'Finds memories' },
+  { from: 'Search', to: 'AI Integration', description: 'Shares context' }
 ]
 
 const processingPipeline = [
-  { step: 'Content Ingestion', value: 'POST /api/memory/processRawContent' },
-  { step: 'AI Processing', value: 'Hybrid Provider' },
-  { step: 'Embedding Generation', value: '768-dim vectors' },
-  { step: 'Relation Building', value: 'Semantic + Topical + Temporal' },
-  { step: 'Blockchain Anchoring', value: 'Batch storage' }
+  { step: 'Capture Content', value: 'From any website' },
+  { step: 'AI Understanding', value: 'Smart summaries' },
+  { step: 'Find Connections', value: 'Links related ideas' },
+  { step: 'Save Permanently', value: 'Blockchain storage' }
 ]
 
 const searchPipeline = [
-  { step: 'Query Processing', value: 'POST /api/search' },
-  { step: 'Vector Similarity', value: 'pgvector distance' },
-  { step: 'Hybrid Search', value: '0.4 keyword + 0.6 semantic' },
-  { step: 'LLM Answer', value: 'Context + Citations' },
-  { step: 'Response Format', value: 'Answer + [n] citations' }
+  { step: 'Ask Question', value: 'Natural language' },
+  { step: 'Find Memories', value: 'Smart search' },
+  { step: 'Get Answer', value: 'AI + your memories' },
+  { step: 'See Sources', value: 'Clear citations' }
 ]
 
 const getColorClasses = (color: string) => {
@@ -80,14 +77,14 @@ export const TechnicalArchitecture: React.FC = () => {
           Technical Architecture
         </h2>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          Complete data flow from browser monitoring to AI-powered memory retrieval
+          How your browsing becomes a powerful, searchable memory system
         </p>
       </div>
 
       <div className="max-w-6xl mx-auto">
         {/* Architecture Flow */}
         <InfoCard className="p-8 mb-8">
-          <div className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-6 text-center">[DATA FLOW]</div>
+            <div className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-6 text-center">[HOW IT WORKS]</div>
           
           {/* Architecture Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -107,7 +104,7 @@ export const TechnicalArchitecture: React.FC = () => {
 
           {/* Flow Connections */}
           <div className="mt-8 text-center">
-            <div className="text-xs font-mono text-gray-500 uppercase tracking-wide mb-4">[DATA FLOW CONNECTIONS]</div>
+            <div className="text-xs font-mono text-gray-500 uppercase tracking-wide mb-4">[CONNECTIONS]</div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
               {connections.map((connection, index) => (
                 <div key={index} className="bg-gray-50 border border-gray-200 p-3">
@@ -122,7 +119,7 @@ export const TechnicalArchitecture: React.FC = () => {
         {/* Technical Details */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <InfoCard className="p-6">
-            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-4">[PROCESSING PIPELINE]</h4>
+            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-4">[SAVING MEMORIES]</h4>
             <div className="space-y-3 text-sm">
               {processingPipeline.map((item, index) => (
                 <div key={index} className="flex justify-between">
@@ -134,7 +131,7 @@ export const TechnicalArchitecture: React.FC = () => {
           </InfoCard>
 
           <InfoCard className="p-6">
-            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-4">[SEARCH PIPELINE]</h4>
+            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-4">[FINDING MEMORIES]</h4>
             <div className="space-y-3 text-sm">
               {searchPipeline.map((item, index) => (
                 <div key={index} className="flex justify-between">
