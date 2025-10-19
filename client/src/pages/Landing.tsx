@@ -64,6 +64,7 @@ export const Landing = () => {
   const { isConnected, address } = useWallet()
   const [recentMemories, setRecentMemories] = useState<Memory[]>([])
   const [memoryCount, setMemoryCount] = useState(0)
+  const [confirmedCount, setConfirmedCount] = useState(0)
   const [isLoadingMemories, setIsLoadingMemories] = useState(false)
 
   // Fetch recent memories when wallet is connected
@@ -77,17 +78,20 @@ export const Landing = () => {
 
       setIsLoadingMemories(true)
       try {
-        const [memories, count] = await Promise.all([
+        const [memories, count, insights] = await Promise.all([
           MemoryService.getRecentMemories(address, 3),
-          MemoryService.getUserMemoryCount(address)
+          MemoryService.getUserMemoryCount(address),
+          MemoryService.getMemoryInsights(address)
         ])
         // Ensure memories is always an array
         setRecentMemories(Array.isArray(memories) ? memories : [])
         setMemoryCount(typeof count === 'number' ? count : 0)
+        setConfirmedCount(typeof insights?.confirmed_transactions === 'number' ? insights.confirmed_transactions : 0)
       } catch (error) {
         console.error('Error fetching recent memories:', error)
         setRecentMemories([])
         setMemoryCount(0)
+        setConfirmedCount(0)
       } finally {
         setIsLoadingMemories(false)
       }
@@ -138,35 +142,35 @@ export const Landing = () => {
   return (
     <div className="min-h-screen bg-gray-50 text-black relative font-primary" role="main">
       <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-8 py-4">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center flex-wrap gap-4 sm:gap-8">
               <button 
-                className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                className="text-xs sm:text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
                 onClick={() => window.open('/docs', '_blank')}
               >
                 [D] DOCS
               </button>
               <button 
-                className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                className="text-xs sm:text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
                 onClick={() => window.open('https://github.com/virajbhartiya/RecallOS', '_blank')}
               >
                 [G] GITHUB
               </button>
-              <div className="text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
+              <div className="text-xs sm:text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
                 [TESTNET]
               </div>
             </div>
             <div className="flex items-center flex-wrap gap-2 sm:gap-4">
               <button 
-                className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                className="text-xs sm:text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
                 onClick={() => window.open('/console', '_blank')}
               >
                 [C] CONSOLE
               </button>
               {isConnected && (
                 <button 
-                  className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                  className="text-xs sm:text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
                   onClick={() => window.location.href = '/memories'}
                 >
                   [M] MEMORIES
@@ -188,7 +192,7 @@ export const Landing = () => {
         }} />
       </div>
       {/* Hero Section */}
-      <Section className="min-h-screen bg-white relative overflow-hidden py-16 lg:py-24">
+      <Section className="min-h-screen bg-white relative overflow-hidden py-12 sm:py-16 lg:py-24">
         {/* Animated Geometric Background */}
         <div className="absolute inset-0 pointer-events-none">
           {/* Floating geometric shapes */}
@@ -209,15 +213,15 @@ export const Landing = () => {
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-8 relative z-10 h-full flex items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 h-full flex items-start lg:items-center">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 xl:gap-16 items-center w-full">
             {/* Left Column - Main Content */}
-            <div className="space-y-10 max-w-2xl">
+            <div className="space-y-8 sm:space-y-10 max-w-2xl">
               {/* Enhanced headline with better value proposition */}
-              <h1 className="text-5xl lg:text-7xl font-light leading-tight font-editorial">
+              <h1 className="text-4xl sm:text-5xl lg:text-7xl font-light leading-tight font-editorial">
                 <span className="block">Browser Extension</span>
                 <span className="block italic text-gray-800">That Monitors</span>
-                <span className="block text-3xl lg:text-5xl text-gray-600 font-mono font-light mt-2">
+                <span className="block text-2xl sm:text-3xl lg:text-5xl text-gray-600 font-mono font-light mt-2">
                   Everything
                 </span>
               </h1>
@@ -235,7 +239,7 @@ export const Landing = () => {
 
               {/* Simplified: removed feature chips for cleaner layout */}
               
-              <div className="mt-8 flex flex-col sm:flex-row sm:flex-wrap gap-4">
+              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4">
                 <ConsoleButton 
                   variant="console_key" 
                   className="group relative overflow-hidden"
@@ -266,7 +270,7 @@ export const Landing = () => {
               {/* Installation section removed to reduce clutter */}
             </div>
             {/* Right Column - Visual Panel */}
-            <div className="w-full">
+            <div className="w-full mt-6 lg:mt-0">
               <div className="relative bg-white border border-gray-200 overflow-hidden">
                 {/* Top status bar */}
                 <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200 bg-gray-50">
@@ -310,64 +314,13 @@ export const Landing = () => {
       <IntegrationCapabilities />
       <PrivacySecurity />
 
-      {/* Getting Started Section */}
-      <Section className="bg-gray-50">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-light font-editorial mb-4">
-            Get Started in Minutes
-          </h2>
-          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Start building your personal knowledge network today
-          </p>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="text-center">
-            <div className="w-16 h-16 bg-blue-100 border border-blue-200 flex items-center justify-center mx-auto mb-4">
-              <div className="text-2xl">📥</div>
-            </div>
-            <h3 className="text-lg font-light mb-3">Download & Install</h3>
-            <p className="text-sm text-gray-600">
-              Download from GitHub releases and install manually in Chrome/Edge developer mode.
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-16 h-16 bg-green-100 border border-green-200 flex items-center justify-center mx-auto mb-4">
-              <div className="text-2xl">🌐</div>
-            </div>
-            <h3 className="text-lg font-light mb-3">Browse & Learn</h3>
-            <p className="text-sm text-gray-600">
-              Just browse the web normally. RecallOS captures and connects everything you read.
-            </p>
-          </div>
-
-          <div className="text-center">
-            <div className="w-16 h-16 bg-purple-100 border border-purple-200 flex items-center justify-center mx-auto mb-4">
-              <div className="text-2xl">🤖</div>
-            </div>
-            <h3 className="text-lg font-light mb-3">Ask & Discover</h3>
-            <p className="text-sm text-gray-600">
-              Search your memories or chat with AI. Get answers informed by everything you've learned.
-            </p>
-          </div>
-        </div>
-
-        <div className="text-center mt-12">
-          <ConsoleButton variant="outlined" className="mr-4">
-            Try RecallOS Free
-          </ConsoleButton>
-          <ConsoleButton variant="console_key">
-            View Demo
-          </ConsoleButton>
-        </div>
-      </Section>
 
       {/* Memory Preview Section */}
       {isConnected && (
         <Section className="bg-gray-50">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-light font-editorial mb-4">
+            <h2 className="text-2xl sm:text-3xl font-light font-editorial mb-4">
               Your Memory Network
             </h2>
             <div className="flex items-center justify-center space-x-4 text-sm font-mono text-gray-600">
@@ -382,7 +335,7 @@ export const Landing = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 items-start">
             {/* Recent Memories */}
             <div>
               <div className="text-sm font-mono text-gray-600 mb-4 uppercase tracking-wide">
@@ -426,9 +379,7 @@ export const Landing = () => {
                     <div className="text-xs font-mono text-gray-600 mt-1">TOTAL MEMORIES</div>
                   </div>
                   <div className="text-center">
-                  <div className="text-2xl font-light font-mono text-gray-800">
-                    {Array.isArray(recentMemories) ? recentMemories.filter(m => m.tx_status === 'confirmed').length : 0}
-                  </div>
+                  <div className="text-2xl font-light font-mono text-gray-800">{confirmedCount}</div>
                     <div className="text-xs font-mono text-gray-600 mt-1">CONFIRMED</div>
                   </div>
                 </div>
