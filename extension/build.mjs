@@ -2,6 +2,10 @@ import { build, context } from 'esbuild';
 import { cp, mkdir } from 'node:fs/promises';
 import { watch as fsWatch } from 'node:fs';
 import { resolve } from 'node:path';
+import postcss from 'postcss';
+import tailwindcss from 'tailwindcss';
+import autoprefixer from 'autoprefixer';
+import { readFile, writeFile } from 'node:fs/promises';
 
 const rootDir = resolve(process.cwd());
 const srcDir = resolve(rootDir, 'src');
@@ -14,12 +18,27 @@ async function copyPublic() {
   await cp(publicDir, outDir, { recursive: true });
 }
 
+async function buildCSS() {
+  const cssFile = resolve(srcDir, 'styles/index.css');
+  const cssContent = await readFile(cssFile, 'utf-8');
+  
+  const result = await postcss([
+    tailwindcss,
+    autoprefixer
+  ]).process(cssContent, {
+    from: cssFile,
+    to: resolve(outDir, 'styles.css')
+  });
+
+  await writeFile(resolve(outDir, 'styles.css'), result.css);
+}
+
 async function buildScripts(watch = false) {
   const options = {
     entryPoints: [
       resolve(srcDir, 'background.ts'),
       resolve(srcDir, 'content.ts'),
-      resolve(srcDir, 'popup.ts'),
+      resolve(srcDir, 'popup.tsx'),
     ],
     outdir: outDir,
     bundle: true,
@@ -29,6 +48,12 @@ async function buildScripts(watch = false) {
     target: ['chrome120'],
     minify: process.env.NODE_ENV === 'production',
     splitting: false,
+    jsx: 'automatic',
+    jsxImportSource: 'react',
+    external: [],
+    define: {
+      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
+    }
   };
 
   if (watch) {
@@ -42,6 +67,7 @@ async function buildScripts(watch = false) {
 async function main() {
   const watch = process.argv.includes('--watch');
   await copyPublic();
+  await buildCSS();
   await buildScripts(watch);
 
   if (watch) {
@@ -50,6 +76,13 @@ async function main() {
       copyPublic()
         .then(() => console.log('Public assets copied'))
         .catch(err => console.error('Copy public failed:', err));
+    });
+    
+    // Watch CSS changes
+    fsWatch(resolve(srcDir, 'styles'), { recursive: true }, (_eventType, _filename) => {
+      buildCSS()
+        .then(() => console.log('CSS built'))
+        .catch(err => console.error('CSS build failed:', err));
     });
   }
   console.log(`Built to ${outDir}`);
