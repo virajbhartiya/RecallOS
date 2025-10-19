@@ -347,15 +347,6 @@ i
         </div>
       </div>
 
-      {/* Warnings */}
-      {isWrongNetwork && (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-          <div className="text-xs font-mono text-yellow-700 uppercase tracking-wide mb-1">⚠️ NETWORK WARNING</div>
-          <div className="text-sm text-yellow-800">
-            RecallOS works best on Sepolia testnet. Switch networks for optimal experience.
-          </div>
-        </div>
-      )}
 
       {isLowGas && (
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
@@ -372,12 +363,6 @@ i
             className="flex-1 px-3 py-2 text-xs font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
           >
             [DEPOSIT GAS]
-          </button>
-          <button
-            onClick={() => window.location.href = '/memories'}
-            className="flex-1 px-3 py-2 text-xs font-mono uppercase tracking-wide border border-blue-300 bg-white hover:bg-blue-50 hover:border-blue-500 text-blue-600 hover:text-blue-700 transition-all duration-200"
-          >
-            [VIEW MEMORIES]
           </button>
         </div>
       )}
