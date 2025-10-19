@@ -5,68 +5,68 @@ import { InfoCardWithIcon } from './InfoCard'
 const useCases = [
   {
     color: 'blue',
-    title: 'Research & Learning',
-    description: 'Track documentation, articles, and tutorials with automatic connections between related concepts.',
+    title: 'Learning & Research',
+    description: 'Never lose track of what you\'ve learned. Connect ideas across articles, tutorials, and documentation.',
     features: [
-      'Academic paper connections',
-      'Tutorial sequence tracking',
-      'Knowledge gap identification',
-      'Citation network building'
+      'Remember every tutorial you follow',
+      'Connect related articles automatically',
+      'Find knowledge gaps in your learning',
+      'Build your personal learning map'
     ]
   },
   {
     color: 'green',
-    title: 'Development Work',
-    description: 'Link GitHub repos, Stack Overflow answers, and documentation for comprehensive project knowledge.',
+    title: 'Development Projects',
+    description: 'Keep track of all the code, solutions, and documentation you discover while building projects.',
     features: [
-      'Code repository tracking',
-      'Stack Overflow Q&A linking',
-      'API documentation indexing',
-      'Bug fix pattern recognition'
+      'Remember GitHub repos you found useful',
+      'Link Stack Overflow answers to your problems',
+      'Track API documentation you used',
+      'Remember how you solved specific bugs'
     ]
   },
   {
     color: 'purple',
-    title: 'Meeting Notes',
-    description: 'Connect Google Meet transcripts with related project memories and action items.',
+    title: 'Work & Meetings',
+    description: 'Connect meeting notes with your research and project work for better context and follow-up.',
     features: [
-      'Meeting transcript analysis',
-      'Action item tracking',
-      'Project context linking',
-      'Follow-up automation'
+      'Link meeting discussions to your research',
+      'Track action items and decisions',
+      'Connect project updates to your learning',
+      'Never lose important work context'
     ]
   },
   {
     color: 'orange',
-    title: 'Content Creation',
-    description: 'Build knowledge graphs from research materials for comprehensive content development.',
+    title: 'Writing & Content',
+    description: 'Build comprehensive knowledge bases for your writing, with all sources and research connected.',
     features: [
-      'Research material organization',
-      'Source verification',
-      'Content gap analysis',
-      'Fact-checking automation'
+      'Organize research materials automatically',
+      'Verify sources and facts easily',
+      'Find content gaps in your knowledge',
+      'Create well-researched content faster'
     ]
   },
   {
     color: 'red',
-    title: 'Personal Knowledge Base',
-    description: 'Create a searchable, verifiable memory archive of your digital interactions and learning.',
+    title: 'Personal Growth',
+    description: 'Track your learning journey and build a searchable archive of everything that interests you.',
     features: [
-      'Digital footprint tracking',
-      'Learning progress monitoring',
-      'Interest pattern analysis',
-      'Knowledge retention metrics'
+      'See your learning progress over time',
+      'Discover patterns in your interests',
+      'Never forget important insights',
+      'Build your personal knowledge library'
     ]
   },
   {
     color: 'indigo',
-    title: 'Team Collaboration',
-    description: 'Share knowledge graphs and memory networks for enhanced team productivity and context sharing.',
+    title: 'Team Knowledge',
+    description: 'Share knowledge and context with your team, making collaboration more effective.',
     features: [
-      'Shared memory networks',
-      'Context-aware collaboration',
-      'Knowledge transfer automation',
-      'Team learning analytics'
+      'Share research with team members',
+      'Build shared knowledge bases',
+      'Transfer knowledge when people leave',
+      'Make team learning visible and searchable'
     ]
   }
 ]
@@ -91,7 +91,7 @@ export const UseCases: React.FC = () => {
           Real-World Use Cases
         </h2>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          How RecallOS transforms different workflows and knowledge management scenarios
+          Real ways RecallOS makes your work, learning, and research more effective
         </p>
       </div>
 

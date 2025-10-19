@@ -13,8 +13,7 @@ import {
   TechnicalArchitecture,
   UseCases,
   IntegrationCapabilities,
-  PrivacySecurity,
-  TechnicalSpecs
+  PrivacySecurity
 } from '../components/sections'
 
 
@@ -114,7 +113,7 @@ export const Landing = () => {
           window.open('/docs', '_blank')
           break
         case 'e':
-          window.open('https://chrome.google.com/webstore', '_blank')
+          window.open('https://github.com/virajbhartiya/RecallOS/releases/latest', '_blank')
           break
         case 'g':
           window.open('https://github.com/virajbhartiya/RecallOS', '_blank')
@@ -286,9 +285,9 @@ export const Landing = () => {
                 <ConsoleButton 
                   variant="console_key" 
                   className="group relative overflow-hidden"
-                  onClick={() => window.open('https://chrome.google.com/webstore', '_blank')}
+                  onClick={() => window.open('https://github.com/virajbhartiya/RecallOS/releases/latest', '_blank')}
                 >
-                  <span className="relative z-10">[E] INSTALL EXTENSION</span>
+                  <span className="relative z-10">[E] DOWNLOAD EXTENSION</span>
                   <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
                 </ConsoleButton>
                 <ConsoleButton 
@@ -299,6 +298,37 @@ export const Landing = () => {
                   <span className="relative z-10">[D] READ DOCS</span>
                   <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
                 </ConsoleButton>
+              </div>
+              
+              {/* Installation Instructions */}
+              <div className="mt-6 p-4 bg-gray-50 border border-gray-200">
+                <div className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[INSTALLATION STEPS]</div>
+                <div className="space-y-2 text-sm text-gray-700">
+                  <div className="flex items-start space-x-2">
+                    <span className="text-gray-500 font-mono">1.</span>
+                    <span>Download the extension .zip file from GitHub releases</span>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <span className="text-gray-500 font-mono">2.</span>
+                    <span>Extract the zip file to a folder on your computer</span>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <span className="text-gray-500 font-mono">3.</span>
+                    <span>Open Chrome/Edge → Extensions → Developer mode → Load unpacked</span>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <span className="text-gray-500 font-mono">4.</span>
+                    <span>Select the extracted folder and click "Select Folder"</span>
+                  </div>
+                </div>
+                <div className="mt-3 pt-3 border-t border-gray-200">
+                  <button 
+                    className="text-xs font-mono text-blue-600 hover:text-blue-800 transition-colors"
+                    onClick={() => window.open('https://github.com/virajbhartiya/RecallOS/blob/main/extension/INSTALLATION.md', '_blank')}
+                  >
+                    [VIEW DETAILED INSTALLATION GUIDE]
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -391,7 +421,58 @@ export const Landing = () => {
       <IntegrationCapabilities />
       <PrivacySecurity />
 
-      <TechnicalSpecs />
+      {/* Getting Started Section */}
+      <Section className="bg-gray-50">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-light font-editorial mb-4">
+            Get Started in Minutes
+          </h2>
+          <p className="text-lg text-gray-600 max-w-3xl mx-auto">
+            Start building your personal knowledge network today
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-blue-100 border border-blue-200 flex items-center justify-center mx-auto mb-4">
+              <div className="text-2xl">📥</div>
+            </div>
+            <h3 className="text-lg font-light mb-3">Download & Install</h3>
+            <p className="text-sm text-gray-600">
+              Download from GitHub releases and install manually in Chrome/Edge developer mode.
+            </p>
+          </div>
+
+          <div className="text-center">
+            <div className="w-16 h-16 bg-green-100 border border-green-200 flex items-center justify-center mx-auto mb-4">
+              <div className="text-2xl">🌐</div>
+            </div>
+            <h3 className="text-lg font-light mb-3">Browse & Learn</h3>
+            <p className="text-sm text-gray-600">
+              Just browse the web normally. RecallOS captures and connects everything you read.
+            </p>
+          </div>
+
+          <div className="text-center">
+            <div className="w-16 h-16 bg-purple-100 border border-purple-200 flex items-center justify-center mx-auto mb-4">
+              <div className="text-2xl">🤖</div>
+            </div>
+            <h3 className="text-lg font-light mb-3">Ask & Discover</h3>
+            <p className="text-sm text-gray-600">
+              Search your memories or chat with AI. Get answers informed by everything you've learned.
+            </p>
+          </div>
+        </div>
+
+        <div className="text-center mt-12">
+          <ConsoleButton variant="outlined" className="mr-4">
+            Try RecallOS Free
+          </ConsoleButton>
+          <ConsoleButton variant="console_key">
+            View Demo
+          </ConsoleButton>
+        </div>
+      </Section>
 
       {/* Memory Preview Section */}
       {isConnected && (

@@ -6,44 +6,44 @@ const steps = [
   {
     number: 1,
     color: 'blue',
-    title: 'Browser Monitoring',
-    description: 'Extension automatically captures page content, metadata, and user interactions as you browse.',
-    features: ['Content extraction', 'Metadata parsing', 'Activity tracking']
+    title: 'Browse Naturally',
+    description: 'Just browse the web as you normally do. RecallOS quietly captures what you read and learn.',
+    features: ['Works in the background', 'No interruption to your flow', 'Captures everything important']
   },
   {
     number: 2,
     color: 'green',
-    title: 'AI Processing',
-    description: 'Gemini or Ollama generates summaries, embeddings, and extracts structured metadata from captured content.',
-    features: ['Content summarization', 'Embedding generation', 'Metadata extraction']
+    title: 'AI Understands',
+    description: 'Our AI reads and understands the content, creating smart summaries and finding key insights.',
+    features: ['Smart summaries', 'Key insights extraction', 'Context understanding']
   },
   {
     number: 3,
     color: 'purple',
-    title: 'Memory Mesh',
-    description: 'Creates semantic, topical, and temporal relationships between memories to build a navigable knowledge graph.',
-    features: ['Semantic relations', 'Topical clustering', 'Temporal connections']
+    title: 'Connects Ideas',
+    description: 'RecallOS finds connections between different pages and topics, building your personal knowledge web.',
+    features: ['Links related content', 'Builds knowledge connections', 'Creates learning pathways']
   },
   {
     number: 4,
     color: 'orange',
-    title: 'Blockchain Anchoring',
-    description: 'Content hashes are stored on Sepolia testnet for verifiable proof of memory existence and timestamp.',
-    features: ['SHA256 hashing', 'Sepolia anchoring', 'Transaction tracking']
+    title: 'Proves It Happened',
+    description: 'Every memory is permanently recorded on the blockchain, so you can always verify what you learned.',
+    features: ['Permanent record', 'Verifiable proof', 'Never lose information']
   },
   {
     number: 5,
     color: 'red',
-    title: 'Search & Retrieval',
-    description: 'pgvector similarity search with hybrid keyword + semantic matching and LLM-generated contextual answers.',
-    features: ['Vector similarity', 'Hybrid search', 'LLM answers']
+    title: 'Find Anything',
+    description: 'Search your memories naturally. Ask questions and get answers from everything you\'ve read.',
+    features: ['Natural language search', 'Instant answers', 'Find anything quickly']
   },
   {
     number: 6,
     color: 'indigo',
-    title: 'ChatGPT Integration',
-    description: 'Automatically injects relevant memories into ChatGPT conversations with 1.5s typing delay for context-aware responses.',
-    features: ['Auto-injection', 'Context-aware', 'Citation support']
+    title: 'Works with ChatGPT',
+    description: 'When you chat with AI, RecallOS automatically shares relevant memories to give you better answers.',
+    features: ['Automatic memory sharing', 'Better AI conversations', 'Context-aware responses']
   }
 ]
 
@@ -97,7 +97,7 @@ export const HowItWorks: React.FC = () => {
           How RecallOS Works
         </h2>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          A complete pipeline from browser monitoring to AI-powered memory retrieval
+          Turn your browsing into a powerful, searchable memory that works with AI
         </p>
       </div>
 

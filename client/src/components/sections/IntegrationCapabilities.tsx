@@ -6,67 +6,67 @@ const integrations = [
   {
     color: 'blue',
     title: 'Browser Extension',
-    description: 'Chrome/Edge extension for automatic monitoring of all web activity with privacy controls.',
+    description: 'Download and install manually. Works automatically in Chrome and Edge with full privacy protection.',
     features: [
-      'Automatic content capture',
-      'Privacy extension detection',
-      'Activity-based monitoring',
-      'Localhost protection'
+      'Download from GitHub releases',
+      'Manual installation in developer mode',
+      'Privacy-first design',
+      'Works automatically once installed'
     ]
   },
   {
     color: 'green',
-    title: 'TypeScript SDK',
-    description: 'TypeScript/JavaScript client for custom integrations and application development.',
+    title: 'Developer Tools',
+    description: 'Build custom apps that work with your memories using our simple developer tools.',
     features: [
-      'Memory CRUD operations',
-      'Search functionality',
-      'Mesh generation',
-      'Blockchain verification'
+      'Easy-to-use APIs',
+      'Search your memories',
+      'Build custom tools',
+      'Full developer support'
     ]
   },
   {
     color: 'purple',
-    title: 'MCP Server',
-    description: 'Model Context Protocol server for seamless AI agent integration and memory access.',
+    title: 'AI Integration',
+    description: 'Works with any AI tool to give you better, more informed responses based on your memories.',
     features: [
-      'AI agent integration',
-      'Context-aware retrieval',
-      'Memory management tools',
-      'Protocol compliance'
+      'Works with ChatGPT',
+      'Works with Claude',
+      'Works with any AI',
+      'Automatic memory sharing'
     ]
   },
   {
     color: 'orange',
-    title: 'REST API',
-    description: 'Direct API access for custom applications and third-party integrations.',
+    title: 'Web App',
+    description: 'Access your memories through our clean, fast web interface for searching and exploring.',
     features: [
-      'Memory processing',
-      'Search endpoints',
-      'Mesh generation',
-      'Blockchain operations'
+      'Beautiful memory visualization',
+      'Powerful search',
+      'Easy to navigate',
+      'Works on any device'
     ]
   },
   {
     color: 'red',
-    title: 'Smart Contract',
-    description: 'On-chain verification and retrieval with upgradeable proxy pattern for future enhancements.',
+    title: 'Blockchain Storage',
+    description: 'Your memories are permanently stored on the blockchain, so they can never be lost or changed.',
     features: [
-      'Memory hash storage',
-      'Batch operations',
-      'Upgradeable design',
-      'Gas optimization'
+      'Permanent storage',
+      'Verifiable records',
+      'Never lost',
+      'Transparent proof'
     ]
   },
   {
     color: 'indigo',
-    title: 'Web Interface',
-    description: 'React-based web application for memory visualization, search, and management.',
+    title: 'Team Sharing',
+    description: 'Share knowledge with your team and build collective memory networks.',
     features: [
-      'Memory mesh visualization',
-      'Advanced search interface',
-      'Transaction tracking',
-      'Wallet integration'
+      'Share with team members',
+      'Build team knowledge',
+      'Collaborative learning',
+      'Knowledge transfer'
     ]
   }
 ]
@@ -91,7 +91,7 @@ export const IntegrationCapabilities: React.FC = () => {
           Integration Capabilities
         </h2>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          Multiple ways to integrate RecallOS into your existing workflows and applications
+          Easy ways to use RecallOS with your favorite tools and workflows
         </p>
       </div>
 

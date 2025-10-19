@@ -4,60 +4,60 @@ import { InfoCard } from './InfoCard'
 
 const privacyFeatures = [
   {
-    title: 'Local-First Approach',
-    description: 'Automatic localhost detection and monitoring skip for local development environments.'
+    title: 'Private by Default',
+    description: 'Never captures private or local content. Only saves public web pages you visit.'
   },
   {
-    title: 'Privacy Extension Compatibility',
-    description: 'Detects and respects privacy-focused browser extensions and user preferences.'
-  },
-  {
-    title: 'User-Controlled Data',
-    description: 'All wallet addresses and personal data are user-controlled with no forced collection.'
+    title: 'You Control Everything',
+    description: 'Your memories belong to you. No one else can access them without your permission.'
   },
   {
     title: 'Transparent Operations',
-    description: 'All blockchain operations are transparent and verifiable on public testnet.'
+    description: 'Everything is open and verifiable. You can see exactly what\'s being stored and when.'
+  },
+  {
+    title: 'No Tracking',
+    description: 'We don\'t track you or sell your data. Your browsing stays private.'
   }
 ]
 
 const securityFeatures = [
   {
-    title: 'Content Hashing',
-    description: 'SHA256 hashing ensures content integrity and prevents tampering.'
+    title: 'Permanent Storage',
+    description: 'Your memories are stored permanently and can never be lost or deleted.'
   },
   {
-    title: 'Blockchain Verification',
-    description: 'On-chain storage provides cryptographic proof of memory existence and timestamp.'
+    title: 'Verifiable Records',
+    description: 'Every memory can be verified and proven to be authentic and unchanged.'
   },
   {
-    title: 'No Third-Party Sharing',
-    description: 'Memory data is not shared with third parties without explicit user consent.'
+    title: 'No Data Sharing',
+    description: 'Your memories are never shared with third parties or advertisers.'
   },
   {
-    title: 'Secure Storage',
-    description: 'PostgreSQL with pgvector provides secure, encrypted storage for all memory data.'
+    title: 'Secure by Design',
+    description: 'Built with security and privacy as core principles from the ground up.'
   }
 ]
 
 const privacyPolicy = {
   dataCollection: [
-    'Page content and metadata from visited websites',
-    'User interactions and browsing patterns',
-    'Generated summaries and embeddings',
-    'Blockchain transaction hashes'
+    'Only public web pages you visit',
+    'No private or local content',
+    'No personal information',
+    'No tracking or analytics'
   ],
   dataStorage: [
-    'Local browser storage for extension data',
-    'PostgreSQL database for processed memories',
-    'Sepolia blockchain for content hashes',
-    'No cloud storage of raw content'
+    'Your memories stored securely',
+    'Permanent blockchain records',
+    'You control access',
+    'No cloud storage of private data'
   ],
   dataSharing: [
-    'No sharing with third-party services',
-    'Public blockchain transactions only',
-    'User-controlled wallet addresses',
-    'Optional memory sharing features'
+    'Never shared with third parties',
+    'No advertising or tracking',
+    'You choose what to share',
+    'Complete privacy protection'
   ]
 }
 
@@ -69,7 +69,7 @@ export const PrivacySecurity: React.FC = () => {
           Privacy & Security
         </h2>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          Your privacy and data security are fundamental to RecallOS design
+          Your privacy and security are our top priority. Your memories belong to you.
         </p>
       </div>
 

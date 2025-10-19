@@ -5,77 +5,77 @@ import { InfoCard } from './InfoCard'
 const features = [
   {
     color: 'blue',
-    title: 'Browser Monitoring',
-    description: 'Intelligent content capture with privacy-aware monitoring and rich metadata extraction.',
+    title: 'Smart Web Capture',
+    description: 'Automatically saves everything important you read, without getting in your way.',
     details: [
       {
-        title: 'Content Extraction',
-        description: 'Captures visible text, meaningful content, page structure, and user interactions with boilerplate filtering.'
+        title: 'Works Everywhere',
+        description: 'Captures content from any website, article, or documentation you visit.'
       },
       {
-        title: 'Privacy Protection',
-        description: 'Automatically skips localhost, detects privacy extensions, and respects user activity patterns.'
+        title: 'Privacy First',
+        description: 'Never captures private or local content. Only saves what you want to remember.'
       },
       {
-        title: 'Rich Metadata',
-        description: 'Extracts topics, keywords, reading time, content quality, and structured data from every page.'
+        title: 'Smart Filtering',
+        description: 'Focuses on meaningful content, skipping ads and irrelevant information.'
       }
     ]
   },
   {
     color: 'purple',
-    title: 'Memory Graph',
-    description: 'Creates a navigable knowledge mesh with multiple relationship types and intelligent clustering.',
+    title: 'Knowledge Connections',
+    description: 'Automatically links related ideas and topics to build your personal knowledge network.',
     details: [
       {
-        title: 'Semantic Relations',
-        description: 'Cosine similarity on 768-dim embeddings with ≥0.3 threshold for meaningful connections.'
+        title: 'Finds Patterns',
+        description: 'Discovers connections between different articles, tutorials, and resources you read.'
       },
       {
-        title: 'Topical Relations',
-        description: 'Weighted overlap of topics, categories, key points, and searchable terms with domain awareness.'
+        title: 'Builds Context',
+        description: 'Understands how topics relate to each other across your learning journey.'
       },
       {
-        title: 'Visual Layout',
-        description: 'Force-directed layout with source-based clustering and mutual kNN pruning for clean visualization.'
+        title: 'Visual Learning',
+        description: 'See your knowledge as an interactive map of connected ideas and concepts.'
       }
     ]
   },
   {
     color: 'green',
-    title: 'LLM Agent Integration',
-    description: 'Universal compatibility with any LLM agent, featuring intelligent context injection and citation support.',
+    title: 'AI Integration',
+    description: 'Works seamlessly with ChatGPT and other AI tools to give you better, more informed responses.',
     details: [
       {
-        title: 'ChatGPT Auto-Injection',
-        description: 'Automatically injects relevant memories with 1.5s typing delay and visual status indicators.'
+        title: 'Automatic Sharing',
+        description: 'When you ask AI questions, it automatically knows about your previous research.'
       },
       {
-        title: 'Context-Aware Retrieval',
-        description: 'Searches memories based on conversation context and provides relevant background information.'
+        title: 'Better Answers',
+        description: 'AI responses are informed by everything you\'ve learned, not just the current conversation.'
       },
       {
-        title: 'Citation Support',
-        description: 'Provides numbered citations with memory titles and URLs for verifiable information sources.'
+        title: 'Source Citations',
+        description: 'Always know where information came from with clear references to your memories.'
       }
     ]
   },
   {
     color: 'orange',
-    title: 'Blockchain Proof',
-    description: 'Verifiable memory provenance with on-chain anchoring and transparent transaction tracking.',
+    title: 'Permanent Records',
+    description: 'Your memories are permanently stored and verifiable, so you never lose important information.',
     details: [
       {
-        title: 'Content Hashing',
-        description: 'SHA256 hashing of memory summaries with URL hashing via keccak256 for unique identification.'
+        title: 'Blockchain Storage',
+        description: 'Every memory is permanently recorded and can be verified anytime.'
       },
       {
-        title: 'Sepolia Anchoring',
-        description: 'Batch storage on Sepolia testnet with upgradeable proxy pattern for future enhancements.'
+        title: 'Never Lost',
+        description: 'Your knowledge is safely stored and accessible forever, even if websites disappear.'
       },
       {
-        title: 'Transaction Tracking',
-        description: 'Full integration with Blockscout for transaction verification and gas usage monitoring.'
+        title: 'Transparent Proof',
+        description: 'You can always verify when and where you learned something.'
       }
     ]
   }
@@ -99,7 +99,7 @@ export const KeyFeatures: React.FC = () => {
           Key Features Deep Dive
         </h2>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-          Advanced capabilities that make RecallOS a powerful memory management system
+          Powerful features that make your browsing smarter and your knowledge permanent
         </p>
       </div>
 
