@@ -99,6 +99,7 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [zoom, setZoom] = useState<number>(1)
+  const [isMobile, setIsMobile] = useState<boolean>(false)
 
   // custom minimalist glyph node (diamond/chevron-like)
   interface GlyphNodeProps {
@@ -167,6 +168,14 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
     }
     fetchMeshData()
   }, [userAddress, similarityThreshold, onMeshLoad])
+
+  // Track viewport size to simplify UI on mobile
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // simple radial layout to avoid overlapping when no positions are provided
   const computePosition = (index: number, total: number) => {
@@ -334,7 +343,7 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
           elementsSelectable={false}
           nodeTypes={{ glyph: GlyphNode }}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
+          fitViewOptions={{ padding: isMobile ? 0.1 : 0.2 }}
           onMove={(_e: unknown, viewport: { x: number; y: number; zoom: number }) => {
             if (viewport && typeof viewport.zoom === 'number') setZoom(viewport.zoom)
           }}
@@ -342,31 +351,30 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
           <Background
             variant="dots"
             color="#d1d5db"
-            gap={18}
+            gap={isMobile ? 14 : 18}
             size={1}
           />
-          <MiniMap
-            pannable
-            zoomable
-            style={{ background: '#f1f5f9', border: '1px solid #e5e7eb' }}
-            nodeColor={(n: { data?: { type?: string; memory_id?: string } }) => {
-              const t = (n?.data?.type as string) || ''
-              const memoryId = n?.data?.memory_id
-              
-              // Check if this node is selected or highlighted
-              if (selectedMemoryId === memoryId) {
-                return '#3B82F6' // Blue for selected
-              } else if (highlightedMemoryIds.includes(memoryId || '')) {
-                return '#F59E0B' // Amber for highlighted
-              }
-              
-              const url = memoryId && memoryUrls ? memoryUrls[memoryId] : undefined
-              return resolveNodeColor(t, url)
-            }}
-            nodeStrokeColor="#111"
-            nodeBorderRadius={9999}
-          />
-          <Controls showFitView showInteractive />
+          {!isMobile && (
+            <MiniMap
+              pannable
+              zoomable
+              style={{ background: '#f1f5f9', border: '1px solid #e5e7eb' }}
+              nodeColor={(n: { data?: { type?: string; memory_id?: string } }) => {
+                const t = (n?.data?.type as string) || ''
+                const memoryId = n?.data?.memory_id
+                if (selectedMemoryId === memoryId) {
+                  return '#3B82F6'
+                } else if (highlightedMemoryIds.includes(memoryId || '')) {
+                  return '#F59E0B'
+                }
+                const url = memoryId && memoryUrls ? memoryUrls[memoryId] : undefined
+                return resolveNodeColor(t, url)
+              }}
+              nodeStrokeColor="#111"
+              nodeBorderRadius={9999}
+            />
+          )}
+          {!isMobile && <Controls showFitView showInteractive />}
         </ReactFlow>
         <div className="absolute bottom-3 right-3 text-[10px] font-mono text-gray-600 bg-white/90 border border-gray-200 rounded px-2 py-1 shadow-sm">
           {Math.round(zoom * 100)}%

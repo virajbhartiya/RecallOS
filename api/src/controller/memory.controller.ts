@@ -61,7 +61,7 @@ export class MemoryController {
         console.log(`✅ Created new user: ${user.id}`);
       }
 
-      console.log(`Processing content through Gemini...`);
+      console.log(`Processing content through AI provider...`);
 
       const [summary, extractedMetadata] = await Promise.all([
         aiProvider.summarizeContent(content, metadata),
@@ -147,7 +147,7 @@ export class MemoryController {
 
       console.log(`Storing memory on blockchain...`);
 
-      const blockchainResult = await storeMemoryBatch([memoryData]);
+      const blockchainResult = await storeMemoryBatch([memoryData], userAddress);
 
       if (blockchainResult.success) {
         await prisma.memory.update({
@@ -243,7 +243,16 @@ export class MemoryController {
         });
       }
 
-      const result = await storeMemory(hash, url, timestamp);
+      const { userAddress } = req.body;
+      
+      if (!userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: 'User address is required',
+        });
+      }
+
+      const result = await storeMemory(hash, url, timestamp, userAddress);
 
       res.status(200).json({
         success: true,
@@ -279,7 +288,16 @@ export class MemoryController {
         }
       }
 
-      const result = await storeMemoryBatch(memories);
+      const { userAddress } = req.body;
+      
+      if (!userAddress) {
+        return res.status(400).json({
+          success: false,
+          error: 'User address is required',
+        });
+      }
+
+      const result = await storeMemoryBatch(memories, userAddress);
 
       res.status(200).json({
         success: true,
@@ -1083,7 +1101,7 @@ export class MemoryController {
 
           console.log(`Retrying blockchain storage for memory: ${memory.id}`);
 
-          const blockchainResult = await storeMemoryBatch([memoryData]);
+          const blockchainResult = await storeMemoryBatch([memoryData], userAddress as string);
 
           if (blockchainResult.success) {
             await prisma.memory.update({

@@ -16,7 +16,6 @@ interface FailureReason {
 
 export const TransactionFailureAnalysis: React.FC<TransactionFailureAnalysisProps> = ({
   txHash,
-  network,
   className = ''
 }) => {
   const { getTransactionStatus } = useBlockscout()

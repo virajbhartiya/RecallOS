@@ -99,7 +99,7 @@ async function main() {
   
   console.log('\nUpgrade Summary:');
   console.log('================');
-  console.log('✅ Upgrade completed successfully!');
+  console.log('Upgrade completed successfully!');
   console.log('Proxy address:', PROXY_ADDRESS);
   console.log('Old implementation:', currentImplementation);
   console.log('New implementation:', newImplementationAddress);

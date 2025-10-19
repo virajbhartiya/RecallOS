@@ -1,17 +1,16 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useWallet } from '@/contexts/WalletContext'
+import { WalletStatus } from '@/components/WalletStatus'
+import { WalletConnectionFlow } from '@/components/WalletConnectionFlow'
+ 
 import { MemoryService } from '@/services/memoryService'
 import { SearchService } from '@/services/search'
 import { MemoryMesh } from '@/components/MemoryMesh'
 import { useBlockscout } from '@/hooks/useBlockscout'
 import { TransactionStatusIndicator } from '@/components/TransactionStatusIndicator'
-import { NetworkHealthIndicator } from '@/components/NetworkHealthIndicator'
-import { TransactionDetailsOverlay } from '@/components/TransactionDetailsOverlay'
-import { TransactionHistorySidebar } from '@/components/TransactionHistorySidebar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import type { Memory, MemoryInsights, SearchFilters, MemorySearchResponse, MemoryMesh as MemoryMeshType } from '@/types/memory'
+import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
 
-// Memory Card Component
 const MemoryCard: React.FC<{
   memory: Memory
   isSelected: boolean
@@ -39,7 +38,6 @@ const MemoryCard: React.FC<{
           : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300 bg-white'
       }`}
     >
-      {/* Compact header */}
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-xs font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors flex items-center gap-2">
           <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getSourceColorLocal(memory.source) }} />
@@ -54,16 +52,16 @@ const MemoryCard: React.FC<{
             }`} title={memory.tx_status}></div>
           )}
           {memory.tx_hash && memory.tx_hash.startsWith('0x') && memory.tx_hash.length === 66 && onViewTransaction && (
-            <button
+            <span
               onClick={(e) => {
                 e.stopPropagation()
                 onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')
               }}
-              className="text-xs text-blue-600 hover:text-blue-800 font-mono"
+              className="text-xs text-blue-600 hover:text-blue-800 font-mono cursor-pointer"
               title="View real transaction on Blockscout"
             >
               TX
-            </button>
+            </span>
           )}
           {searchResult?.blended_score !== undefined && (
             <span className="text-xs text-gray-500 font-mono">
@@ -73,14 +71,12 @@ const MemoryCard: React.FC<{
         </div>
       </div>
       
-      {/* Metadata */}
       <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
         <span>{memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'No date'}</span>
         <span>•</span>
         <span className="uppercase font-mono text-xs">{memory.source}</span>
       </div>
       
-      {/* Content preview */}
       {(memory.summary || memory.content) && (
         <p className="text-xs text-gray-600 line-clamp-1 leading-relaxed">
           {memory.summary || (memory.content && memory.content.slice(0, 60) + (memory.content.length > 60 ? '...' : ''))}
@@ -90,7 +86,6 @@ const MemoryCard: React.FC<{
   )
 }
 
-// Memory Details Panel
 const MemoryDetails: React.FC<{
   memory: Memory | null
   expandedContent: boolean
@@ -116,7 +111,6 @@ const MemoryDetails: React.FC<{
   return (
     <div className="flex-1 overflow-y-auto">
               <div className="p-6">
-                {/* Header */}
                 <div className="mb-6">
                   <h3 className="text-lg font-light text-gray-900 mb-2 leading-tight">
             {memory.title || 'Untitled Memory'}
@@ -134,7 +128,6 @@ const MemoryDetails: React.FC<{
                   </div>
                 </div>
 
-                {/* Status & Importance */}
                 <div className="flex items-center gap-4 mb-6">
           {memory.tx_status && (
                     <div className="flex items-center gap-2">
@@ -181,7 +174,6 @@ const MemoryDetails: React.FC<{
                   )}
                 </div>
 
-                {/* Summary */}
         {memory.summary && (
                   <div className="mb-6">
                     <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SUMMARY]</h4>
@@ -193,7 +185,6 @@ const MemoryDetails: React.FC<{
                   </div>
                 )}
 
-                {/* Full Content */}
         {memory.content && (
                   <div className="mb-6">
                     <div className="flex items-center justify-between mb-3">
@@ -213,7 +204,6 @@ const MemoryDetails: React.FC<{
                   </div>
                 )}
 
-                {/* URL */}
         {memory.url && memory.url !== 'unknown' && (
                   <div className="mb-6">
                     <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SOURCE URL]</h4>
@@ -230,7 +220,6 @@ const MemoryDetails: React.FC<{
                   </div>
                 )}
 
-        {/* Metadata */}
         {memory.page_metadata && (
           <div className="mb-6">
             <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[METADATA]</h4>
@@ -248,24 +237,22 @@ const MemoryDetails: React.FC<{
 
 export const Memories: React.FC = () => {
   const { isConnected, address } = useWallet()
-  const { showTransactionNotification, showAllTransactions, prefetchTransaction } = useBlockscout()
+  const { showTransactionNotification, prefetchTransaction } = useBlockscout()
   const [memories, setMemories] = useState<Memory[]>([])
-  const [insights, setInsights] = useState<MemoryInsights | null>(null)
+  
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [expandedContent, setExpandedContent] = useState(false)
   const similarityThreshold = 0.3
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const [isMobile, setIsMobile] = useState<boolean>(false)
+  
   
   const [isNodeModalOpen, setIsNodeModalOpen] = useState(false)
-  const [meshStats, setMeshStats] = useState<{ nodes: number; edges: number }>({ nodes: 0, edges: 0 })
   
-  const [showTransactionDetails, setShowTransactionDetails] = useState(false)
-  const [selectedTxHash, setSelectedTxHash] = useState<string | null>(null)
-  const [selectedNetwork, setSelectedNetwork] = useState<string>('sepolia')
   
-  const [showTransactionHistorySidebar, setShowTransactionHistorySidebar] = useState(false)
+  
   
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
   const [searchAnswer, setSearchAnswer] = useState<string | null>(null)
@@ -280,6 +267,18 @@ export const Memories: React.FC = () => {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
+  // Track viewport for responsive behavior
+  useEffect(() => {
+    const update = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      setIsSidebarCollapsed(mobile) // auto-collapse on mobile
+    }
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
   const fetchMemories = useCallback(async () => {
     if (!address) return
     
@@ -287,15 +286,10 @@ export const Memories: React.FC = () => {
     setError(null)
     
     try {
-      const [memoriesData, insightsData] = await Promise.all([
-        MemoryService.getMemoriesWithTransactionDetails(address),
-        MemoryService.getMemoryInsights(address)
-      ])
+      const memoriesData = await MemoryService.getMemoriesWithTransactionDetails(address)
       
       setMemories(memoriesData || [])
-      setInsights(insightsData)
       
-      // Prefetch transaction data for memories with transaction hashes
       const transactionsToPrefetch = (memoriesData || [])
         .filter(memory => memory.tx_hash && memory.tx_hash.startsWith('0x'))
         .map(memory => ({
@@ -305,7 +299,6 @@ export const Memories: React.FC = () => {
       
       if (transactionsToPrefetch.length > 0) {
         console.log(`Prefetching ${transactionsToPrefetch.length} transactions`)
-        // Trigger prefetch in background
         transactionsToPrefetch.forEach(({ txHash, network }) => {
           prefetchTransaction(txHash, network)
         })
@@ -319,8 +312,6 @@ export const Memories: React.FC = () => {
   }, [address, prefetchTransaction])
 
   const handleSelectMemory = (memory: Memory) => {
-    // If the selected item is from search results, it may be a slim object without full content/metadata.
-    // Prefer the fully loaded version from the main `memories` state when available.
     const full = memories.find(m => m.id === memory.id)
     setSelectedMemory(full || memory)
     setExpandedContent(false)
@@ -331,7 +322,6 @@ export const Memories: React.FC = () => {
     const fromSearch = searchResults?.results.find(r => r.memory.id === memoryId)?.memory
     const preferred = fromMemories || fromSearch
     if (preferred) {
-      // Ensure we display the richest version if both exist
       const full = fromMemories || preferred
       setSelectedMemory(full)
       setExpandedContent(false)
@@ -346,18 +336,13 @@ export const Memories: React.FC = () => {
     if (chosen) {
       setSelectedMemory(chosen)
       setExpandedContent(false)
-      // If sidebar is collapsed, open the floating details; otherwise panel is already visible
       if (isSidebarCollapsed) {
         setIsNodeModalOpen(true)
       }
     }
   }
 
-  const handleMeshLoad = useCallback((mesh: MemoryMeshType) => {
-    const nodeCount = Array.isArray(mesh.nodes) ? mesh.nodes.length : 0
-    const edgeCount = Array.isArray(mesh.edges) ? mesh.edges.length : 0
-    setMeshStats({ nodes: nodeCount, edges: edgeCount })
-  }, [])
+  
 
   const handleSearch = useCallback(async (
     query: string,
@@ -365,12 +350,10 @@ export const Memories: React.FC = () => {
   ) => {
     if (!address) return
 
-    // Cancel any previous search request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
 
-    // Create new AbortController for this request
     abortControllerRef.current = new AbortController()
 
     setSearchError(null)
@@ -445,26 +428,10 @@ export const Memories: React.FC = () => {
   }, [searchJobId, searchAnswer])
 
   const handleViewTransaction = useCallback((txHash: string, network: string) => {
-    setSelectedTxHash(txHash)
-    setSelectedNetwork(network)
-    setShowTransactionDetails(true)
     showTransactionNotification(txHash, network)
   }, [showTransactionNotification])
 
-  const handleCloseTransactionDetails = useCallback(() => {
-    setShowTransactionDetails(false)
-    setSelectedTxHash(null)
-  }, [])
-
-  const handleViewTransactionHistory = useCallback(() => {
-    if (address) {
-      setShowTransactionHistorySidebar(true)
-    }
-  }, [address])
-
-  const handleCloseTransactionHistory = useCallback(() => {
-    setShowTransactionHistorySidebar(false)
-  }, [])
+  
 
   // Filter results to show only cited memories
   const getFilteredMemories = () => {
@@ -485,9 +452,7 @@ export const Memories: React.FC = () => {
       .map(result => result.memory)
   }
 
-  const handleViewAllTransactions = useCallback(() => {
-    showAllTransactions('sepolia')
-  }, [showAllTransactions])
+  
 
   // Debounced search effect
   useEffect(() => {
@@ -536,20 +501,8 @@ export const Memories: React.FC = () => {
   if (!isConnected) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 border border-gray-200 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-          </div>
-          <h2 className="text-lg font-light text-gray-900 mb-2">[WALLET NOT CONNECTED]</h2>
-          <p className="text-sm font-mono text-gray-500 mb-4">Connect your wallet to view your memories</p>
-          <button
-            onClick={() => window.location.href = '/'}
-            className="px-4 py-2 text-sm font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
-          >
-            [CONNECT WALLET]
-          </button>
+        <div className="max-w-md w-full mx-4">
+          <WalletConnectionFlow />
         </div>
       </div>
     )
@@ -575,40 +528,28 @@ export const Memories: React.FC = () => {
               <div className="text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
                 [MEMORY MESH]
               </div>
+              {/* Mobile toggle for sidebar */}
+              <button
+                onClick={() => setIsSidebarCollapsed((v) => !v)}
+                className="md:hidden text-xs font-mono text-gray-700 hover:text-black bg-gray-50 px-2 py-1 border border-gray-200 hover:border-gray-300 transition-colors"
+              >
+                {isSidebarCollapsed ? '[OPEN LIST]' : '[HIDE LIST]'}
+              </button>
             </div>
             <div className="flex items-center space-x-4">
               {address && address.startsWith('0x') && address.length === 42 && (
-                <>
-                  <NetworkHealthIndicator network="sepolia" />
-                  <button
-                    onClick={handleViewTransactionHistory}
-                    className="text-xs font-mono text-blue-600 hover:text-blue-800 bg-blue-50 px-3 py-1 border border-blue-200 hover:border-blue-300 transition-all duration-200"
-                  >
-                    [TX HISTORY]
-                  </button>
-                  <button
-                    onClick={handleViewAllTransactions}
-                    className="text-xs font-mono text-gray-600 hover:text-gray-800 bg-gray-50 px-3 py-1 border border-gray-200 hover:border-gray-300 transition-all duration-200"
-                  >
-                    [ALL TX]
-                  </button>
-                  <div className="flex items-center space-x-2 text-xs font-mono text-green-600">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>{address.slice(0, 6)}...{address.slice(-4)}</span>
-                  </div>
-                </>
+ 
+                <WalletStatus variant="compact" showActions={true} />
               )}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Summary Toolbar removed to avoid duplication with bottom bar */}
-
       {/* Main Content */}
-      <div className="flex h-[calc(100vh-73px-48px)]">
+      <div className="flex flex-col md:flex-row h-[calc(100vh-73px)]">
         {/* Left Panel - Memory Mesh */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-auto">
         <MemoryMesh 
           userAddress={address || undefined}
           className="w-full h-full"
@@ -616,7 +557,6 @@ export const Memories: React.FC = () => {
           similarityThreshold={similarityThreshold}
           selectedMemoryId={selectedMemory?.id}
           highlightedMemoryIds={isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory.id) : []}
-          onMeshLoad={handleMeshLoad}
           memorySources={{
             ...Object.fromEntries(memories.map(m => [m.id, m.source || ''])),
             ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.source || '']))
@@ -631,7 +571,7 @@ export const Memories: React.FC = () => {
         {/* Collapse/Expand Button */}
         <button
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-200 border-r-0 rounded-l-lg px-2 py-4 hover:bg-gray-50 transition-all duration-200 shadow-sm"
+          className={`hidden md:block absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-200 border-r-0 rounded-l-lg px-2 py-4 hover:bg-gray-50 transition-all duration-200 shadow-sm`}
         >
           <svg 
             className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${isSidebarCollapsed ? 'rotate-180' : ''}`} 
@@ -644,7 +584,7 @@ export const Memories: React.FC = () => {
         </button>
 
         {/* Right Panel - Search & Memory List */}
-        <div className={`${isSidebarCollapsed ? 'w-0' : 'w-[320px]'} border-l border-gray-200 bg-white flex flex-col transition-all duration-300 overflow-hidden`}>
+        <div className={`${isSidebarCollapsed ? 'h-0 md:h-auto w-full md:w-0' : 'h-[50vh] md:h-auto w-full md:w-[320px]'} order-1 md:order-2 border-b md:border-b-0 md:border-l border-gray-200 bg-white flex flex-col transition-all duration-300 overflow-hidden`}> 
           {/* Compact Controls */}
           <div className="border-b border-gray-200 bg-gray-50/50 flex-shrink-0 p-3">
             
@@ -862,8 +802,8 @@ export const Memories: React.FC = () => {
         </div>
 
         {/* Memory Details Panel */}
-        {selectedMemory && !isSidebarCollapsed && (
-          <div className="w-[500px] border-l border-gray-200 bg-white flex flex-col">
+        {selectedMemory && !isSidebarCollapsed && !isMobile && (
+          <div className="w-full md:w-[500px] border-l border-gray-200 bg-white flex flex-col">
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-700">Memory Details</h3>
@@ -887,8 +827,8 @@ export const Memories: React.FC = () => {
         )}
 
         {/* Floating Memory Details Panel (when sidebar is collapsed) */}
-        {selectedMemory && isSidebarCollapsed && (
-          <div className="fixed right-4 top-1/2 transform -translate-y-1/2 w-[400px] max-h-[80vh] bg-white border border-gray-200 rounded-lg shadow-xl z-50 flex flex-col">
+        {selectedMemory && (isSidebarCollapsed || isMobile) && (
+          <div className="fixed right-4 top-1/2 transform -translate-y-1/2 w-[90vw] max-w-[420px] max-h-[80vh] bg-white border border-gray-200 rounded-lg shadow-xl z-50 flex flex-col">
             <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0 rounded-t-lg">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-medium text-gray-700">Memory Details</h3>
@@ -941,37 +881,10 @@ export const Memories: React.FC = () => {
         </div>
       )} */}
 
-      {/* Bottom System Bar */}
-      {insights && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-gray-200 z-40">
-          <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-center gap-6 text-xs font-mono">
-            <span className="text-gray-700">[ Total Memories: <span className="text-sky-600">{insights.total_memories}</span> ]</span>
-            <span className="text-gray-700">[ Verified: <span className="text-emerald-600">{insights.confirmed_transactions}</span> ]</span>
-            <span className="text-gray-700">[ Relationships: <span className="text-violet-600">{meshStats.edges}</span> ]</span>
-            <span className="text-green-600">[ Embeddings Synced ]</span>
-          </div>
-        </div>
-      )}
+      
 
-      {/* Transaction Details Overlay */}
-      {showTransactionDetails && selectedTxHash && (
-        <TransactionDetailsOverlay
-          txHash={selectedTxHash}
-          network={selectedNetwork}
-          isOpen={showTransactionDetails}
-          onClose={handleCloseTransactionDetails}
-        />
-      )}
-
-      {/* Transaction History Sidebar */}
-      {showTransactionHistorySidebar && address && (
-        <TransactionHistorySidebar
-          address={address}
-          network="sepolia"
-          isOpen={showTransactionHistorySidebar}
-          onClose={handleCloseTransactionHistory}
-        />
-      )}
+      {/* Gas Deposit Section */}
+      
 
       {/* Node Detail Overlay */}
       <Dialog open={isNodeModalOpen} onOpenChange={setIsNodeModalOpen}>

@@ -70,6 +70,8 @@ export class BlockscoutPrefetchService {
    */
   static async prefetchTransaction(txHash: string, network: Network = 'sepolia'): Promise<void> {
     try {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
       // Check if transaction already exists in cache
       const existing = await prisma.blockscoutTransaction.findUnique({
         where: { tx_hash: txHash }
@@ -89,6 +91,12 @@ export class BlockscoutPrefetchService {
           // Transaction not found, might still be pending
           await this.handlePendingTransaction(txHash, network)
           return
+        }
+        if (response.status === 429) {
+          // Rate limited, wait and retry
+          console.log(`Rate limited for ${txHash}, waiting 5 seconds...`)
+          await new Promise(resolve => setTimeout(resolve, 5000))
+          return // Skip this transaction for now, it will be retried later
         }
         throw new Error(`Blockscout API error: ${response.status}`)
       }
@@ -218,7 +226,7 @@ export class BlockscoutPrefetchService {
         from_address: txData.from?.hash,
         to_address: txData.to?.hash,
         value: txData.value,
-        timestamp: txData.timestamp ? BigInt(txData.timestamp) : null,
+        timestamp: txData.timestamp ? Math.floor(new Date(txData.timestamp).getTime() / 1000) : null,
         finality_reached: finalityReached,
         finality_confirmed_at: finalityReached ? new Date() : null,
         raw_data: txData as any,
@@ -235,7 +243,7 @@ export class BlockscoutPrefetchService {
         from_address: txData.from?.hash,
         to_address: txData.to?.hash,
         value: txData.value,
-        timestamp: txData.timestamp ? BigInt(txData.timestamp) : null,
+        timestamp: txData.timestamp ? Math.floor(new Date(txData.timestamp).getTime() / 1000) : null,
         finality_reached: finalityReached,
         finality_confirmed_at: finalityReached ? new Date() : null,
         raw_data: txData as any,
