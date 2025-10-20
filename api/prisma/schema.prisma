@@ -118,7 +118,6 @@ model QueryEvent {
   query          String
   embedding_hash String
   meta_summary   String?
-  avail_hash     String?
   created_at     DateTime @default(now())
   related        QueryRelatedMemory[]
   @@map("query_events")

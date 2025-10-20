@@ -131,7 +131,6 @@ RecallOS is a decentralized memory management system that captures, processes, a
 **Search:**
 - SEARCH_TOP_K: Number of results to return (default: 10)
 - SEARCH_ENABLE_REASONING: Enable AI answer generation (default: true)
-- SEARCH_ANCHOR_META: Anchor meta summaries on-chain (default: false)
 - SEARCH_EMBED_SALT: Salt for embedding hashes
 
 **Queue/Workers:**
