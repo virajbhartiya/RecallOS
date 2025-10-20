@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { useWallet } from '../contexts/WalletContext'
 
 interface WalletConnectProps {
@@ -14,18 +14,19 @@ export const WalletConnect: React.FC<WalletConnectProps> = ({
   className = '',
   onConnect
 }) => {
-  const { connect } = useWallet()
-  const [isConnecting, setIsConnecting] = useState(false)
+  const { connect, isConnecting } = useWallet()
 
   const handleConnect = async () => {
-    setIsConnecting(true)
+    if (isConnecting) {
+      console.log('Wallet connection already in progress...')
+      return
+    }
+
     try {
       await connect()
       onConnect?.()
     } catch (error) {
       console.error('Connection failed:', error)
-    } finally {
-      setIsConnecting(false)
     }
   }
 
