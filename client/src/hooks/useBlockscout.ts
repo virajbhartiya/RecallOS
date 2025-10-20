@@ -1,4 +1,5 @@
-import { useNotification, useTransactionPopup } from '@blockscout/app-sdk'
+import { useNotification } from '@/contexts/NotificationContext'
+import { useTransactionPopup } from '@/contexts/TransactionPopupContext'
 import { useCallback, useState } from 'react'
 
 const CHAIN_IDS = {
