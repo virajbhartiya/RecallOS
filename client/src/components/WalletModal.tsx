@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React from 'react'
 import { useWallet } from '@/contexts/WalletContext'
 import { useBlockscout } from '@/hooks/useBlockscout'
 
@@ -8,19 +8,20 @@ interface WalletModalProps {
 }
 
 const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
-  const { isConnected, address, chainId, balance, connect, disconnect } = useWallet()
+  const { isConnected, address, chainId, balance, connect, disconnect, isConnecting } = useWallet()
   const { showTransactionHistory } = useBlockscout()
-  const [isConnecting, setIsConnecting] = useState(false)
 
   const handleConnect = async () => {
-    setIsConnecting(true)
+    if (isConnecting) {
+      console.log('Wallet connection already in progress...')
+      return
+    }
+
     try {
       await connect()
       onClose()
     } catch (error) {
       console.error('Connection failed:', error)
-    } finally {
-      setIsConnecting(false)
     }
   }
 

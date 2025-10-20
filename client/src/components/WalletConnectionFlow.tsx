@@ -12,13 +12,16 @@ export const WalletConnectionFlow: React.FC<WalletConnectionFlowProps> = ({
   onError,
   className = ''
 }) => {
-  const { isConnected, connect, chainId } = useWallet()
-  const [isConnecting, setIsConnecting] = useState(false)
+  const { isConnected, connect, chainId, isConnecting } = useWallet()
   const [connectionStep, setConnectionStep] = useState<'idle' | 'connecting' | 'checking-network' | 'success' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
 
   const handleConnect = async () => {
-    setIsConnecting(true)
+    if (isConnecting) {
+      console.log('Wallet connection already in progress...')
+      return
+    }
+
     setConnectionStep('connecting')
     setError(null)
 
@@ -40,8 +43,6 @@ export const WalletConnectionFlow: React.FC<WalletConnectionFlowProps> = ({
       const errorMessage = err instanceof Error ? err.message : 'Failed to connect wallet'
       setError(errorMessage)
       onError?.(errorMessage)
-    } finally {
-      setIsConnecting(false)
     }
   }
 

@@ -190,10 +190,20 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
 
     if (typeof window !== 'undefined' && window.ethereum) {
       setIsConnecting(true)
+      
+      // Add a timeout to prevent hanging connections
+      const connectionTimeout = setTimeout(() => {
+        console.log('Wallet connection timeout')
+        setIsConnecting(false)
+      }, 30000) // 30 second timeout
+
       try {
         const accounts = await window.ethereum.request({ 
           method: 'eth_requestAccounts' 
         }) as string[]
+        
+        clearTimeout(connectionTimeout)
+        
         if (accounts.length > 0) {
           setIsConnected(true)
           setAddress(accounts[0])
@@ -203,6 +213,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           await fetchGasBalance()
         }
       } catch (error: any) {
+        clearTimeout(connectionTimeout)
         console.error('Error connecting wallet:', error)
         
         // Handle specific MetaMask error codes
@@ -212,6 +223,10 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         } else if (error.code === 4001) {
           console.log('User rejected the connection request.')
           // Don't show alert for user rejection
+        } else if (error.code === -32602) {
+          console.log('Invalid parameters for wallet connection.')
+        } else if (error.code === -32603) {
+          console.log('Internal error in wallet connection.')
         } else {
           console.error('Failed to connect wallet:', error.message || 'Unknown error')
         }
