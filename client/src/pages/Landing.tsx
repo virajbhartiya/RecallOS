@@ -239,32 +239,44 @@ export const Landing = () => {
 
               {/* Simplified: removed feature chips for cleaner layout */}
               
-              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4">
-                <ConsoleButton 
-                  variant="console_key" 
-                  className="group relative overflow-hidden"
-                  onClick={() => window.open('https://github.com/virajbhartiya/RecallOS/releases/latest', '_blank')}
-                >
-                  <span className="relative z-10 whitespace-nowrap">[E] DOWNLOAD EXTENSION</span>
-                  <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                </ConsoleButton>
-                <ConsoleButton
-                  variant="outlined"
-                  className="group relative overflow-hidden"
-                  onClick={() => {
-                    if (isConnected) {
-                      window.location.href = '/memories'
-                    } else {
-                      const walletButton = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement
-                      if (walletButton) {
-                        walletButton.click()
+              <div className="mt-6 sm:mt-8 space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                  <ConsoleButton 
+                    variant="console_key" 
+                    className="group relative overflow-hidden flex-1 sm:flex-none"
+                    onClick={() => window.open('https://github.com/virajbhartiya/RecallOS/releases/latest', '_blank')}
+                  >
+                    <span className="relative z-10 whitespace-nowrap">[E] DOWNLOAD EXTENSION</span>
+                    <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                  </ConsoleButton>
+                  <ConsoleButton
+                    variant="outlined"
+                    className="group relative overflow-hidden flex-1 sm:flex-none"
+                    onClick={() => window.location.href = '/docs'}
+                  >
+                    <span className="relative z-10 whitespace-nowrap">[D] READ DOCS</span>
+                    <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                  </ConsoleButton>
+                </div>
+                <div className="flex justify-center sm:justify-start">
+                  <ConsoleButton
+                    variant="outlined"
+                    className="group relative overflow-hidden w-full sm:w-auto"
+                    onClick={() => {
+                      if (isConnected) {
+                        window.location.href = '/memories'
+                      } else {
+                        const walletButton = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement
+                        if (walletButton) {
+                          walletButton.click()
+                        }
                       }
-                    }
-                  }}
-                >
-                  <span className="relative z-10 whitespace-nowrap">[M] VIEW MEMORIES</span>
-                  <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
-                </ConsoleButton>
+                    }}
+                  >
+                    <span className="relative z-10 whitespace-nowrap">[M] VIEW MEMORIES</span>
+                    <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>
+                  </ConsoleButton>
+                </div>
               </div>
               
               {/* Installation section removed to reduce clutter */}
@@ -292,9 +304,17 @@ export const Landing = () => {
                     </div>
                   ) : (
                     <div className="relative h-64 sm:h-72 md:h-80 border border-dashed border-gray-300 grid place-items-center bg-gradient-to-br from-gray-50 to-gray-100">
-                      <div className="text-center">
+                      <div className="text-center space-y-4">
                         <div className="text-5xl mb-2">🧠</div>
                         <div className="text-sm font-mono text-gray-600">INSTALL EXTENSION TO SEE LIVE MEMORIES</div>
+                        <div className="flex justify-center">
+                          <button
+                            onClick={() => window.location.href = '/docs'}
+                            className="text-xs font-mono uppercase tracking-wide border border-gray-400 bg-white hover:bg-gray-50 px-4 py-2 transition-all duration-200 hover:border-gray-600"
+                          >
+                            [READ DOCS]
+                          </button>
+                        </div>
                       </div>
                       {/* Decorative dots */}
                       <div className="pointer-events-none absolute inset-0 opacity-30" style={{backgroundImage: `radial-gradient(#000 1px, transparent 1px)`, backgroundSize: '12px 12px'}} />
@@ -402,12 +422,18 @@ export const Landing = () => {
                 </div>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-4 space-y-2">
                 <button
                   onClick={() => window.location.href = '/memories'}
                   className="w-full px-4 py-3 text-sm font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200"
                 >
                   [VIEW ALL MEMORIES]
+                </button>
+                <button
+                  onClick={() => window.location.href = '/docs'}
+                  className="w-full px-4 py-2 text-xs font-mono uppercase tracking-wide border border-gray-300 bg-gray-50 hover:bg-gray-100 transition-all duration-200"
+                >
+                  [READ DOCS]
                 </button>
               </div>
             </div>
