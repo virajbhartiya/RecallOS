@@ -3,7 +3,8 @@ import AppRoutes from '@/router/routes'
 import { CommandMenu } from '@/components/CommandMenu'
 import { Toaster } from '@/components/ui/sonner'
 import { WalletProvider } from '@/contexts/WalletContext'
-import { NotificationProvider, TransactionPopupProvider } from '@blockscout/app-sdk'
+import { NotificationProvider } from '@/contexts/NotificationContext'
+import { TransactionPopupProvider } from '@/contexts/TransactionPopupContext'
 
 function App() {
   return (
