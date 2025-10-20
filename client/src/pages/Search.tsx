@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { useWallet } from '../contexts/WalletContext'
 import { MemorySearch } from '../components/MemorySearch'
 import { MemoryService } from '../services/memoryService'
-import { LoadingSpinner, LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
+import { LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
 import type { Memory, SearchFilters, MemorySearchResponse, SearchResult } from '../types/memory'
 
 const SearchResultCard: React.FC<{ 
@@ -334,9 +334,9 @@ export const Search: React.FC = () => {
                       </>
                     )}
                   </div>
-                  {searchResults.appliedFilters && Object.keys(searchResults.appliedFilters).length > 0 && (
+                  {searchResults.filters && Object.keys(searchResults.filters).length > 0 && (
                     <div className="text-xs font-mono text-gray-500">
-                      Filters applied: {Object.keys(searchResults.appliedFilters).length}
+                      Filters applied: {Object.keys(searchResults.filters).length}
                     </div>
                   )}
                 </div>
