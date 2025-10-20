@@ -1,8 +1,21 @@
 # RecallOS Memory Processing, Embeddings, Indexing, and Linking
 
 ## Overview
-- Goal: Persist user context as memories, enrich with AI, index for retrieval, and link memories into a navigable mesh.
-- Components: Extension/Client → API (Express) → AI Provider (Gemini/Ollama/Hybrid) → PostgreSQL + pgvector → Sepolia Memory Registry → Mesh → Search/Insights.
+RecallOS is a decentralized memory management system that captures, processes, and organizes user context from various sources (browser extension, client app) into a searchable knowledge graph anchored on-chain.
+
+**Goal**: Persist user context as memories, enrich with AI, index for retrieval, and link memories into a navigable mesh.
+
+**Components**: yes
+- **Browser Extension** → Captures web content
+- **Express.js API** → Processing engine with controllers for memory, content, search, deposit, blockscout
+- **AI Provider** → Hybrid (Gemini/Ollama) for embeddings, summarization, metadata extraction
+- **PostgreSQL + pgvector** → Database with vector similarity search
+- **Sepolia Blockchain** → On-chain memory registry with gas deposits and relayer system
+- **Memory Mesh Service** → Graph relationship builder (semantic, topical, temporal)
+- **Search Service** → Semantic search with AI-generated answers and citations
+- **SDK** → JavaScript client library
+- **MCP Server** → Model Context Protocol for AI tool integration
+- **Web Client** → React interface for memory visualization and search
 
 ## 1) Ingestion (Extension/Client → API)
 - Endpoint: POST /api/memory/processRawContent
@@ -99,9 +112,31 @@
 - AI fallbacks: deterministic embedding; heuristic metadata if JSON parse fails.
 
 ## 11) Env Vars (key)
-- AI_PROVIDER, GEMINI_API_KEY, OLLAMA_BASE_URL, OLLAMA_EMBED_MODEL, OLLAMA_GEN_MODEL
-- SEPOLIA_RPC_URL, DEPLOYER_PRIVATE_KEY, MEMORY_REGISTRY_CONTRACT_ADDRESS
-- SEARCH_TOP_K, SEARCH_ENABLE_REASONING, SEARCH_ANCHOR_META, SEARCH_EMBED_SALT
+**AI Provider:**
+- AI_PROVIDER: 'gemini' | 'ollama' | 'hybrid' (default: 'hybrid')
+- GEMINI_API_KEY: Google Gemini API key
+- OLLAMA_BASE_URL: Ollama server URL (default: http://localhost:11434)
+- OLLAMA_EMBED_MODEL: Embedding model (default: all-minilm:l6-v2)
+- OLLAMA_GEN_MODEL: Generation model (default: llama3.1:8b)
+
+**Blockchain:**
+- SEPOLIA_RPC_URL: Ethereum Sepolia RPC endpoint
+- RELAYER_PRIVATE_KEY: Private key for authorized relayer wallet
+- DEPLOYER_PRIVATE_KEY: Fallback if RELAYER_PRIVATE_KEY not set
+- MEMORY_REGISTRY_CONTRACT_ADDRESS: Deployed smart contract address
+
+**Database:**
+- DATABASE_URL: PostgreSQL connection string with pgvector extension
+
+**Search:**
+- SEARCH_TOP_K: Number of results to return (default: 10)
+- SEARCH_ENABLE_REASONING: Enable AI answer generation (default: true)
+- SEARCH_ANCHOR_META: Anchor meta summaries on-chain (default: false)
+- SEARCH_EMBED_SALT: Salt for embedding hashes
+
+**Queue/Workers:**
+- REDIS_HOST, REDIS_PORT, REDIS_PASSWORD: Redis for Bull queue
+- PORT: API server port (default: 3000)
 
 ## 12) On-Chain Verification Examples
 ```js
@@ -111,8 +146,31 @@ const recent = await contract.getRecentMemories(userAddress, 10);
 ```
 
 ## 13) Lifecycle
-- Ingestion → AI enrichment → DB persist → On-chain anchor → Embeddings → Relations → Mesh → Search/Insights.
-- Periodic cleanup of low-quality relations and degree caps to avoid hubs.
+**Synchronous Flow (blocks HTTP response):**
+1. Validate input (content, userAddress)
+2. Ensure user exists (create if needed)
+3. AI summarization and metadata extraction (parallel)
+4. Generate content hash and URL hash
+5. Check for duplicates (same hash or URL within 24h)
+6. Create memory record in PostgreSQL
+7. Store memory batch on-chain (via authorized relayer)
+8. Update memory with blockchain transaction details
+9. Return success response
+
+**Asynchronous Flow (via setImmediate, doesn't block response):**
+1. Create memory snapshot
+2. Generate embeddings (content, summary, title)
+3. Build memory relations (semantic, topical, temporal)
+4. Prune and optimize graph connections
+
+**Background Workers:**
+- Content Worker: Processes queued content jobs for bulk ingestion
+- Blockscout Worker: Monitors blockchain transactions for finality
+
+**Periodic Cleanup:**
+- Memory relation quality filtering
+- Degree caps on nodes to avoid hubs
+- Cache expiration for relationship data
 
 ## 14) Flowchart
 ```
