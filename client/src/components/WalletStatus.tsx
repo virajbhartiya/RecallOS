@@ -13,7 +13,7 @@ export const WalletStatus: React.FC<WalletStatusProps> = ({
   showActions = true,
   className = ''
 }) => {
-  const { isConnected, address, chainId, balance, gasBalance, connect, disconnect } = useWallet()
+  const { isConnected, address, chainId, balance, gasBalance, isConnecting, connect, disconnect } = useWallet()
   const [showDepositModal, setShowDepositModal] = useState(false)
   const [showWalletModal, setShowWalletModal] = useState(false)
 
@@ -84,12 +84,22 @@ i
                       console.error('Connection failed:', error)
                     }
                   }}
-                  className="w-full px-6 py-4 text-sm font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200 flex items-center justify-center space-x-2"
+                  disabled={isConnecting}
+                  className="w-full px-6 py-4 text-sm font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                  </svg>
-                  <span>CONNECT WALLET</span>
+                  {isConnecting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
+                      <span>CONNECTING...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      <span>CONNECT WALLET</span>
+                    </>
+                  )}
                 </button>
 
                 <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg">
