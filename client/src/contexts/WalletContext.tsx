@@ -6,6 +6,7 @@ interface WalletContextType {
   chainId: number | null
   balance: string | null
   gasBalance: string | null
+  isConnecting: boolean
   connect: () => void
   disconnect: () => void
   depositGas: (amount: string) => Promise<void>
@@ -32,6 +33,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   const [chainId, setChainId] = useState<number | null>(null)
   const [balance, setBalance] = useState<string | null>(null)
   const [gasBalance, setGasBalance] = useState<string | null>(null)
+  const [isConnecting, setIsConnecting] = useState(false)
 
   const fetchBalance = async (walletAddress: string) => {
     if (typeof window !== 'undefined' && window.ethereum) {
@@ -181,7 +183,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   }, [fetchGasBalance])
 
   const connect = async () => {
+    if (isConnecting) {
+      console.log('Wallet connection already in progress...')
+      return
+    }
+
     if (typeof window !== 'undefined' && window.ethereum) {
+      setIsConnecting(true)
       try {
         const accounts = await window.ethereum.request({ 
           method: 'eth_requestAccounts' 
@@ -194,9 +202,21 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           await fetchBalance(accounts[0])
           await fetchGasBalance()
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error connecting wallet:', error)
-        alert('Failed to connect wallet. Please try again.')
+        
+        // Handle specific MetaMask error codes
+        if (error.code === -32002) {
+          console.log('Wallet connection request already pending. Please check your wallet.')
+          // Don't show alert for pending requests, just log it
+        } else if (error.code === 4001) {
+          console.log('User rejected the connection request.')
+          // Don't show alert for user rejection
+        } else {
+          console.error('Failed to connect wallet:', error.message || 'Unknown error')
+        }
+      } finally {
+        setIsConnecting(false)
       }
     } else {
       alert('Please install MetaMask or another Web3 wallet to continue.')
@@ -217,6 +237,7 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     chainId,
     balance,
     gasBalance,
+    isConnecting,
     connect,
     disconnect,
     depositGas,
