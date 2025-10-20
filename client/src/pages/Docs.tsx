@@ -1,5 +1,4 @@
 import React, { useState } from 'react'
-import { Section } from '../components/sections/Section'
 import { useNavigate } from 'react-router-dom'
 
 const TableOfContents: React.FC<{ onSectionClick: (id: string) => void }> = ({ onSectionClick }) => {
@@ -38,7 +37,7 @@ const TableOfContents: React.FC<{ onSectionClick: (id: string) => void }> = ({ o
   )
 }
 
-const CodeBlock: React.FC<{ code: string; language?: string }> = ({ code, language = 'bash' }) => {
+const CodeBlock: React.FC<{ code: string; language?: string }> = ({ code }) => {
   return (
     <div className="bg-gray-900 text-gray-100 p-4 rounded border border-gray-700 overflow-x-auto">
       <code className="font-mono text-sm">{code}</code>

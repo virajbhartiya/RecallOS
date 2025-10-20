@@ -1,6 +1,5 @@
 import React from 'react'
 import { useWallet } from '../contexts/WalletContext'
-import { WalletIndicator } from './WalletIndicator'
 
 interface WalletStatusBarProps {
   className?: string

@@ -20,11 +20,13 @@ export const InfoCard: React.FC<InfoCardProps> = ({
   )
 }
 
-interface InfoCardWithIconProps extends InfoCardProps {
+interface InfoCardWithIconProps {
   icon: React.ReactNode
   title: string
   description: string
-  features?: string[]
+  features?: React.ReactNode[]
+  className?: string
+  hover?: boolean
 }
 
 export const InfoCardWithIcon: React.FC<InfoCardWithIconProps> = ({ 
@@ -45,9 +47,8 @@ export const InfoCardWithIcon: React.FC<InfoCardWithIconProps> = ({
       {features.length > 0 && (
         <div className="space-y-2 text-xs font-mono text-gray-500">
           {features.map((feature, index) => (
-            <div key={index} className="flex items-center space-x-2">
-              <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
-              <span>{feature}</span>
+            <div key={index}>
+              {feature}
             </div>
           ))}
         </div>
