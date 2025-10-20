@@ -713,7 +713,6 @@ export class MemoryController {
         query: query as string,
         limit: parseInt(limit as string),
         enableReasoning: true,
-        enableAnchoring: false,
         contextOnly: false
       });
 
@@ -724,7 +723,7 @@ export class MemoryController {
         summary: result.summary,
         url: result.url,
         timestamp: result.timestamp,
-        hash: result.avail_hash,
+        hash: null as string | null,
         content: result.summary, // Use summary as content for display
         source: 'browser',
         user_id: userAddress,

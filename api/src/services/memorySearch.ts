@@ -9,7 +9,6 @@ type SearchResult = {
   summary: string | null;
   url: string | null;
   timestamp: number;
-  avail_hash: string | null;
   related_memories: string[];
   score: number;
 };
@@ -49,10 +48,9 @@ export async function searchMemories(params: {
   query: string;
   limit?: number;
   enableReasoning?: boolean;
-  enableAnchoring?: boolean;
   contextOnly?: boolean;
 }): Promise<{ query: string; results: SearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string }>{
-  const { wallet, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', enableAnchoring = process.env.SEARCH_ANCHOR_META === 'true', contextOnly = false } = params;
+  const { wallet, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', contextOnly = false } = params;
 
   if (!aiProvider.isInitialized) {
     console.error('AI Provider not initialized. Check GEMINI_API_KEY or AI_PROVIDER configuration.');
@@ -290,17 +288,6 @@ ${bullets}`;
     });
   }
 
-  if (enableAnchoring && (answer || metaSummary)) {
-    setImmediate(async () => {
-      try {
-        const { anchorMetaSummary } = await import('./blockchainAnchor');
-        const availHash = await anchorMetaSummary(String(answer || metaSummary));
-        await prisma.queryEvent.update({ where: { id: created.id }, data: { avail_hash: availHash } });
-      } catch {
-        // ignore anchoring failures
-      }
-    });
-  }
 
   const results: SearchResult[] = filteredRows.map(r => ({
     memory_id: r.id,
@@ -308,7 +295,6 @@ ${bullets}`;
     summary: r.summary,
     url: r.url,
     timestamp: Number(r.timestamp),
-    avail_hash: r.hash,
     related_memories: relatedById.get(r.id) || [],
     score: r.score,
   }));
