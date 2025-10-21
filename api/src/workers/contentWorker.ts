@@ -9,12 +9,6 @@ import { prisma } from '../lib/prisma';
 import { createHash } from 'crypto';
 
 export const startContentWorker = () => {
-  if (!contentQueue) {
-    console.warn('Content queue not available. Content worker will not start.');
-
-    return;
-  }
-
   contentQueue.process('process-content', async (job: any) => {
     const { user_id, raw_text, metadata } = job.data as ContentJobData;
 
@@ -110,14 +104,14 @@ export const startContentWorker = () => {
       throw error;
     }
   });
+  
   contentQueue.on('completed', (job: any, result: any) => {
     console.log(`Job ${job.id} completed:`, result);
   });
+  
   contentQueue.on('failed', (job: any, err: any) => {
     console.error(`Job ${job.id} failed:`, err.message);
   });
-  contentQueue.on('stalled', (job: any) => {
-    console.warn(`Job ${job.id} stalled`);
-  });
+  
   console.log('Content processing worker started');
 };
