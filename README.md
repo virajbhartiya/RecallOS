@@ -2,102 +2,7 @@
 
 > A blockchain-verified, AI-powered knowledge graph for capturing, organizing, and retrieving your digital context.
 
-## Quick Links
-
-- **[System Overview](SYSTEM_OVERVIEW.md)** - High-level architecture and capabilities
-- **[Component Documentation](COMPONENTS.md)** - Detailed breakdown of all system components
-- **[Architecture & Memory Pipeline](ARCHITECTURE_MEMORY_PIPELINE.md)** - Memory processing flow
-- **[Data Flow Diagrams](DATA_FLOW_DIAGRAM.md)** - Simple data flow overview
-- **[Data Flow Detailed](DATA_FLOW_DETAILED.md)** - Comprehensive flow diagrams
-- **[API Reference](API_REFERENCE.md)** - Complete API documentation
-
----
-
-## What is RecallOS?
-
-RecallOS transforms your browsing history and digital content into a searchable, interconnected knowledge graph. Every memory is:
-- **AI-Summarized** - Concise summaries with extracted metadata
-- **Blockchain-Verified** - Immutable proof of capture on Sepolia
-- **Semantically Indexed** - Fast vector similarity search with pgvector
-- **Graph-Connected** - Automatic relationship building between related memories
-
----
-
-## Key Features
-
-### 🧠 Intelligent Capture
-- **Browser Extension**: Automatic capture of web content as you browse
-- **Smart Deduplication**: Prevents storing the same content twice
-- **Privacy-Aware**: Detects and adapts to privacy extensions
-- **Multi-Source**: Extension, web client, SDK, or MCP integration
-
-### 🤖 AI-Powered Processing
-- **Hybrid AI**: Gemini (cloud) → Ollama (local) → Deterministic fallback
-- **Summarization**: Concise, actionable summaries (≤200 words)
-- **Metadata Extraction**: Topics, categories, sentiment, importance
-- **Vector Embeddings**: 768-dimensional semantic representations
-
-### 🔗 Knowledge Graph (Memory Mesh)
-- **Semantic Relations**: Content similarity via embeddings (≥0.3 threshold)
-- **Topical Relations**: Weighted metadata overlap
-- **Temporal Relations**: Time-based proximity with decay
-- **Force-Directed Visualization**: 3D graph in web client
-
-### 🔍 Semantic Search
-- **Vector Similarity**: pgvector-powered fast search
-- **AI Answers**: GPT-style responses with inline citations [1], [2]
-- **Meta Summaries**: Contextual overview across results
-- **Hybrid Mode**: Blends keyword (40%) + semantic (60%) search
-- **Context Export**: Format results for ChatGPT/Claude
-
-### ⛓️ Blockchain Verification
-- **Sepolia Testnet**: On-chain memory hash storage
-- **Gas Deposits**: Users deposit ETH, relayer submits transactions
-- **Transaction Tracking**: Full tx_hash, block_number, gas_used
-- **Immutable Proof**: Verifiable capture timestamps
-
-### 📊 Analytics & Insights
-- **Memory Stats**: Total count, confirmed transactions
-- **Topic Analysis**: Top topics, categories, sentiment distribution
-- **Transaction Monitoring**: Track pending/confirmed/failed states
-- **Retry Failed**: Automatic retry of failed blockchain writes
-
----
-
-## Architecture Overview
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    USER INTERFACES                          │
-│  Browser Extension │ Web Client │ SDK │ MCP Server          │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-        ┌────────────▼────────────┐
-        │  Express.js API Server  │
-        │  - Memory Controller    │
-        │  - Search Controller    │
-        │  - Content Controller   │
-        │  - Deposit Controller   │
-        │  - Blockscout Controller│
-        └────────────┬────────────┘
-                     │
-        ┌────────────┼────────────┐
-        ▼            ▼            ▼
-   ┌────────┐  ┌─────────┐  ┌──────────┐
-   │   AI   │  │ Memory  │  │Blockchain│
-   │Provider│  │  Mesh   │  │ Service  │
-   └────────┘  └─────────┘  └──────────┘
-        │            │            │
-        ▼            ▼            ▼
-   ┌─────────────────────────────────┐
-   │  PostgreSQL + pgvector + Redis  │
-   │  Sepolia Blockchain + Blockscout│
-   └─────────────────────────────────┘
-```
-
----
-
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 - Node.js 18+
@@ -137,7 +42,7 @@ cp .env.example .env
 # - GEMINI_API_KEY (or OLLAMA_BASE_URL)
 # - SEPOLIA_RPC_URL
 # - RELAYER_PRIVATE_KEY
-# - MEMORY_REGISTRY_CONTRACT_ADDRESS
+# - MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
 
 # Run migrations
 npm run db:migrate
@@ -189,34 +94,288 @@ npm run build
 # 3. Connect wallet
 ```
 
-### 5. Smart Contract Setup (Optional)
+---
 
+## 📋 Contract Addresses
+
+### Sepolia Testnet (Current Deployment)
+
+**Network:** Sepolia (Chain ID: 11155111)  
+**Deployment Date:** October 21, 2025
+
+| Component | Address | Description |
+|-----------|---------|-------------|
+| **Proxy (Main Contract)** | `0xde662d9c6a0bb41ad82b3550177feaf4e43bd602` | Use this address for all integrations |
+| **Implementation** | `0x35af2cae8c7788e58dcf81b4d8637e54073cc6bc` | Internal implementation contract |
+| **Proxy Admin** | `0xB5f1377433865BE245586997A7042c564926b2e9` | Upgrade management |
+| **Contract Owner** | `0x01b7b2bC30c958bA3bC0852bF1BD4efB165281Ba` | Deployer address |
+
+**Block Explorer:** [Etherscan](https://sepolia.etherscan.io/address/0xde662d9c6a0bb41ad82b3550177feaf4e43bd602)
+
+### Environment Configuration
+
+Add to your `.env` file:
 ```bash
-cd contract
-
-# Install dependencies
-npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with:
-# - SEPOLIA_RPC_URL
-# - DEPLOYER_PRIVATE_KEY
-# - ETHERSCAN_API_KEY
-
-# Deploy contract
-npx hardhat run scripts/deploy.ts --network sepolia
-
-# Verify contract
-npx hardhat run scripts/verify.ts --network sepolia
-
-# Authorize relayer
-# Use the relayer address from API setup
+MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
 ```
 
 ---
 
-## Usage
+## 🏗️ System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        USER INTERFACES                          │
+├─────────────────────────────────────────────────────────────────┤
+│  Browser Extension  │   Web Client (React)   │   SDK/MCP       │
+└──────────┬──────────┴────────────┬────────────┴──────────┬──────┘
+           │                       │                       │
+           └───────────────────────┼───────────────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │   Express.js API Server   │
+                    │  (Controllers & Routes)   │
+                    └─────────────┬─────────────┘
+                                  │
+        ┌─────────────┬───────────┼───────────┬─────────────┐
+        │             │           │           │             │
+   ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼────┐  ┌────▼────┐
+   │ Memory  │  │ Search  │ │ Content │ │ Deposit │  │Blockscout│
+   │Controller│  │Controller│ │Controller│ │Controller│  │Controller│
+   └────┬────┘  └────┬────┘ └────┬────┘ └────┬────┘  └────┬────┘
+        │            │           │           │             │
+        └────────────┴───────────┴───────────┴─────────────┘
+                                  │
+        ┌─────────────┬───────────┼───────────┬─────────────┐
+        │             │           │           │             │
+   ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼────┐  ┌────▼────┐
+   │   AI    │  │ Memory  │ │ Memory  │ │Blockchain│  │Blockscout│
+   │Provider │  │  Mesh   │ │ Search  │ │ Service  │  │  Prefetch│
+   └────┬────┘  └────┬────┘ └────┬────┘ └────┬────┘  └────┬────┘
+        │            │           │           │             │
+        └────────────┴───────────┴───────────┴─────────────┘
+                                  │
+        ┌─────────────┬───────────┼───────────┬─────────────┐
+        │             │           │           │             │
+   ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼────┐  ┌────▼────┐
+   │PostgreSQL│  │ pgvector│ │  Redis  │ │ Sepolia │  │ Blockscout│
+   │ Database │  │Embeddings│ │ Queue   │ │Blockchain│  │   API    │
+   └─────────┘  └─────────┘ └─────────┘ └─────────┘  └─────────┘
+```
+
+---
+
+## 🧠 Core Features
+
+### 1. Intelligent Capture
+- **Browser Extension**: Automatic capture of web content as you browse
+- **Smart Deduplication**: Prevents storing the same content twice
+- **Privacy-Aware**: Detects and adapts to privacy extensions
+- **Multi-Source**: Extension, web client, SDK, or MCP integration
+
+### 2. AI-Powered Processing
+- **Hybrid AI**: Gemini (cloud) → Ollama (local) → Deterministic fallback
+- **Summarization**: Concise, actionable summaries (≤200 words)
+- **Metadata Extraction**: Topics, categories, sentiment, importance
+- **Vector Embeddings**: 768-dimensional semantic representations
+
+### 3. Knowledge Graph (Memory Mesh)
+- **Semantic Relations**: Content similarity via embeddings (≥0.3 threshold)
+- **Topical Relations**: Weighted metadata overlap
+- **Temporal Relations**: Time-based proximity with decay
+- **Force-Directed Visualization**: 3D graph in web client
+
+### 4. Semantic Search
+- **Vector Similarity**: pgvector-powered fast search
+- **AI Answers**: GPT-style responses with inline citations [1], [2]
+- **Meta Summaries**: Contextual overview across results
+- **Hybrid Mode**: Blends keyword (40%) + semantic (60%) search
+- **Context Export**: Format results for ChatGPT/Claude
+
+### 5. Blockchain Verification
+- **Sepolia Testnet**: On-chain memory hash storage
+- **Gas Deposits**: Users deposit ETH, relayer submits transactions
+- **Transaction Tracking**: Full tx_hash, block_number, gas_used
+- **Immutable Proof**: Verifiable capture timestamps
+
+### 6. Analytics & Insights
+- **Memory Stats**: Total count, confirmed transactions
+- **Topic Analysis**: Top topics, categories, sentiment distribution
+- **Transaction Monitoring**: Track pending/confirmed/failed states
+- **Retry Failed**: Automatic retry of failed blockchain writes
+
+---
+
+## 📁 Project Structure
+
+```
+RecallOS/
+├── api/                     # Express.js API server
+│   ├── src/
+│   │   ├── controller/      # Request handlers
+│   │   ├── routes/          # Route definitions
+│   │   ├── services/        # Business logic
+│   │   ├── workers/         # Background jobs
+│   │   └── lib/             # Utilities
+│   └── prisma/
+│       └── schema.prisma    # Database schema
+│
+├── client/                  # React web app
+│   └── src/
+│       ├── pages/           # Landing, Memories, Search
+│       ├── components/      # UI components
+│       ├── contexts/        # State management
+│       └── services/        # API clients
+│
+├── extension/               # Chrome extension
+│   ├── src/
+│   │   ├── background.ts    # Service worker
+│   │   ├── content.ts       # Content script
+│   │   └── popup.tsx        # Popup UI
+│   └── public/
+│       └── manifest.json    # Extension manifest
+│
+├── contract/                # Solidity smart contracts
+│   ├── contracts/
+│   │   └── RecallOSMemoryRegistry.sol
+│   └── scripts/             # Deployment scripts
+│
+├── sdk/                     # TypeScript SDK
+│   └── src/
+│       ├── clients/         # API clients
+│       └── types.ts         # Type definitions
+│
+├── mcp-server/              # Model Context Protocol server
+│   └── src/
+│       ├── tools/           # MCP tools
+│       └── index.ts         # Server entry
+│
+└── docs/                    # Documentation
+    ├── SYSTEM_OVERVIEW.md
+    ├── COMPONENTS.md
+    ├── API_REFERENCE.md
+    ├── ARCHITECTURE_MEMORY_PIPELINE.md
+    ├── DATA_FLOW_DIAGRAM.md
+    └── DATA_FLOW_DETAILED.md
+```
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend
+- React 18 with TypeScript
+- Vite build tool
+- Tailwind CSS
+- wagmi + viem for Web3
+- ConnectKit for wallet connection
+- Three.js + React Three Fiber for 3D graph
+- @xyflow/react for 2D graph
+
+### Backend
+- Node.js + Express.js
+- TypeScript
+- Prisma ORM
+- Bull queue (Redis)
+- Ethers.js v6
+
+### Database
+- PostgreSQL 14+
+- pgvector extension for vector similarity
+- Redis for job queue
+
+### AI/ML
+- Google Gemini API (text-embedding-004)
+- Ollama (local alternative)
+- Deterministic fallback embeddings
+
+### Blockchain
+- Ethereum Sepolia testnet
+- Solidity 0.8.24
+- OpenZeppelin upgradeable contracts
+- Hardhat development environment
+
+### Tools
+- ESBuild (extension bundling)
+- Jest (API testing)
+- Foundry (contract testing)
+- Prettier (code formatting)
+
+---
+
+## 🔧 API Endpoints
+
+### Memory Management
+- `POST /api/memory/processRawContent` - Store new memory
+- `GET /api/memory/:userAddress/recent` - Get recent memories
+- `GET /api/memory/:userAddress/count` - Get memory count
+- `GET /api/memory/getMemoryByHash/:hash` - Get memory by hash
+- `GET /api/memory/insights` - Analytics and insights
+- `GET /api/memory/transaction-details` - Memories with blockchain data
+- `POST /api/memory/retry-failed` - Retry failed transactions
+
+### Memory Mesh
+- `GET /api/memory/:userAddress/mesh` - Get full graph
+- `GET /api/memory/:memoryId/with-relations` - Get memory with edges
+- `GET /api/memory/:memoryId/cluster` - Get memory cluster
+
+### Search
+- `POST /api/search` - Semantic search with AI answer
+- `GET /api/search/job/:id` - Search job status
+- `POST /api/search/context` - Context-only search
+- `GET /api/memory/search` - Keyword search
+- `GET /api/memory/search-embed` - Semantic search with filters
+- `GET /api/memory/search-hybrid` - Hybrid search
+
+### Content Queue
+- `POST /api/content/submit` - Queue content for processing
+- `GET /api/content/:user_id` - Get processed content
+
+### Gas Deposits
+- `GET /api/deposit/:userAddress/balance` - Check balance
+- `GET /api/deposit/contract-address` - Get contract address
+- `GET /api/deposit/estimate` - Estimate gas cost
+- `GET /api/deposit/:userAddress/info` - Complete deposit info
+
+### Blockchain
+- `GET /api/blockscout/transaction/:txHash` - Get transaction
+- `GET /api/blockscout/user/:userAddress/transactions` - User transactions
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+**API (`api/.env`):**
+```bash
+DATABASE_URL=postgresql://user:pass@localhost:5432/recallos
+AI_PROVIDER=hybrid
+GEMINI_API_KEY=your_key
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
+RELAYER_PRIVATE_KEY=0x...
+MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+**Client (`client/.env`):**
+```bash
+VITE_API_URL=http://localhost:3000
+VITE_CHAIN_ID=11155111
+VITE_WALLETCONNECT_PROJECT_ID=your_project_id
+```
+
+**Contract (`contract/.env`):**
+```bash
+SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
+DEPLOYER_PRIVATE_KEY=0x...
+ETHERSCAN_API_KEY=your_key
+```
+
+---
+
+## 🚀 Usage
 
 ### Capturing Memories
 
@@ -321,178 +480,7 @@ contract.withdrawGas(amountInWei)
 
 ---
 
-## Project Structure
-
-```
-RecallOS/
-├── api/                     # Express.js API server
-│   ├── src/
-│   │   ├── controller/      # Request handlers
-│   │   ├── routes/          # Route definitions
-│   │   ├── services/        # Business logic
-│   │   ├── workers/         # Background jobs
-│   │   └── lib/             # Utilities
-│   └── prisma/
-│       └── schema.prisma    # Database schema
-│
-├── client/                  # React web app
-│   └── src/
-│       ├── pages/           # Landing, Memories, Search
-│       ├── components/      # UI components
-│       ├── contexts/        # State management
-│       └── services/        # API clients
-│
-├── extension/               # Chrome extension
-│   ├── src/
-│   │   ├── background.ts    # Service worker
-│   │   ├── content.ts       # Content script
-│   │   └── popup.tsx        # Popup UI
-│   └── public/
-│       └── manifest.json    # Extension manifest
-│
-├── contract/                # Solidity smart contracts
-│   ├── contracts/
-│   │   └── RecallOSMemoryRegistry.sol
-│   └── scripts/             # Deployment scripts
-│
-├── sdk/                     # TypeScript SDK
-│   └── src/
-│       ├── clients/         # API clients
-│       └── types.ts         # Type definitions
-│
-├── mcp-server/              # Model Context Protocol server
-│   └── src/
-│       ├── tools/           # MCP tools
-│       └── index.ts         # Server entry
-│
-└── docs/                    # Documentation
-    ├── SYSTEM_OVERVIEW.md
-    ├── COMPONENTS.md
-    ├── API_REFERENCE.md
-    ├── ARCHITECTURE_MEMORY_PIPELINE.md
-    ├── DATA_FLOW_DIAGRAM.md
-    └── DATA_FLOW_DETAILED.md
-```
-
----
-
-## Technology Stack
-
-### Frontend
-- React 18 with TypeScript
-- Vite build tool
-- Tailwind CSS
-- wagmi + viem for Web3
-- ConnectKit for wallet connection
-- Three.js + React Three Fiber for 3D graph
-- @xyflow/react for 2D graph
-
-### Backend
-- Node.js + Express.js
-- TypeScript
-- Prisma ORM
-- Bull queue (Redis)
-- Ethers.js v6
-
-### Database
-- PostgreSQL 14+
-- pgvector extension for vector similarity
-- Redis for job queue
-
-### AI/ML
-- Google Gemini API (text-embedding-004)
-- Ollama (local alternative)
-- Deterministic fallback embeddings
-
-### Blockchain
-- Ethereum Sepolia testnet
-- Solidity 0.8.24
-- OpenZeppelin upgradeable contracts
-- Hardhat development environment
-
-### Tools
-- ESBuild (extension bundling)
-- Jest (API testing)
-- Foundry (contract testing)
-- Prettier (code formatting)
-
----
-
-## API Endpoints
-
-### Memory Management
-- `POST /api/memory/processRawContent` - Store new memory
-- `GET /api/memory/:userAddress/recent` - Get recent memories
-- `GET /api/memory/:userAddress/count` - Get memory count
-- `GET /api/memory/getMemoryByHash/:hash` - Get memory by hash
-- `GET /api/memory/insights` - Analytics and insights
-- `GET /api/memory/transaction-details` - Memories with blockchain data
-- `POST /api/memory/retry-failed` - Retry failed transactions
-
-### Memory Mesh
-- `GET /api/memory/:userAddress/mesh` - Get full graph
-- `GET /api/memory/:memoryId/with-relations` - Get memory with edges
-- `GET /api/memory/:memoryId/cluster` - Get memory cluster
-
-### Search
-- `POST /api/search` - Semantic search with AI answer
-- `GET /api/search/job/:id` - Search job status
-- `POST /api/search/context` - Context-only search
-- `GET /api/memory/search` - Keyword search
-- `GET /api/memory/search-embed` - Semantic search with filters
-- `GET /api/memory/search-hybrid` - Hybrid search
-
-### Content Queue
-- `POST /api/content/submit` - Queue content for processing
-- `GET /api/content/:user_id` - Get processed content
-
-### Gas Deposits
-- `GET /api/deposit/:userAddress/balance` - Check balance
-- `GET /api/deposit/contract-address` - Get contract address
-- `GET /api/deposit/estimate` - Estimate gas cost
-- `GET /api/deposit/:userAddress/info` - Complete deposit info
-
-### Blockchain
-- `GET /api/blockscout/transaction/:txHash` - Get transaction
-- `GET /api/blockscout/user/:userAddress/transactions` - User transactions
-
-**See [API_REFERENCE.md](API_REFERENCE.md) for complete documentation.**
-
----
-
-## Configuration
-
-### Environment Variables
-
-**API (`api/.env`):**
-```bash
-DATABASE_URL=postgresql://user:pass@localhost:5432/recallos
-AI_PROVIDER=hybrid
-GEMINI_API_KEY=your_key
-SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
-RELAYER_PRIVATE_KEY=0x...
-MEMORY_REGISTRY_CONTRACT_ADDRESS=0x...
-REDIS_HOST=localhost
-REDIS_PORT=6379
-```
-
-**Client (`client/.env`):**
-```bash
-VITE_API_URL=http://localhost:3000
-VITE_CHAIN_ID=11155111
-VITE_WALLETCONNECT_PROJECT_ID=your_project_id
-```
-
-**Contract (`contract/.env`):**
-```bash
-SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
-DEPLOYER_PRIVATE_KEY=0x...
-ETHERSCAN_API_KEY=your_key
-```
-
----
-
-## Development
+## 🧪 Development
 
 ### Running Tests
 
@@ -566,7 +554,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## Deployment
+## 🚀 Deployment
 
 ### API (Railway/Render)
 1. Create PostgreSQL database with pgvector
@@ -597,7 +585,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Extension not capturing
 - Check extension is enabled
@@ -636,7 +624,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## Performance
+## 📊 Performance
 
 ### Ingestion
 - **Synchronous**: 2-5 seconds
@@ -660,7 +648,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## Security
+## 🔒 Security
 
 - **Authentication**: Wallet-based, no passwords
 - **Data Isolation**: User-scoped queries
@@ -673,7 +661,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## Roadmap
+## 🗺️ Roadmap
 
 ### Phase 1 (Current)
 - ✅ Browser extension
@@ -708,13 +696,13 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## License
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## Support
+## 🆘 Support
 
 - **Documentation**: See `/docs` folder
 - **Issues**: GitHub Issues
@@ -723,7 +711,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## Acknowledgments
+## 🙏 Acknowledgments
 
 - OpenZeppelin for smart contract libraries
 - Prisma for excellent ORM
@@ -733,7 +721,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## Citation
+## 📚 Citation
 
 If you use RecallOS in your research, please cite:
 
@@ -749,4 +737,3 @@ If you use RecallOS in your research, please cite:
 ---
 
 **Built with ❤️ by the RecallOS team**
-

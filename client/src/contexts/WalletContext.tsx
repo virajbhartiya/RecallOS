@@ -11,6 +11,7 @@ interface WalletContextType {
   disconnect: () => void
   depositGas: (amount: string) => Promise<void>
   fetchGasBalance: () => Promise<void>
+  refreshBalance: () => Promise<void>
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined)
@@ -139,7 +140,49 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
             setIsConnected(true)
             setAddress(accounts[0])
             const chainId = await window.ethereum.request({ method: 'eth_chainId' }) as string
-            setChainId(parseInt(chainId, 16))
+            const chainIdNumber = parseInt(chainId, 16)
+            console.log('Detected chain ID:', chainIdNumber, 'from hex:', chainId)
+            setChainId(chainIdNumber)
+            
+            // Force switch to Sepolia if not already on it
+            if (chainIdNumber !== 11155111) {
+              console.log(`Auto-switching from network ${chainIdNumber} to Sepolia...`)
+              try {
+                await window.ethereum.request({
+                  method: 'wallet_switchEthereumChain',
+                  params: [{ chainId: '0xaa36a7' }],
+                })
+                setChainId(11155111)
+                console.log('Successfully switched to Sepolia')
+                // Refresh balance after network switch
+                await fetchBalance(accounts[0])
+                await fetchGasBalance()
+              } catch (switchError: any) {
+                if (switchError.code === 4902) {
+                  try {
+                    await window.ethereum.request({
+                      method: 'wallet_addEthereumChain',
+                      params: [{
+                        chainId: '0xaa36a7',
+                        chainName: 'Sepolia Testnet',
+                        rpcUrls: ['https://sepolia.infura.io/v3/'],
+                        nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                        blockExplorerUrls: ['https://sepolia.etherscan.io'],
+                      }],
+                    })
+                    setChainId(11155111)
+                    console.log('Successfully added and switched to Sepolia')
+                    // Refresh balance after network switch
+                    await fetchBalance(accounts[0])
+                    await fetchGasBalance()
+                  } catch (addError) {
+                    console.error('Could not add Sepolia network:', addError)
+                  }
+                } else {
+                  console.error('Could not switch to Sepolia:', switchError)
+                }
+              }
+            }
             await fetchBalance(accounts[0])
             await fetchGasBalance()
           }
@@ -168,9 +211,41 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
         }
       })
 
-      window.ethereum.on('chainChanged', (...args: unknown[]) => {
+      window.ethereum.on('chainChanged', async (...args: unknown[]) => {
         const chainId = args[0] as string
-        setChainId(parseInt(chainId, 16))
+        const chainIdNumber = parseInt(chainId, 16)
+        console.log('Chain changed to:', chainIdNumber)
+        setChainId(chainIdNumber)
+        
+        // Auto-switch to Sepolia if user switched to a different network
+        if (chainIdNumber !== 11155111) {
+          console.log(`User switched to network ${chainIdNumber}, auto-switching to Sepolia...`)
+          try {
+            if (window.ethereum) {
+              await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0xaa36a7' }],
+              })
+              setChainId(11155111)
+              console.log('Successfully switched to Sepolia')
+              // Refresh balance after network switch
+              if (address) {
+                await fetchBalance(address)
+                await fetchGasBalance()
+              }
+            }
+          } catch (switchError: any) {
+            console.log('Auto-switch failed:', switchError)
+            // Keep the current network but show warning
+          }
+        } else {
+          // If already on Sepolia, refresh balance to ensure it's correct
+          console.log('Already on Sepolia, refreshing balance...')
+          if (address) {
+            await fetchBalance(address)
+            await fetchGasBalance()
+          }
+        }
       })
     }
 
@@ -208,7 +283,60 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
           setIsConnected(true)
           setAddress(accounts[0])
           const chainId = await window.ethereum.request({ method: 'eth_chainId' }) as string
-          setChainId(parseInt(chainId, 16))
+          const chainIdNumber = parseInt(chainId, 16)
+          console.log('Connected to chain ID:', chainIdNumber, 'from hex:', chainId)
+          setChainId(chainIdNumber)
+          
+          // Force switch to Sepolia - this is the only supported network
+          if (chainIdNumber !== 11155111) {
+            console.log(`Current network (${chainIdNumber}) is not Sepolia. Forcing switch to Sepolia...`)
+            try {
+              await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: '0xaa36a7' }], // 11155111 in hex
+              })
+              setChainId(11155111)
+              console.log('Successfully switched to Sepolia')
+              // Refresh balance after network switch
+              await fetchBalance(accounts[0])
+              await fetchGasBalance()
+            } catch (switchError: any) {
+              console.log('Switch failed, trying to add Sepolia network...', switchError)
+              // If Sepolia is not added, try to add it
+              if (switchError.code === 4902) {
+                try {
+                  await window.ethereum.request({
+                    method: 'wallet_addEthereumChain',
+                    params: [{
+                      chainId: '0xaa36a7',
+                      chainName: 'Sepolia Testnet',
+                      rpcUrls: ['https://sepolia.infura.io/v3/'],
+                      nativeCurrency: {
+                        name: 'ETH',
+                        symbol: 'ETH',
+                        decimals: 18,
+                      },
+                      blockExplorerUrls: ['https://sepolia.etherscan.io'],
+                    }],
+                  })
+                  setChainId(11155111)
+                  console.log('Successfully added and switched to Sepolia')
+                  // Refresh balance after network switch
+                  await fetchBalance(accounts[0])
+                  await fetchGasBalance()
+                } catch (addError) {
+                  console.error('Could not add Sepolia network:', addError)
+                  // Keep the current chainId but show warning
+                }
+              } else {
+                console.error('Could not switch to Sepolia:', switchError)
+                // Keep the current chainId but show warning
+              }
+            }
+          } else {
+            console.log('Already on Sepolia testnet')
+          }
+          
           await fetchBalance(accounts[0])
           await fetchGasBalance()
         }
@@ -246,6 +374,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     setGasBalance(null)
   }
 
+  const refreshBalance = async () => {
+    if (address) {
+      console.log('Manually refreshing balance...')
+      await fetchBalance(address)
+      await fetchGasBalance()
+    }
+  }
+
   const value: WalletContextType = {
     isConnected,
     address,
@@ -256,7 +392,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     connect,
     disconnect,
     depositGas,
-    fetchGasBalance
+    fetchGasBalance,
+    refreshBalance
   }
 
   return (

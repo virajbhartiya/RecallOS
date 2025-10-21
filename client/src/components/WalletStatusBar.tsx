@@ -9,12 +9,20 @@ export const WalletStatusBar: React.FC<WalletStatusBarProps> = ({ className = ''
   const { isConnected, address, chainId, gasBalance } = useWallet()
 
   const getNetworkName = (chainId: number | null) => {
+    console.log('Getting network name for chainId:', chainId)
     switch (chainId) {
       case 11155111: return 'Sepolia'
       case 1: return 'Ethereum'
       case 137: return 'Polygon'
       case 42161: return 'Arbitrum'
-      default: return 'Unknown'
+      case 10: return 'Optimism'
+      case 8453: return 'Base'
+      case 56: return 'BSC'
+      case 250: return 'Fantom'
+      case 43114: return 'Avalanche'
+      default: 
+        console.log('Unknown chainId:', chainId)
+        return 'Unknown'
     }
   }
 
@@ -70,7 +78,23 @@ export const WalletStatusBar: React.FC<WalletStatusBarProps> = ({ className = ''
           {isWrongNetwork && (
             <div className="flex items-center space-x-2 text-yellow-600">
               <span>⚠️</span>
-              <span>Switch to Sepolia</span>
+              <button 
+                onClick={async () => {
+                  try {
+                    if (window.ethereum) {
+                      await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: '0xaa36a7' }],
+                      })
+                    }
+                  } catch (error) {
+                    console.error('Failed to switch network:', error)
+                  }
+                }}
+                className="underline hover:text-yellow-800"
+              >
+                Switch to Sepolia
+              </button>
             </div>
           )}
           

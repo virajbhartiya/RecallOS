@@ -122,7 +122,7 @@ For testnet deployment, set these environment variables:
 ```bash
 SEPOLIA_RPC_URL=your_sepolia_rpc_url
 SEPOLIA_PRIVATE_KEY=your_private_key
-PROXY_CONTRACT_ADDRESS=0x... # For upgrades
+PROXY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602 # Current Sepolia deployment
 ```
 
 ## Contract Architecture
