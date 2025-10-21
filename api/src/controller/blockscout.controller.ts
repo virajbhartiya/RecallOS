@@ -1,14 +1,52 @@
 import { Request, Response } from 'express'
 import BlockscoutPrefetchService from '../services/blockscoutPrefetch'
-import Queue from 'bull'
+import { EventEmitter } from 'events'
+import crypto from 'crypto'
 
-const blockscoutQueue = new Queue('blockscout-prefetch', {
-  redis: {
-    host: process.env.REDIS_HOST || 'localhost',
-    port: parseInt(process.env.REDIS_PORT || '6379'),
-    password: process.env.REDIS_PASSWORD,
-  },
-})
+interface BlockscoutJob {
+  id: string
+  data: any
+  attempts: number
+  maxAttempts: number
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+}
+
+class BlockscoutInMemoryQueue extends EventEmitter {
+  private jobs: Map<string, BlockscoutJob> = new Map()
+  private processingJobs: Set<string> = new Set()
+
+  async add(jobType: string, data: any, options?: { delay?: number }) {
+    const id = crypto.randomUUID()
+    const job: BlockscoutJob = {
+      id,
+      data,
+      attempts: 0,
+      maxAttempts: 3,
+      status: 'pending',
+    }
+    
+    this.jobs.set(id, job)
+    return { id }
+  }
+
+  async getWaiting(): Promise<BlockscoutJob[]> {
+    return Array.from(this.jobs.values()).filter(j => j.status === 'pending')
+  }
+
+  async getActive(): Promise<BlockscoutJob[]> {
+    return Array.from(this.jobs.values()).filter(j => j.status === 'processing')
+  }
+
+  async getCompleted(): Promise<BlockscoutJob[]> {
+    return []
+  }
+
+  async getFailed(): Promise<BlockscoutJob[]> {
+    return []
+  }
+}
+
+const blockscoutQueue = new BlockscoutInMemoryQueue()
 
 export class BlockscoutController {
   /**
