@@ -13,17 +13,25 @@ export const WalletStatus: React.FC<WalletStatusProps> = ({
   showActions = true,
   className = ''
 }) => {
-  const { isConnected, address, chainId, balance, gasBalance, isConnecting, connect, disconnect } = useWallet()
+  const { isConnected, address, chainId, balance, gasBalance, isConnecting, connect, disconnect, refreshBalance } = useWallet()
   const [showDepositModal, setShowDepositModal] = useState(false)
   const [showWalletModal, setShowWalletModal] = useState(false)
 
   const getNetworkName = (chainId: number | null) => {
+    console.log('Getting network name for chainId:', chainId)
     switch (chainId) {
       case 11155111: return 'Sepolia'
       case 1: return 'Ethereum'
       case 137: return 'Polygon'
       case 42161: return 'Arbitrum'
-      default: return 'Unknown'
+      case 10: return 'Optimism'
+      case 8453: return 'Base'
+      case 56: return 'BSC'
+      case 250: return 'Fantom'
+      case 43114: return 'Avalanche'
+      default: 
+        console.log('Unknown chainId:', chainId)
+        return 'Unknown'
     }
   }
 
@@ -269,13 +277,39 @@ i
                 {isWrongNetwork && (
                   <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
                     <div className="text-xs font-mono text-yellow-700 uppercase tracking-wider mb-2">⚠️ NETWORK WARNING</div>
-                    <div className="text-sm text-yellow-800">
+                    <div className="text-sm text-yellow-800 mb-3">
                       RecallOS works best on Sepolia testnet. Please switch to Sepolia network for optimal experience.
                     </div>
+                    <button 
+                      onClick={async () => {
+                        try {
+                          if (window.ethereum) {
+                            await window.ethereum.request({
+                              method: 'wallet_switchEthereumChain',
+                              params: [{ chainId: '0xaa36a7' }],
+                            })
+                          }
+                        } catch (error) {
+                          console.error('Failed to switch network:', error)
+                        }
+                      }}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
+                    >
+                      Switch to Sepolia
+                    </button>
                   </div>
                 )}
 
-                <div className="flex space-x-3">
+                <div className="flex space-x-2">
+                  <button
+                    onClick={async () => {
+                      await refreshBalance()
+                    }}
+                    className="px-3 py-3 text-sm font-mono uppercase tracking-wide border border-gray-300 bg-white hover:bg-gray-50 hover:border-gray-500 text-gray-600 hover:text-gray-700 transition-all duration-200"
+                    title="Refresh balance"
+                  >
+                    🔄
+                  </button>
                   <button
                     onClick={() => {
                       setShowWalletModal(false)
