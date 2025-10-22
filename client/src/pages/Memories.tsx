@@ -9,6 +9,8 @@ import { MemoryMesh3D } from '@/components/MemoryMesh3D'
 import { useBlockscout } from '@/hooks/useBlockscout'
 import { TransactionStatusIndicator } from '@/components/TransactionStatusIndicator'
 import { HyperIndexPanel } from '@/components/HyperIndexPanel'
+import { HyperIndexService } from '@/services/hyperindexService'
+import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
 
 const MemoryCard: React.FC<{
@@ -20,7 +22,12 @@ const MemoryCard: React.FC<{
     search_type?: 'keyword' | 'semantic' | 'hybrid'
     blended_score?: number
   }
-}> = ({ memory, isSelected, onSelect, onViewTransaction, searchResult }) => {
+  hyperIndexData?: {
+    blockNumber?: string
+    gasUsed?: string
+    gasPrice?: string
+  }
+}> = ({ memory, isSelected, onSelect, onViewTransaction, searchResult, hyperIndexData }) => {
   const getSourceColorLocal = (source?: string) => {
     const s = (source || '').toLowerCase()
     if (s.includes('extension') || s.includes('browser')) return '#0ea5e9'
@@ -75,6 +82,12 @@ const MemoryCard: React.FC<{
         <span>{memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'No date'}</span>
         <span>•</span>
         <span className="uppercase">{memory.source}</span>
+        {hyperIndexData?.blockNumber && (
+          <>
+            <span>•</span>
+            <span className="text-blue-600">Block {hyperIndexData.blockNumber}</span>
+          </>
+        )}
       </div>
       
       {(memory.summary || memory.content) && (
@@ -91,7 +104,13 @@ const MemoryDetails: React.FC<{
   expandedContent: boolean
   setExpandedContent: (expanded: boolean) => void
   onViewTransaction?: (txHash: string, network: string) => void
-}> = ({ memory, expandedContent, setExpandedContent, onViewTransaction }) => {
+  hyperIndexData?: {
+    blockNumber?: string
+    gasUsed?: string
+    gasPrice?: string
+    timestamp?: string
+  }
+}> = ({ memory, expandedContent, setExpandedContent, onViewTransaction, hyperIndexData }) => {
   if (!memory) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -224,6 +243,42 @@ const MemoryDetails: React.FC<{
           </div>
         )}
 
+        {hyperIndexData && (
+          <div className="mb-6">
+            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[BLOCKCHAIN DATA]</h4>
+            <div className="bg-blue-50 border border-blue-200 p-3 sm:p-4">
+              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                {hyperIndexData.blockNumber && (
+                  <div>
+                    <div className="text-gray-500 uppercase tracking-wide">Block</div>
+                    <div className="text-gray-900 font-semibold">{hyperIndexData.blockNumber}</div>
+                  </div>
+                )}
+                {hyperIndexData.gasUsed && (
+                  <div>
+                    <div className="text-gray-500 uppercase tracking-wide">Gas Used</div>
+                    <div className="text-gray-900 font-semibold">{hyperIndexData.gasUsed}</div>
+                  </div>
+                )}
+                {hyperIndexData.gasPrice && (
+                  <div>
+                    <div className="text-gray-500 uppercase tracking-wide">Gas Price</div>
+                    <div className="text-gray-900 font-semibold">{hyperIndexData.gasPrice}</div>
+                  </div>
+                )}
+                {hyperIndexData.timestamp && (
+                  <div>
+                    <div className="text-gray-500 uppercase tracking-wide">Block Time</div>
+                    <div className="text-gray-900 font-semibold">
+                      {new Date(parseInt(hyperIndexData.timestamp) * 1000).toLocaleString()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {memory.page_metadata && (
           <div className="mb-6">
             <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[METADATA]</h4>
@@ -262,6 +317,8 @@ export const Memories: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [showOnlyCited, setShowOnlyCited] = useState(true)
+  const [hyperIndexData, setHyperIndexData] = useState<Record<string, any>>({})
+  const [isLoadingHyperIndex, setIsLoadingHyperIndex] = useState(false)
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -276,6 +333,35 @@ export const Memories: React.FC = () => {
     return () => window.removeEventListener('resize', update)
   }, [])
 
+  const fetchHyperIndexData = useCallback(async (memoriesData: Memory[]) => {
+    if (!address || memoriesData.length === 0) return
+    
+    setIsLoadingHyperIndex(true)
+    try {
+      const hyperIndexMemories = await HyperIndexService.getUserMemoryEvents(address, 100)
+      const hyperIndexMap: Record<string, any> = {}
+      
+      // Map HyperIndex data by memory hash or transaction hash
+      hyperIndexMemories.forEach(hiMemory => {
+        const key = hiMemory.hash || hiMemory.transactionHash
+        if (key) {
+          hyperIndexMap[key] = {
+            blockNumber: hiMemory.blockNumber,
+            gasUsed: hiMemory.gasUsed,
+            gasPrice: hiMemory.gasPrice,
+            timestamp: hiMemory.timestamp
+          }
+        }
+      })
+      
+      setHyperIndexData(hyperIndexMap)
+    } catch (err) {
+      console.error('Error fetching HyperIndex data:', err)
+    } finally {
+      setIsLoadingHyperIndex(false)
+    }
+  }, [address])
+
   const fetchMemories = useCallback(async () => {
     if (!address) return
     
@@ -286,6 +372,11 @@ export const Memories: React.FC = () => {
       const memoriesData = await MemoryService.getMemoriesWithTransactionDetails(address)
       
       setMemories(memoriesData || [])
+      
+      // Fetch HyperIndex data in parallel
+      if (memoriesData && memoriesData.length > 0) {
+        fetchHyperIndexData(memoriesData)
+      }
       
       const transactionsToPrefetch = (memoriesData || [])
         .filter(memory => memory.tx_hash && memory.tx_hash.startsWith('0x'))
@@ -306,7 +397,7 @@ export const Memories: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [address, prefetchTransaction])
+  }, [address, prefetchTransaction, fetchHyperIndexData])
 
   const handleSelectMemory = (memory: Memory) => {
     // Enable memory selection from the list and highlight in mesh
@@ -785,6 +876,7 @@ export const Memories: React.FC = () => {
               <div className="space-y-2">
                 {(currentMemories || []).map((memory) => {
                   const searchResult = currentResults?.find(r => r.memory.id === memory.id)
+                  const memoryHyperIndexData = hyperIndexData[memory.tx_hash || memory.id]
                   return (
                     <MemoryCard
                       key={memory.id}
@@ -793,6 +885,7 @@ export const Memories: React.FC = () => {
                       onSelect={handleSelectMemory}
                       onViewTransaction={handleViewTransaction}
                       searchResult={searchResult}
+                      hyperIndexData={memoryHyperIndexData}
                     />
                   )
                 })}
@@ -826,6 +919,7 @@ export const Memories: React.FC = () => {
               expandedContent={expandedContent}
               setExpandedContent={setExpandedContent}
               onViewTransaction={handleViewTransaction}
+              hyperIndexData={selectedMemory ? hyperIndexData[selectedMemory.tx_hash || selectedMemory.id] : undefined}
             />
           </div>
         )}
@@ -864,9 +958,15 @@ export const Memories: React.FC = () => {
       {/* Gas Deposit Section */}
       
 
-      {/* HyperIndex Panel */}
-      <div className="fixed bottom-4 right-4 w-96 max-h-96 z-40">
-        <HyperIndexPanel userAddress={address} />
+      {/* HyperIndex Link */}
+      <div className="fixed bottom-4 right-4 z-40">
+        <button
+          onClick={() => window.location.href = '/hyperindex'}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg transition-colors flex items-center gap-2 text-sm font-mono uppercase tracking-wide"
+        >
+          <Database className="w-4 h-4" />
+          HyperIndex
+        </button>
       </div>
 
     </div>

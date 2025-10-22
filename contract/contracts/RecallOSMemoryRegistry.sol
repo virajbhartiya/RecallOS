@@ -36,6 +36,8 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
 
     function initialize() public initializer {
         __Ownable_init(msg.sender);
+        authorizedRelayers[msg.sender] = true;
+        emit RelayerAuthorized(msg.sender, true);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
