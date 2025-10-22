@@ -2,13 +2,21 @@ import React, { useState, useCallback } from 'react'
 import { useWallet } from '../contexts/WalletContext'
 import { MemorySearch } from '../components/MemorySearch'
 import { MemoryService } from '../services/memoryService'
+import { HyperIndexService } from '../services/hyperindexService'
 import { LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
+import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse, SearchResult } from '../types/memory'
 
 const SearchResultCard: React.FC<{ 
   result: SearchResult
-  onClick: (memory: Memory) => void 
-}> = ({ result, onClick }) => {
+  onClick: (memory: Memory) => void
+  hyperIndexData?: {
+    blockNumber?: string
+    gasUsed?: string
+    gasPrice?: string
+    timestamp?: string
+  }
+}> = ({ result, onClick, hyperIndexData }) => {
   const memory = result.memory
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -66,6 +74,15 @@ const SearchResultCard: React.FC<{
                 </span>
               </>
             )}
+            {hyperIndexData?.blockNumber && (
+              <>
+                <span>•</span>
+                <span className="text-blue-600 flex items-center gap-1">
+                  <Database className="w-3 h-3" />
+                  Block {hyperIndexData.blockNumber}
+                </span>
+              </>
+            )}
           </div>
         </div>
         <div className="flex items-center space-x-2">
@@ -82,6 +99,37 @@ const SearchResultCard: React.FC<{
         <p className="text-sm text-gray-700 mb-3 line-clamp-2">
           {memory.summary}
         </p>
+      )}
+
+      {hyperIndexData && (
+        <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs font-mono">
+          <div className="flex items-center gap-2 mb-1">
+            <Database className="w-3 h-3 text-blue-600" />
+            <span className="text-blue-800 font-semibold">BLOCKCHAIN DATA</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-gray-700">
+            {hyperIndexData.blockNumber && (
+              <div>
+                <span className="text-gray-500">Block:</span> {hyperIndexData.blockNumber}
+              </div>
+            )}
+            {hyperIndexData.gasUsed && (
+              <div>
+                <span className="text-gray-500">Gas:</span> {hyperIndexData.gasUsed}
+              </div>
+            )}
+            {hyperIndexData.gasPrice && (
+              <div>
+                <span className="text-gray-500">Price:</span> {hyperIndexData.gasPrice}
+              </div>
+            )}
+            {hyperIndexData.timestamp && (
+              <div>
+                <span className="text-gray-500">Time:</span> {new Date(parseInt(hyperIndexData.timestamp) * 1000).toLocaleString()}
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       {memory.url && memory.url !== 'unknown' && (
@@ -120,6 +168,37 @@ export const Search: React.FC = () => {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [showOnlyCited, setShowOnlyCited] = useState(true)
+  const [hyperIndexData, setHyperIndexData] = useState<Record<string, any>>({})
+  const [isLoadingHyperIndex, setIsLoadingHyperIndex] = useState(false)
+
+  const fetchHyperIndexData = useCallback(async (memories: Memory[]) => {
+    if (!address || memories.length === 0) return
+    
+    setIsLoadingHyperIndex(true)
+    try {
+      const hyperIndexMemories = await HyperIndexService.getUserMemoryEvents(address, 100)
+      const hyperIndexMap: Record<string, any> = {}
+      
+      // Map HyperIndex data by memory hash or transaction hash
+      hyperIndexMemories.forEach(hiMemory => {
+        const key = hiMemory.hash || hiMemory.transactionHash
+        if (key) {
+          hyperIndexMap[key] = {
+            blockNumber: hiMemory.blockNumber,
+            gasUsed: hiMemory.gasUsed,
+            gasPrice: hiMemory.gasPrice,
+            timestamp: hiMemory.timestamp
+          }
+        }
+      })
+      
+      setHyperIndexData(hyperIndexMap)
+    } catch (err) {
+      console.error('Error fetching HyperIndex data:', err)
+    } finally {
+      setIsLoadingHyperIndex(false)
+    }
+  }, [address])
 
   const handleSearch = useCallback(async (
     query: string, 
@@ -154,13 +233,19 @@ export const Search: React.FC = () => {
       }
 
       setSearchResults(response)
+      
+      // Fetch HyperIndex data for search results
+      if (response.results && response.results.length > 0) {
+        const memories = response.results.map(r => r.memory)
+        fetchHyperIndexData(memories)
+      }
     } catch (err) {
       setError('Failed to search memories')
       console.error('Error searching memories:', err)
     } finally {
       setIsLoading(false)
     }
-  }, [address])
+  }, [address, fetchHyperIndexData])
 
   const handleClearFilters = useCallback(() => {
     setSearchResults(null)
@@ -344,13 +429,17 @@ export const Search: React.FC = () => {
 
               {/* Results Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {getFilteredResults().map((result) => (
-                  <SearchResultCard
-                    key={result.memory.id}
-                    result={result}
-                    onClick={handleSelectMemory}
-                  />
-                ))}
+                {getFilteredResults().map((result) => {
+                  const memoryHyperIndexData = hyperIndexData[result.memory.tx_hash || result.memory.id]
+                  return (
+                    <SearchResultCard
+                      key={result.memory.id}
+                      result={result}
+                      onClick={handleSelectMemory}
+                      hyperIndexData={memoryHyperIndexData}
+                    />
+                  )
+                })}
               </div>
             </>
           )}
