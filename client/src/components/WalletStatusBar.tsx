@@ -9,7 +9,6 @@ export const WalletStatusBar: React.FC<WalletStatusBarProps> = ({ className = ''
   const { isConnected, address, chainId, gasBalance } = useWallet()
 
   const getNetworkName = (chainId: number | null) => {
-    console.log('Getting network name for chainId:', chainId)
     switch (chainId) {
       case 11155111: return 'Sepolia'
       case 1: return 'Ethereum'

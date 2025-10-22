@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma';
-
 import { aiProvider } from './aiProvider';
+import { UMAP } from 'umap-js';
 
 export class MemoryMeshService {
   private relationshipCache = new Map<string, any>();
@@ -1082,6 +1082,78 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     return nodes;
   }
 
+  private async computeLatentSpaceProjection(memories: any[]): Promise<Map<string, { x: number; y: number }>> {
+    try {
+      // Extract embeddings for memories that have them
+      const memoriesWithEmbeddings = memories.filter(m => m.embeddings && m.embeddings.length > 0);
+      
+      if (memoriesWithEmbeddings.length < 3) {
+        // Not enough data for UMAP, use fallback positioning
+        return new Map();
+      }
+
+      // Get content embeddings (prefer content type, fallback to any)
+      const embeddingData: { id: string; vector: number[] }[] = [];
+      for (const memory of memoriesWithEmbeddings) {
+        const contentEmb = memory.embeddings.find((e: any) => e.embedding_type === 'content');
+        const embedding = contentEmb || memory.embeddings[0];
+        if (embedding && embedding.vector) {
+          embeddingData.push({ id: memory.id, vector: embedding.vector });
+        }
+      }
+
+      if (embeddingData.length < 3) {
+        return new Map();
+      }
+
+      // Create embedding matrix for UMAP
+      const embeddingMatrix = embeddingData.map(e => e.vector);
+
+      // Configure UMAP for latent space visualization with better clustering
+      const umap = new UMAP({
+        nComponents: 2,
+        nEpochs: 400, // More epochs for better convergence
+        nNeighbors: Math.min(10, Math.max(3, Math.floor(embeddingMatrix.length / 3))), // Fewer neighbors = tighter clusters
+        minDist: 0.1, // Smaller minDist = tighter packing, clearer clusters
+        spread: 1.5, // Smaller spread = more compact clusters
+        random: Math.random
+      });
+
+      console.log(`Running UMAP projection on ${embeddingMatrix.length} embeddings...`);
+      const projection = umap.fit(embeddingMatrix);
+
+      // Normalize coordinates to a reasonable range and center at origin
+      const coords = projection.map(p => ({ x: p[0], y: p[1] }));
+      
+      // Find bounds
+      const xCoords = coords.map(c => c.x);
+      const yCoords = coords.map(c => c.y);
+      const xMin = Math.min(...xCoords);
+      const xMax = Math.max(...xCoords);
+      const yMin = Math.min(...yCoords);
+      const yMax = Math.max(...yCoords);
+      
+      // Scale and center
+      const scale = 1200; // Scale to fit viewport
+      const normalized = coords.map(c => ({
+        x: ((c.x - xMin) / (xMax - xMin) - 0.5) * scale,
+        y: ((c.y - yMin) / (yMax - yMin) - 0.5) * scale
+      }));
+
+      // Create map of memory ID to coordinates
+      const coordMap = new Map<string, { x: number; y: number }>();
+      embeddingData.forEach((data, index) => {
+        coordMap.set(data.id, normalized[index]);
+      });
+
+      console.log(`Latent space projection complete: ${coordMap.size} coordinates computed`);
+      return coordMap;
+    } catch (error) {
+      console.error('Error computing latent space projection:', error);
+      return new Map();
+    }
+  }
+
   async getMemoryMesh(userId: string, limit: number = 50, similarityThreshold: number = 0.4): Promise<any> {
     try {
       const memories = await prisma.memory.findMany({
@@ -1115,19 +1187,26 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         take: limit,
       });
 
-      // Create nodes from memories with grid-based initial positioning
+      // Compute latent space projection using UMAP on embeddings
+      const latentCoords = await this.computeLatentSpaceProjection(memories);
+
+      // Create nodes from memories with latent space positioning
       const nodes = memories.map((memory: any, index: number) => {
-        // Use a grid-based distribution instead of circular
-        const gridSize = Math.ceil(Math.sqrt(memories.length));
-        const row = Math.floor(index / gridSize);
-        const col = index % gridSize;
+        let x, y;
         
-        // Add randomness and relationship-based offset
-        const baseX = (col - gridSize / 2) * 200 + (Math.random() - 0.5) * 150;
-        const baseY = (row - gridSize / 2) * 200 + (Math.random() - 0.5) * 150;
-        
-        // Offset based on source type to create natural clusters
-        const sourceOffset = this.getSourceOffset(memory.source || 'on_chain');
+        // Use latent space coordinates if available
+        if (latentCoords.has(memory.id)) {
+          const coords = latentCoords.get(memory.id)!;
+          x = coords.x;
+          y = coords.y;
+        } else {
+          // Fallback: grid-based distribution for memories without embeddings
+          const gridSize = Math.ceil(Math.sqrt(memories.length));
+          const row = Math.floor(index / gridSize);
+          const col = index % gridSize;
+          x = (col - gridSize / 2) * 200 + (Math.random() - 0.5) * 100;
+          y = (row - gridSize / 2) * 200 + (Math.random() - 0.5) * 100;
+        }
         
         return {
           id: memory.id,
@@ -1136,56 +1215,146 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           memory_id: memory.id,
           title: memory.title,
           summary: memory.summary,
-          importance_score: memory.related_memories.length / 10, // Normalize to 0-1
-          x: baseX + sourceOffset.x,
-          y: baseY + sourceOffset.y,
-          // Add layout hints for frontend
+          importance_score: memory.importance_score || (memory.related_memories.length / 10),
+          x,
+          y,
+          hasEmbedding: latentCoords.has(memory.id),
+          clusterId: undefined as number | undefined,
           layout: {
-            preferredPosition: {
-              x: baseX + sourceOffset.x,
-              y: baseY + sourceOffset.y,
-            },
+            isLatentSpace: latentCoords.has(memory.id),
             cluster: memory.source || 'on_chain',
             centrality: memory.related_memories.length,
           }
         };
       });
 
-      // Create edges from relationships - only include high-quality connections
+      // Create edges based on proximity in latent space
       const rawEdges: any[] = [];
-      const nodeIds = new Set(nodes.map(n => n.id));
       
-      memories.forEach((memory: any) => {
-        memory.related_memories.forEach((relation: any) => {
-          // Double-check similarity threshold and ensure both nodes exist
-          if (nodeIds.has(relation.related_memory.id) && 
-              relation.similarity_score >= similarityThreshold) {
-            rawEdges.push({
-              source: memory.id,
-              target: relation.related_memory.id,
-              relation_type: relation.relation_type || 'semantic',
-              similarity_score: relation.similarity_score,
+      // For each node, find its k-nearest neighbors in latent space
+      const k = 5; // Connect to 5 nearest neighbors
+      
+      nodes.forEach((node, i) => {
+        if (!latentCoords.has(node.id)) return; // Skip nodes without embeddings
+        
+        const nodeCoord = latentCoords.get(node.id)!;
+        
+        // Calculate distances to all other nodes
+        const distances: Array<{ targetId: string; distance: number; hasEmbedding: boolean }> = [];
+        
+        nodes.forEach((otherNode, j) => {
+          if (i === j) return; // Skip self
+          
+          if (latentCoords.has(otherNode.id)) {
+            const otherCoord = latentCoords.get(otherNode.id)!;
+            const dx = nodeCoord.x - otherCoord.x;
+            const dy = nodeCoord.y - otherCoord.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            distances.push({
+              targetId: otherNode.id,
+              distance,
+              hasEmbedding: true
             });
           }
         });
+        
+        // Sort by distance and take k nearest
+        distances.sort((a, b) => a.distance - b.distance);
+        const nearest = distances.slice(0, k);
+        
+        // Create edges to nearest neighbors
+        nearest.forEach(({ targetId, distance }) => {
+          // Convert distance to similarity score (closer = higher similarity)
+          const maxDistance = 1200; // Based on our scale
+          const similarityScore = Math.max(0, 1 - (distance / maxDistance));
+          
+          rawEdges.push({
+            source: node.id,
+            target: targetId,
+            relation_type: 'semantic',
+            similarity_score: similarityScore,
+            distance: distance
+          });
+        });
       });
 
-      // Apply mutual kNN pruning and degree caps to avoid full connectivity
-      const edges = this.pruneEdgesMutualKNN(rawEdges, 3, similarityThreshold);
-
-      // Apply force-directed layout for more natural positioning
-      const layoutNodes = this.applyForceDirectedLayout(nodes, edges);
-
-      // Create clusters based on source types
-      const clusters: { [key: string]: string[] } = {};
-      layoutNodes.forEach(node => {
-        if (!clusters[node.type]) {
-          clusters[node.type] = [];
+      // Remove duplicate edges (keep the one with higher similarity)
+      const edgeMap = new Map<string, any>();
+      rawEdges.forEach(edge => {
+        const key = [edge.source, edge.target].sort().join('_');
+        const existing = edgeMap.get(key);
+        if (!existing || edge.similarity_score > existing.similarity_score) {
+          edgeMap.set(key, edge);
         }
-        clusters[node.type].push(node.id);
+      });
+      
+      const edges = Array.from(edgeMap.values()).filter(e => e.similarity_score > 0.1);
+
+      // No force-directed layout needed - using latent space coordinates from UMAP
+      const layoutNodes = nodes;
+
+      // Create clusters based on density in latent space (DBSCAN-like)
+      const clusters: { [key: string]: string[] } = {};
+      const clusterAssignments = new Map<string, number>();
+      let nextClusterId = 0;
+      
+      // Group nodes by proximity in latent space
+      const visited = new Set<string>();
+      const epsilon = 250; // Distance threshold for same cluster
+      const minPoints = 2; // Minimum points to form a cluster
+      
+      layoutNodes.forEach(node => {
+        if (visited.has(node.id) || !latentCoords.has(node.id)) return;
+        
+        visited.add(node.id);
+        const nodeCoord = latentCoords.get(node.id)!;
+        
+        // Find all neighbors within epsilon
+        const neighbors: string[] = [];
+        layoutNodes.forEach(otherNode => {
+          if (node.id === otherNode.id || !latentCoords.has(otherNode.id)) return;
+          
+          const otherCoord = latentCoords.get(otherNode.id)!;
+          const dx = nodeCoord.x - otherCoord.x;
+          const dy = nodeCoord.y - otherCoord.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance <= epsilon) {
+            neighbors.push(otherNode.id);
+          }
+        });
+        
+        // If we have enough neighbors, form a cluster
+        if (neighbors.length >= minPoints) {
+          const clusterId = nextClusterId++;
+          const clusterKey = `cluster_${clusterId}`;
+          clusters[clusterKey] = [node.id, ...neighbors];
+          
+          clusterAssignments.set(node.id, clusterId);
+          neighbors.forEach(nId => {
+            visited.add(nId);
+            clusterAssignments.set(nId, clusterId);
+          });
+        }
+      });
+      
+      // Add cluster info to nodes
+      layoutNodes.forEach(node => {
+        if (clusterAssignments.has(node.id)) {
+          node.clusterId = clusterAssignments.get(node.id);
+        }
       });
 
-      console.log(`Memory mesh generated: ${layoutNodes.length} nodes, ${edges.length} edges (threshold: ${similarityThreshold})`);
+      const nodesWithEmbeddings = layoutNodes.filter(n => n.hasEmbedding).length;
+      const detectedClusters = Object.keys(clusters).length;
+      
+      console.log(`Latent space mesh generated:
+        - Total nodes: ${layoutNodes.length}
+        - Nodes with embeddings (in latent space): ${nodesWithEmbeddings}
+        - Edges (k-NN connections): ${edges.length}
+        - Detected clusters: ${detectedClusters}
+        - Average connections per node: ${layoutNodes.length > 0 ? (edges.length / layoutNodes.length).toFixed(2) : 0}`);
 
       return {
         nodes: layoutNodes,
@@ -1194,8 +1363,12 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         metadata: {
           similarity_threshold: similarityThreshold,
           total_nodes: layoutNodes.length,
+          nodes_in_latent_space: nodesWithEmbeddings,
           total_edges: edges.length,
-          average_connections: layoutNodes.length > 0 ? edges.length / layoutNodes.length : 0
+          detected_clusters: detectedClusters,
+          average_connections: layoutNodes.length > 0 ? edges.length / layoutNodes.length : 0,
+          is_latent_space: nodesWithEmbeddings > 0,
+          projection_method: 'UMAP'
         }
       };
     } catch (error) {
@@ -1421,3 +1594,4 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 }
 
 export const memoryMeshService = new MemoryMeshService();
+
