@@ -693,10 +693,11 @@ export const Memories: React.FC = () => {
 
           {/* Memory List */}
           <div className="flex-1 overflow-y-auto p-3 w-full">
+            <div className="max-w-[268px] mx-auto w-full">
             {isLoading ? (
-              <div className="space-y-2">
+              <div className="space-y-2 w-full flex flex-col items-center">
                 {Array.from({ length: 8 }).map((_, index) => (
-                  <div key={index} className="w-full text-left p-3 bg-gray-100 animate-pulse border border-gray-200">
+                  <div key={index} className="w-[92%] text-left p-3 bg-gray-100 animate-pulse border border-gray-200 mx-auto">
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
@@ -713,33 +714,15 @@ export const Memories: React.FC = () => {
                 ))}
               </div>
             ) : isSearching ? (
-              <div className="space-y-3 w-full">
+              <div className="space-y-3 w-full flex flex-col items-center">
                 {/* Search Status */}
-                <div className="bg-blue-50 border border-blue-200 p-3 rounded w-full">
-                  <div className="flex items-center gap-2 text-sm text-blue-700">
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded w-[92%] mx-auto">
+                  <div className="flex items-center gap-2 text-sm text-blue-700 justify-center">
                     <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
                     <span className="truncate">Querying memories...</span>
                   </div>
                 </div>
-                {/* Search Result Placeholders */}
-                <div className="space-y-2">
-                  {Array.from({ length: 3 }).map((_, index) => (
-                    <div key={index} className="w-full text-left p-3 bg-blue-50 animate-pulse border border-blue-200">
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-200"></div>
-                          <div className="h-3 bg-blue-100 rounded w-32"></div>
-                        </div>
-                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-200"></div>
-                          <div className="h-2 bg-blue-100 rounded w-4"></div>
-                        </div>
-                      </div>
-                      <div className="h-2 bg-blue-100 rounded w-full mb-1"></div>
-                      <div className="h-2 bg-blue-100 rounded w-3/4"></div>
-                    </div>
-                  ))}
-                </div>
+
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
@@ -814,6 +797,7 @@ export const Memories: React.FC = () => {
                 })}
               </div>
             )}
+            </div>
           </div>
         </div>
 
