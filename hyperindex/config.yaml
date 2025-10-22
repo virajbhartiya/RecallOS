@@ -1,0 +1,28 @@
+name: recallos-indexer
+description: "Envio HyperIndex for RecallOS Memory Registry on Sepolia"
+
+schema: "./schema.graphql"
+output: "./generated"
+
+contracts:
+  - name: RecallOSMemoryRegistry
+    abi_file_path: "./abis/RecallOSMemoryRegistry.json"
+    handler: "./src/EventHandlers.ts"
+    events:
+      - event: MemoryStored
+      - event: MemoryBatchStored
+      - event: GasDeposited
+      - event: GasDeducted
+      - event: GasWithdrawn
+      - event: RelayerAuthorized
+
+networks:
+  - id: 11155111
+    rpc: ${SEPOLIA_RPC_URL}
+    start_block: 0
+    contracts:
+      - name: RecallOSMemoryRegistry
+        address: ${CONTRACT_ADDRESS}
+        start_block: 0
+
+preload_handlers: true

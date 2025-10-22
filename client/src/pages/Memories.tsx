@@ -8,6 +8,7 @@ import { SearchService } from '@/services/search'
 import { MemoryMesh3D } from '@/components/MemoryMesh3D'
 import { useBlockscout } from '@/hooks/useBlockscout'
 import { TransactionStatusIndicator } from '@/components/TransactionStatusIndicator'
+import { HyperIndexPanel } from '@/components/HyperIndexPanel'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
 
 const MemoryCard: React.FC<{
@@ -862,6 +863,11 @@ export const Memories: React.FC = () => {
 
       {/* Gas Deposit Section */}
       
+
+      {/* HyperIndex Panel */}
+      <div className="fixed bottom-4 right-4 w-96 max-h-96 z-40">
+        <HyperIndexPanel userAddress={address} />
+      </div>
 
     </div>
   )

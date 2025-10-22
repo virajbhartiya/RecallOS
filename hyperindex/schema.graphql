@@ -1,0 +1,96 @@
+type MemoryStored @entity {
+  id: ID!
+  user: User!
+  hash: Bytes!
+  urlHash: Bytes!
+  timestamp: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+}
+
+type MemoryBatchStored @entity {
+  id: ID!
+  user: User!
+  count: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+}
+
+type GasDeposited @entity {
+  id: ID!
+  user: User!
+  amount: BigInt!
+  newBalance: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+}
+
+type GasDeducted @entity {
+  id: ID!
+  user: User!
+  amount: BigInt!
+  remainingBalance: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+}
+
+type GasWithdrawn @entity {
+  id: ID!
+  user: User!
+  amount: BigInt!
+  newBalance: BigInt!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+}
+
+type RelayerAuthorized @entity {
+  id: ID!
+  relayer: Relayer!
+  authorized: Boolean!
+  blockNumber: BigInt!
+  transactionHash: Bytes!
+  gasUsed: BigInt!
+  gasPrice: BigInt!
+}
+
+type User @entity {
+  id: ID!
+  address: Bytes!
+  totalMemories: BigInt!
+  totalGasDeposited: BigInt!
+  totalGasWithdrawn: BigInt!
+  currentGasBalance: BigInt!
+  firstMemoryTimestamp: BigInt
+  lastMemoryTimestamp: BigInt
+  memories: [MemoryStored!]! @derivedFrom(field: "user")
+  gasDeposits: [GasDeposited!]! @derivedFrom(field: "user")
+  gasWithdrawals: [GasWithdrawn!]! @derivedFrom(field: "user")
+  gasDeductions: [GasDeducted!]! @derivedFrom(field: "user")
+}
+
+type Relayer @entity {
+  id: ID!
+  address: Bytes!
+  authorized: Boolean!
+  authorizationEvents: [RelayerAuthorized!]! @derivedFrom(field: "relayer")
+}
+
+type SystemStats @entity {
+  id: ID!
+  totalMemories: BigInt!
+  totalUsers: BigInt!
+  totalGasDeposited: BigInt!
+  totalGasWithdrawn: BigInt!
+  totalRelayers: BigInt!
+  lastUpdated: BigInt!
+}
