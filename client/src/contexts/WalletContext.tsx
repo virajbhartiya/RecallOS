@@ -53,16 +53,46 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
   }
 
   const fetchGasBalance = useCallback(async () => {
-    if (!address) return
+    if (!address || !window.ethereum) {
+      console.log('fetchGasBalance: No address or ethereum provider')
+      return
+    }
+    
+    console.log('fetchGasBalance: Starting for address:', address)
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/deposit/balance/${address}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success) {
-          setGasBalance(data.data.balance)
-        }
+      // Get contract address
+      const contractAddress =
+        (import.meta.env.VITE_CONTRACT_ADDRESS as string) ||
+        (import.meta.env.VITE_MEMORY_REGISTRY_CONTRACT_ADDRESS as string)
+
+      if (!contractAddress) {
+        console.error('Missing VITE_CONTRACT_ADDRESS in environment')
+        setGasBalance(null)
+        return
       }
+
+      // Call getUserGasBalance(address) function on the smart contract
+      // Function selector: 0xbb383c69 (getUserGasBalance(address))
+      const functionSelector = '0xbb383c69'
+      const addressParam = address.slice(2).padStart(64, '0') // Remove 0x and pad to 64 chars
+      const data = functionSelector + addressParam
+
+      const result = await window.ethereum.request({
+        method: 'eth_call',
+        params: [{
+          to: contractAddress,
+          data: data
+        }, 'latest']
+      }) as string
+
+      console.log('Gas balance call result:', result)
+      
+      // Convert hex result to ETH
+      const balanceWei = parseInt(result, 16)
+      const balanceEth = (balanceWei / Math.pow(10, 18)).toFixed(6)
+      console.log('Gas balance in ETH:', balanceEth)
+      setGasBalance(balanceEth)
     } catch (error) {
       console.error('Error fetching gas balance:', error)
       setGasBalance(null)
@@ -85,6 +115,8 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       }
       const amountWei = (parseFloat(amount) * Math.pow(10, 18)).toString(16)
       
+      // depositGas() is a payable function with no parameters
+      // Function selector: 0xae9bb692 (depositGas())
       const depositGasFunctionSelector = '0xae9bb692'
       
       const txHash = await window.ethereum.request({
@@ -255,6 +287,13 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
       }
     }
   }, [fetchGasBalance])
+
+  // Fetch gas balance when address changes
+  useEffect(() => {
+    if (address) {
+      fetchGasBalance()
+    }
+  }, [address, fetchGasBalance])
 
   const connect = async () => {
     if (isConnecting) {

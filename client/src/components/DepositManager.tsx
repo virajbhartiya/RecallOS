@@ -31,21 +31,39 @@ export const DepositManager: React.FC<DepositManagerProps> = ({ onClose }) => {
     if (address) {
       fetchDepositInfo()
     }
-  }, [address])
+  }, [address, gasBalance])
 
   const fetchDepositInfo = async () => {
     if (!address) return
     
     setIsLoading(true)
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/deposit/info/${address}`)
-      const data = await response.json()
-      
-      if (data.success) {
-        setDepositInfo(data.data)
-      } else {
-        setError('Failed to fetch deposit info')
+      // Get contract address for display
+      const contractAddress =
+        (import.meta.env.VITE_CONTRACT_ADDRESS as string) ||
+        (import.meta.env.VITE_MEMORY_REGISTRY_CONTRACT_ADDRESS as string)
+
+      if (!contractAddress) {
+        setError('Missing contract address configuration')
+        return
       }
+
+      // Create mock deposit info using the gas balance from context
+      const mockDepositInfo: DepositInfo = {
+        balance: gasBalance || '0',
+        contractAddress: contractAddress,
+        gasEstimate: {
+          gasPrice: '20', // 20 gwei
+          estimatedGas: '50000',
+          estimatedCost: '0.001'
+        },
+        recommendations: {
+          minDeposit: '0.001',
+          lowBalanceThreshold: '0.005'
+        }
+      }
+      
+      setDepositInfo(mockDepositInfo)
     } catch (error) {
       console.error('Error fetching deposit info:', error)
       setError('Failed to fetch deposit info')

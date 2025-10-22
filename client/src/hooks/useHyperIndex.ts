@@ -30,11 +30,13 @@ export function useHyperIndex(): UseHyperIndexReturn {
       
       if (available) {
         // Load initial data
+        console.log('Loading system stats and memories...')
         const [stats, memories] = await Promise.all([
           HyperIndexService.getSystemStats(),
           HyperIndexService.getRecentMemoryStoredEvents(10)
         ])
         
+        console.log('System stats loaded:', stats)
         setSystemStats(stats)
         setRecentMemories(memories)
       }
@@ -83,11 +85,13 @@ export function useHyperIndex(): UseHyperIndexReturn {
     if (!isAvailable) return
     
     try {
+      console.log('Refreshing system stats and memories...')
       const [stats, memories] = await Promise.all([
         HyperIndexService.getSystemStats(),
         HyperIndexService.getRecentMemoryStoredEvents(10)
       ])
       
+      console.log('Refreshed system stats:', stats)
       setSystemStats(stats)
       setRecentMemories(memories)
     } catch (err) {
@@ -97,7 +101,7 @@ export function useHyperIndex(): UseHyperIndexReturn {
 
   useEffect(() => {
     checkAvailability()
-  }, [checkAvailability])
+  }, []) // Remove checkAvailability dependency to prevent infinite loops
 
   return {
     isAvailable,
