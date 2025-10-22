@@ -18,11 +18,11 @@ contracts:
 
 networks:
   - id: 11155111
-    rpc: ${SEPOLIA_RPC_URL}
+    rpc: https://eth-sepolia.public.blastapi.io
     start_block: 9400000
     contracts:
       - name: RecallOSMemoryRegistry
-        address: ${CONTRACT_ADDRESS}
+        address: 0x40b55b9634fcf2454c138fa5ed914ac7044f931b
         start_block: 9400000
 
 preload_handlers: true
