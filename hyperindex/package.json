@@ -7,13 +7,29 @@
     "build": "tsc",
     "dev": "envio dev",
     "start": "envio start",
-    "stop": "envio stop"
+    "stop": "envio stop",
+    "codegen": "envio codegen",
+    "test": "node test-integration.js"
   },
   "dependencies": {
-    "envio": "latest"
+    "envio": "^2.31.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0"
-  }
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "keywords": [
+    "envio",
+    "hyperindex",
+    "blockchain",
+    "indexer",
+    "recallos",
+    "memory-registry"
+  ],
+  "author": "RecallOS Team",
+  "license": "MIT"
 }
