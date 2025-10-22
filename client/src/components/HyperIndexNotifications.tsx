@@ -185,6 +185,9 @@ export const HyperIndexNotifications: React.FC<HyperIndexNotificationsProps> = (
               <div className="flex items-center justify-between">
                 <CardTitle className="text-sm font-mono uppercase tracking-wide text-gray-600">
                   Notifications
+                  <span className="ml-2 text-xs font-mono text-purple-600 bg-purple-50 px-2 py-1 border border-purple-200 rounded">
+                    ENVIO
+                  </span>
                 </CardTitle>
                 <div className="flex items-center gap-2">
                   {unreadCount > 0 && (

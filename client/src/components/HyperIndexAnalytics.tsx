@@ -151,6 +151,9 @@ export const HyperIndexAnalytics: React.FC<HyperIndexAnalyticsProps> = ({
             <Badge variant="outline" className="text-xs">
               {getTimeRangeLabel()}
             </Badge>
+            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
+              ENVIO
+            </Badge>
           </div>
           <div className="flex gap-2">
             {(['7d', '30d', '90d'] as const).map((range) => (
