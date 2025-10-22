@@ -20,7 +20,6 @@ export const WalletStatusBar: React.FC<WalletStatusBarProps> = ({ className = ''
       case 250: return 'Fantom'
       case 43114: return 'Avalanche'
       default: 
-        console.log('Unknown chainId:', chainId)
         return 'Unknown'
     }
   }

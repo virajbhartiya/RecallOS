@@ -241,15 +241,12 @@ export class HyperIndexService {
       `
 
       const systemData = await this.executeGraphQLQuery(systemStatsQuery)
-      console.log('SystemStats query result:', systemData)
       
       if (systemData.SystemStats && systemData.SystemStats.length > 0) {
         const systemStats = systemData.SystemStats[0]
-        console.log('Using SystemStats entity:', systemStats)
         
         // If SystemStats shows 0 gas deposits, use fallback calculation
         if (systemStats.totalGasDeposited === '0' || systemStats.totalGasDeposited === '0' || parseInt(systemStats.totalGasDeposited) === 0) {
-          console.log('SystemStats shows 0 gas deposits, using fallback calculation...')
           // Continue to fallback calculation below
         } else {
           return systemStats
@@ -257,7 +254,6 @@ export class HyperIndexService {
       }
 
       // Fallback: Calculate stats from individual events
-      console.log('SystemStats entity not found or shows 0, calculating from events...')
       
       const [memories, gasDeposits, gasWithdrawals, relayers] = await Promise.all([
         this.getRecentMemoryStoredEvents(1000), // Get more memories for accurate count
@@ -266,11 +262,6 @@ export class HyperIndexService {
         this.getAuthorizedRelayers()
       ])
 
-      console.log('=== FALLBACK CALCULATION DEBUG ===')
-      console.log('Gas deposits found:', gasDeposits.length, gasDeposits)
-      console.log('Gas withdrawals found:', gasWithdrawals.length, gasWithdrawals)
-      console.log('Memories found:', memories.length)
-      console.log('Relayers found:', relayers.length)
 
       // Calculate totals
       const totalGasDeposited = gasDeposits.reduce((sum, deposit) => sum + parseInt(deposit.amount), 0)
@@ -278,12 +269,6 @@ export class HyperIndexService {
       const totalGasUsed = totalGasDeposited - totalGasWithdrawn
       const uniqueUsers = new Set(memories.map(m => m.user_id)).size
 
-      console.log('Calculated totals:', {
-        totalGasDeposited,
-        totalGasWithdrawn,
-        totalGasUsed,
-        uniqueUsers
-      })
 
       const fallbackStats = {
         id: 'system',
@@ -296,8 +281,6 @@ export class HyperIndexService {
         lastUpdated: new Date().toISOString()
       }
 
-      console.log('=== FALLBACK STATS RESULT ===')
-      console.log('Returning fallback stats:', fallbackStats)
       return fallbackStats
     } catch (error) {
       console.error('Error fetching system stats:', error)
@@ -325,10 +308,7 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query)
-    console.log('All gas deposits query result:', data)
-    console.log('GasDeposited events found:', data.GasDeposited?.length || 0)
     if (data.GasDeposited && data.GasDeposited.length > 0) {
-      console.log('Sample gas deposit event:', data.GasDeposited[0])
     }
     return data.GasDeposited || []
   }
@@ -375,7 +355,6 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query)
-    console.log('Relayer query result:', data)
     return data.RelayerAuthorized || []
   }
 

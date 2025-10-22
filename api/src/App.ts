@@ -53,11 +53,9 @@ app.use(
 async function testDatabaseConnection() {
   try {
     await prisma.$connect();
-    console.log('Database connected successfully');
 
     const userCount = await prisma.user.count();
 
-    console.log(`Database ready - ${userCount} users in database`);
   } catch (error) {
     console.error('Database connection failed:', error);
     process.exit(1);
@@ -65,7 +63,6 @@ async function testDatabaseConnection() {
 }
 
 server.listen(port, async () => {
-  console.log(`RecallOS Context Capture API is running on port ${port}`);
   await testDatabaseConnection();
   startContentWorker();
 });

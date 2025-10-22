@@ -50,7 +50,6 @@ export class MemoryMeshService {
       }
 
       await Promise.all(embeddingPromises);
-      console.log(`Generated embeddings for memory ${memoryId}`);
     } catch (error) {
       console.error(
         `Error generating embeddings for memory ${memoryId}:`,
@@ -84,7 +83,6 @@ export class MemoryMeshService {
         INSERT INTO memory_embeddings (id, memory_id, embedding, dim, model, created_at)
         VALUES (gen_random_uuid(), ${memoryId}::uuid, ${embeddingArray}::vector, ${embedding.length}, 'text-embedding-004', NOW())
       `;
-      console.log(`Created MemoryEmbedding for memory ${memoryId} (${type})`);
     } catch (error) {
       console.error(
         `Error creating ${type} embedding for memory ${memoryId}:`,
@@ -273,7 +271,6 @@ export class MemoryMeshService {
       const hasMetadata = !!memory.page_metadata;
       const hasContent = !!memory.content;
       if (!hasEmbeddings && !hasMetadata && !hasContent) {
-        console.log(`Skipping relation creation for memory ${memoryId} - no embeddings, metadata, or content`);
         return;
       }
 
@@ -335,7 +332,6 @@ export class MemoryMeshService {
             } catch (createError) {
               // If creation fails due to unique constraint, it means another process created it
               if (createError.code === 'P2002') {
-                console.log(`Relation already exists between ${memoryId} and ${relatedMemory.id}, skipping creation...`);
                 return;
               }
               throw createError;
@@ -360,7 +356,6 @@ export class MemoryMeshService {
         } catch (error) {
           // Handle any other errors
           if (error.code === 'P2002') {
-            console.log(`Relation already exists between ${memoryId} and ${relatedMemory.id}, skipping...`);
             return;
           }
           throw error;
@@ -368,9 +363,6 @@ export class MemoryMeshService {
       });
 
       await Promise.all(relationPromises);
-      console.log(
-        `Created ${filteredRelations.length} memory relations for ${memoryId} (filtered from ${uniqueRelations.length} candidates)`
-      );
     } catch (error) {
       console.error(`Error creating memory relations for ${memoryId}:`, error);
       throw error;
@@ -1119,7 +1111,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         random: Math.random
       });
 
-      console.log(`Running UMAP projection on ${embeddingMatrix.length} embeddings...`);
       const projection = umap.fit(embeddingMatrix);
 
       // Normalize coordinates to a reasonable range and center at origin
@@ -1146,7 +1137,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         coordMap.set(data.id, normalized[index]);
       });
 
-      console.log(`Latent space projection complete: ${coordMap.size} coordinates computed`);
       return coordMap;
     } catch (error) {
       console.error('Error computing latent space projection:', error);
@@ -1349,12 +1339,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       const nodesWithEmbeddings = layoutNodes.filter(n => n.hasEmbedding).length;
       const detectedClusters = Object.keys(clusters).length;
       
-      console.log(`Latent space mesh generated:
-        - Total nodes: ${layoutNodes.length}
-        - Nodes with embeddings (in latent space): ${nodesWithEmbeddings}
-        - Edges (k-NN connections): ${edges.length}
-        - Detected clusters: ${detectedClusters}
-        - Average connections per node: ${layoutNodes.length > 0 ? (edges.length / layoutNodes.length).toFixed(2) : 0}`);
 
       return {
         nodes: layoutNodes,
@@ -1450,10 +1434,8 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
   async processMemoryForMesh(memoryId: string, userId: string): Promise<void> {
     try {
-      console.log(`Processing memory ${memoryId} for mesh integration...`);
       await this.generateEmbeddingsForMemory(memoryId);
       await this.createMemoryRelations(memoryId, userId);
-      console.log(`Successfully processed memory ${memoryId} for mesh`);
     } catch (error) {
       console.error(`Error processing memory ${memoryId} for mesh:`, error);
       throw error;

@@ -9,9 +9,7 @@ import {
   Database, 
   Activity, 
   RefreshCw, 
-  TrendingUp, 
   Users, 
-  Zap, 
   Cpu,
   Network
 } from 'lucide-react'
@@ -41,14 +39,11 @@ export const HyperIndexPage: React.FC = () => {
   useEffect(() => {
     const loadActivityData = async () => {
       try {
-        console.log('Loading activity data...')
         const [memories, relayers] = await Promise.all([
           HyperIndexService.getRecentMemoryStoredEvents(10),
           HyperIndexService.getAuthorizedRelayers()
         ])
         
-        console.log('Fetched memories:', memories.length, memories)
-        console.log('Fetched relayers:', relayers.length, relayers)
         
         // Combine and sort activities
         const activities = [
@@ -56,7 +51,6 @@ export const HyperIndexPage: React.FC = () => {
           ...relayers.map(r => ({ ...r, type: 'relayer' }))
         ].sort((a, b) => parseInt(b.blockNumber) - parseInt(a.blockNumber))
         
-        console.log('Combined activities:', activities.length, activities)
         setRecentActivity(activities.slice(0, 10))
       } catch (error) {
         console.error('Error loading activity data:', error)
@@ -96,7 +90,6 @@ export const HyperIndexPage: React.FC = () => {
   const handleRefresh = async () => {
     setIsRefreshing(true)
     try {
-      console.log('Manual refresh triggered - forcing system stats recalculation')
       await refreshData()
       
       // Reload activity data
@@ -105,15 +98,12 @@ export const HyperIndexPage: React.FC = () => {
         HyperIndexService.getAuthorizedRelayers()
       ])
       
-      console.log('Refresh - Fetched memories:', memories.length, memories)
-      console.log('Refresh - Fetched relayers:', relayers.length, relayers)
       
       const activities = [
         ...memories.map(m => ({ ...m, type: 'memory' })),
         ...relayers.map(r => ({ ...r, type: 'relayer' }))
       ].sort((a, b) => parseInt(b.blockNumber) - parseInt(a.blockNumber))
       
-      console.log('Refresh - Combined activities:', activities.length, activities)
       setRecentActivity(activities.slice(0, 10))
     } catch (error) {
       console.error('Error during refresh:', error)

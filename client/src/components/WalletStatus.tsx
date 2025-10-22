@@ -29,7 +29,6 @@ export const WalletStatus: React.FC<WalletStatusProps> = ({
       case 250: return 'Fantom'
       case 43114: return 'Avalanche'
       default: 
-        console.log('Unknown chainId:', chainId)
         return 'Unknown'
     }
   }

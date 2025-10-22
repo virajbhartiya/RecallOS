@@ -13,7 +13,6 @@ export const startContentWorker = () => {
     const { user_id, raw_text, metadata } = job.data as ContentJobData;
 
     try {
-      console.log(`Processing content for user ${user_id}`);
 
       const summary = await aiProvider.summarizeContent(raw_text, metadata);
 
@@ -22,15 +21,10 @@ export const startContentWorker = () => {
           where: { id: metadata.memory_id },
           data: { summary: summary },
         });
-        console.log(`Updated memory ${metadata.memory_id} with AI summary`);
         await memoryMeshService.generateEmbeddingsForMemory(metadata.memory_id);
-        console.log(`Generated embeddings for memory ${metadata.memory_id}`);
         await memoryMeshService.createMemoryRelations(
           metadata.memory_id,
           user_id
-        );
-        console.log(
-          `Created memory relations for memory ${metadata.memory_id}`
         );
 
         const summaryHash = createHash('sha256').update(summary).digest('hex');
@@ -43,7 +37,6 @@ export const startContentWorker = () => {
             summary_hash: summaryHash,
           },
         });
-        console.log(`Created memory snapshot for memory ${metadata.memory_id}`);
       } else {
         const user = await prisma.user.findUnique({
           where: { id: user_id },
@@ -70,9 +63,6 @@ export const startContentWorker = () => {
             },
           });
 
-          console.log(
-            `Created memory ${memory.id} from queue processing for user ${user_id}`
-          );
           await memoryMeshService.generateEmbeddingsForMemory(memory.id);
           await memoryMeshService.createMemoryRelations(memory.id, user_id);
 
@@ -87,11 +77,9 @@ export const startContentWorker = () => {
               summary_hash: summaryHash,
             },
           });
-          console.log(`Created memory snapshot for memory ${memory.id}`);
         }
       }
 
-      console.log(`Successfully processed content for user ${user_id}`);
 
       return {
         success: true,
@@ -106,12 +94,10 @@ export const startContentWorker = () => {
   });
   
   contentQueue.on('completed', (job: any, result: any) => {
-    console.log(`Job ${job.id} completed:`, result);
   });
   
   contentQueue.on('failed', (job: any, err: any) => {
     console.error(`Job ${job.id} failed:`, err.message);
   });
   
-  console.log('Content processing worker started');
 };

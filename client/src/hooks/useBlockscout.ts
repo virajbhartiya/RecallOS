@@ -125,7 +125,6 @@ export const useBlockscout = () => {
       
       if (response.ok) {
         const txData = await response.json()
-        console.log('Transaction data from Blockscout:', txData)
         
         // Determine status based on transaction data
         let status: TransactionStatus = 'pending'
@@ -249,7 +248,6 @@ export const useBlockscout = () => {
           }))
         })
       })
-      console.log(`Batch prefetch triggered for ${transactions.length} transactions`)
     } catch (error) {
       console.error('Failed to trigger batch prefetch:', error)
     }

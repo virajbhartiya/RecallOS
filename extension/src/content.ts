@@ -87,14 +87,10 @@ function detectPrivacyExtensions(): void {
     if (hasAdBlockers || hasPrivacyElements) {
       privacyExtensionDetected = true;
       privacyExtensionType = 'adblocker';
-      console.log(
-        'RecallOS: Privacy extension detected, enabling compatibility mode'
-      );
     }
     if (document.querySelector('meta[http-equiv="Content-Security-Policy"]')) {
       privacyExtensionDetected = true;
       privacyExtensionType = 'csp';
-      console.log('RecallOS: CSP detected, enabling compatibility mode');
     }
     try {
       const testIframe = document.createElement('iframe');
@@ -104,12 +100,8 @@ function detectPrivacyExtensions(): void {
     } catch (error) {
       privacyExtensionDetected = true;
       privacyExtensionType = 'iframe_restriction';
-      console.log(
-        'RecallOS: Iframe restrictions detected, enabling compatibility mode'
-      );
     }
   } catch (error) {
-    console.log('RecallOS: Error detecting privacy extensions:', error);
   }
 }
 (window as any).pageLoadTime = Date.now();
@@ -118,7 +110,6 @@ detectPrivacyExtensions();
 function extractVisibleText(): string {
   try {
     if (!document.body || !document.body.textContent) {
-      console.log('RecallOS: Document body not accessible, using fallback');
       return document.documentElement?.textContent || document.title || '';
     }
     const walker = document.createTreeWalker(
@@ -135,9 +126,6 @@ function extractVisibleText(): string {
             }
             return NodeFilter.FILTER_ACCEPT;
           } catch (error) {
-            console.log(
-              'RecallOS: Privacy extension blocking style access, accepting node'
-            );
             return NodeFilter.FILTER_ACCEPT;
           }
         },
@@ -152,16 +140,11 @@ function extractVisibleText(): string {
           textNodes.push(text);
         }
       } catch (error) {
-        console.log('RecallOS: Error accessing text content:', error);
         continue;
       }
     }
     return textNodes.join(' ');
   } catch (error) {
-    console.log(
-      'RecallOS: Error in extractVisibleText, using fallback:',
-      error
-    );
     try {
       return (
         document.body?.textContent ||
@@ -170,7 +153,6 @@ function extractVisibleText(): string {
         ''
       );
     } catch (fallbackError) {
-      console.log('RecallOS: Fallback also failed:', fallbackError);
       return document.title || window.location.href;
     }
   }
@@ -178,9 +160,6 @@ function extractVisibleText(): string {
 function extractMeaningfulContent(): string {
   try {
     if (!document.body || !document.body.innerHTML) {
-      console.log(
-        'RecallOS: Document body not accessible for meaningful content extraction'
-      );
       return extractVisibleText();
     }
     const boilerplateSelectors = [
@@ -253,9 +232,6 @@ function extractMeaningfulContent(): string {
     try {
       tempDiv.innerHTML = document.body.innerHTML;
     } catch (error) {
-      console.log(
-        'RecallOS: Error accessing innerHTML, using textContent fallback'
-      );
       tempDiv.textContent = document.body.textContent || '';
     }
     boilerplateSelectors.forEach(selector => {
@@ -263,7 +239,6 @@ function extractMeaningfulContent(): string {
         const elements = tempDiv.querySelectorAll(selector);
         elements.forEach(el => el.remove());
       } catch (error) {
-        console.log('RecallOS: Error removing boilerplate elements:', error);
       }
     });
     const contentSelectors = [
@@ -303,11 +278,6 @@ function extractMeaningfulContent(): string {
           }
         }
       } catch (error) {
-        console.log(
-          'RecallOS: Error querying content selector:',
-          selector,
-          error
-        );
         continue;
       }
     }
@@ -330,23 +300,17 @@ function extractMeaningfulContent(): string {
           meaningfulContent = paragraphs;
         }
       } catch (error) {
-        console.log('RecallOS: Error extracting meaningful elements:', error);
       }
     }
     if (!meaningfulContent) {
       try {
         meaningfulContent = cleanAndExtractText(tempDiv);
       } catch (error) {
-        console.log('RecallOS: Error in fallback extraction:', error);
         meaningfulContent = extractVisibleText();
       }
     }
     return cleanText(meaningfulContent).substring(0, 50000);
   } catch (error) {
-    console.log(
-      'RecallOS: Error in extractMeaningfulContent, using fallback:',
-      error
-    );
     return extractVisibleText();
   }
 }
@@ -358,20 +322,14 @@ function cleanAndExtractText(element: Element): string {
       try {
         el.remove();
       } catch (error) {
-        console.log('RecallOS: Error removing script/style element:', error);
       }
     });
     const text = element.textContent || '';
     return cleanText(text);
   } catch (error) {
-    console.log('RecallOS: Error in cleanAndExtractText:', error);
     try {
       return cleanText(element.textContent || '');
     } catch (fallbackError) {
-      console.log(
-        'RecallOS: Fallback also failed in cleanAndExtractText:',
-        fallbackError
-      );
       return '';
     }
   }
@@ -762,10 +720,6 @@ function captureContext(): ContextData {
       content_quality: extractContentQuality(),
     };
   } catch (error) {
-    console.log(
-      'RecallOS: Error in captureContext, using minimal fallback:',
-      error
-    );
     
     const basicTitle = document.title || 'Untitled Page';
     const basicUrl = window.location.href;
@@ -829,18 +783,15 @@ function isLocalhost(): boolean {
 function sendContextToBackground() {
   try {
     if (!chrome.runtime?.id) {
-      console.log('RecallOS: Extension context invalidated, skipping capture');
       return;
     }
     
     if (isLocalhost()) {
-      console.log('RecallOS: Skipping capture - localhost detected');
       return;
     }
     
     const now = Date.now();
     if (now - lastCaptureTime < MIN_CAPTURE_INTERVAL) {
-      console.log('RecallOS: Skipping capture - too soon since last capture');
       return;
     }
     const contextData = captureContext();
@@ -850,12 +801,10 @@ function sendContextToBackground() {
                            !contextData.content_snippet.includes('Content extraction failed');
     
     if (privacyExtensionDetected && !hasValidContent) {
-      console.log('RecallOS: Privacy extension blocking content capture, skipping backend send');
       return;
     }
     
     if (!hasValidContent) {
-      console.log('RecallOS: Insufficient content captured, skipping backend send');
       return;
     }
     
@@ -864,13 +813,6 @@ function sendContextToBackground() {
       type: privacyExtensionType,
       compatibility_mode: privacyExtensionDetected,
     };
-    console.log('RecallOS: Captured context:', contextData);
-    console.log(
-      'RecallOS: Privacy extension detected:',
-      privacyExtensionDetected,
-      'Type:',
-      privacyExtensionType
-    );
     chrome.runtime.sendMessage(
       { type: 'CAPTURE_CONTEXT', data: contextData },
       response => {
@@ -881,7 +823,6 @@ function sendContextToBackground() {
           );
           return;
         }
-        console.log('RecallOS: Background response:', response);
       }
     );
     lastCaptureTime = now;
@@ -968,9 +909,6 @@ window.addEventListener('message', event => {
     chrome.storage.sync.set(
       { wallet_address: event.data.walletAddress },
       () => {
-        console.log(
-          'RecallOS: Wallet address received and stored from frontend'
-        );
       }
     );
   }
@@ -980,10 +918,6 @@ setInterval(() => {
     const walletAddress = localStorage.getItem('wallet_address');
     if (walletAddress) {
       chrome.storage.sync.set({ wallet_address: walletAddress }, () => {
-        console.log(
-          'RecallOS: Wallet address synced from localStorage:',
-          walletAddress
-        );
       });
     }
   } catch (error) {}
@@ -991,7 +925,6 @@ setInterval(() => {
 chrome.storage.sync.get(['wallet_address'], result => {
   if (result.wallet_address) {
   } else {
-    console.log('RecallOS: No wallet address found in storage');
   }
 });
 function calculateContentHash(content: string): string {
@@ -1285,7 +1218,6 @@ async function getMemorySummary(query: string): Promise<string | null> {
     
     // If we have a job_id but no immediate answer, poll for the result
     if (result.job_id && !result.answer) {
-      console.log('RecallOS: Polling for async search result...');
       
       // Poll for up to 10 seconds (6 attempts with 1.5s intervals)
       for (let i = 0; i < 6; i++) {
@@ -1371,21 +1303,18 @@ async function autoInjectMemories(userText: string): Promise<void> {
       const currentText = getCurrentInputText();
       if (currentText === userText) {
         injectMemorySummary(memorySummary, userText);
-        console.log('RecallOS: Memories injected successfully');
         
         if (recallOSIcon) {
           recallOSIcon.style.color = '#10a37f';
           recallOSIcon.style.animation = 'none';
         }
       } else {
-        console.log('RecallOS: User continued typing, skipping injection');
         if (recallOSIcon) {
           recallOSIcon.style.color = '#8e8ea0';
           recallOSIcon.style.animation = 'none';
         }
       }
     } else {
-      console.log('RecallOS: No memories found');
       if (recallOSIcon) {
         recallOSIcon.style.color = '#8e8ea0';
         recallOSIcon.style.animation = 'none';
@@ -1432,7 +1361,6 @@ function handleTyping(): void {
   
   typingTimeout = setTimeout(async () => {
     if (currentText && currentText.length >= 3 && currentText !== lastTypedText) {
-      console.log('RecallOS: Auto-injecting memories for:', currentText);
       lastTypedText = currentText;
       await autoInjectMemories(currentText);
     }
@@ -1658,14 +1586,12 @@ function setupChatGPTIntegration(): void {
   if (!isChatGPT) return;
   
   if (originalSendHandler) {
-    console.log('RecallOS: Integration already set up, skipping');
     return;
   }
   
   findChatGPTElements();
   
   if (chatGPTInput && !recallOSIcon) {
-    console.log('RecallOS: Attempting to add icon to input area');
     
     const containerSelectors = [
       'div[class*="input"]',
@@ -1683,14 +1609,12 @@ function setupChatGPTIntegration(): void {
       const container = chatGPTInput.closest(selector);
       if (container) {
         inputContainer = container;
-        console.log(`RecallOS: Found container with selector: ${selector}`);
         break;
       }
     }
     
     if (!inputContainer) {
       inputContainer = chatGPTInput.parentElement;
-      console.log('RecallOS: Using parent element as container');
     }
     
     if (inputContainer) {
@@ -1706,11 +1630,9 @@ function setupChatGPTIntegration(): void {
       
       recallOSIcon = createRecallOSIcon();
       inputContainer.appendChild(recallOSIcon);
-      console.log('RecallOS: Icon added to ChatGPT input container');
       
       const ensureIconVisible = () => {
         if (!recallOSIcon || !document.body.contains(recallOSIcon)) {
-          console.log('RecallOS: Icon missing, attempting to recreate');
           
           findChatGPTElements();
           
@@ -1747,7 +1669,6 @@ function setupChatGPTIntegration(): void {
               
               recallOSIcon = createRecallOSIcon();
               newContainer.appendChild(recallOSIcon);
-              console.log('RecallOS: Icon recreated and added');
             }
           }
         }
@@ -1765,7 +1686,6 @@ function setupChatGPTIntegration(): void {
             );
             
             if (iconRemoved) {
-              console.log('RecallOS: Icon was removed by ChatGPT, scheduling recreation');
               setTimeout(() => {
                 if (!recallOSIcon || !document.body.contains(recallOSIcon)) {
                   ensureIconVisible();
@@ -1786,23 +1706,16 @@ function setupChatGPTIntegration(): void {
   }
   
   if (chatGPTInput && !originalSendHandler) {
-    console.log('RecallOS: Setting up ChatGPT auto-injection');
-    console.log('RecallOS: Input element:', chatGPTInput);
-    console.log('RecallOS: Input tag:', chatGPTInput.tagName);
-    console.log('RecallOS: Input contentEditable:', chatGPTInput.contentEditable);
     
     const inputHandler = (e) => {
-      console.log('RecallOS: Input event triggered on', e.target);
       handleTyping();
     };
     
     const keyupHandler = (e) => {
-      console.log('RecallOS: Keyup event triggered on', e.target);
       handleTyping();
     };
     
     const pasteHandler = (e) => {
-      console.log('RecallOS: Paste event triggered on', e.target);
       setTimeout(handleTyping, 100);
     };
     
@@ -1813,7 +1726,6 @@ function setupChatGPTIntegration(): void {
     if (chatGPTInput.contentEditable === 'true') {
       document.addEventListener('input', (e) => {
         if (e.target === chatGPTInput) {
-          console.log('RecallOS: Document input event triggered on contenteditable');
           handleTyping();
         }
       }, true);
@@ -1821,7 +1733,6 @@ function setupChatGPTIntegration(): void {
       const contentObserver = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
           if (mutation.type === 'childList' || mutation.type === 'characterData') {
-            console.log('RecallOS: Contenteditable content changed');
             handleTyping();
           }
         });
@@ -1833,16 +1744,12 @@ function setupChatGPTIntegration(): void {
         characterData: true
       });
       
-      console.log('RecallOS: MutationObserver added for contenteditable');
     }
     
-    console.log('RecallOS: Event listeners added successfully');
     
     originalSendHandler = () => {}; 
   } else if (!chatGPTInput) {
-    console.log('RecallOS: No input element found for auto-injection setup');
   } else if (originalSendHandler) {
-    console.log('RecallOS: Auto-injection already set up');
   }
 }
 
@@ -1893,17 +1800,14 @@ function waitForChatGPTReady(): Promise<void> {
 }
 
 function trySetupImmediately(): void {
-  console.log('RecallOS: Attempting immediate setup');
   setupChatGPTIntegration();
   
   if (!recallOSIcon) {
     setTimeout(() => {
-      console.log('RecallOS: Retry setup after 3 seconds');
       setupChatGPTIntegration();
     }, 3000);
     
     setTimeout(() => {
-      console.log('RecallOS: Final retry setup after 6 seconds');
       setupChatGPTIntegration();
     }, 6000);
   }
@@ -1913,13 +1817,11 @@ function initChatGPTIntegration(): void {
   isChatGPT = detectChatGPT();
   
   if (isChatGPT) {
-    console.log('RecallOS: ChatGPT detected');
     addRecallOSStyles();
     
     trySetupImmediately();
     
     waitForChatGPTReady().then(() => {
-      console.log('RecallOS: ChatGPT is ready, setting up integration');
       setupChatGPTIntegration();
     });
     
@@ -1946,7 +1848,6 @@ function initChatGPTIntegration(): void {
           });
           
           if (hasNewChatElements && !setupTimeout) {
-            console.log('RecallOS: New chat elements detected, scheduling setup');
             setupTimeout = setTimeout(() => {
               setupChatGPTIntegration();
               setupTimeout = null;
@@ -1969,11 +1870,9 @@ function initChatGPTIntegration(): void {
     const retrySetup = () => {
       if (!recallOSIcon && !originalSendHandler && retryCount < maxRetries) {
         retryCount++;
-        console.log(`RecallOS: Retrying setup (attempt ${retryCount}/${maxRetries})...`);
         setupChatGPTIntegration();
         setTimeout(retrySetup, 3000);
       } else if (retryCount >= maxRetries) {
-        console.log('RecallOS: Max retry attempts reached, stopping retries');
       }
     };
     
@@ -1983,7 +1882,6 @@ function initChatGPTIntegration(): void {
     
     const continuousIconMonitor = () => {
       if (!recallOSIcon && isChatGPT) {
-        console.log('RecallOS: Continuous monitor - icon missing, attempting setup');
         setupChatGPTIntegration();
       }
     };
@@ -1993,46 +1891,29 @@ function initChatGPTIntegration(): void {
 }
 
 function debugChatGPTElements(): void {
-  console.log('RecallOS: Debug - ChatGPT elements found:');
-  console.log('- Input element:', chatGPTInput);
-  console.log('- Send button:', chatGPTSendButton);
-  console.log('- Icon element:', recallOSIcon);
-  console.log('- Is ChatGPT detected:', isChatGPT);
   
   if (chatGPTInput) {
-    console.log('- Input container:', chatGPTInput.parentElement);
-    console.log('- Input position:', window.getComputedStyle(chatGPTInput).position);
-    console.log('- Input visibility:', chatGPTInput.offsetParent !== null);
   }
   
   if (recallOSIcon) {
-    console.log('- Icon position:', window.getComputedStyle(recallOSIcon).position);
-    console.log('- Icon visibility:', recallOSIcon.offsetParent !== null);
-    console.log('- Icon display:', window.getComputedStyle(recallOSIcon).display);
   }
 }
 
 (window as any).debugRecallOS = debugChatGPTElements;
 
 (window as any).triggerRecallOS = async () => {
-  console.log('RecallOS: Manual trigger activated');
   const currentText = getCurrentInputText();
-  console.log('RecallOS: Current text:', currentText);
   if (currentText && currentText.length >= 3) {
     await autoInjectMemories(currentText);
   } else {
-    console.log('RecallOS: No text to process');
   }
 };
 
 (window as any).setupRecallOSListeners = () => {
-  console.log('RecallOS: Manually setting up event listeners');
   findChatGPTElements();
   if (chatGPTInput) {
-    console.log('RecallOS: Found input element, adding listeners');
     
     const inputHandler = (e) => {
-      console.log('RecallOS: Manual input event triggered on', e.target);
       handleTyping();
     };
     
@@ -2040,20 +1921,15 @@ function debugChatGPTElements(): void {
     chatGPTInput.addEventListener('keyup', inputHandler, true);
     chatGPTInput.addEventListener('paste', inputHandler, true);
     
-    console.log('RecallOS: Manual event listeners added');
   } else {
-    console.log('RecallOS: No input element found for manual setup');
   }
 };
 
 (window as any).testMemoryInjection = async () => {
-  console.log('RecallOS: Testing memory injection with current input text');
   const currentText = getCurrentInputText();
-  console.log('RecallOS: Current input text:', currentText);
   if (currentText && currentText.length >= 3) {
     await autoInjectMemories(currentText);
   } else {
-    console.log('RecallOS: No text in input field to test with');
   }
 };
 (window as any).testRecallOSSearch = async (query = 'server boilerplates') => {
@@ -2090,7 +1966,6 @@ document.addEventListener('input', (e) => {
     target.closest('[data-testid*="textbox"]') ||
     target.closest('div[contenteditable="true"]')
   )) {
-    console.log('RecallOS: Typing detected in ChatGPT input');
     if (!chatGPTInput || !document.body.contains(chatGPTInput)) {
       chatGPTInput = target as any;
     }

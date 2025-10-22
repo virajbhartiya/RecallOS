@@ -52,7 +52,6 @@ function initializeBlockchain() {
   provider = new ethers.JsonRpcProvider(rpcUrl);
   wallet = new ethers.Wallet(privateKey, provider);
   contract = new ethers.Contract(contractAddress, CONTRACT_ABI, wallet);
-  console.log('Blockchain initialized successfully with relayer wallet:', wallet.address);
 }
 
 try {
@@ -95,7 +94,6 @@ export async function storeMemory(
 
   // Check user's gas balance first
   const userBalance = await contract.getUserGasBalance(userAddress);
-  console.log(`User ${userAddress} gas balance: ${ethers.formatEther(userBalance)} ETH`);
 
   const maxRetries = 3;
   let lastError: Error | null = null;
@@ -104,9 +102,6 @@ export async function storeMemory(
     try {
       const urlHash = hashUrl(url);
 
-      console.log(
-        `Storing memory for user ${userAddress}: hash=${hash}, urlHash=${urlHash}, timestamp=${timestamp} (attempt ${attempt}/${maxRetries})`
-      );
 
       const gasPrice = await provider.getFeeData();
       const bufferMultiplier = 100 + attempt * 20;
@@ -127,9 +122,6 @@ export async function storeMemory(
         );
         gasLimit = (gasLimit * BigInt(120)) / BigInt(100);
       } catch (gasEstimateError) {
-        console.log(
-          `Gas estimation failed, using default: ${gasEstimateError.message}`
-        );
         gasLimit = BigInt(200000);
       }
 
@@ -138,9 +130,6 @@ export async function storeMemory(
         ? gasPriceWithBuffer * gasLimit 
         : BigInt(0);
 
-      console.log(
-        `Using gas price: ${gasPriceWithBuffer?.toString()}, gas limit: ${gasLimit?.toString()}, estimated cost: ${ethers.formatEther(estimatedGasCost)} ETH`
-      );
 
       // Check if user has sufficient balance
       if (userBalance < estimatedGasCost) {
@@ -157,8 +146,6 @@ export async function storeMemory(
       // Get updated user balance after transaction
       const updatedBalance = await contract.getUserGasBalance(userAddress);
 
-      console.log(`Memory stored successfully: ${tx.hash}`);
-      console.log(`User balance after transaction: ${ethers.formatEther(updatedBalance)} ETH`);
 
       return {
         success: true,
@@ -182,7 +169,6 @@ export async function storeMemory(
         error.message.includes('transaction underpriced')
       ) {
         if (attempt < maxRetries) {
-          console.log(`Retrying with higher gas price in 2 seconds...`);
           await new Promise(resolve => setTimeout(resolve, 2000));
           continue;
         }
@@ -212,16 +198,12 @@ export async function storeMemoryBatch(memories: MemoryData[], userAddress: stri
   }
 
   const userBalance = await contract.getUserGasBalance(userAddress);
-  console.log(`User ${userAddress} gas balance: ${ethers.formatEther(userBalance)} ETH`);
 
   const maxRetries = 3;
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(
-        `Storing batch of ${memories.length} memories for user ${userAddress} (attempt ${attempt}/${maxRetries})`
-      );
 
       const hashes = memories.map(m => m.hash);
       const urlHashes = memories.map(m => m.urlHash);
@@ -246,9 +228,6 @@ export async function storeMemoryBatch(memories: MemoryData[], userAddress: stri
         );
         gasLimit = (gasLimit * BigInt(120)) / BigInt(100);
       } catch (gasEstimateError) {
-        console.log(
-          `Gas estimation failed, using default: ${gasEstimateError.message}`
-        );
         gasLimit = BigInt(500000);
       }
 
@@ -257,9 +236,6 @@ export async function storeMemoryBatch(memories: MemoryData[], userAddress: stri
         ? gasPriceWithBuffer * gasLimit 
         : BigInt(0);
 
-      console.log(
-        `Using gas price: ${gasPriceWithBuffer?.toString()}, gas limit: ${gasLimit?.toString()}, estimated cost: ${ethers.formatEther(estimatedGasCost)} ETH`
-      );
 
       if (userBalance < estimatedGasCost) {
         throw new Error(`Insufficient gas deposit. Required: ${ethers.formatEther(estimatedGasCost)} ETH, Available: ${ethers.formatEther(userBalance)} ETH`);
@@ -280,8 +256,6 @@ export async function storeMemoryBatch(memories: MemoryData[], userAddress: stri
       // Get updated user balance after transaction
       const updatedBalance = await contract.getUserGasBalance(userAddress);
 
-      console.log(`Memory batch stored successfully: ${tx.hash}`);
-      console.log(`User balance after transaction: ${ethers.formatEther(updatedBalance)} ETH`);
 
       return {
         success: true,
@@ -306,7 +280,6 @@ export async function storeMemoryBatch(memories: MemoryData[], userAddress: stri
         error.message.includes('transaction underpriced')
       ) {
         if (attempt < maxRetries) {
-          console.log(`Retrying with higher gas price in 2 seconds...`);
           await new Promise(resolve => setTimeout(resolve, 2000));
           continue;
         }

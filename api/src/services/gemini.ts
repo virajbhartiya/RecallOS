@@ -87,7 +87,6 @@ export class GeminiService {
     }
     try {
       this.ai = new GoogleGenAI({ apiKey });
-      console.log('Gemini service initialized successfully');
     } catch (error) {
       console.error('Failed to initialize Gemini service:', error);
       this.ai = null as any;
@@ -110,7 +109,6 @@ export class GeminiService {
   private switchToNextModel(): boolean {
     if (this.currentModelIndex < this.availableModels.length - 1) {
       this.currentModelIndex++;
-      console.log(`Switching to model: ${this.getCurrentModel()}`);
       return true;
     }
     return false;
@@ -118,7 +116,6 @@ export class GeminiService {
 
   private resetToFirstModel(): void {
     this.currentModelIndex = 0;
-    console.log(`Reset to primary model: ${this.getCurrentModel()}`);
   }
 
   private isRateLimitError(err: any): boolean {
@@ -185,14 +182,12 @@ Return clean, readable plain text only.`;
   async generateEmbedding(text: string): Promise<number[]> {
     this.ensureInit();
     
-    console.log('Generating embedding for text:', text.substring(0, 100) + '...');
     
     let lastError: any;
     const originalModelIndex = this.currentModelIndex;
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
-        console.log(`Attempting embedding generation with model: ${this.getCurrentModel()}`);
         const response = await runWithRateLimit(() =>
           this.ai.models.embedContent({
             model: 'text-embedding-004',
@@ -202,7 +197,6 @@ Return clean, readable plain text only.`;
         const values = response.embeddings?.[0]?.values;
         if (!values) throw new Error('No embedding generated from Gemini API');
         
-        console.log('Embedding generated successfully, length:', values.length);
         // Reset to first model on success
         this.resetToFirstModel();
         return values;

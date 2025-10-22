@@ -4,7 +4,6 @@ import { geminiService } from './gemini'
 type Provider = 'gemini' | 'ollama' | 'hybrid'
 
 const provider: Provider = (process.env.AI_PROVIDER as Provider) || 'hybrid'
-console.log('AI Provider configured as:', provider)
 
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
 const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'all-minilm:l6-v2'
@@ -32,7 +31,6 @@ export const aiProvider = {
     }
     
     // Since Ollama embedding models are not working properly, use fallback directly
-    console.log('Using fallback embedding method due to Ollama embedding issues')
     return this.generateFallbackEmbedding(text)
     
     // Keep the original Ollama code commented out for future reference
@@ -50,7 +48,6 @@ export const aiProvider = {
       }
       
       const data: any = await res.json()
-      console.log('Ollama embedding response:', { 
         hasEmbedding: !!data?.embedding, 
         embeddingLength: data?.embedding?.length || 0,
         hasEmbeddings: !!data?.embeddings,
@@ -117,7 +114,6 @@ export const aiProvider = {
       throw new Error('Empty embedding array')
     }
     
-    console.log(`Successfully generated embedding using ${model}`)
     return vec.map((v: any) => Number(v) || 0)
   },
 
