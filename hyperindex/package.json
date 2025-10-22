@@ -1,0 +1,19 @@
+{
+  "name": "recallos-hyperindex",
+  "version": "1.0.0",
+  "description": "Envio HyperIndex for RecallOS Memory Registry",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "envio dev",
+    "start": "envio start",
+    "stop": "envio stop"
+  },
+  "dependencies": {
+    "envio": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

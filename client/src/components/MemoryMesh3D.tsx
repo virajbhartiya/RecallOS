@@ -19,27 +19,27 @@ interface MemoryMesh3DProps {
 }
 
 const nodeColors = {
-  manual: '#4A90E2',
-  on_chain: '#22c55e',
-  onchain: '#22c55e',
-  'on-chain': '#22c55e',
-  browser: '#0ea5e9',
-  extension: '#0ea5e9',
-  reasoning: '#f59e0b',
-  ai: '#f59e0b'
+  manual: '#2563eb',
+  on_chain: '#16a34a',
+  onchain: '#16a34a',
+  'on-chain': '#16a34a',
+  browser: '#0284c7',
+  extension: '#0284c7',
+  reasoning: '#d97706',
+  ai: '#d97706'
 } as Record<string, string>
 
 const resolveNodeColor = (rawType?: string, url?: string): string => {
   const key = (rawType || '').toLowerCase()
   const href = (url || '').toLowerCase()
   if (href) {
-    if (/github\.com|gitlab\.com|bitbucket\.org/.test(href)) return '#6366f1'
-    if (/npmjs\.com|pypi\.org|crates\.io|rubygems\.org/.test(href)) return '#ec4899'
-    if (/docs\.|developer\.|readthedocs|mdn\.|dev\.docs|learn\./.test(href)) return '#a855f7'
-    if (/youtube\.com|youtu\.be|vimeo\.com/.test(href)) return '#ef4444'
-    if (/mail\.google\.com|gmail\.com|outlook\.live\.com/.test(href)) return '#22c55e'
+    if (/github\.com|gitlab\.com|bitbucket\.org/.test(href)) return '#4f46e5'
+    if (/npmjs\.com|pypi\.org|crates\.io|rubygems\.org/.test(href)) return '#db2777'
+    if (/docs\.|developer\.|readthedocs|mdn\.|dev\.docs|learn\./.test(href)) return '#9333ea'
+    if (/youtube\.com|youtu\.be|vimeo\.com/.test(href)) return '#dc2626'
+    if (/mail\.google\.com|gmail\.com|outlook\.live\.com/.test(href)) return '#16a34a'
   }
-  return nodeColors[key] || '#6b7280'
+  return nodeColors[key] || '#374151'
 }
 
 interface MemoryNodeProps {
@@ -66,10 +66,10 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null)
   const [hovered, setHovered] = useState(false)
   
-  // Ultra-small, point-like dots
-  const baseSize = 0.015 + (importance * 0.02)
-  const size = isSelected ? baseSize + 0.005 : isHighlighted ? baseSize + 0.003 : baseSize
-  const opacity = inLatentSpace ? 0.95 : 0.4
+  // More visible dots with better sizing
+  const baseSize = 0.08 + (importance * 0.04)
+  const size = isSelected ? baseSize + 0.02 : isHighlighted ? baseSize + 0.01 : baseSize
+  const opacity = inLatentSpace ? 1.0 : 0.7
   
   useFrame(() => {
     if (meshRef.current) {
@@ -85,7 +85,7 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      <sphereGeometry args={[size, 4, 4]} />
+      <sphereGeometry args={[size, 8, 8]} />
       <meshBasicMaterial
         color={color}
         transparent
@@ -103,16 +103,16 @@ interface MemoryEdgeProps {
   relationType?: string
 }
 
-const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity, relationType }) => {
+const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
   const points = useMemo(() => [
     new THREE.Vector3(...start),
     new THREE.Vector3(...end)
   ], [start, end])
 
-  // Minimal, clean styling: thin, neutral, subtle variation by similarity
-  const opacity = 0.22 + (similarity * 0.12)
-  const lineWidth = 0.9 + (similarity * 0.6)
-  const color = '#cbd5e1'
+  // More visible lines with better contrast
+  const opacity = 0.6 + (similarity * 0.3)
+  const lineWidth = 2.5 + (similarity * 1.5)
+  const color = '#64748b'
 
   return (
     <Line

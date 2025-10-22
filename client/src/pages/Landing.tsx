@@ -124,6 +124,11 @@ export const Landing = () => {
             window.location.href = '/memories'
           }
           break
+        case 'h':
+          if (isConnected) {
+            window.location.href = '/hyperindex'
+          }
+          break
         case 'w': {
           // Trigger wallet modal through WalletStatus component
           const walletButton = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement
@@ -169,12 +174,20 @@ export const Landing = () => {
                 [C] CONSOLE
               </button>
               {isConnected && (
-                <button 
-                  className="text-xs sm:text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
-                  onClick={() => window.location.href = '/memories'}
-                >
-                  [M] MEMORIES
-                </button>
+                <>
+                  <button 
+                    className="text-xs sm:text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                    onClick={() => window.location.href = '/memories'}
+                  >
+                    [M] MEMORIES
+                  </button>
+                  <button 
+                    className="text-xs sm:text-sm font-mono text-blue-600 uppercase tracking-wide hover:text-blue-800 transition-colors cursor-pointer"
+                    onClick={() => window.location.href = '/hyperindex'}
+                  >
+                    [H] HYPERINDEX
+                  </button>
+                </>
               )}
               <WalletStatus variant="compact" showActions={true} />
             </div>

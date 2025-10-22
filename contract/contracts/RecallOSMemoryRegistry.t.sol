@@ -263,7 +263,7 @@ contract RecallOSMemoryRegistryTest is Test {
 
         vm.prank(user1);
         vm.expectEmit(true, true, false, true);
-        emit RecallOSMemoryRegistry.MemoryStored(user1, memoryHash, urlHash, timestamp);
+        emit RecallOSMemoryRegistry.MemoryStored(user1, memoryHash, urlHash, timestamp, 0, 0);
         registry.storeMemory(memoryHash, urlHash, timestamp);
 
         // Test batch event
@@ -280,7 +280,7 @@ contract RecallOSMemoryRegistryTest is Test {
 
         vm.prank(user1);
         vm.expectEmit(true, false, false, true);
-        emit RecallOSMemoryRegistry.MemoryBatchStored(user1, 2);
+        emit RecallOSMemoryRegistry.MemoryBatchStored(user1, 2, 0, 0);
         registry.storeMemoryBatch(hashes, urlHashes, timestamps);
     }
 
