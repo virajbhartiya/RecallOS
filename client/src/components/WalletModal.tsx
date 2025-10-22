@@ -13,7 +13,6 @@ const WalletModal: React.FC<WalletModalProps> = ({ isOpen, onClose }) => {
 
   const handleConnect = async () => {
     if (isConnecting) {
-      console.log('Wallet connection already in progress...')
       return
     }
 

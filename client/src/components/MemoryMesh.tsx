@@ -126,7 +126,6 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
     
     // Debug logging for selected node
     if (isSelected) {
-      console.log('GlyphNode rendering as selected:', data?.memory_id, 'size:', size)
     }
     
     // Reduce opacity for nodes not in latent space
@@ -219,7 +218,6 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
 
   const rfNodes: RFNode[] = useMemo(() => {
     if (!meshData?.nodes?.length) return []
-    console.log('selectedMemoryId:', selectedMemoryId)
     return meshData.nodes.map((n, i) => {
       const sourceType = memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
       const url = memoryUrls && n.memory_id ? memoryUrls[n.memory_id] : undefined
@@ -229,7 +227,6 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
       
       // Debug logging for selected node
       if (isSelected) {
-        console.log('Node is selected:', n.memory_id, 'selectedMemoryId:', selectedMemoryId)
       }
       
       // Check if node is in latent space (has embedding)
@@ -349,7 +346,6 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
   const onNodeClickRF = useCallback((_e: unknown, node: RFNode) => {
     const memoryId = node.data?.memory_id
     if (memoryId && onNodeClick) {
-      console.log('ReactFlow onNodeClick triggered for:', memoryId)
       onNodeClick(memoryId)
     }
   }, [onNodeClick])

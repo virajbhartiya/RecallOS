@@ -14,25 +14,20 @@ async function main() {
     chainType = 'op';
   }
   
-  console.log('Deploying to network:', networkName);
   
   const { viem } = await network.connect({
     network: networkName,
     chainType: chainType,
   });
   
-  console.log('Viem client methods:', Object.getOwnPropertyNames(viem).filter(name => typeof (viem as any)[name] === 'function'));
 
-  console.log('Deploying RecallOSMemoryRegistry...');
 
   // Deploy the implementation contract first
   const implementation = await viem.deployContract('RecallOSMemoryRegistry');
   const implementationAddress = implementation.address;
-  console.log('Implementation deployed at:', implementationAddress);
   
   // Get wallet client for deployment
   const walletClients = await viem.getWalletClients();
-  console.log('Available wallet clients:', walletClients.length);
   
   if (walletClients.length === 0) {
     throw new Error('No wallet clients found. Make sure your private key is configured correctly.');
@@ -41,7 +36,6 @@ async function main() {
   const senderClient = walletClients[0];
   const owner = senderClient.account.address;
   
-  console.log('Deploying proxy with owner:', owner);
   
   // Get the contract ABI to encode the initialize function call
   const contractArtifact = await viem.getContractAt('RecallOSMemoryRegistry', implementationAddress);
@@ -50,7 +44,6 @@ async function main() {
   // The initialize function has no parameters, so we just need the function selector
   const initializeData = '0x8129fc1c'; // This is the function selector for initialize()
   
-  console.log('Initialize data:', initializeData);
   
   // Deploy RecallOSProxy with initialization data and admin
   const proxy = await viem.deployContract('RecallOSProxy', [
@@ -59,11 +52,8 @@ async function main() {
     initializeData
   ]);
   const proxyAddress = proxy.address;
-  console.log('Proxy deployed at:', proxyAddress);
-  console.log('Admin set to:', owner);
   
   // Wait for deployment to be mined
-  console.log('Waiting for deployment to be mined...');
   await new Promise(resolve => setTimeout(resolve, 3000));
   
   // Get contract instance through proxy
@@ -71,22 +61,12 @@ async function main() {
   
   // Verify deployment
   const contractOwner = await registry.read.owner();
-  console.log('Contract owner:', contractOwner);
   
   // Get proxy instance to verify admin
   const proxyContract = await viem.getContractAt('RecallOSProxy', proxyAddress);
   const adminAddress = await proxyContract.read.admin();
-  console.log('Proxy admin:', adminAddress);
   
   // Save deployment info
-  console.log('\nDeployment Summary:');
-  console.log('==================');
-  console.log('Proxy Address:', proxyAddress);
-  console.log('Implementation Address:', implementationAddress);
-  console.log('Admin:', adminAddress);
-  console.log('Owner:', contractOwner);
-  console.log('Network:', networkName);
-  console.log('\nNote: This is a proxy deployment. The proxy address is the main contract address to use.');
 }
 
 main().catch(error => {

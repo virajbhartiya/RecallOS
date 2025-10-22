@@ -8,7 +8,6 @@ import { SearchService } from '@/services/search'
 import { MemoryMesh3D } from '@/components/MemoryMesh3D'
 import { useBlockscout } from '@/hooks/useBlockscout'
 import { TransactionStatusIndicator } from '@/components/TransactionStatusIndicator'
-import { HyperIndexPanel } from '@/components/HyperIndexPanel'
 import { HyperIndexService } from '@/services/hyperindexService'
 import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
@@ -318,7 +317,6 @@ export const Memories: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [showOnlyCited, setShowOnlyCited] = useState(true)
   const [hyperIndexData, setHyperIndexData] = useState<Record<string, any>>({})
-  const [isLoadingHyperIndex, setIsLoadingHyperIndex] = useState(false)
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -336,7 +334,7 @@ export const Memories: React.FC = () => {
   const fetchHyperIndexData = useCallback(async (memoriesData: Memory[]) => {
     if (!address || memoriesData.length === 0) return
     
-    setIsLoadingHyperIndex(true)
+    // setIsLoadingHyperIndex(true)
     try {
       const hyperIndexMemories = await HyperIndexService.getUserMemoryEvents(address, 100)
       const hyperIndexMap: Record<string, any> = {}
@@ -358,7 +356,7 @@ export const Memories: React.FC = () => {
     } catch (err) {
       console.error('Error fetching HyperIndex data:', err)
     } finally {
-      setIsLoadingHyperIndex(false)
+      // setIsLoadingHyperIndex(false)
     }
   }, [address])
 
@@ -386,7 +384,6 @@ export const Memories: React.FC = () => {
         }))
       
       if (transactionsToPrefetch.length > 0) {
-        console.log(`Prefetching ${transactionsToPrefetch.length} transactions`)
         transactionsToPrefetch.forEach(({ txHash, network }) => {
           prefetchTransaction(txHash, network)
         })
@@ -407,8 +404,6 @@ export const Memories: React.FC = () => {
   }
 
   const handleNodeClick = (memoryId: string) => {
-    console.log('handleNodeClick called with:', memoryId)
-    console.log('Setting clickedNodeId to:', memoryId)
     
     // Find the memory information
     const memoryInfo = memories.find(m => m.id === memoryId)
@@ -456,9 +451,7 @@ export const Memories: React.FC = () => {
       const signal = abortControllerRef.current?.signal
 
       // Use the working /api/search endpoint for all searches
-      console.log('Using unified search endpoint for query:', query)
       const response = await MemoryService.searchMemories(address, query, filters, 1, 50, signal)
-      console.log('Search results:', response.results?.length, 'results')
       
       // Set all the response data immediately
       setSearchResults(response)
@@ -474,7 +467,6 @@ export const Memories: React.FC = () => {
       }
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') {
-        console.log('Search request was cancelled')
         return
       }
       setSearchError('Failed to search memories')
@@ -897,7 +889,6 @@ export const Memories: React.FC = () => {
 
         {/* Memory Details Sidebar */}
         {selectedMemory && (() => {
-          console.log('Rendering sidebar for memory:', selectedMemory.id, selectedMemory.title)
           return true
         })() && (
           <div className="fixed inset-y-0 left-0 w-[300px] md:w-[320px] lg:w-[360px] border-r border-gray-200 bg-white/95 backdrop-blur-sm flex flex-col max-h-full z-30 shadow-sm">

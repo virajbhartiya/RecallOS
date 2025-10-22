@@ -42,13 +42,11 @@ export async function setSearchJobResult(id: string, data: { answer?: string; me
       console.error('Search job not found:', id)
       return
     }
-    console.log('Updating search job:', id, 'from status:', job.status, 'to status:', data.status || 'completed')
     job.status = data.status || 'completed'
     if (data.answer !== undefined) job.answer = data.answer
     if (data.meta_summary !== undefined) job.meta_summary = data.meta_summary
     job.expires_at = Date.now() + (60 * 15 * 1000)
     jobStore.set(id, job)
-    console.log('Search job updated successfully:', id, 'status:', job.status)
   } catch (error) {
     console.error('Error updating search job result:', error)
   }
@@ -58,10 +56,8 @@ export async function getSearchJob(id: string): Promise<SearchJob | null> {
   try {
     const job = jobStore.get(id)
     if (!job) {
-      console.log('Search job not found for ID:', id)
       return null
     }
-    console.log('Retrieved search job:', id, 'status:', job.status)
     return job
   } catch (error) {
     console.error('Error retrieving search job:', error)

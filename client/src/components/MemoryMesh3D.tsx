@@ -331,7 +331,6 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
 
   const handleNodeClick = useCallback((memoryId: string) => {
     if (onNodeClick) {
-      console.log('3D MemoryMesh onNodeClick triggered for:', memoryId)
       onNodeClick(memoryId)
     }
   }, [onNodeClick])

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Badge } from './ui/badge'
 import { HyperIndexService } from '../services/hyperindexService'
-import { Bell, X, Activity, Users, Database, TrendingUp, Zap, Clock } from 'lucide-react'
+import { Bell, X, Activity, Database, TrendingUp, Zap, Clock } from 'lucide-react'
 
 interface Notification {
   id: string
@@ -132,13 +131,6 @@ export const HyperIndexNotifications: React.FC<HyperIndexNotificationsProps> = (
     }
   }, [userAddress, lastChecked, isPolling])
 
-  const markAsRead = (notificationId: string) => {
-    setNotifications(prev => 
-      prev.map(notif => 
-        notif.id === notificationId ? { ...notif, read: true } : notif
-      )
-    )
-  }
 
   const markAllAsRead = () => {
     setNotifications(prev => 
@@ -167,22 +159,6 @@ export const HyperIndexNotifications: React.FC<HyperIndexNotificationsProps> = (
     }
   }
 
-  const getNotificationColor = (type: string) => {
-    switch (type) {
-      case 'memory_stored':
-        return 'bg-blue-50 border-blue-200'
-      case 'gas_deposited':
-        return 'bg-green-50 border-green-200'
-      case 'gas_withdrawn':
-        return 'bg-red-50 border-red-200'
-      case 'relayer_authorized':
-        return 'bg-yellow-50 border-yellow-200'
-      case 'system_update':
-        return 'bg-purple-50 border-purple-200'
-      default:
-        return 'bg-gray-50 border-gray-200'
-    }
-  }
 
   const unreadCount = notifications.filter(n => !n.read).length
 

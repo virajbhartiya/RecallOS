@@ -169,12 +169,11 @@ export const Search: React.FC = () => {
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [showOnlyCited, setShowOnlyCited] = useState(true)
   const [hyperIndexData, setHyperIndexData] = useState<Record<string, any>>({})
-  const [isLoadingHyperIndex, setIsLoadingHyperIndex] = useState(false)
 
   const fetchHyperIndexData = useCallback(async (memories: Memory[]) => {
     if (!address || memories.length === 0) return
     
-    setIsLoadingHyperIndex(true)
+    // setIsLoadingHyperIndex(true)
     try {
       const hyperIndexMemories = await HyperIndexService.getUserMemoryEvents(address, 100)
       const hyperIndexMap: Record<string, any> = {}
@@ -196,7 +195,7 @@ export const Search: React.FC = () => {
     } catch (err) {
       console.error('Error fetching HyperIndex data:', err)
     } finally {
-      setIsLoadingHyperIndex(false)
+      // setIsLoadingHyperIndex(false)
     }
   }, [address])
 

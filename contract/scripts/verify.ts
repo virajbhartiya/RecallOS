@@ -22,9 +22,6 @@ async function main() {
     chainType: chainType,
   });
 
-  console.log('🔍 Verifying RecallOSMemoryRegistry Proxy...');
-  console.log('Proxy address:', PROXY_ADDRESS);
-  console.log('Network:', networkName);
 
   try {
     // Get the proxy instance
@@ -34,37 +31,20 @@ async function main() {
     const implementation = await proxy.read.implementation();
     const admin = await proxy.read.admin();
     
-    console.log('\nProxy Information:');
-    console.log('==================');
-    console.log('Implementation address:', implementation);
-    console.log('Admin address:', admin);
     
     // Get the contract instance through proxy
     const contract = await viem.getContractAt('RecallOSMemoryRegistry', PROXY_ADDRESS as `0x${string}`);
     
     // Verify contract functionality
     const owner = await contract.read.owner();
-    console.log('Contract owner:', owner);
     
     // Test a simple read function
     const testAddress = '0x0000000000000000000000000000000000000000';
     const memoryCount = await contract.read.getUserMemoryCount([testAddress]);
-    console.log('Test memory count for zero address:', memoryCount.toString());
     
-    console.log('\n✅ Contract verification successful!');
-    console.log('The proxy is properly configured and the contract is functional.');
     
-    console.log('\nContract Summary:');
-    console.log('=================');
-    console.log('Proxy Address (use this):', PROXY_ADDRESS);
-    console.log('Implementation Address:', implementation);
-    console.log('Admin:', admin);
-    console.log('Owner:', owner);
-    console.log('Network:', networkName);
     
   } catch (error) {
-    console.log('❌ Contract verification failed:', (error as Error).message);
-    console.log('Error details:', error);
     throw error;
   }
 }

@@ -77,7 +77,6 @@ export class SearchService {
     signal?: AbortSignal
   ): Promise<MemorySearchResponse> {
     const data = await this.semanticSearch(wallet, query, limit, false, signal)
-    console.log('Semantic search results:', data.results?.map(r => ({ id: r.memory_id, score: r.score, summary: r.summary?.substring(0, 100) })))
     const results: SearchResult[] = (data.results || [])
       .map((r) => {
         const createdAtIso = new Date(r.timestamp * 1000).toISOString()

@@ -172,7 +172,7 @@ function RecentMemoriesPanel({ memories }: { memories: HyperIndexMemoryStored[] 
                 </Badge>
               </div>
               <div className="text-sm font-mono text-muted-foreground mb-1">
-                User: {memory.user.slice(0, 6)}...{memory.user.slice(-4)}
+                User: {memory.user_id.slice(0, 6)}...{memory.user_id.slice(-4)}
               </div>
               <div className="text-sm font-mono text-muted-foreground mb-1">
                 Hash: {memory.hash.slice(0, 10)}...{memory.hash.slice(-6)}

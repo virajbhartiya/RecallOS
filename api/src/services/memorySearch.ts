@@ -75,7 +75,6 @@ export async function searchMemories(params: {
     try {
       const jobId = (global as any).__currentSearchJobId as string | undefined;
       if (jobId) {
-        console.log('Updating search job status to failed due to embedding timeout:', jobId);
         await setSearchJobResult(jobId, { status: 'failed' });
         (global as any).__currentSearchJobId = undefined;
       }
@@ -299,24 +298,18 @@ ${bullets}`;
     score: r.score,
   }));
 
-  console.log('About to update search job status. Results count:', results.length);
   
   try {
     const jobId = (global as any).__currentSearchJobId as string | undefined;
-    console.log('Search job ID from global:', jobId);
     if (jobId) {
-      console.log('Updating search job result:', jobId, { hasAnswer: !!answer, hasMetaSummary: !!metaSummary, resultsCount: results.length });
       await setSearchJobResult(jobId, { answer, meta_summary: metaSummary, status: 'completed' });
       (global as any).__currentSearchJobId = undefined;
-      console.log('Search job completed successfully:', jobId);
     } else {
-      console.log('No job ID found, skipping job status update');
     }
   } catch (error) {
     console.error('Error updating search job result:', error);
   }
   
-  console.log('Returning search results:', { query: normalized, resultsCount: results.length, hasAnswer: !!answer, hasMetaSummary: !!metaSummary });
   return { query: normalized, results, meta_summary: metaSummary, answer, citations, context };
 }
 

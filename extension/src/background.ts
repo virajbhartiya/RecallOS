@@ -23,16 +23,9 @@ async function getWalletAddress(): Promise<string | null> {
   try {
     const result = await chrome.storage.sync.get(['wallet_address']);
     if (result.wallet_address) {
-      console.log(
-        'RecallOS: Found wallet address in storage:',
-        result.wallet_address
-      );
       return result.wallet_address;
     }
 
-    console.log(
-      'RecallOS: No wallet address found in storage, trying content script...'
-    );
 
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     if (tabs[0]?.id) {
@@ -41,24 +34,15 @@ async function getWalletAddress(): Promise<string | null> {
           type: 'GET_WALLET_ADDRESS',
         });
         if (response?.walletAddress) {
-          console.log(
-            'RecallOS: Found wallet address in content script:',
-            response.walletAddress
-          );
           await chrome.storage.sync.set({
             wallet_address: response.walletAddress,
           });
           return response.walletAddress;
         }
       } catch (error) {
-        console.log(
-          'RecallOS: Could not get wallet address from content script:',
-          error
-        );
       }
     }
 
-    console.log('RecallOS: No wallet address found anywhere');
     return null;
   } catch (error) {
     console.error('RecallOS: Error getting wallet address:', error);
@@ -83,7 +67,6 @@ async function sendToBackend(data: ContextData): Promise<void> {
 
     // Don't send if content is invalid or privacy extensions are blocking
     if (!isValidContent) {
-      console.log('RecallOS: Invalid or blocked content, skipping backend send');
       return;
     }
 
@@ -103,10 +86,6 @@ async function sendToBackend(data: ContextData): Promise<void> {
       },
     };
 
-    console.log('RecallOS: Sending to backend:', payload);
-    console.log('RecallOS: Using endpoint:', apiEndpoint);
-    console.log('RecallOS: Wallet Address:', walletAddress || 'Anonymous');
-    console.log('RecallOS: Privacy conflicts detected:', hasPrivacyConflicts);
 
     const response = await fetch(apiEndpoint, {
       method: 'POST',
@@ -121,14 +100,12 @@ async function sendToBackend(data: ContextData): Promise<void> {
     }
 
     const result = await response.json();
-    console.log('RecallOS: Backend response:', result);
   } catch (error) {
     console.error('RecallOS: Error sending to backend:', error);
   }
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  console.log('RecallOS Context Capture Extension installed.');
 });
 
 chrome.tabs.onActivated.addListener(async activeInfo => {
@@ -137,17 +114,14 @@ chrome.tabs.onActivated.addListener(async activeInfo => {
       type: 'CAPTURE_CONTEXT_NOW',
     });
   } catch (error) {
-    console.log('RecallOS: Could not send message to tab:', error);
   }
 });
 
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
     try {
-      console.log('RecallOS: Tab updated, triggering context capture');
       await chrome.tabs.sendMessage(tabId, { type: 'CAPTURE_CONTEXT_NOW' });
     } catch (error) {
-      console.log('RecallOS: Could not send message to updated tab:', error);
     }
   }
 });
@@ -155,7 +129,6 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 async function setApiEndpoint(endpoint: string): Promise<void> {
   try {
     await chrome.storage.sync.set({ apiEndpoint: endpoint });
-    console.log('RecallOS: API endpoint set to:', endpoint);
   } catch (error) {
     console.error('RecallOS: Error setting API endpoint:', error);
   }
@@ -164,7 +137,6 @@ async function setApiEndpoint(endpoint: string): Promise<void> {
 async function setWalletAddress(walletAddress: string): Promise<void> {
   try {
     await chrome.storage.sync.set({ wallet_address: walletAddress });
-    console.log('RecallOS: Wallet address set to:', walletAddress);
   } catch (error) {
     console.error('RecallOS: Error setting wallet address:', error);
   }

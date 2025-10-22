@@ -129,7 +129,6 @@ blockscoutQueue.process('cleanup-old-pending', async () => {
 })
 
 blockscoutQueue.on('completed', (job) => {
-  console.log(`Blockscout job ${job.id} completed: ${job.name}`)
 })
 
 blockscoutQueue.on('failed', (job, err) => {
@@ -137,13 +136,11 @@ blockscoutQueue.on('failed', (job, err) => {
 })
 
 process.on('SIGINT', async () => {
-  console.log('Shutting down Blockscout worker...')
   await blockscoutQueue.close()
   process.exit(0)
 })
 
 process.on('SIGTERM', async () => {
-  console.log('Shutting down Blockscout worker...')
   await blockscoutQueue.close()
   process.exit(0)
 })

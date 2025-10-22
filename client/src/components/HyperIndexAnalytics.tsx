@@ -46,7 +46,7 @@ export const HyperIndexAnalytics: React.FC<HyperIndexAnalyticsProps> = ({
     setError(null)
     
     try {
-      const [systemStats, recentMemories, userStats, userMemories, userGasDeposits, userGasWithdrawals] = await Promise.all([
+      const [systemStats, recentMemories, , userMemories, userGasDeposits, userGasWithdrawals] = await Promise.all([
         HyperIndexService.getSystemStats(),
         HyperIndexService.getRecentMemoryStoredEvents(50),
         userAddress ? HyperIndexService.getUserStats(userAddress) : null,

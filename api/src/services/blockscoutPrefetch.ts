@@ -184,7 +184,6 @@ export class BlockscoutPrefetchService {
       })
 
       if (existing && existing.finality_reached) {
-        console.log(`Transaction ${txHash} already cached with finality`)
         return
       }
 
@@ -200,7 +199,6 @@ export class BlockscoutPrefetchService {
         }
         if (response.status === 429) {
           // Rate limited, wait and retry
-          console.log(`Rate limited for ${txHash}, waiting 5 seconds...`)
           await new Promise(resolve => setTimeout(resolve, 5000))
           return // Skip this transaction for now, it will be retried later
         }

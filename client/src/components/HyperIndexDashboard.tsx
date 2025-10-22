@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
-import { HyperIndexService } from '../services/hyperindexService'
 import { useHyperIndex, useUserHyperIndex } from '../hooks/useHyperIndex'
-import { ExternalLink, RefreshCw, Activity, Users, Database, TrendingUp, Clock, Zap } from 'lucide-react'
+import { RefreshCw, Activity, Users, Database, TrendingUp, Zap } from 'lucide-react'
 
 interface HyperIndexDashboardProps {
   userAddress: string | null
@@ -22,21 +21,19 @@ export const HyperIndexDashboard: React.FC<HyperIndexDashboardProps> = ({
   const { 
     systemStats, 
     recentMemories, 
-    authorizedRelayers, 
     isLoading: isLoadingSystem,
     error: systemError,
-    refetch: refetchSystem
+    refreshData: refetchSystem
   } = useHyperIndex()
   
   // User-specific data
   const { 
     userStats, 
     userMemories, 
-    userGasDeposits, 
-    userGasWithdrawals,
+    userActivity,
     isLoading: isLoadingUser,
     error: userError,
-    refetch: refetchUser
+    refresh: refetchUser
   } = useUserHyperIndex(userAddress)
 
   const handleRefresh = async () => {
@@ -196,7 +193,7 @@ export const HyperIndexDashboard: React.FC<HyperIndexDashboardProps> = ({
                 <CardContent>
                   {recentMemories && recentMemories.length > 0 ? (
                     <div className="space-y-3">
-                      {recentMemories.slice(0, 5).map((memory, index) => (
+                      {recentMemories.slice(0, 5).map((memory) => (
                         <div key={memory.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center gap-3">
                             <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -308,7 +305,7 @@ export const HyperIndexDashboard: React.FC<HyperIndexDashboardProps> = ({
                       </div>
                     ))}
                     
-                    {userGasDeposits.slice(0, 2).map((deposit) => (
+                    {userActivity.slice(0, 2).map((deposit: any) => (
                       <div key={deposit.id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className="w-2 h-2 bg-green-500 rounded-full"></div>
@@ -390,9 +387,9 @@ export const HyperIndexDashboard: React.FC<HyperIndexDashboardProps> = ({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {authorizedRelayers && authorizedRelayers.length > 0 ? (
+              {false ? (
                 <div className="space-y-3">
-                  {authorizedRelayers.map((relayer) => (
+                  {[].map((relayer: any) => (
                     <div key={relayer.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="flex items-center gap-3">
                         <div className={`w-2 h-2 rounded-full ${relayer.authorized ? 'bg-green-500' : 'bg-red-500'}`}></div>

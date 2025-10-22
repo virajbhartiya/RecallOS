@@ -30,13 +30,7 @@ export class MemoryController {
     try {
       const { content, url, title, userAddress, metadata } = req.body;
 
-      console.log('📥 Processing raw content:', {
-        userAddress,
-        url,
-        title,
-        contentLength: content?.length,
-        metadata,
-      });
+
 
       if (!content || !userAddress) {
         return res.status(400).json({
@@ -58,17 +52,14 @@ export class MemoryController {
         user = await prisma.user.create({
           data: { wallet_address: userAddress.toLowerCase() },
         });
-        console.log(`✅ Created new user: ${user.id}`);
       }
 
-      console.log(`Processing content through AI provider...`);
 
       const [summary, extractedMetadata] = await Promise.all([
         aiProvider.summarizeContent(content, metadata),
         aiProvider.extractContentMetadata(content, metadata),
       ]);
 
-      console.log(`Extracted metadata:`, extractedMetadata);
 
       const memoryHash =
         '0x' + createHash('sha256').update(summary).digest('hex');
@@ -98,7 +89,6 @@ export class MemoryController {
       });
 
       if (existingMemory) {
-        console.log(`Duplicate memory detected for user ${user.id}, skipping creation`);
 
         return res.status(200).json({
           success: true,
@@ -137,7 +127,6 @@ export class MemoryController {
         },
       });
 
-      console.log(`Created memory in database: ${memory.id}`);
 
       const memoryData: MemoryData = {
         hash: memoryHash,
@@ -145,7 +134,6 @@ export class MemoryController {
         timestamp: timestamp,
       };
 
-      console.log(`Storing memory on blockchain...`);
 
       const blockchainResult = await storeMemoryBatch([memoryData], userAddress);
 
@@ -163,9 +151,6 @@ export class MemoryController {
             confirmed_at: new Date(),
           } as any,
         });
-        console.log(
-          `Updated memory with blockchain transaction: ${blockchainResult.txHash}`
-        );
       } else {
         await prisma.memory.update({
           where: { id: memory.id },
@@ -173,7 +158,6 @@ export class MemoryController {
             tx_status: 'failed' as any,
           } as any,
         });
-        console.log(`❌ Blockchain storage failed for memory: ${memory.id}`);
       }
 
       setImmediate(async () => {
@@ -190,7 +174,6 @@ export class MemoryController {
               summary_hash: summaryHash,
             },
           });
-          console.log(`Created memory snapshot for memory ${memory.id}`);
         } catch (snapshotError) {
           console.error(`Error creating snapshot for memory ${memory.id}:`, snapshotError);
         }
@@ -705,7 +688,6 @@ export class MemoryController {
         });
       }
 
-      console.log(`Memory search for: "${query}" for user: ${userAddress}`);
 
       // Use the semantic search functionality
       const searchResults = await searchMemories({
@@ -736,7 +718,6 @@ export class MemoryController {
         }
       }));
 
-      console.log(`Found ${memories.length} memories for query: "${query}"`);
 
       res.status(200).json({
         success: true,
@@ -1098,7 +1079,6 @@ export class MemoryController {
             timestamp: Number(memory.timestamp),
           };
 
-          console.log(`Retrying blockchain storage for memory: ${memory.id}`);
 
           const blockchainResult = await storeMemoryBatch([memoryData], userAddress as string);
 
@@ -1122,7 +1102,6 @@ export class MemoryController {
               status: 'success',
               txHash: blockchainResult.txHash,
             });
-            console.log(`✅ Successfully retried memory: ${memory.id}`);
           } else {
             results.push({
               memoryId: memory.id,
@@ -1347,7 +1326,6 @@ export class MemoryController {
             }
           }
         } catch (error) {
-          console.log('Invalid dateRange format:', error);
         }
       }
 
@@ -1496,7 +1474,6 @@ export class MemoryController {
             }
           }
         } catch (error) {
-          console.log('Invalid dateRange format:', error);
         }
       }
 

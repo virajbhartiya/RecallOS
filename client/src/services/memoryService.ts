@@ -51,9 +51,7 @@ export class MemoryService {
     
     try {
       const response = await getRequest(`${this.baseUrl}/transactions?${params.toString()}`)
-      console.log('Database transactions response:', response)
       const data = response.data?.data
-      console.log('Database transactions data:', data)
       
       // Check if the API returned an error
       if (response.data?.success === false) {
@@ -414,18 +412,15 @@ export class MemoryService {
       console.error('Error fetching insights from database:', error)
       // If user not found (404), try to create the user and then retry
       if (error && typeof error === 'object' && 'response' in error && (error as { response: { status: number } }).response?.status === 404) {
-        console.log('User not found for insights. Attempting to create user record...')
         try {
           // Try to create user by calling the process endpoint with minimal data
-          const createResponse = await postRequest(`${this.baseUrl}/process`, {
+          await postRequest(`${this.baseUrl}/process`, {
             content: 'User initialization',
             url: 'user-init',
             title: 'User Setup',
             userAddress: userAddress,
             metadata: { source: 'manual' }
           })
-          console.log('User creation response for insights:', createResponse)
-          console.log('User created successfully, retrying insights fetch...')
           
           // Retry the original request
           const retryResponse = await getRequest(`${this.baseUrl}/insights?${params.toString()}`)
@@ -488,14 +483,11 @@ export class MemoryService {
 
   static async getRecentMemories(userAddress: string, count: number = 10): Promise<Memory[]> {
     const normalizedAddress = this.normalizeAddress(userAddress)
-    console.log('Fetching recent memories for:', normalizedAddress)
     
     // First try the database endpoint for full data
     try {
       const response = await getRequest(`${this.baseUrl}/transactions?userAddress=${normalizedAddress}&limit=${count}`)
-      console.log('Database memories API response:', response)
       const data = response.data?.data
-      console.log('Database memories data:', data)
       if (Array.isArray(data?.memories) && data.memories.length > 0) {
         return data.memories
       }
@@ -506,9 +498,7 @@ export class MemoryService {
     // Fallback to recent memories endpoint (now returns full database data)
     try {
       const response = await getRequest(`${this.baseUrl}/user/${normalizedAddress}/recent?count=${count}`)
-      console.log('Recent memories API response:', response)
       const data = response.data?.data
-      console.log('Recent memories data:', data)
       
       if (Array.isArray(data?.memories) && data.memories.length > 0) {
         // The API now returns full memory details from database, so we can use them directly
@@ -562,12 +552,9 @@ export class MemoryService {
 
   static async getUserMemoryCount(userAddress: string): Promise<number> {
     const normalizedAddress = this.normalizeAddress(userAddress)
-    console.log('Fetching memory count for:', normalizedAddress)
     try {
       const response = await getRequest(`${this.baseUrl}/user/${normalizedAddress}/count`)
-      console.log('Memory count API response:', response)
       const count = response.data?.data?.memoryCount
-      console.log('Memory count data:', count)
       return typeof count === 'number' ? count : parseInt(count) || 0
     } catch (error) {
       console.error('Error fetching memory count:', error)

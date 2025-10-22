@@ -18,7 +18,6 @@ export const WalletConnectionFlow: React.FC<WalletConnectionFlowProps> = ({
 
   const handleConnect = async () => {
     if (isConnecting) {
-      console.log('Wallet connection already in progress...')
       return
     }
 

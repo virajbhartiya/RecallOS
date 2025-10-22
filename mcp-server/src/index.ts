@@ -22,7 +22,6 @@ async function main() {
     await server.connect(transport)
     // Keep process alive
     // eslint-disable-next-line no-console
-    console.log('RecallOS MCP server listening (HTTP/WebSocket)')
   } else {
     const transport = createStdioTransport()
     await server.connect(transport)
