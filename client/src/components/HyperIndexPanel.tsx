@@ -23,6 +23,9 @@ export function HyperIndexPanel({ userAddress }: HyperIndexPanelProps) {
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
             HyperIndex Status
+            <span className="text-xs font-mono text-purple-600 bg-purple-50 px-2 py-1 border border-purple-200 rounded">
+              ENVIO
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -42,6 +45,9 @@ export function HyperIndexPanel({ userAddress }: HyperIndexPanelProps) {
           <CardTitle className="flex items-center gap-2">
             <Database className="h-5 w-5" />
             HyperIndex Status
+            <span className="text-xs font-mono text-purple-600 bg-purple-50 px-2 py-1 border border-purple-200 rounded">
+              ENVIO
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -71,6 +77,9 @@ export function HyperIndexPanel({ userAddress }: HyperIndexPanelProps) {
           <div className="flex items-center gap-2">
             <Database className="h-5 w-5" />
             HyperIndex Data
+            <span className="text-xs font-mono text-purple-600 bg-purple-50 px-2 py-1 border border-purple-200 rounded">
+              ENVIO
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="bg-green-100 text-green-800">

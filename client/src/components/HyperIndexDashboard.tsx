@@ -73,6 +73,9 @@ export const HyperIndexDashboard: React.FC<HyperIndexDashboardProps> = ({
           <p className="text-sm text-gray-600 mb-4">
             The HyperIndex service is not running or accessible.
           </p>
+          <div className="text-xs font-mono text-purple-600 mb-2">
+            Powered by Envio Indexer
+          </div>
           <button
             onClick={handleRefresh}
             className="text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 px-4 py-2 rounded-lg transition-colors border border-blue-200"
@@ -94,6 +97,9 @@ export const HyperIndexDashboard: React.FC<HyperIndexDashboardProps> = ({
             <h2 className="text-lg font-semibold text-gray-900">HyperIndex Analytics</h2>
             <Badge variant="outline" className="text-xs">
               Live Data
+            </Badge>
+            <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">
+              ENVIO
             </Badge>
           </div>
           <button

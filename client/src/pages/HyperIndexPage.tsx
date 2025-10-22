@@ -163,6 +163,9 @@ export const HyperIndexPage: React.FC = () => {
                 <div className="text-xs font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
                   [LIVE DATA]
                 </div>
+                <div className="text-xs font-mono text-purple-600 uppercase tracking-wide bg-purple-50 px-2 py-1 border border-purple-200">
+                  [ENVIO]
+                </div>
               </div>
             </div>
             <div className="flex items-center flex-wrap gap-2 sm:gap-4">
@@ -190,6 +193,9 @@ export const HyperIndexPage: React.FC = () => {
             <span className="block">HyperIndex</span>
             <span className="block text-2xl sm:text-3xl lg:text-4xl text-gray-600 font-mono font-light mt-2">
               Blockchain Analytics Dashboard
+            </span>
+            <span className="block text-lg sm:text-xl lg:text-2xl text-purple-600 font-mono font-light mt-2">
+              Powered by Envio
             </span>
           </h1>
           <p className="text-xl text-gray-800 leading-relaxed max-w-3xl mx-auto">
@@ -270,6 +276,9 @@ export const HyperIndexPage: React.FC = () => {
             </p>
             <div className="text-xs font-mono text-gray-500">
               indexer.dev.hyperindex.xyz/f04c2db/v1/graphql
+            </div>
+            <div className="text-xs font-mono text-purple-600 mt-1">
+              Powered by Envio Indexer
             </div>
           </div>
 

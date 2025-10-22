@@ -2,6 +2,7 @@
 
 // HyperIndex GraphQL endpoint (deployed Envio indexer)
 const HYPERINDEX_ENDPOINT = 'https://indexer.dev.hyperindex.xyz/f04c2db/v1/graphql' //'http://localhost:8080/v1/graphql'
+// Powered by Envio Indexer
 // const HYPERINDEX_ENDPOINT = 'http://localhost:8080/v1/graphql' //'http://localhost:8080/v1/graphql'
 
 // Types for HyperIndex entities
