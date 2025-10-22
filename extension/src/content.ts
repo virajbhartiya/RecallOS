@@ -1782,13 +1782,7 @@ function setupChatGPTIntegration(): void {
           subtree: true
         });
       }
-    } else {
-      console.log('RecallOS: Could not find any suitable container for icon');
-    }
-  } else if (!chatGPTInput) {
-    console.log('RecallOS: No input element found, cannot add icon');
-  } else if (recallOSIcon) {
-    console.log('RecallOS: Icon already exists, skipping');
+    } 
   }
   
   if (chatGPTInput && !originalSendHandler) {

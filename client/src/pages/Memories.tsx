@@ -5,7 +5,7 @@ import { WalletConnectionFlow } from '@/components/WalletConnectionFlow'
  
 import { MemoryService } from '@/services/memoryService'
 import { SearchService } from '@/services/search'
-import { MemoryMesh } from '@/components/MemoryMesh'
+import { MemoryMesh3D } from '@/components/MemoryMesh3D'
 import { useBlockscout } from '@/hooks/useBlockscout'
 import { TransactionStatusIndicator } from '@/components/TransactionStatusIndicator'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
@@ -308,9 +308,10 @@ export const Memories: React.FC = () => {
   }, [address, prefetchTransaction])
 
   const handleSelectMemory = (memory: Memory) => {
-    // Enable memory selection from the list
+    // Enable memory selection from the list and highlight in mesh
     setSelectedMemory(memory)
     setExpandedContent(false)
+    setClickedNodeId(memory.id)
   }
 
   const handleNodeClick = (memoryId: string) => {
@@ -326,16 +327,16 @@ export const Memories: React.FC = () => {
     
     // Visual feedback - highlight the clicked node
     setClickedNodeId(memoryId)
-    
-    // Clear the highlight after 3 seconds (but keep sidebar open)
-    setTimeout(() => {
-      console.log('Clearing clickedNodeId')
-      setClickedNodeId(null)
-    }, 3000)
   }
 
-  const handleCitationClick = (_memoryId: string) => {
-    // Disabled - no action on citation click
+  const handleCitationClick = (memoryId: string) => {
+    // Select and highlight a memory from citations
+    const memoryInfo = memories.find(m => m.id === memoryId)
+    if (memoryInfo) {
+      setSelectedMemory(memoryInfo)
+      setExpandedContent(false)
+    }
+    setClickedNodeId(memoryId)
   }
 
   
@@ -522,7 +523,7 @@ export const Memories: React.FC = () => {
                 [← HOME]
               </button>
               <div className="text-xs sm:text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
-                [LATENT SPACE]
+                [3D LATENT SPACE]
               </div>
               {/* Mobile toggle for sidebar */}
               <button
@@ -542,16 +543,20 @@ export const Memories: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <div className="flex flex-col md:flex-row h-[calc(100vh-65px)]">
+      <div className="flex flex-col md:flex-row h-[calc(100vh-65px)] relative">
         {/* Left Panel - Memory Mesh */}
         <div className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-auto bg-white border-b md:border-b-0 md:border-r border-gray-200">
-        <MemoryMesh 
+        <MemoryMesh3D 
           userAddress={address || undefined}
           className="w-full h-full"
           onNodeClick={handleNodeClick}
           similarityThreshold={similarityThreshold}
           selectedMemoryId={clickedNodeId || undefined}
-          highlightedMemoryIds={isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory.id) : []}
+          highlightedMemoryIds={[
+            ...(isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory.id) : []),
+            ...(clickedNodeId ? [clickedNodeId] : []),
+            ...(selectedMemory ? [selectedMemory.id] : [])
+          ]}
           memorySources={{
             ...Object.fromEntries(memories.map(m => [m.id, m.source || ''])),
             ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.source || '']))
@@ -566,7 +571,7 @@ export const Memories: React.FC = () => {
         {/* Collapse/Expand Button */}
         <button
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className={`hidden md:block absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-200 border-r-0 rounded-l px-2 py-4 hover:bg-gray-50 transition-all duration-200 shadow-sm`}
+          className={`hidden md:block fixed right-[300px] top-1/2 transform -translate-y-1/2 z-40 bg-white border border-gray-200 border-r-0 rounded-l px-2 py-4 hover:bg-gray-50 transition-all duration-200 shadow-sm ${isSidebarCollapsed ? 'translate-x-[300px]' : ''}`}
         >
           <svg 
             className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${isSidebarCollapsed ? 'rotate-180' : ''}`} 
@@ -578,8 +583,8 @@ export const Memories: React.FC = () => {
           </svg>
         </button>
 
-        {/* Right Panel - Search & Memory List */}
-        <div className={`${isSidebarCollapsed ? 'h-0 md:h-auto w-full md:w-0' : 'h-[50vh] md:h-auto w-full md:w-[360px]'} order-1 md:order-2 border-b md:border-b-0 md:border-l border-gray-200 bg-white flex flex-col transition-all duration-300 overflow-hidden`}> 
+        {/* Right Panel - Search & Memory List (overlay) */}
+        <div className={`fixed inset-y-0 right-0 ${isSidebarCollapsed ? 'translate-x-full' : 'translate-x-0'} w-[300px] md:w-[300px] border-l border-gray-200 bg-white flex flex-col transition-transform duration-300 overflow-hidden z-30 shadow-sm`}> 
           {/* Search Controls */}
           <div className="border-b border-gray-200 bg-gray-50 flex-shrink-0 p-3">
             <div className="flex gap-2">
@@ -817,7 +822,7 @@ export const Memories: React.FC = () => {
           console.log('Rendering sidebar for memory:', selectedMemory.id, selectedMemory.title)
           return true
         })() && (
-          <div className="w-full md:w-[400px] lg:w-[480px] border-l border-gray-200 bg-white flex flex-col max-h-full">
+          <div className="fixed inset-y-0 left-0 w-[300px] md:w-[320px] lg:w-[360px] border-r border-gray-200 bg-white/95 backdrop-blur-sm flex flex-col max-h-full z-30 shadow-sm">
             <div className="px-3 sm:px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-mono uppercase tracking-wide text-gray-600">[MEMORY DETAILS]</h3>
