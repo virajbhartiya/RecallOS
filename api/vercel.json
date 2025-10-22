@@ -14,5 +14,8 @@
       "src": "/(.*)",
       "dest": "dist/App.js"
     }
-  ]
+  ],
+  "env": {
+    "MEMORY_REGISTRY_CONTRACT_ADDRESS": "0xde662d9c6a0bb41ad82b3550177feaf4e43bd602"
+  }
 }

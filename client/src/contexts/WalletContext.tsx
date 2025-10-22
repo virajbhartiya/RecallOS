@@ -75,15 +75,14 @@ export const WalletProvider: React.FC<WalletProviderProps> = ({ children }) => {
     }
 
     try {
-      // Get contract address
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}/api/deposit/address`)
-      const data = await response.json()
-      
-      if (!data.success) {
-        throw new Error('Failed to get contract address')
-      }
+      // Prefer contract address from env for frontend usage
+      const contractAddress =
+        (import.meta.env.VITE_CONTRACT_ADDRESS as string) ||
+        (import.meta.env.VITE_MEMORY_REGISTRY_CONTRACT_ADDRESS as string)
 
-      const contractAddress = data.data.contractAddress
+      if (!contractAddress) {
+        throw new Error('Missing VITE_CONTRACT_ADDRESS in environment')
+      }
       const amountWei = (parseFloat(amount) * Math.pow(10, 18)).toString(16)
       
       const depositGasFunctionSelector = '0xae9bb692'
