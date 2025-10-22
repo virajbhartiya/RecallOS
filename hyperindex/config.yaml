@@ -19,10 +19,10 @@ contracts:
 networks:
   - id: 11155111
     rpc: ${SEPOLIA_RPC_URL}
-    start_block: 0
+    start_block: 9400000
     contracts:
       - name: RecallOSMemoryRegistry
         address: ${CONTRACT_ADDRESS}
-        start_block: 0
+        start_block: 9400000
 
 preload_handlers: true

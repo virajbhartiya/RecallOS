@@ -126,14 +126,13 @@ export class HyperIndexService {
   static async getUserMemoryEvents(userAddress: string, limit: number = 20): Promise<HyperIndexMemoryStored[]> {
     const query = `
       query GetUserMemoryEvents($userAddress: String!, $limit: Int!) {
-        memoryStoreds(
-          where: { user: $userAddress }
-          orderBy: blockNumber
-          orderDirection: desc
-          first: $limit
+        MemoryStored(
+          where: { user_id: { _eq: $userAddress } }
+          limit: $limit
+          order_by: { blockNumber: desc }
         ) {
           id
-          user
+          user_id
           hash
           urlHash
           timestamp
@@ -146,14 +145,14 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query, { userAddress: userAddress.toLowerCase(), limit })
-    return data.memoryStoreds || []
+    return data.MemoryStored || []
   }
 
   // Get user statistics from HyperIndex
   static async getUserStats(userAddress: string): Promise<HyperIndexUser | null> {
     const query = `
       query GetUserStats($userAddress: String!) {
-        user(id: $userAddress) {
+        User(where: { id: { _eq: $userAddress } }) {
           id
           address
           totalMemories
@@ -167,21 +166,20 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query, { userAddress: userAddress.toLowerCase() })
-    return data.user || null
+    return data.User && data.User.length > 0 ? data.User[0] : null
   }
 
   // Get gas deposit events for a user
   static async getUserGasDeposits(userAddress: string, limit: number = 20): Promise<HyperIndexGasDeposited[]> {
     const query = `
       query GetUserGasDeposits($userAddress: String!, $limit: Int!) {
-        gasDepositeds(
-          where: { user: $userAddress }
-          orderBy: blockNumber
-          orderDirection: desc
-          first: $limit
+        GasDeposited(
+          where: { user_id: { _eq: $userAddress } }
+          limit: $limit
+          order_by: { blockNumber: desc }
         ) {
           id
-          user
+          user_id
           amount
           newBalance
           blockNumber
@@ -193,21 +191,20 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query, { userAddress: userAddress.toLowerCase(), limit })
-    return data.gasDepositeds || []
+    return data.GasDeposited || []
   }
 
   // Get gas withdrawal events for a user
   static async getUserGasWithdrawals(userAddress: string, limit: number = 20): Promise<HyperIndexGasWithdrawn[]> {
     const query = `
       query GetUserGasWithdrawals($userAddress: String!, $limit: Int!) {
-        gasWithdrawns(
-          where: { user: $userAddress }
-          orderBy: blockNumber
-          orderDirection: desc
-          first: $limit
+        GasWithdrawn(
+          where: { user_id: { _eq: $userAddress } }
+          limit: $limit
+          order_by: { blockNumber: desc }
         ) {
           id
-          user
+          user_id
           amount
           newBalance
           blockNumber
@@ -219,7 +216,7 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query, { userAddress: userAddress.toLowerCase(), limit })
-    return data.gasWithdrawns || []
+    return data.GasWithdrawn || []
   }
 
   // Get system statistics
@@ -246,13 +243,12 @@ export class HyperIndexService {
   static async getAuthorizedRelayers(): Promise<HyperIndexRelayerAuthorized[]> {
     const query = `
       query GetAuthorizedRelayers {
-        relayerAuthorizeds(
-          where: { authorized: true }
-          orderBy: blockNumber
-          orderDirection: desc
+        RelayerAuthorized(
+          where: { authorized: { _eq: true } }
+          order_by: { blockNumber: desc }
         ) {
           id
-          relayer
+          relayer_id
           authorized
           blockNumber
           transactionHash
@@ -263,19 +259,19 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query)
-    return data.relayerAuthorizeds || []
+    return data.RelayerAuthorized || []
   }
 
   // Get memory events by hash
   static async getMemoryEventByHash(hash: string): Promise<HyperIndexMemoryStored | null> {
     const query = `
       query GetMemoryEventByHash($hash: String!) {
-        memoryStoreds(
-          where: { hash: $hash }
-          first: 1
+        MemoryStored(
+          where: { hash: { _eq: $hash } }
+          limit: 1
         ) {
           id
-          user
+          user_id
           hash
           urlHash
           timestamp
@@ -288,21 +284,20 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query, { hash })
-    return data.memoryStoreds?.[0] || null
+    return data.MemoryStored?.[0] || null
   }
 
   // Get memory events by URL hash
   static async getMemoryEventsByUrlHash(urlHash: string, limit: number = 20): Promise<HyperIndexMemoryStored[]> {
     const query = `
       query GetMemoryEventsByUrlHash($urlHash: String!, $limit: Int!) {
-        memoryStoreds(
-          where: { urlHash: $urlHash }
-          orderBy: blockNumber
-          orderDirection: desc
-          first: $limit
+        MemoryStored(
+          where: { urlHash: { _eq: $urlHash } }
+          limit: $limit
+          order_by: { blockNumber: desc }
         ) {
           id
-          user
+          user_id
           hash
           urlHash
           timestamp
@@ -315,7 +310,7 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query, { urlHash, limit })
-    return data.memoryStoreds || []
+    return data.MemoryStored || []
   }
 
   // Get memory events by timestamp range
@@ -326,17 +321,15 @@ export class HyperIndexService {
   ): Promise<HyperIndexMemoryStored[]> {
     const query = `
       query GetMemoryEventsByTimestampRange($startTimestamp: String!, $endTimestamp: String!, $limit: Int!) {
-        memoryStoreds(
+        MemoryStored(
           where: { 
-            timestamp_gte: $startTimestamp,
-            timestamp_lte: $endTimestamp
+            timestamp: { _gte: $startTimestamp, _lte: $endTimestamp }
           }
-          orderBy: blockNumber
-          orderDirection: desc
-          first: $limit
+          limit: $limit
+          order_by: { blockNumber: desc }
         ) {
           id
-          user
+          user_id
           hash
           urlHash
           timestamp
@@ -349,7 +342,7 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query, { startTimestamp, endTimestamp, limit })
-    return data.memoryStoreds || []
+    return data.MemoryStored || []
   }
 
   // Check if HyperIndex is available

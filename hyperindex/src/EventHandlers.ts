@@ -1,15 +1,4 @@
 import { RecallOSMemoryRegistry } from "../generated/src/Handlers.gen";
-import { 
-  MemoryStored, 
-  MemoryBatchStored, 
-  GasDeposited, 
-  GasDeducted, 
-  GasWithdrawn, 
-  RelayerAuthorized,
-  User,
-  Relayer,
-  SystemStats
-} from "../generated/src/Types.gen";
 
 // Register MemoryStored event handler
 RecallOSMemoryRegistry.MemoryStored.handler(async ({ event, context }) => {
@@ -57,10 +46,10 @@ RecallOSMemoryRegistry.MemoryStored.handler(async ({ event, context }) => {
   if (!systemStats) {
     systemStats = {
       id: "system",
-      totalMemories: 0n,
+      totalMemories: 1n, // First memory
       totalGasDeposited: 0n,
       totalGasWithdrawn: 0n,
-      totalUsers: 0n,
+      totalUsers: 1n, // First user
       totalRelayers: 0n,
       lastUpdated: BigInt(event.block.timestamp)
     };
@@ -116,10 +105,10 @@ RecallOSMemoryRegistry.MemoryBatchStored.handler(async ({ event, context }) => {
   if (!systemStats) {
     systemStats = {
       id: "system",
-      totalMemories: 0n,
+      totalMemories: event.params.count, // First batch of memories
       totalGasDeposited: 0n,
       totalGasWithdrawn: 0n,
-      totalUsers: 0n,
+      totalUsers: 1n, // First user
       totalRelayers: 0n,
       lastUpdated: BigInt(event.block.timestamp)
     };
@@ -156,9 +145,9 @@ RecallOSMemoryRegistry.GasDeposited.handler(async ({ event, context }) => {
     systemStats = {
       id: "system",
       totalMemories: 0n,
-      totalGasDeposited: 0n,
+      totalGasDeposited: event.params.amount,
       totalGasWithdrawn: 0n,
-      totalUsers: 0n,
+      totalUsers: 1n, // First user
       totalRelayers: 0n,
       lastUpdated: BigInt(event.block.timestamp)
     };
@@ -214,8 +203,8 @@ RecallOSMemoryRegistry.GasWithdrawn.handler(async ({ event, context }) => {
       id: "system",
       totalMemories: 0n,
       totalGasDeposited: 0n,
-      totalGasWithdrawn: 0n,
-      totalUsers: 0n,
+      totalGasWithdrawn: event.params.amount, // First withdrawal
+      totalUsers: 1n, // First user
       totalRelayers: 0n,
       lastUpdated: BigInt(event.block.timestamp)
     };
@@ -247,17 +236,48 @@ RecallOSMemoryRegistry.RelayerAuthorized.handler(async ({ event, context }) => {
 
   // Update relayer information
   let relayer = await context.Relayer.get(event.params.relayer);
+  const wasAuthorized = relayer ? Boolean(relayer.authorized) : false;
+  const isAuthorized = Boolean(event.params.authorized);
+
   if (!relayer) {
     relayer = {
       id: event.params.relayer,
       address: event.params.relayer,
-      authorized: false
+      authorized: isAuthorized
     };
   } else {
     relayer = {
       ...relayer,
-      authorized: event.params.authorized
+      authorized: isAuthorized
     };
   }
   await context.Relayer.set(relayer);
+
+  // Update system statistics (increment on first authorization, decrement on revocation)
+  let systemStats = await context.SystemStats.get("system");
+  if (!systemStats) {
+    systemStats = {
+      id: "system",
+      totalMemories: 0n,
+      totalGasDeposited: 0n,
+      totalGasWithdrawn: 0n,
+      totalUsers: 0n,
+      totalRelayers: isAuthorized ? 1n : 0n,
+      lastUpdated: BigInt(event.block.timestamp)
+    };
+  } else {
+    let nextRelayers = systemStats.totalRelayers;
+    if (isAuthorized && !wasAuthorized) {
+      nextRelayers = systemStats.totalRelayers + 1n;
+    } else if (!isAuthorized && wasAuthorized) {
+      nextRelayers = systemStats.totalRelayers > 0n ? systemStats.totalRelayers - 1n : 0n;
+    }
+
+    systemStats = {
+      ...systemStats,
+      totalRelayers: nextRelayers,
+      lastUpdated: BigInt(event.block.timestamp)
+    };
+  }
+  await context.SystemStats.set(systemStats);
 });
