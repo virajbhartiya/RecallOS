@@ -1,7 +1,8 @@
 // import { getRequest } from '../utility/generalServices'
 
-// HyperIndex GraphQL endpoint (when running locally)
-const HYPERINDEX_ENDPOINT = 'http://localhost:8080/v1/graphql'
+// HyperIndex GraphQL endpoint (deployed Envio indexer)
+const HYPERINDEX_ENDPOINT = 'https://indexer.dev.hyperindex.xyz/f04c2db/v1/graphql' //'http://localhost:8080/v1/graphql'
+// const HYPERINDEX_ENDPOINT = 'http://localhost:8080/v1/graphql' //'http://localhost:8080/v1/graphql'
 
 // Types for HyperIndex entities
 export interface HyperIndexMemoryStored {
@@ -222,23 +223,137 @@ export class HyperIndexService {
 
   // Get system statistics
   static async getSystemStats(): Promise<HyperIndexSystemStats | null> {
+    try {
+      // First try to get SystemStats entity
+      const systemStatsQuery = `
+        query GetSystemStats {
+          SystemStats(where: { id: { _eq: "system" } }) {
+            id
+            totalMemories
+            totalUsers
+            totalGasDeposited
+            totalGasWithdrawn
+            totalGasUsed
+            totalRelayers
+            lastUpdated
+          }
+        }
+      `
+
+      const systemData = await this.executeGraphQLQuery(systemStatsQuery)
+      console.log('SystemStats query result:', systemData)
+      
+      if (systemData.SystemStats && systemData.SystemStats.length > 0) {
+        const systemStats = systemData.SystemStats[0]
+        console.log('Using SystemStats entity:', systemStats)
+        
+        // If SystemStats shows 0 gas deposits, use fallback calculation
+        if (systemStats.totalGasDeposited === '0' || systemStats.totalGasDeposited === '0' || parseInt(systemStats.totalGasDeposited) === 0) {
+          console.log('SystemStats shows 0 gas deposits, using fallback calculation...')
+          // Continue to fallback calculation below
+        } else {
+          return systemStats
+        }
+      }
+
+      // Fallback: Calculate stats from individual events
+      console.log('SystemStats entity not found or shows 0, calculating from events...')
+      
+      const [memories, gasDeposits, gasWithdrawals, relayers] = await Promise.all([
+        this.getRecentMemoryStoredEvents(1000), // Get more memories for accurate count
+        this.getAllGasDeposits(),
+        this.getAllGasWithdrawals(),
+        this.getAuthorizedRelayers()
+      ])
+
+      console.log('=== FALLBACK CALCULATION DEBUG ===')
+      console.log('Gas deposits found:', gasDeposits.length, gasDeposits)
+      console.log('Gas withdrawals found:', gasWithdrawals.length, gasWithdrawals)
+      console.log('Memories found:', memories.length)
+      console.log('Relayers found:', relayers.length)
+
+      // Calculate totals
+      const totalGasDeposited = gasDeposits.reduce((sum, deposit) => sum + parseInt(deposit.amount), 0)
+      const totalGasWithdrawn = gasWithdrawals.reduce((sum, withdrawal) => sum + parseInt(withdrawal.amount), 0)
+      const totalGasUsed = totalGasDeposited - totalGasWithdrawn
+      const uniqueUsers = new Set(memories.map(m => m.user_id)).size
+
+      console.log('Calculated totals:', {
+        totalGasDeposited,
+        totalGasWithdrawn,
+        totalGasUsed,
+        uniqueUsers
+      })
+
+      const fallbackStats = {
+        id: 'system',
+        totalMemories: memories.length.toString(),
+        totalUsers: uniqueUsers.toString(),
+        totalGasDeposited: totalGasDeposited.toString(),
+        totalGasWithdrawn: totalGasWithdrawn.toString(),
+        totalGasUsed: totalGasUsed.toString(),
+        totalRelayers: relayers.length.toString(),
+        lastUpdated: new Date().toISOString()
+      }
+
+      console.log('=== FALLBACK STATS RESULT ===')
+      console.log('Returning fallback stats:', fallbackStats)
+      return fallbackStats
+    } catch (error) {
+      console.error('Error fetching system stats:', error)
+      return null
+    }
+  }
+
+  // Get all gas deposits (for system stats calculation)
+  static async getAllGasDeposits(): Promise<HyperIndexGasDeposited[]> {
     const query = `
-      query GetSystemStats {
-        SystemStats(where: { id: { _eq: "system" } }) {
+      query GetAllGasDeposits {
+        GasDeposited(
+          order_by: { blockNumber: desc }
+        ) {
           id
-          totalMemories
-          totalUsers
-          totalGasDeposited
-          totalGasWithdrawn
-          totalGasUsed
-          totalRelayers
-          lastUpdated
+          user_id
+          amount
+          newBalance
+          blockNumber
+          transactionHash
+          gasUsed
+          gasPrice
         }
       }
     `
 
     const data = await this.executeGraphQLQuery(query)
-    return data.SystemStats && data.SystemStats.length > 0 ? data.SystemStats[0] : null
+    console.log('All gas deposits query result:', data)
+    console.log('GasDeposited events found:', data.GasDeposited?.length || 0)
+    if (data.GasDeposited && data.GasDeposited.length > 0) {
+      console.log('Sample gas deposit event:', data.GasDeposited[0])
+    }
+    return data.GasDeposited || []
+  }
+
+  // Get all gas withdrawals (for system stats calculation)
+  static async getAllGasWithdrawals(): Promise<HyperIndexGasWithdrawn[]> {
+    const query = `
+      query GetAllGasWithdrawals {
+        GasWithdrawn(
+          order_by: { blockNumber: desc }
+        ) {
+          id
+          user_id
+          amount
+          newBalance
+          blockNumber
+          transactionHash
+          gasUsed
+          gasPrice
+        }
+      }
+    `
+
+    const data = await this.executeGraphQLQuery(query)
+    return data.GasWithdrawn || []
   }
 
   // Get all authorized relayers
@@ -260,6 +375,7 @@ export class HyperIndexService {
     `
 
     const data = await this.executeGraphQLQuery(query)
+    console.log('Relayer query result:', data)
     return data.RelayerAuthorized || []
   }
 

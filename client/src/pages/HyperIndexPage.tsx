@@ -65,8 +65,8 @@ export const HyperIndexPage: React.FC = () => {
 
     if (isAvailable) {
       loadActivityData()
-      // Set up periodic refresh every 30 seconds
-      const interval = setInterval(loadActivityData, 30000)
+      // Set up periodic refresh every 2 minutes to reduce API calls
+      const interval = setInterval(loadActivityData, 120000)
       return () => clearInterval(interval)
     }
   }, [isAvailable])
@@ -96,7 +96,7 @@ export const HyperIndexPage: React.FC = () => {
   const handleRefresh = async () => {
     setIsRefreshing(true)
     try {
-      console.log('Manual refresh triggered')
+      console.log('Manual refresh triggered - forcing system stats recalculation')
       await refreshData()
       
       // Reload activity data
@@ -209,7 +209,7 @@ export const HyperIndexPage: React.FC = () => {
         </div>
 
         {/* Key Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
           <div className="bg-white border border-gray-200 p-6 hover:border-black transition-all duration-300">
             <div className="flex items-center gap-3 mb-3">
               <Database className="w-6 h-6 text-blue-600" />
@@ -232,16 +232,6 @@ export const HyperIndexPage: React.FC = () => {
             <div className="text-xs text-gray-500">Unique addresses</div>
           </div>
 
-          <div className="bg-white border border-gray-200 p-6 hover:border-black transition-all duration-300">
-            <div className="flex items-center gap-3 mb-3">
-              <TrendingUp className="w-6 h-6 text-purple-600" />
-              <div className="text-sm font-mono text-gray-600 uppercase tracking-wide">Gas Deposited</div>
-            </div>
-            <div className="text-3xl font-light text-gray-900 mb-1">
-              {systemStats ? formatETH(systemStats.totalGasDeposited) : '0 ETH'}
-            </div>
-            <div className="text-xs text-gray-500">Total deposited</div>
-          </div>
 
 
         </div>
@@ -289,7 +279,7 @@ export const HyperIndexPage: React.FC = () => {
               {systemStatus.graphql ? 'API responding and serving data' : 'API endpoint not responding'}
             </p>
             <div className="text-xs font-mono text-gray-500">
-              localhost:8080/v1/graphql
+              indexer.dev.hyperindex.xyz/f04c2db/v1/graphql
             </div>
           </div>
 
@@ -414,24 +404,6 @@ export const HyperIndexPage: React.FC = () => {
                 <span className="text-sm text-gray-600">Total Transactions</span>
                 <span className="text-sm font-mono text-gray-900">
                   {systemStats ? formatNumber(systemStats.totalMemories) : '0'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-600">Gas Deposited</span>
-                <span className="text-sm font-mono text-gray-900">
-                  {systemStats ? formatETH(systemStats.totalGasDeposited) : '0 ETH'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-600">Gas Withdrawn</span>
-                <span className="text-sm font-mono text-gray-900">
-                  {systemStats ? formatETH(systemStats.totalGasWithdrawn) : '0 ETH'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-2 border-b border-gray-100">
-                <span className="text-sm text-gray-600">Total Gas Used</span>
-                <span className="text-sm font-mono text-gray-900">
-                  {systemStats ? formatETH(systemStats.totalGasUsed) : '0 ETH'}
                 </span>
               </div>
               <div className="flex justify-between items-center py-2">

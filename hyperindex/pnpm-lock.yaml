@@ -16,7 +16,7 @@ importers:
         specifier: ^22.0.0
         version: 22.18.12
       typescript:
-        specifier: ^5.9.3
+        specifier: ^5.9.0
         version: 5.9.3
 
 packages:
