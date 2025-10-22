@@ -251,12 +251,8 @@ RecallOS/
 │       └── index.ts         # Server entry
 │
 └── docs/                    # Documentation
-    ├── SYSTEM_OVERVIEW.md
-    ├── COMPONENTS.md
-    ├── API_REFERENCE.md
-    ├── ARCHITECTURE_MEMORY_PIPELINE.md
-    ├── DATA_FLOW_DIAGRAM.md
-    └── DATA_FLOW_DETAILED.md
+    ├── HYPERINDEX_INTEGRATION.md
+    └── contract/DEPLOYMENT_GUIDE.md
 ```
 
 ---
