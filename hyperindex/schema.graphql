@@ -69,6 +69,7 @@ type User @entity {
   totalMemories: BigInt!
   totalGasDeposited: BigInt!
   totalGasWithdrawn: BigInt!
+  totalGasUsed: BigInt!
   currentGasBalance: BigInt!
   firstMemoryTimestamp: BigInt
   lastMemoryTimestamp: BigInt
@@ -91,6 +92,7 @@ type SystemStats @entity {
   totalUsers: BigInt!
   totalGasDeposited: BigInt!
   totalGasWithdrawn: BigInt!
+  totalGasUsed: BigInt!
   totalRelayers: BigInt!
   lastUpdated: BigInt!
 }

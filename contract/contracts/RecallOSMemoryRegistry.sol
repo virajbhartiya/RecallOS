@@ -27,17 +27,17 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
     mapping(address => uint256) public lastWithdrawalTime;
     mapping(address => uint256) public dailyWithdrawalAmount;
 
-    event MemoryStored(address indexed user, bytes32 indexed hash, bytes32 urlHash, uint256 timestamp);
-    event MemoryBatchStored(address indexed user, uint256 count);
-    event GasDeposited(address indexed user, uint256 amount, uint256 newBalance);
-    event GasDeducted(address indexed user, uint256 amount, uint256 remainingBalance);
-    event GasWithdrawn(address indexed user, uint256 amount, uint256 newBalance);
-    event RelayerAuthorized(address indexed relayer, bool authorized);
+    event MemoryStored(address indexed user, bytes32 indexed hash, bytes32 urlHash, uint256 timestamp, uint256 gasUsed, uint256 gasPrice);
+    event MemoryBatchStored(address indexed user, uint256 count, uint256 gasUsed, uint256 gasPrice);
+    event GasDeposited(address indexed user, uint256 amount, uint256 newBalance, uint256 gasUsed, uint256 gasPrice);
+    event GasDeducted(address indexed user, uint256 amount, uint256 remainingBalance, uint256 gasUsed, uint256 gasPrice);
+    event GasWithdrawn(address indexed user, uint256 amount, uint256 newBalance, uint256 gasUsed, uint256 gasPrice);
+    event RelayerAuthorized(address indexed relayer, bool authorized, uint256 gasUsed, uint256 gasPrice);
 
     function initialize() public initializer {
         __Ownable_init(msg.sender);
         authorizedRelayers[msg.sender] = true;
-        emit RelayerAuthorized(msg.sender, true);
+        emit RelayerAuthorized(msg.sender, true, 0, 0);
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
@@ -46,7 +46,7 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
     function depositGas() external payable {
         require(msg.value >= MIN_DEPOSIT, "Deposit amount too small");
         userGasDeposits[msg.sender] += msg.value;
-        emit GasDeposited(msg.sender, msg.value, userGasDeposits[msg.sender]);
+        emit GasDeposited(msg.sender, msg.value, userGasDeposits[msg.sender], 0, 0);
     }
 
     function withdrawGas(uint256 amount) external {
@@ -70,7 +70,7 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
         (bool success, ) = payable(msg.sender).call{value: amount}("");
         require(success, "Withdrawal failed");
         
-        emit GasWithdrawn(msg.sender, amount, userGasDeposits[msg.sender]);
+        emit GasWithdrawn(msg.sender, amount, userGasDeposits[msg.sender], 0, 0);
     }
 
     function getUserGasBalance(address user) external view returns (uint256) {
@@ -79,7 +79,7 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
 
     function authorizeRelayer(address relayer, bool authorized) external onlyOwner {
         authorizedRelayers[relayer] = authorized;
-        emit RelayerAuthorized(relayer, authorized);
+        emit RelayerAuthorized(relayer, authorized, 0, 0);
     }
 
     function isAuthorizedRelayer(address relayer) external view returns (bool) {
@@ -90,7 +90,7 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
     function _deductGas(address user, uint256 gasCost) internal {
         require(userGasDeposits[user] >= gasCost, "Insufficient gas deposit");
         userGasDeposits[user] -= gasCost;
-        emit GasDeducted(user, gasCost, userGasDeposits[user]);
+        emit GasDeducted(user, gasCost, userGasDeposits[user], 0, 0);
     }
 
     function storeMemory(bytes32 _hash, bytes32 _urlHash, uint256 _timestamp) external {
@@ -117,7 +117,7 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
         uint256 gasCost = tx.gasprice * gasUsed * GAS_BUFFER_PERCENT / 100;
         _deductGas(tx.origin, gasCost);
         
-        emit MemoryStored(tx.origin, _hash, _urlHash, _timestamp);
+        emit MemoryStored(tx.origin, _hash, _urlHash, _timestamp, gasUsed, tx.gasprice);
     }
 
     function storeMemoryBatch(
@@ -147,7 +147,7 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
             memoryExists[_hashes[i]] = true;
             memoryOwner[_hashes[i]] = tx.origin;
             
-            emit MemoryStored(tx.origin, _hashes[i], _urlHashes[i], _timestamps[i]);
+            emit MemoryStored(tx.origin, _hashes[i], _urlHashes[i], _timestamps[i], 0, 0);
         }
         
         // Calculate actual gas used and deduct from user's deposit
@@ -155,7 +155,7 @@ contract RecallOSMemoryRegistry is Initializable, UUPSUpgradeable, OwnableUpgrad
         uint256 gasCost = tx.gasprice * gasUsed * GAS_BUFFER_PERCENT / 100;
         _deductGas(tx.origin, gasCost);
         
-        emit MemoryBatchStored(tx.origin, _hashes.length);
+        emit MemoryBatchStored(tx.origin, _hashes.length, gasUsed, tx.gasprice);
     }
 
     function getMemory(address _user, uint256 _index) external view returns (bytes32 hash, bytes32 urlHash, uint256 timestamp) {

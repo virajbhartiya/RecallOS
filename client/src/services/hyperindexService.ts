@@ -29,7 +29,7 @@ export interface HyperIndexUser {
 
 export interface HyperIndexGasDeposited {
   id: string
-  user: string
+  user_id: string
   amount: string
   newBalance: string
   blockNumber: string
@@ -40,7 +40,7 @@ export interface HyperIndexGasDeposited {
 
 export interface HyperIndexGasWithdrawn {
   id: string
-  user: string
+  user_id: string
   amount: string
   newBalance: string
   blockNumber: string
@@ -51,7 +51,7 @@ export interface HyperIndexGasWithdrawn {
 
 export interface HyperIndexRelayerAuthorized {
   id: string
-  relayer: string
+  relayer_id: string
   authorized: boolean
   blockNumber: string
   transactionHash: string
@@ -65,6 +65,7 @@ export interface HyperIndexSystemStats {
   totalUsers: string
   totalGasDeposited: string
   totalGasWithdrawn: string
+  totalGasUsed: string
   totalRelayers: string
   lastUpdated: string
 }
@@ -229,6 +230,7 @@ export class HyperIndexService {
           totalUsers
           totalGasDeposited
           totalGasWithdrawn
+          totalGasUsed
           totalRelayers
           lastUpdated
         }
@@ -244,7 +246,6 @@ export class HyperIndexService {
     const query = `
       query GetAuthorizedRelayers {
         RelayerAuthorized(
-          where: { authorized: { _eq: true } }
           order_by: { blockNumber: desc }
         ) {
           id
