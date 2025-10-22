@@ -228,7 +228,6 @@ export const useBlockscout = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ txHash, network })
       })
-      console.log(`Prefetch triggered for transaction: ${txHash}`)
     } catch (error) {
       console.error('Failed to trigger prefetch:', error)
     }

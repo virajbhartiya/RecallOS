@@ -101,7 +101,7 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
   const [zoom, setZoom] = useState<number>(1)
   const [isMobile, setIsMobile] = useState<boolean>(false)
 
-  // custom minimalist glyph node (diamond/chevron-like)
+  // Latent space node with glow effects
   interface GlyphNodeProps {
     data: {
       label: string
@@ -111,29 +111,54 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
       isSelected: boolean
       isHighlighted: boolean
       importance?: number
+      inLatentSpace?: boolean
+      clusterId?: number
     }
   }
   const GlyphNode: React.FC<GlyphNodeProps> = ({ data }) => {
     const isSelected = Boolean(data?.isSelected)
     const isHighlighted = Boolean(data?.isHighlighted)
+    const inLatentSpace = Boolean(data?.inLatentSpace)
     const importance = typeof data?.importance === 'number' ? Math.max(0, Math.min(1, data.importance)) : 0.5
     const baseSize = 6 + Math.round(importance * 6)
-    const size = isSelected ? baseSize + 4 : isHighlighted ? baseSize + 2 : baseSize
+    const size = isSelected ? baseSize + 8 : isHighlighted ? baseSize + 2 : baseSize
     const fill = String(data?.color || '#9ca3af')
+    
+    // Debug logging for selected node
+    if (isSelected) {
+      console.log('GlyphNode rendering as selected:', data?.memory_id, 'size:', size)
+    }
+    
+    // Reduce opacity for nodes not in latent space
+    const opacity = inLatentSpace ? 1 : 0.3
+    
+    
     return (
-      <div style={{ position: 'relative', width: size, height: size }}>
-        <div style={{
-          width: size,
-          height: size,
-          background: fill,
-          borderRadius: 9999,
-          transition: 'all 120ms ease',
-          boxShadow: isSelected
-            ? '0 0 0 3px rgba(59,130,246,0.20), 0 1px 3px rgba(0,0,0,0.10)'
-            : isHighlighted
-            ? '0 0 0 2px rgba(245,158,11,0.20), 0 1px 2px rgba(0,0,0,0.08)'
-            : '0 1px 2px rgba(0,0,0,0.08)'
-        }} />
+      <div style={{ position: 'relative', width: size + 6, height: size + 6 }}>
+        {/* Main node - clean and minimal */}
+        <div 
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: size,
+            height: size,
+            background: fill,
+            borderRadius: '50%',
+          border: isSelected ? `3px solid ${fill}` : `1px solid ${fill}dd`,
+          transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+          boxShadow: isSelected 
+            ? `0 0 0 6px ${fill}44, 0 0 20px ${fill}66, 0 2px 4px rgba(0,0,0,0.2)`
+            : isHighlighted 
+            ? `0 0 0 2px ${fill}22, 0 1px 2px rgba(0,0,0,0.05)`
+            : '0 1px 2px rgba(0,0,0,0.05)',
+            cursor: 'pointer',
+            opacity: opacity,
+            animation: isSelected ? 'pulse 0.6s ease-in-out' : 'none'
+          }} 
+        />
+        
         <Handle
           type="target"
           position={Position.Top}
@@ -194,12 +219,21 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
 
   const rfNodes: RFNode[] = useMemo(() => {
     if (!meshData?.nodes?.length) return []
+    console.log('selectedMemoryId:', selectedMemoryId)
     return meshData.nodes.map((n, i) => {
       const sourceType = memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
       const url = memoryUrls && n.memory_id ? memoryUrls[n.memory_id] : undefined
       const color = resolveNodeColor(String(sourceType || n.type), url)
       const isSelected = selectedMemoryId === n.memory_id
       const isHighlighted = highlightedMemoryIds.includes(n.memory_id || '')
+      
+      // Debug logging for selected node
+      if (isSelected) {
+        console.log('Node is selected:', n.memory_id, 'selectedMemoryId:', selectedMemoryId)
+      }
+      
+      // Check if node is in latent space (has embedding)
+      const inLatentSpace = n.hasEmbedding === true
       
       // Render as dots (no text label)
       const label = ''
@@ -213,7 +247,17 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
       return {
         id: n.id,
         position,
-        data: { label, memory_id: n.memory_id, type: n.type, color, isSelected, isHighlighted, importance: typeof n.importance_score === 'number' ? n.importance_score : undefined },
+        data: { 
+          label, 
+          memory_id: n.memory_id, 
+          type: n.type, 
+          color, 
+          isSelected, 
+          isHighlighted, 
+          importance: typeof n.importance_score === 'number' ? n.importance_score : undefined,
+          inLatentSpace,
+          clusterId: n.clusterId
+        },
         type: 'glyph',
         style: nodeStyle
       }
@@ -245,24 +289,33 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
         return cs > ps ? curr : prev
       }, edgesForPair[0]) as MemoryMeshEdge
 
-      const style: React.CSSProperties = {}
-      // Relation type encoding
-      if (best.relation_type === 'topical') style.strokeDasharray = '6 6'
-      if (best.relation_type === 'contextual') style.strokeDasharray = '2 4'
-      if (best.relation_type === 'temporal') {
-        style.strokeDasharray = '2 2'
-        style.opacity = 0.6
+      // Clean edge styling based on similarity
+      const similarity = best.similarity_score || 0.5
+      const opacity = 0.15 + (similarity * 0.25)
+      const strokeWidth = 1 + (similarity * 1.5)
+      
+      const style: React.CSSProperties = {
+        stroke: '#9ca3af',
+        strokeWidth: strokeWidth,
+        opacity: opacity,
+        transition: 'all 0.3s ease'
       }
-      if (best.relation_type === 'causal') {
-        // animation hint omitted to avoid custom CSS dependency
+      
+      // Subtle color variations
+      if (best.relation_type === 'topical') {
+        style.stroke = '#3b82f6'
+      } else if (best.relation_type === 'temporal') {
+        style.stroke = '#10b981'
+      } else if (best.relation_type === 'semantic') {
+        style.stroke = '#6366f1'
       }
 
       result.push({
         id: `e-${key}`,
         source: best.source,
         target: best.target,
-        type: 'straight',
-        animated: best.relation_type === 'causal',
+        type: 'smoothstep',
+        animated: similarity > 0.8,
         style
       })
     })
@@ -272,6 +325,9 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
 
   const [nodes, setNodes] = useState<RFNode[]>([])
   const [edges, setEdges] = useState<RFEdge[]>([])
+
+  // Memoize nodeTypes to prevent React Flow warning
+  const nodeTypes = useMemo(() => ({ glyph: GlyphNode }), [])
 
   useEffect(() => {
     setNodes(rfNodes)
@@ -292,7 +348,10 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
 
   const onNodeClickRF = useCallback((_e: unknown, node: RFNode) => {
     const memoryId = node.data?.memory_id
-    if (memoryId && onNodeClick) onNodeClick(memoryId)
+    if (memoryId && onNodeClick) {
+      console.log('ReactFlow onNodeClick triggered for:', memoryId)
+      onNodeClick(memoryId)
+    }
   }, [onNodeClick])
 
   if (isLoading) {
@@ -329,7 +388,7 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
 
   return (
     <div className={`w-full h-full ${className}`}>
-      <div className="w-full h-full bg-gray-50 border border-gray-200 overflow-hidden relative">
+      <div className="w-full h-full overflow-hidden relative bg-white">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -337,47 +396,73 @@ const MemoryMesh: React.FC<MemoryMeshProps> = ({
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClickRF}
-          defaultEdgeOptions={{ type: 'straight' }}
-          connectionLineType="straight"
+          defaultEdgeOptions={{ type: 'smoothstep' }}
+          connectionLineType="smoothstep"
           nodesConnectable={false}
-          elementsSelectable={false}
-          nodeTypes={{ glyph: GlyphNode }}
+          elementsSelectable={true}
+          selectNodesOnDrag={false}
+          nodeTypes={nodeTypes}
           fitView
-          fitViewOptions={{ padding: isMobile ? 0.1 : 0.2 }}
+          fitViewOptions={{ padding: isMobile ? 0.15 : 0.25 }}
           onMove={(_e: unknown, viewport: { x: number; y: number; zoom: number }) => {
             if (viewport && typeof viewport.zoom === 'number') setZoom(viewport.zoom)
+          }}
+          style={{
+            background: 'transparent'
           }}
         >
           <Background
             variant="dots"
-            color="#d1d5db"
-            gap={isMobile ? 14 : 18}
+            color="#e5e7eb"
+            gap={isMobile ? 20 : 24}
             size={1}
           />
           {!isMobile && (
             <MiniMap
               pannable
               zoomable
-              style={{ background: '#f1f5f9', border: '1px solid #e5e7eb' }}
+              style={{ 
+                background: '#f9fafb',
+                border: '1px solid #e5e7eb'
+              }}
               nodeColor={(n: { data?: { type?: string; memory_id?: string } }) => {
                 const t = (n?.data?.type as string) || ''
                 const memoryId = n?.data?.memory_id
                 if (selectedMemoryId === memoryId) {
-                  return '#3B82F6'
+                  return '#3b82f6'
                 } else if (highlightedMemoryIds.includes(memoryId || '')) {
-                  return '#F59E0B'
+                  return '#60a5fa'
                 }
                 const url = memoryId && memoryUrls ? memoryUrls[memoryId] : undefined
                 return resolveNodeColor(t, url)
               }}
-              nodeStrokeColor="#111"
+              nodeStrokeColor="#d1d5db"
               nodeBorderRadius={9999}
+              maskColor="rgba(0, 0, 0, 0.05)"
             />
           )}
-          {!isMobile && <Controls showFitView showInteractive />}
+          {!isMobile && (
+            <Controls 
+              showFitView 
+              showInteractive
+            />
+          )}
         </ReactFlow>
-        <div className="absolute bottom-3 right-3 text-[10px] font-mono text-gray-600 bg-white/90 border border-gray-200 rounded px-2 py-1 shadow-sm">
-          {Math.round(zoom * 100)}%
+        
+        {/* Info overlay */}
+        <div className="absolute bottom-3 right-3 text-[10px] font-mono bg-white border border-gray-200 px-3 py-2 shadow-sm">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-blue-500" />
+              <span className="font-medium text-gray-700 uppercase tracking-wide">[LATENT SPACE]</span>
+            </div>
+            {meshData?.metadata && (
+              <div className="flex flex-col gap-0.5 text-[9px] text-gray-500 pl-3.5 font-mono">
+                <div>{meshData.metadata.projection_method || 'UMAP'} • {meshData.metadata.nodes_in_latent_space || 0}/{meshData.metadata.total_nodes || 0} nodes</div>
+                <div>{meshData.metadata.detected_clusters || 0} clusters • {Math.round(zoom * 100)}% zoom</div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

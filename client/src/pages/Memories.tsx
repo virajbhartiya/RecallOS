@@ -8,7 +8,6 @@ import { SearchService } from '@/services/search'
 import { MemoryMesh } from '@/components/MemoryMesh'
 import { useBlockscout } from '@/hooks/useBlockscout'
 import { TransactionStatusIndicator } from '@/components/TransactionStatusIndicator'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
 
 const MemoryCard: React.FC<{
@@ -32,14 +31,14 @@ const MemoryCard: React.FC<{
   return (
     <button
       onClick={() => onSelect(memory)}
-      className={`w-full text-left p-2 rounded transition-all duration-200 group border ${
+      className={`w-full text-left p-3 transition-all duration-200 group border ${
         isSelected
           ? 'bg-blue-50 border-blue-200'
           : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300 bg-white'
       }`}
     >
-      <div className="flex items-center justify-between mb-1">
-        <h3 className="text-xs font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors flex items-center gap-2">
+      <div className="flex items-center justify-between mb-1.5">
+        <h3 className="text-xs font-medium text-gray-900 truncate group-hover:text-black transition-colors flex items-center gap-2">
           <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getSourceColorLocal(memory.source) }} />
           <span className="truncate">{memory.title || 'Untitled Memory'}</span>
         </h3>
@@ -71,15 +70,15 @@ const MemoryCard: React.FC<{
         </div>
       </div>
       
-      <div className="flex items-center gap-1 text-xs text-gray-500 mb-1">
+      <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-1.5 font-mono">
         <span>{memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'No date'}</span>
         <span>•</span>
-        <span className="uppercase font-mono text-xs">{memory.source}</span>
+        <span className="uppercase">{memory.source}</span>
       </div>
       
       {(memory.summary || memory.content) && (
-        <p className="text-xs text-gray-600 line-clamp-1 leading-relaxed">
-          {memory.summary || (memory.content && memory.content.slice(0, 60) + (memory.content.length > 60 ? '...' : ''))}
+        <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
+          {memory.summary || (memory.content && memory.content.slice(0, 80) + (memory.content.length > 80 ? '...' : ''))}
         </p>
       )}
     </button>
@@ -102,7 +101,7 @@ const MemoryDetails: React.FC<{
             </svg>
           </div>
           <h3 className="text-lg font-light text-gray-900 mb-2">[SELECT A MEMORY]</h3>
-          <p className="text-sm font-mono text-gray-500">Choose a memory from the list to view its details.</p>
+          <p className="text-sm font-mono text-gray-500">Click a node in the latent space to view its details.</p>
         </div>
       </div>
     )
@@ -110,126 +109,130 @@ const MemoryDetails: React.FC<{
 
   return (
     <div className="flex-1 overflow-y-auto">
-              <div className="p-6">
-                <div className="mb-6">
-                  <h3 className="text-lg font-light text-gray-900 mb-2 leading-tight">
+      <div className="p-4 sm:p-6">
+        {/* Header Section */}
+        <div className="mb-6">
+          <h3 className="text-lg sm:text-xl font-light text-gray-900 mb-3 leading-tight break-words">
             {memory.title || 'Untitled Memory'}
-                  </h3>
-                  <div className="flex items-center gap-3 text-sm font-mono text-gray-500">
+          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-sm font-mono text-gray-500">
             <span>{memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'NO DATE'}</span>
             {memory.source && (
-                      <>
-                        <span>•</span>
-                        <span className="font-mono uppercase text-xs bg-gray-100 px-2 py-1 border border-gray-200">
+              <>
+                <span className="hidden sm:inline">•</span>
+                <span className="font-mono uppercase text-xs bg-gray-100 px-2 py-1 border border-gray-200 w-fit">
                   [{memory.source}]
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
+                </span>
+              </>
+            )}
+          </div>
+        </div>
 
-                <div className="flex items-center gap-4 mb-6">
+        {/* Status and Importance Section */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
           {memory.tx_status && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-gray-600">[STATUS]</span>
-                      <span className={`px-3 py-1 text-sm font-mono uppercase tracking-wide border ${
-                memory.tx_status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-200' :
-                memory.tx_status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                        'bg-red-100 text-red-800 border-red-200'
-                      }`}>
-                {memory.tx_status}
-                      </span>
-                      {memory.tx_hash && memory.tx_hash.startsWith('0x') && memory.tx_hash.length === 66 && onViewTransaction && (
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')}
-                            className="text-xs font-mono text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 border border-blue-200 hover:border-blue-300 transition-all duration-200"
-                          >
-                            [VIEW TX]
-                          </button>
-                          <TransactionStatusIndicator 
-                            txHash={memory.tx_hash} 
-                            network={memory.blockchain_network || 'sepolia'}
-                            className="text-xs"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="text-sm font-mono text-gray-600">[STATUS]</span>
+              <div className="flex items-center gap-2">
+                <span className={`px-3 py-1 text-sm font-mono uppercase tracking-wide border ${
+                  memory.tx_status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-200' :
+                  memory.tx_status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                  'bg-red-100 text-red-800 border-red-200'
+                }`}>
+                  {memory.tx_status}
+                </span>
+                {memory.tx_hash && memory.tx_hash.startsWith('0x') && memory.tx_hash.length === 66 && onViewTransaction && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')}
+                      className="text-xs font-mono text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 border border-blue-200 hover:border-blue-300 transition-all duration-200 whitespace-nowrap"
+                    >
+                      [VIEW TX]
+                    </button>
+                    <TransactionStatusIndicator 
+                      txHash={memory.tx_hash} 
+                      network={memory.blockchain_network || 'sepolia'}
+                      className="text-xs"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {memory.importance_score && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-gray-600">[IMPORTANCE]</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 bg-gray-200 h-2 border border-gray-300">
-                          <div 
-                            className="bg-blue-500 h-2 transition-all duration-300" 
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <span className="text-sm font-mono text-gray-600">[IMPORTANCE]</span>
+              <div className="flex items-center gap-2">
+                <div className="w-20 bg-gray-200 h-2 border border-gray-300">
+                  <div 
+                    className="bg-blue-500 h-2 transition-all duration-300" 
                     style={{ width: `${memory.importance_score * 100}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-sm font-mono text-gray-600">
-                  {Math.round(memory.importance_score * 100)}%
-                        </span>
-                      </div>
-                    </div>
-                  )}
+                  ></div>
                 </div>
+                <span className="text-sm font-mono text-gray-600">
+                  {Math.round(memory.importance_score * 100)}%
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
 
         {memory.summary && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SUMMARY]</h4>
-                    <div className="bg-gray-50 border border-gray-200 p-4">
-                      <p className="text-sm text-gray-700 leading-relaxed">
+          <div className="mb-6">
+            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SUMMARY]</h4>
+            <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4">
+              <p className="text-sm text-gray-700 leading-relaxed break-words">
                 {memory.summary}
-                      </p>
-                    </div>
-                  </div>
-                )}
+              </p>
+            </div>
+          </div>
+        )}
 
         {memory.content && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide">[CONTENT]</h4>
-                      <button
-                        onClick={() => setExpandedContent(!expandedContent)}
-                        className="text-sm font-mono text-blue-600 hover:text-black bg-blue-50 px-3 py-1 border border-blue-200 hover:border-black transition-all duration-200"
-                      >
+          <div className="mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide">[CONTENT]</h4>
+              <button
+                onClick={() => setExpandedContent(!expandedContent)}
+                className="text-sm font-mono text-blue-600 hover:text-black bg-blue-50 px-3 py-1 border border-blue-200 hover:border-black transition-all duration-200 w-fit"
+              >
                 {expandedContent ? '[COLLAPSE]' : '[EXPAND]'}
-                      </button>
-                    </div>
-            <div className="bg-gray-50 border border-gray-200 p-4">
-              <p className={`text-sm text-gray-700 leading-relaxed ${expandedContent ? '' : 'line-clamp-6'}`}>
+              </button>
+            </div>
+            <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4">
+              <p className={`text-sm text-gray-700 leading-relaxed break-words ${expandedContent ? '' : 'line-clamp-6'}`}>
                 {memory.content}
-                      </p>
-                    </div>
-                  </div>
-                )}
+              </p>
+            </div>
+          </div>
+        )}
 
         {memory.url && memory.url !== 'unknown' && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SOURCE URL]</h4>
-                    <div className="bg-gray-50 border border-gray-200 p-4">
-                      <a
+          <div className="mb-6">
+            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SOURCE URL]</h4>
+            <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4">
+              <a
                 href={memory.url} 
-                        target="_blank"
-                        rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:text-blue-800 break-all"
-                      >
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 hover:text-blue-800 break-all hover:underline"
+              >
                 {memory.url}
-                      </a>
-                    </div>
-                  </div>
-                )}
+              </a>
+            </div>
+          </div>
+        )}
 
         {memory.page_metadata && (
           <div className="mb-6">
             <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[METADATA]</h4>
-            <div className="bg-gray-50 border border-gray-200 p-4">
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap">
+            <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4 overflow-x-auto">
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words">
                 {JSON.stringify(memory.page_metadata, null, 2)}
               </pre>
-              </div>
             </div>
-          )}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -242,17 +245,11 @@ export const Memories: React.FC = () => {
   
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
-  const [expandedContent, setExpandedContent] = useState(false)
   const similarityThreshold = 0.3
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [isMobile, setIsMobile] = useState<boolean>(false)
-  
-  
-  const [isNodeModalOpen, setIsNodeModalOpen] = useState(false)
-  
-  
-  
+  const [clickedNodeId, setClickedNodeId] = useState<string | null>(null)
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
+  const [expandedContent, setExpandedContent] = useState(false)
   
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
   const [searchAnswer, setSearchAnswer] = useState<string | null>(null)
@@ -271,7 +268,6 @@ export const Memories: React.FC = () => {
   useEffect(() => {
     const update = () => {
       const mobile = window.innerWidth < 768
-      setIsMobile(mobile)
       setIsSidebarCollapsed(mobile) // auto-collapse on mobile
     }
     update()
@@ -312,34 +308,34 @@ export const Memories: React.FC = () => {
   }, [address, prefetchTransaction])
 
   const handleSelectMemory = (memory: Memory) => {
-    const full = memories.find(m => m.id === memory.id)
-    setSelectedMemory(full || memory)
+    // Enable memory selection from the list
+    setSelectedMemory(memory)
     setExpandedContent(false)
   }
 
   const handleNodeClick = (memoryId: string) => {
-    const fromMemories = memories.find(m => m.id === memoryId)
-    const fromSearch = searchResults?.results.find(r => r.memory.id === memoryId)?.memory
-    const preferred = fromMemories || fromSearch
-    if (preferred) {
-      const full = fromMemories || preferred
-      setSelectedMemory(full)
+    console.log('handleNodeClick called with:', memoryId)
+    console.log('Setting clickedNodeId to:', memoryId)
+    
+    // Find the memory information
+    const memoryInfo = memories.find(m => m.id === memoryId)
+    if (memoryInfo) {
+      setSelectedMemory(memoryInfo)
       setExpandedContent(false)
-      setIsNodeModalOpen(true)
     }
+    
+    // Visual feedback - highlight the clicked node
+    setClickedNodeId(memoryId)
+    
+    // Clear the highlight after 3 seconds (but keep sidebar open)
+    setTimeout(() => {
+      console.log('Clearing clickedNodeId')
+      setClickedNodeId(null)
+    }, 3000)
   }
 
-  const handleCitationClick = (memoryId: string) => {
-    const fromMemories = memories.find(m => m.id === memoryId)
-    const fromSearch = searchResults?.results.find(r => r.memory.id === memoryId)?.memory
-    const chosen = fromMemories || fromSearch
-    if (chosen) {
-      setSelectedMemory(chosen)
-      setExpandedContent(false)
-      if (isSidebarCollapsed) {
-        setIsNodeModalOpen(true)
-      }
-    }
+  const handleCitationClick = (_memoryId: string) => {
+    // Disabled - no action on citation click
   }
 
   
@@ -513,32 +509,31 @@ export const Memories: React.FC = () => {
   currentMemories = [...(currentMemories || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-sky-50/30">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="border-b border-gray-200 bg-white">
-        <div className="max-w-7xl mx-auto px-8 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-4 sm:space-x-8">
               <button 
                 onClick={() => window.location.href = '/'}
-                className="text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                className="text-xs sm:text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
               >
-                [← BACK TO HOME]
+                [← HOME]
               </button>
-              <div className="text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
-                [MEMORY MESH]
+              <div className="text-xs sm:text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
+                [LATENT SPACE]
               </div>
               {/* Mobile toggle for sidebar */}
               <button
                 onClick={() => setIsSidebarCollapsed((v) => !v)}
-                className="md:hidden text-xs font-mono text-gray-700 hover:text-black bg-gray-50 px-2 py-1 border border-gray-200 hover:border-gray-300 transition-colors"
+                className="md:hidden text-xs font-mono text-gray-600 hover:text-black bg-white px-2 py-1 border border-gray-200 hover:border-gray-300 transition-colors"
               >
-                {isSidebarCollapsed ? '[OPEN LIST]' : '[HIDE LIST]'}
+                {isSidebarCollapsed ? '[SHOW]' : '[HIDE]'}
               </button>
             </div>
             <div className="flex items-center space-x-4">
               {address && address.startsWith('0x') && address.length === 42 && (
- 
                 <WalletStatus variant="compact" showActions={true} />
               )}
             </div>
@@ -547,15 +542,15 @@ export const Memories: React.FC = () => {
       </header>
 
       {/* Main Content */}
-      <div className="flex flex-col md:flex-row h-[calc(100vh-73px)]">
+      <div className="flex flex-col md:flex-row h-[calc(100vh-65px)]">
         {/* Left Panel - Memory Mesh */}
-        <div className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-auto">
+        <div className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-auto bg-white border-b md:border-b-0 md:border-r border-gray-200">
         <MemoryMesh 
           userAddress={address || undefined}
           className="w-full h-full"
           onNodeClick={handleNodeClick}
           similarityThreshold={similarityThreshold}
-          selectedMemoryId={selectedMemory?.id}
+          selectedMemoryId={clickedNodeId || undefined}
           highlightedMemoryIds={isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory.id) : []}
           memorySources={{
             ...Object.fromEntries(memories.map(m => [m.id, m.source || ''])),
@@ -571,7 +566,7 @@ export const Memories: React.FC = () => {
         {/* Collapse/Expand Button */}
         <button
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className={`hidden md:block absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-200 border-r-0 rounded-l-lg px-2 py-4 hover:bg-gray-50 transition-all duration-200 shadow-sm`}
+          className={`hidden md:block absolute right-0 top-1/2 transform -translate-y-1/2 z-10 bg-white border border-gray-200 border-r-0 rounded-l px-2 py-4 hover:bg-gray-50 transition-all duration-200 shadow-sm`}
         >
           <svg 
             className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${isSidebarCollapsed ? 'rotate-180' : ''}`} 
@@ -584,11 +579,9 @@ export const Memories: React.FC = () => {
         </button>
 
         {/* Right Panel - Search & Memory List */}
-        <div className={`${isSidebarCollapsed ? 'h-0 md:h-auto w-full md:w-0' : 'h-[50vh] md:h-auto w-full md:w-[320px]'} order-1 md:order-2 border-b md:border-b-0 md:border-l border-gray-200 bg-white flex flex-col transition-all duration-300 overflow-hidden`}> 
-          {/* Compact Controls */}
-          <div className="border-b border-gray-200 bg-gray-50/50 flex-shrink-0 p-3">
-            
-            {/* Auto-search Input */}
+        <div className={`${isSidebarCollapsed ? 'h-0 md:h-auto w-full md:w-0' : 'h-[50vh] md:h-auto w-full md:w-[360px]'} order-1 md:order-2 border-b md:border-b-0 md:border-l border-gray-200 bg-white flex flex-col transition-all duration-300 overflow-hidden`}> 
+          {/* Search Controls */}
+          <div className="border-b border-gray-200 bg-gray-50 flex-shrink-0 p-3">
             <div className="flex gap-2">
               <div className="flex-1 relative">
                 <input
@@ -597,15 +590,15 @@ export const Memories: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   disabled={isSearching}
-                  className={`w-full text-xs px-2 py-1.5 border rounded focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  className={`w-full text-xs px-3 py-2 border focus:outline-none focus:ring-1 focus:ring-black bg-white ${
                     isSearching 
-                      ? 'border-blue-300 bg-blue-50 text-blue-700' 
-                      : 'border-gray-200'
+                      ? 'border-blue-300 text-gray-700' 
+                      : 'border-gray-200 text-gray-900'
                   }`}
                 />
                 {isSearching && (
                   <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                    <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-3 h-3 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
                   </div>
                 )}
               </div>
@@ -615,10 +608,10 @@ export const Memories: React.FC = () => {
                   handleClearSearch()
                 }}
                 disabled={isSearching}
-                className={`text-xs px-2 py-1.5 border rounded transition-colors ${
+                className={`text-xs px-3 py-2 border font-mono uppercase tracking-wide transition-colors ${
                   isSearching
                     ? 'text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed'
-                    : 'text-gray-500 hover:text-gray-700 border-gray-200 hover:bg-gray-50'
+                    : 'text-gray-600 hover:text-black border-gray-200 hover:bg-gray-100'
                 }`}
               >
                 Clear
@@ -627,13 +620,13 @@ export const Memories: React.FC = () => {
           </div>
 
           {/* Memory List Header */}
-          <div className="px-3 py-2 border-b border-gray-200 bg-white flex-shrink-0">
+          <div className="px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xs font-medium text-gray-700">
-                  {isSearchMode ? 'Search Results' : 'Memories'}
+                <h3 className="text-xs font-mono uppercase tracking-wide text-gray-600">
+                  {isSearchMode ? '[SEARCH RESULTS]' : '[MEMORIES]'}
                 </h3>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-500 mt-0.5">
                   {isSearchMode ? (
                     isSearching ? (
                       <span className="flex items-center gap-1">
@@ -650,41 +643,28 @@ export const Memories: React.FC = () => {
                   )}
                 </p>
               </div>
-              {selectedMemory && (
-                <button
-                  onClick={() => setSelectedMemory(null)}
-                  className="text-xs text-gray-400 hover:text-gray-600"
-                >
-                  ✕
-                </button>
-              )}
             </div>
-            {isSearchMode && (isSearching || searchAnswer || searchMeta) && (
-              <div className="mt-2 text-[11px] font-mono text-gray-800 bg-yellow-50 border border-yellow-200 p-2 rounded">
-                {isSearching ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 border border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
-                    <span>Searching and generating answer...</span>
-                  </div>
-                ) : (searchAnswer || searchMeta) ? (
-                  <span>
+            {isSearchMode && (searchAnswer || searchMeta) && !isSearching && (
+              <div className="mt-3 text-[11px] bg-blue-50 border border-blue-200 p-3 rounded">
+                <div className="space-y-2">
+                  <span className="block">
                     {searchAnswer || searchMeta}
                   </span>
-                ) : null}
-                {searchCitations && searchCitations.length > 0 && (
-                  <div className="mt-2 text-[11px] text-gray-700 gap-2 flex flex-wrap">
-                    {searchCitations.slice(0,6).map(c => (
-                      <button
-                        key={c.label}
-                        onClick={() => handleCitationClick(c.memory_id)}
-                        className="underline decoration-dotted hover:text-blue-700 text-left"
-                        title={c.title || c.url || ''}
-                      >
-                        [{c.label}] {c.title || 'Open memory'}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  {searchCitations && searchCitations.length > 0 && (
+                    <div className="text-[11px] text-gray-700 gap-2 flex flex-wrap">
+                      {searchCitations.slice(0,6).map(c => (
+                        <button
+                          key={c.label}
+                          onClick={() => handleCitationClick(c.memory_id)}
+                          className="underline decoration-dotted hover:text-blue-700 text-left"
+                          title={c.title || c.url || ''}
+                        >
+                          [{c.label}] {c.title || 'Open memory'}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             
@@ -707,23 +687,54 @@ export const Memories: React.FC = () => {
           </div>
 
           {/* Memory List */}
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="flex-1 overflow-y-auto p-3 w-full">
             {isLoading ? (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {Array.from({ length: 8 }).map((_, index) => (
-                  <div key={index} className="h-12 bg-gray-200 animate-pulse rounded"></div>
+                  <div key={index} className="w-full text-left p-3 bg-gray-100 animate-pulse border border-gray-200">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
+                        <div className="h-3 bg-gray-300 rounded w-32"></div>
+                      </div>
+                      <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                        <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
+                        <div className="h-2 bg-gray-300 rounded w-4"></div>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-gray-300 rounded w-full mb-1"></div>
+                    <div className="h-2 bg-gray-300 rounded w-3/4"></div>
+                  </div>
                 ))}
               </div>
             ) : isSearching ? (
-              <div className="space-y-1">
-                {Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="h-12 bg-blue-100 animate-pulse rounded border border-blue-200">
-                    <div className="p-2">
-                      <div className="h-3 bg-blue-200 rounded mb-1"></div>
-                      <div className="h-2 bg-blue-200 rounded w-2/3"></div>
-                    </div>
+              <div className="space-y-3 w-full">
+                {/* Search Status */}
+                <div className="bg-blue-50 border border-blue-200 p-3 rounded w-full">
+                  <div className="flex items-center gap-2 text-sm text-blue-700">
+                    <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                    <span className="truncate">Querying memories...</span>
                   </div>
-                ))}
+                </div>
+                {/* Search Result Placeholders */}
+                <div className="space-y-2">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={index} className="w-full text-left p-3 bg-blue-50 animate-pulse border border-blue-200">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-200"></div>
+                          <div className="h-3 bg-blue-100 rounded w-32"></div>
+                        </div>
+                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-200"></div>
+                          <div className="h-2 bg-blue-100 rounded w-4"></div>
+                        </div>
+                      </div>
+                      <div className="h-2 bg-blue-100 rounded w-full mb-1"></div>
+                      <div className="h-2 bg-blue-100 rounded w-3/4"></div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : error ? (
               <div className="flex flex-col items-center justify-center h-full text-center">
@@ -756,7 +767,7 @@ export const Memories: React.FC = () => {
                 </button>
               </div>
             ) : (currentMemories || []).length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
+              <div className="flex flex-col items-center justify-center h-full text-center p-4">
                 {isSearching ? (
                   <>
                     <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -782,7 +793,7 @@ export const Memories: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {(currentMemories || []).map((memory) => {
                   const searchResult = currentResults?.find(r => r.memory.id === memory.id)
                   return (
@@ -801,15 +812,18 @@ export const Memories: React.FC = () => {
           </div>
         </div>
 
-        {/* Memory Details Panel */}
-        {selectedMemory && !isSidebarCollapsed && !isMobile && (
-          <div className="w-full md:w-[500px] border-l border-gray-200 bg-white flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
+        {/* Memory Details Sidebar */}
+        {selectedMemory && (() => {
+          console.log('Rendering sidebar for memory:', selectedMemory.id, selectedMemory.title)
+          return true
+        })() && (
+          <div className="w-full md:w-[400px] lg:w-[480px] border-l border-gray-200 bg-white flex flex-col max-h-full">
+            <div className="px-3 sm:px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-700">Memory Details</h3>
+                <h3 className="text-xs font-mono uppercase tracking-wide text-gray-600">[MEMORY DETAILS]</h3>
                 <button
                   onClick={() => setSelectedMemory(null)}
-                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-all duration-200"
+                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-all duration-200 flex-shrink-0"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -826,32 +840,6 @@ export const Memories: React.FC = () => {
           </div>
         )}
 
-        {/* Floating Memory Details Panel (when sidebar is collapsed) */}
-        {selectedMemory && (isSidebarCollapsed || isMobile) && (
-          <div className="fixed right-4 top-1/2 transform -translate-y-1/2 w-[90vw] max-w-[420px] max-h-[80vh] bg-white border border-gray-200 rounded-lg shadow-xl z-50 flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0 rounded-t-lg">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-medium text-gray-700">Memory Details</h3>
-                <button
-                  onClick={() => setSelectedMemory(null)}
-                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-all duration-200"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <MemoryDetails
-                memory={selectedMemory}
-                expandedContent={expandedContent}
-                setExpandedContent={setExpandedContent}
-                onViewTransaction={handleViewTransaction}
-              />
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Memory Stats Overlay */}
@@ -886,22 +874,6 @@ export const Memories: React.FC = () => {
       {/* Gas Deposit Section */}
       
 
-      {/* Node Detail Overlay */}
-      <Dialog open={isNodeModalOpen} onOpenChange={setIsNodeModalOpen}>
-        <DialogContent className="sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="font-mono text-sm tracking-wide">[MEMORY DETAILS]</DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[70vh] overflow-y-auto">
-            <MemoryDetails
-              memory={selectedMemory}
-              expandedContent={expandedContent}
-              setExpandedContent={setExpandedContent}
-              onViewTransaction={handleViewTransaction}
-            />
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

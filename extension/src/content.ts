@@ -1082,7 +1082,6 @@ function updateActivityLevel() {
 }
 function startContinuousMonitoring() {
   if (isLocalhost()) {
-    console.log('RecallOS: Skipping continuous monitoring - localhost detected');
     return;
   }
   

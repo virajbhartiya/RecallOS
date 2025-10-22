@@ -80,6 +80,13 @@ export interface MemoryMeshNode {
   block_number?: number
   blockchain_network?: string
   tx_status?: 'pending' | 'confirmed' | 'failed'
+  hasEmbedding?: boolean
+  clusterId?: number
+  layout?: {
+    isLatentSpace?: boolean
+    cluster?: string
+    centrality?: number
+  }
 }
 
 export interface MemoryMeshEdge {
@@ -94,6 +101,16 @@ export interface MemoryMesh {
   edges: MemoryMeshEdge[]
   clusters: {
     [clusterId: string]: string[]
+  }
+  metadata?: {
+    similarity_threshold?: number
+    total_nodes?: number
+    nodes_in_latent_space?: number
+    total_edges?: number
+    detected_clusters?: number
+    average_connections?: number
+    is_latent_space?: boolean
+    projection_method?: string
   }
 }
 

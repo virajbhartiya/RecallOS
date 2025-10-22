@@ -18,7 +18,6 @@ export const WalletStatus: React.FC<WalletStatusProps> = ({
   const [showWalletModal, setShowWalletModal] = useState(false)
 
   const getNetworkName = (chainId: number | null) => {
-    console.log('Getting network name for chainId:', chainId)
     switch (chainId) {
       case 11155111: return 'Sepolia'
       case 1: return 'Ethereum'
