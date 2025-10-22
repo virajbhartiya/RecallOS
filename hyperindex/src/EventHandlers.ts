@@ -13,8 +13,8 @@ RecallOSMemoryRegistry.MemoryStored.handler(async ({ event, context }) => {
     timestamp: event.params.timestamp,
     blockNumber: BigInt(event.block.number),
     transactionHash: `${event.logIndex}`,
-    gasUsed: 0n, // Not available in current event structure
-    gasPrice: 0n  // Not available in current event structure
+    gasUsed: event.params.gasUsed,
+    gasPrice: event.params.gasPrice
   };
   
   await context.MemoryStored.set(memoryStored);
@@ -25,17 +25,19 @@ RecallOSMemoryRegistry.MemoryStored.handler(async ({ event, context }) => {
     user = {
       id: event.params.user,
       address: event.params.user,
-      totalMemories: 0n,
-      totalGasDeposited: 0n,
-      totalGasWithdrawn: 0n,
-      currentGasBalance: 0n,
+      totalMemories: BigInt(0),
+      totalGasDeposited: BigInt(0),
+      totalGasWithdrawn: BigInt(0),
+      totalGasUsed: BigInt(0),
+      currentGasBalance: BigInt(0),
       firstMemoryTimestamp: event.params.timestamp,
       lastMemoryTimestamp: undefined
     };
   } else {
     user = {
       ...user,
-      totalMemories: user.totalMemories + 1n,
+      totalMemories: user.totalMemories + BigInt(1),
+      totalGasUsed: user.totalGasUsed + event.params.gasUsed,
       lastMemoryTimestamp: event.params.timestamp
     };
   }
@@ -46,17 +48,19 @@ RecallOSMemoryRegistry.MemoryStored.handler(async ({ event, context }) => {
   if (!systemStats) {
     systemStats = {
       id: "system",
-      totalMemories: 1n, // First memory
-      totalGasDeposited: 0n,
-      totalGasWithdrawn: 0n,
-      totalUsers: 1n, // First user
-      totalRelayers: 0n,
+      totalMemories: BigInt(1), // First memory
+      totalGasDeposited: BigInt(0),
+      totalGasWithdrawn: BigInt(0),
+      totalGasUsed: event.params.gasUsed,
+      totalUsers: BigInt(1), // First user
+      totalRelayers: BigInt(0),
       lastUpdated: BigInt(event.block.timestamp)
     };
   } else {
     systemStats = {
       ...systemStats,
-      totalMemories: systemStats.totalMemories + 1n,
+      totalMemories: systemStats.totalMemories + BigInt(1),
+      totalGasUsed: systemStats.totalGasUsed + event.params.gasUsed,
       lastUpdated: BigInt(event.block.timestamp)
     };
   }
@@ -73,8 +77,8 @@ RecallOSMemoryRegistry.MemoryBatchStored.handler(async ({ event, context }) => {
     count: event.params.count,
     blockNumber: BigInt(event.block.number),
     transactionHash: `${event.logIndex}`,
-    gasUsed: 0n,
-    gasPrice: 0n
+    gasUsed: event.params.gasUsed,
+    gasPrice: event.params.gasPrice
   };
   
   await context.MemoryBatchStored.set(memoryBatchStored);
@@ -85,17 +89,19 @@ RecallOSMemoryRegistry.MemoryBatchStored.handler(async ({ event, context }) => {
     user = {
       id: event.params.user,
       address: event.params.user,
-      totalMemories: 0n,
-      totalGasDeposited: 0n,
-      totalGasWithdrawn: 0n,
-      currentGasBalance: 0n,
+      totalMemories: BigInt(0),
+      totalGasDeposited: BigInt(0),
+      totalGasWithdrawn: BigInt(0),
+      totalGasUsed: BigInt(0),
+      currentGasBalance: BigInt(0),
       firstMemoryTimestamp: undefined,
       lastMemoryTimestamp: undefined
     };
   } else {
     user = {
       ...user,
-      totalMemories: user.totalMemories + event.params.count
+      totalMemories: user.totalMemories + event.params.count,
+      totalGasUsed: user.totalGasUsed + event.params.gasUsed
     };
   }
   await context.User.set(user);
@@ -106,16 +112,18 @@ RecallOSMemoryRegistry.MemoryBatchStored.handler(async ({ event, context }) => {
     systemStats = {
       id: "system",
       totalMemories: event.params.count, // First batch of memories
-      totalGasDeposited: 0n,
-      totalGasWithdrawn: 0n,
-      totalUsers: 1n, // First user
-      totalRelayers: 0n,
+      totalGasDeposited: BigInt(0),
+      totalGasWithdrawn: BigInt(0),
+      totalGasUsed: event.params.gasUsed,
+      totalUsers: BigInt(1), // First user
+      totalRelayers: BigInt(0),
       lastUpdated: BigInt(event.block.timestamp)
     };
   } else {
     systemStats = {
       ...systemStats,
       totalMemories: systemStats.totalMemories + event.params.count,
+      totalGasUsed: systemStats.totalGasUsed + event.params.gasUsed,
       lastUpdated: BigInt(event.block.timestamp)
     };
   }
@@ -133,8 +141,8 @@ RecallOSMemoryRegistry.GasDeposited.handler(async ({ event, context }) => {
     newBalance: event.params.newBalance,
     blockNumber: BigInt(event.block.number),
     transactionHash: `${event.logIndex}`,
-    gasUsed: 0n,
-    gasPrice: 0n
+    gasUsed: event.params.gasUsed,
+    gasPrice: event.params.gasPrice
   };
   
   await context.GasDeposited.set(gasDeposited);
@@ -144,11 +152,12 @@ RecallOSMemoryRegistry.GasDeposited.handler(async ({ event, context }) => {
   if (!systemStats) {
     systemStats = {
       id: "system",
-      totalMemories: 0n,
+      totalMemories: BigInt(0),
       totalGasDeposited: event.params.amount,
-      totalGasWithdrawn: 0n,
-      totalUsers: 1n, // First user
-      totalRelayers: 0n,
+      totalGasWithdrawn: BigInt(0),
+      totalGasUsed: BigInt(0),
+      totalUsers: BigInt(1), // First user
+      totalRelayers: BigInt(0),
       lastUpdated: BigInt(event.block.timestamp)
     };
   } else {
@@ -172,8 +181,8 @@ RecallOSMemoryRegistry.GasDeducted.handler(async ({ event, context }) => {
     remainingBalance: event.params.remainingBalance,
     blockNumber: BigInt(event.block.number),
     transactionHash: `${event.logIndex}`,
-    gasUsed: 0n,
-    gasPrice: 0n
+    gasUsed: event.params.gasUsed,
+    gasPrice: event.params.gasPrice
   };
   
   await context.GasDeducted.set(gasDeducted);
@@ -190,8 +199,8 @@ RecallOSMemoryRegistry.GasWithdrawn.handler(async ({ event, context }) => {
     newBalance: event.params.newBalance,
     blockNumber: BigInt(event.block.number),
     transactionHash: `${event.logIndex}`,
-    gasUsed: 0n,
-    gasPrice: 0n
+    gasUsed: event.params.gasUsed,
+    gasPrice: event.params.gasPrice
   };
   
   await context.GasWithdrawn.set(gasWithdrawn);
@@ -201,11 +210,12 @@ RecallOSMemoryRegistry.GasWithdrawn.handler(async ({ event, context }) => {
   if (!systemStats) {
     systemStats = {
       id: "system",
-      totalMemories: 0n,
-      totalGasDeposited: 0n,
+      totalMemories: BigInt(0),
+      totalGasDeposited: BigInt(0),
       totalGasWithdrawn: event.params.amount, // First withdrawal
-      totalUsers: 1n, // First user
-      totalRelayers: 0n,
+      totalGasUsed: BigInt(0),
+      totalUsers: BigInt(1), // First user
+      totalRelayers: BigInt(0),
       lastUpdated: BigInt(event.block.timestamp)
     };
   } else {
@@ -228,8 +238,8 @@ RecallOSMemoryRegistry.RelayerAuthorized.handler(async ({ event, context }) => {
     authorized: event.params.authorized,
     blockNumber: BigInt(event.block.number),
     transactionHash: `${event.logIndex}`,
-    gasUsed: 0n,
-    gasPrice: 0n
+    gasUsed: event.params.gasUsed,
+    gasPrice: event.params.gasPrice
   };
   
   await context.RelayerAuthorized.set(relayerAuthorized);
@@ -258,19 +268,20 @@ RecallOSMemoryRegistry.RelayerAuthorized.handler(async ({ event, context }) => {
   if (!systemStats) {
     systemStats = {
       id: "system",
-      totalMemories: 0n,
-      totalGasDeposited: 0n,
-      totalGasWithdrawn: 0n,
-      totalUsers: 0n,
-      totalRelayers: isAuthorized ? 1n : 0n,
+      totalMemories: BigInt(0),
+      totalGasDeposited: BigInt(0),
+      totalGasWithdrawn: BigInt(0),
+      totalGasUsed: BigInt(0),
+      totalUsers: BigInt(0),
+      totalRelayers: isAuthorized ? BigInt(1) : BigInt(0),
       lastUpdated: BigInt(event.block.timestamp)
     };
   } else {
     let nextRelayers = systemStats.totalRelayers;
     if (isAuthorized && !wasAuthorized) {
-      nextRelayers = systemStats.totalRelayers + 1n;
+      nextRelayers = systemStats.totalRelayers + BigInt(1);
     } else if (!isAuthorized && wasAuthorized) {
-      nextRelayers = systemStats.totalRelayers > 0n ? systemStats.totalRelayers - 1n : 0n;
+      nextRelayers = systemStats.totalRelayers > BigInt(0) ? systemStats.totalRelayers - BigInt(1) : BigInt(0);
     }
 
     systemStats = {
