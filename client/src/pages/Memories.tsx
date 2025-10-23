@@ -432,8 +432,9 @@ export const Memories: React.FC = () => {
     query: string,
     filters: SearchFilters
   ) => {
-    if (!address) return
+    if (!address || !query.trim()) return
 
+    // Cancel any existing search
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
@@ -453,6 +454,9 @@ export const Memories: React.FC = () => {
       // Use the working /api/search endpoint for all searches
       const response = await MemoryService.searchMemories(address, query, filters, 1, 50, signal)
       
+      // Check if the search was aborted before setting results
+      if (signal?.aborted) return
+      
       // Set all the response data immediately
       setSearchResults(response)
       setSearchAnswer(response.answer || null)
@@ -469,10 +473,15 @@ export const Memories: React.FC = () => {
       if (err instanceof Error && err.name === 'AbortError') {
         return
       }
-      setSearchError('Failed to search memories')
-      // Error searching memories
+      // Only set error if not aborted
+      if (!abortControllerRef.current?.signal.aborted) {
+        setSearchError('Failed to search memories')
+      }
     } finally {
-      setIsSearching(false)
+      // Only set searching to false if not aborted
+      if (!abortControllerRef.current?.signal.aborted) {
+        setIsSearching(false)
+      }
     }
   }, [address])
 
@@ -550,16 +559,16 @@ export const Memories: React.FC = () => {
 
     // Set new timeout for debounced search
     debounceTimeoutRef.current = setTimeout(() => {
-      handleSearch(searchQuery.trim(), {})
-    }, 500)
+      // Only search if the query is still non-empty (user hasn't cleared it)
+      if (searchQuery.trim()) {
+        handleSearch(searchQuery.trim(), {})
+      }
+    }, 800) // Increased debounce time to 800ms for better UX
 
     // Cleanup function
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current)
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
       }
     }
   }, [searchQuery, handleSearch, handleClearSearch])
@@ -677,8 +686,10 @@ export const Memories: React.FC = () => {
                   type="text"
                   placeholder={isSearching ? "Searching..." : "Search memories..."}
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  disabled={isSearching}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    // Don't disable input while searching to allow continued typing
+                  }}
                   className={`w-full text-xs px-3 py-2 border focus:outline-none focus:ring-1 focus:ring-black bg-white ${
                     isSearching 
                       ? 'border-blue-300 text-gray-700' 
@@ -693,15 +704,14 @@ export const Memories: React.FC = () => {
               </div>
               <button
                 onClick={() => {
+                  // Cancel any pending search
+                  if (abortControllerRef.current) {
+                    abortControllerRef.current.abort()
+                  }
                   setSearchQuery('')
                   handleClearSearch()
                 }}
-                disabled={isSearching}
-                className={`text-xs px-3 py-2 border font-mono uppercase tracking-wide transition-colors ${
-                  isSearching
-                    ? 'text-gray-400 border-gray-200 bg-gray-50 cursor-not-allowed'
-                    : 'text-gray-600 hover:text-black border-gray-200 hover:bg-gray-100'
-                }`}
+                className="text-xs px-3 py-2 border font-mono uppercase tracking-wide transition-colors text-gray-600 hover:text-black border-gray-200 hover:bg-gray-100"
               >
                 Clear
               </button>

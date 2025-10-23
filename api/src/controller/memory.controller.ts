@@ -1485,13 +1485,28 @@ export class MemoryController {
 
       const preFilteredMemoryIds = preFilteredMemories.map(m => m.id);
 
+      // Tokenize query for better keyword matching
+      const queryTokens = (query as string)
+        .toLowerCase()
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(token => token.length > 2);
+      
+      // Build OR conditions for each token
+      const tokenConditions = queryTokens.flatMap(token => [
+        { content: { contains: token, mode: 'insensitive' as const } },
+        { summary: { contains: token, mode: 'insensitive' as const } },
+        { title: { contains: token, mode: 'insensitive' as const } },
+        { url: { contains: token, mode: 'insensitive' as const } },
+      ]);
+
       // Perform both keyword and semantic search in parallel
       const [keywordResults, semanticResults] = await Promise.all([
-        // Keyword search
+        // Keyword search with token-based matching
         prisma.memory.findMany({
           where: {
             ...whereConditions,
-            OR: [
+            OR: tokenConditions.length > 0 ? tokenConditions : [
               { content: { contains: query as string, mode: 'insensitive' } },
               { summary: { contains: query as string, mode: 'insensitive' } },
               { title: { contains: query as string, mode: 'insensitive' } },
@@ -1629,36 +1644,68 @@ export class MemoryController {
 
   private static calculateKeywordRelevance(memory: any, query: string): number {
     const queryLower = query.toLowerCase();
+    
+    // Tokenize the query for better matching
+    const queryTokens = queryLower
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(token => token.length > 2);
 
     let score = 0;
+    let matchedTokens = 0;
+    
+    const title = (memory.title || '').toLowerCase();
+    const summary = (memory.summary || '').toLowerCase();
+    const content = (memory.content || '').toLowerCase();
 
-    // Title matches get highest score
-    if (memory.title && memory.title.toLowerCase().includes(queryLower)) {
-      score += 0.4;
+    // Token-based matching with word boundaries
+    for (const token of queryTokens) {
+      const tokenRegex = new RegExp(`\\b${token}\\b`, 'gi');
+      
+      // Title matches get highest score
+      if (tokenRegex.test(title)) {
+        score += 0.4;
+        matchedTokens++;
+      }
+
+      // Summary matches get medium score
+      if (tokenRegex.test(summary)) {
+        score += 0.3;
+        matchedTokens++;
+      }
+
+      // Content matches get lower score
+      if (tokenRegex.test(content)) {
+        score += 0.2;
+        matchedTokens++;
+      }
     }
-
-    // Summary matches get medium score
-    if (memory.summary && memory.summary.toLowerCase().includes(queryLower)) {
-      score += 0.3;
+    
+    // Normalize by number of tokens
+    if (queryTokens.length > 0) {
+      score = score / queryTokens.length;
     }
-
-    // Content matches get lower score
-    if (memory.content && memory.content.toLowerCase().includes(queryLower)) {
+    
+    // Boost for exact phrase match
+    const exactPhraseRegex = new RegExp(`\\b${this.escapeRegex(queryLower)}\\b`, 'gi');
+    
+    if (exactPhraseRegex.test(title)) {
       score += 0.2;
     }
-
-    // Boost score for exact phrase matches
-    const exactPhraseRegex = new RegExp(`\\b${queryLower}\\b`, 'gi');
-
-    if (memory.title && exactPhraseRegex.test(memory.title)) {
-      score += 0.1;
+    
+    if (exactPhraseRegex.test(summary)) {
+      score += 0.15;
     }
-
-    if (memory.summary && exactPhraseRegex.test(memory.summary)) {
-      score += 0.1;
-    }
+    
+    // Boost based on token coverage
+    const coverageRatio = queryTokens.length > 0 ? matchedTokens / queryTokens.length : 0;
+    score = score * (1 + (coverageRatio * 0.3));
 
     return Math.min(1, score);
+  }
+  
+  private static escapeRegex(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   static async processMemoryForMesh(req: Request, res: Response) {

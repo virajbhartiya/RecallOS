@@ -2,7 +2,7 @@
 
 > A blockchain-verified, AI-powered knowledge graph for capturing, organizing, and retrieving your digital context.
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - Node.js 18+
@@ -96,7 +96,7 @@ npm run build
 
 ---
 
-## 📋 Contract Addresses
+## Contract Addresses
 
 ### Sepolia Testnet (Current Deployment)
 
@@ -121,7 +121,7 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -165,7 +165,7 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
 
 ---
 
-## 🧠 Core Features
+## Core Features
 
 ### 1. Intelligent Capture
 - **Browser Extension**: Automatic capture of web content as you browse
@@ -206,7 +206,7 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 RecallOS/
@@ -257,7 +257,7 @@ RecallOS/
 
 ---
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 ### Frontend
 - React 18 with TypeScript
@@ -299,7 +299,7 @@ RecallOS/
 
 ---
 
-## 🔧 API Endpoints
+## API Endpoints
 
 ### Memory Management
 - `POST /api/memory/processRawContent` - Store new memory
@@ -339,7 +339,7 @@ RecallOS/
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -371,7 +371,7 @@ ETHERSCAN_API_KEY=your_key
 
 ---
 
-## 🚀 Usage
+## Usage
 
 ### Capturing Memories
 
@@ -476,7 +476,7 @@ contract.withdrawGas(amountInWei)
 
 ---
 
-## 🧪 Development
+## Development
 
 ### Running Tests
 
@@ -550,7 +550,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## 🚀 Deployment
+## Deployment
 
 ### API (Railway/Render)
 1. Create PostgreSQL database with pgvector
@@ -581,7 +581,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Extension not capturing
 - Check extension is enabled
@@ -620,7 +620,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## 📊 Performance
+## Performance
 
 ### Ingestion
 - **Synchronous**: 2-5 seconds
@@ -644,7 +644,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## 🔒 Security
+## Security
 
 - **Authentication**: Wallet-based, no passwords
 - **Data Isolation**: User-scoped queries
@@ -657,7 +657,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
 ### Phase 1 (Current)
 - ✅ Browser extension
@@ -692,13 +692,13 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ---
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🆘 Support
+## Support
 
 - **Documentation**: See `/docs` folder
 - **Issues**: GitHub Issues
@@ -707,7 +707,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - OpenZeppelin for smart contract libraries
 - Prisma for excellent ORM
@@ -717,7 +717,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## 📚 Citation
+## Citation
 
 If you use RecallOS in your research, please cite:
 
@@ -732,4 +732,4 @@ If you use RecallOS in your research, please cite:
 
 ---
 
-**Built with ❤️ by the RecallOS team**
+**Built by the RecallOS team**

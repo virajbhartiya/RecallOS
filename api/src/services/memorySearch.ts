@@ -26,6 +26,24 @@ function normalizeText(text: string): string {
     .slice(0, 8000);
 }
 
+function tokenizeQuery(query: string): string[] {
+  // Extract meaningful tokens from the query
+  return query
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ') // Remove punctuation
+    .split(/\s+/)
+    .filter(token => token.length > 2) // Filter out short tokens
+    .filter(token => !STOP_WORDS.has(token)); // Remove stop words
+}
+
+// Common stop words to filter out
+const STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
+  'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
+  'to', 'was', 'will', 'with', 'the', 'this', 'but', 'they', 'have',
+  'had', 'what', 'when', 'where', 'who', 'which', 'why', 'how'
+]);
+
 function sha256Hex(input: string): string {
   return crypto.createHash('sha256').update(input).digest('hex');
 }
@@ -92,7 +110,10 @@ export async function searchMemories(params: {
   const salt = process.env.SEARCH_EMBED_SALT || 'recallos';
   const embeddingHash = sha256Hex(JSON.stringify({ model: 'text-embedding-004', values: embedding.slice(0, 64), salt }));
 
-  const rows = await prisma.$queryRawUnsafe<Array<{ id: string; title: string | null; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; score: number }>>(`
+  // Extract query tokens for keyword boosting
+  const queryTokens = tokenizeQuery(normalized);
+  
+  const rows = await prisma.$queryRawUnsafe<Array<{ id: string; title: string | null; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; content: string | null; score: number }>>(`
     WITH ranked AS (
       SELECT 
         m.id,
@@ -101,39 +122,87 @@ export async function searchMemories(params: {
         m.url,
         m.timestamp,
         m.hash,
-        GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}))) AS score,
+        m.content,
+        GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}))) AS semantic_score,
         ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY me.embedding <=> ${queryVecSql}) AS rn
       FROM memory_embeddings me
       JOIN memories m ON m.id = me.memory_id
       WHERE m.user_id = '${user.id}'::uuid
     )
-    SELECT id, title, summary, url, timestamp, hash, score
+    SELECT id, title, summary, url, timestamp, hash, content, semantic_score as score
     FROM ranked
-    WHERE rn = 1 AND score > 0.01
-    ORDER BY score DESC
-    LIMIT ${Number(limit)}
+    WHERE rn = 1 AND semantic_score > 0.0
+    ORDER BY semantic_score DESC
+    LIMIT ${Number(limit) * 3}
   `);
 
   
-  // Additional relevance filtering based on content analysis
-  const queryKeywords = normalized.toLowerCase().split(/\s+/).filter(word => word.length > 2);
-  const filteredRows = rows.filter(row => {
+  // Calculate hybrid scores combining semantic and keyword matching
+  const scoredRows = rows.map(row => {
     const title = (row.title || '').toLowerCase();
     const summary = (row.summary || '').toLowerCase();
-    const content = title + ' ' + summary;
+    const content = (row.content || '').toLowerCase();
+    const fullText = `${title} ${summary} ${content}`;
     
-    // For semantic search, be more lenient with keyword matching
-    // Only filter out results if they have very low semantic scores AND no keyword matches
-    if (row.score < 0.02) {
-      const hasRelevantKeywords = queryKeywords.some(keyword => 
-        content.includes(keyword.toLowerCase())
-      );
-      return hasRelevantKeywords;
+    // Calculate keyword match score using token-based matching
+    let keywordScore = 0;
+    let matchedTokens = 0;
+    
+    for (const token of queryTokens) {
+      const tokenRegex = new RegExp(`\\b${token}\\b`, 'gi');
+      
+      // Check title (highest weight)
+      if (tokenRegex.test(title)) {
+        keywordScore += 0.5;
+        matchedTokens++;
+      }
+      
+      // Check summary (medium weight)
+      if (tokenRegex.test(summary)) {
+        keywordScore += 0.3;
+        matchedTokens++;
+      }
+      
+      // Check content (lower weight)
+      if (tokenRegex.test(content)) {
+        keywordScore += 0.2;
+        matchedTokens++;
+      }
     }
     
-    // For higher semantic scores, trust the semantic similarity
-    return true;
+    // Normalize keyword score
+    if (queryTokens.length > 0) {
+      keywordScore = keywordScore / queryTokens.length;
+    }
+    
+    // Calculate token coverage ratio
+    const coverageRatio = queryTokens.length > 0 ? matchedTokens / queryTokens.length : 0;
+    
+    // Combine semantic and keyword scores
+    // Weight: 60% semantic, 40% keyword
+    const semanticScore = row.score;
+    const hybridScore = (semanticScore * 0.6) + (keywordScore * 0.4);
+    
+    // Boost score if query coverage is high
+    const boostedScore = hybridScore * (1 + (coverageRatio * 0.3));
+    
+    return {
+      ...row,
+      semantic_score: semanticScore,
+      keyword_score: keywordScore,
+      coverage_ratio: coverageRatio,
+      final_score: boostedScore,
+    };
   });
+  
+  // Sort by final score and apply relevance threshold
+  const filteredRows = scoredRows
+    .filter(row => {
+      // Keep results with good semantic score OR good keyword matches
+      return row.semantic_score >= 0.15 || row.keyword_score >= 0.3 || row.coverage_ratio >= 0.5;
+    })
+    .sort((a, b) => b.final_score - a.final_score)
+    .slice(0, Number(limit));
   
   const memoryIds = filteredRows.map(r => r.id);
 
@@ -302,7 +371,7 @@ ${bullets}`;
     url: r.url,
     timestamp: Number(r.timestamp),
     related_memories: relatedById.get(r.id) || [],
-    score: r.score,
+    score: r.final_score,
   }));
 
   
