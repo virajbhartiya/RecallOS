@@ -106,18 +106,16 @@ npm run build
 
 | Component | Address | Description |
 |-----------|---------|-------------|
-| **Proxy (Main Contract)** | `0xde662d9c6a0bb41ad82b3550177feaf4e43bd602` | Use this address for all integrations |
-| **Implementation** | `0x35af2cae8c7788e58dcf81b4d8637e54073cc6bc` | Internal implementation contract |
-| **Proxy Admin** | `0xB5f1377433865BE245586997A7042c564926b2e9` | Upgrade management |
+| **Proxy (Main Contract)** | `0x40b55b9634fcf2454c138fa5ed914ac7044f931b` | Use this address for all integrations |
 | **Contract Owner** | `0x01b7b2bC30c958bA3bC0852bF1BD4efB165281Ba` | Deployer address |
 
-**Block Explorer:** [Etherscan](https://sepolia.etherscan.io/address/0xde662d9c6a0bb41ad82b3550177feaf4e43bd602)
+**Block Explorer:** [Etherscan](https://sepolia.etherscan.io/address/0x40b55b9634fcf2454c138fa5ed914ac7044f931b)
 
 ### Environment Configuration
 
 Add to your `.env` file:
 ```bash
-MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
+MEMORY_REGISTRY_CONTRACT_ADDRESS=0x40b55b9634fcf2454c138fa5ed914ac7044f931b
 ```
 
 ---
@@ -128,40 +126,40 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
 ┌─────────────────────────────────────────────────────────────────┐
 │                        USER INTERFACES                          │
 ├─────────────────────────────────────────────────────────────────┤
-│  Browser Extension  │   Web Client (React)   │   SDK/MCP       │
+│  Browser Extension  │   Web Client (React)    │   SDK/MCP       │
 └──────────┬──────────┴────────────┬────────────┴──────────┬──────┘
            │                       │                       │
            └───────────────────────┼───────────────────────┘
-                                  │
-                    ┌─────────────▼─────────────┐
-                    │   Express.js API Server   │
-                    │  (Controllers & Routes)   │
-                    └─────────────┬─────────────┘
-                                  │
-        ┌─────────────┬───────────┼───────────┬─────────────┐
-        │             │           │           │             │
-   ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼────┐  ┌────▼────┐
-   │ Memory  │  │ Search  │ │ Content │ │ Deposit │  │Blockscout│
-   │Controller│  │Controller│ │Controller│ │Controller│  │Controller│
-   └────┬────┘  └────┬────┘ └────┬────┘ └────┬────┘  └────┬────┘
-        │            │           │           │             │
-        └────────────┴───────────┴───────────┴─────────────┘
-                                  │
-        ┌─────────────┬───────────┼───────────┬─────────────┐
-        │             │           │           │             │
-   ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼────┐  ┌────▼────┐
-   │   AI    │  │ Memory  │ │ Memory  │ │Blockchain│  │Blockscout│
-   │Provider │  │  Mesh   │ │ Search  │ │ Service  │  │  Prefetch│
-   └────┬────┘  └────┬────┘ └────┬────┘ └────┬────┘  └────┬────┘
-        │            │           │           │             │
-        └────────────┴───────────┴───────────┴─────────────┘
-                                  │
-        ┌─────────────┬───────────┼───────────┬─────────────┐
-        │             │           │           │             │
-   ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼────┐  ┌────▼────┐
-   │PostgreSQL│  │ pgvector│ │  Redis  │ │ Sepolia │  │ Blockscout│
-   │ Database │  │Embeddings│ │ Queue   │ │Blockchain│  │   API    │
-   └─────────┘  └─────────┘ └─────────┘ └─────────┘  └─────────┘
+                                   │
+                     ┌─────────────▼─────────────┐
+                     │   Express.js API Server   │
+                     │  (Controllers & Routes)   │
+                     └─────────────┬─────────────┘
+                                   │
+         ┌─────────────┬───────────┼───────────┬─────────────┐
+         │             │           │           │             │
+     ┌────▼─────┐ ┌────▼─────┐┌────▼─────┐┌────▼─────┐  ┌────▼─────┐
+     │ Memory   │ │ Search   ││ Content  ││ Deposit  │  │Blockscout│
+     │Controller│ │Controller││Controller││Controller│  │Controller│
+     └────┬─────┘ └────┬─────┘└────┬─────┘└────┬─────┘  └────┬─────┘
+          │            │           │           │             │
+          └────────────┴───────────┴───────────┴─────────────┘
+                                   │
+         ┌─────────────┬───────────┼───────────┬─────────────┐
+         │             │           │           │             │
+    ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼─────┐  ┌────▼─────┐
+    │   AI    │  │ Memory  │ │ Memory  │ │Blockchain│  │Blockscout│
+    │Provider │  │  Mesh   │ │ Search  │ │ Service  │  │  Prefetch│
+    └────┬────┘  └────┬────┘ └────┬────┘ └────┬─────┘  └────┬─────┘
+         │            │           │           │             │
+         └────────────┴───────────┴───────────┴─────────────┘
+                                    │
+          ┌─────────────┬───────────┼───────────┬─────────────┐
+          │             │           │           │             │
+     ┌────▼─────┐  ┌────▼─────┐ ┌────▼────┐ ┌────▼─────┐  ┌────▼──────┐
+     │PostgreSQL│  │ pgvector │ │  Redis  │ │ Sepolia  │  │ Blockscout│
+     │ Database │  │Embeddings│ │ Queue   │ │Blockchain│  │   API     │
+     └──────────┘  └──────────┘ └─────────┘ └──────────┘  └───────────┘
 ```
 
 ---
@@ -204,57 +202,6 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
 - **Topic Analysis**: Top topics, categories, sentiment distribution
 - **Transaction Monitoring**: Track pending/confirmed/failed states
 - **Retry Failed**: Automatic retry of failed blockchain writes
-
----
-
-## Project Structure
-
-```
-RecallOS/
-├── api/                     # Express.js API server
-│   ├── src/
-│   │   ├── controller/      # Request handlers
-│   │   ├── routes/          # Route definitions
-│   │   ├── services/        # Business logic
-│   │   ├── workers/         # Background jobs
-│   │   └── lib/             # Utilities
-│   └── prisma/
-│       └── schema.prisma    # Database schema
-│
-├── client/                  # React web app
-│   └── src/
-│       ├── pages/           # Landing, Memories, Search
-│       ├── components/      # UI components
-│       ├── contexts/        # State management
-│       └── services/        # API clients
-│
-├── extension/               # Chrome extension
-│   ├── src/
-│   │   ├── background.ts    # Service worker
-│   │   ├── content.ts       # Content script
-│   │   └── popup.tsx        # Popup UI
-│   └── public/
-│       └── manifest.json    # Extension manifest
-│
-├── contract/                # Solidity smart contracts
-│   ├── contracts/
-│   │   └── RecallOSMemoryRegistry.sol
-│   └── scripts/             # Deployment scripts
-│
-├── sdk/                     # TypeScript SDK
-│   └── src/
-│       ├── clients/         # API clients
-│       └── types.ts         # Type definitions
-│
-├── mcp-server/              # Model Context Protocol server
-│   └── src/
-│       ├── tools/           # MCP tools
-│       └── index.ts         # Server entry
-│
-└── docs/                    # Documentation
-    ├── HYPERINDEX_INTEGRATION.md
-    └── contract/DEPLOYMENT_GUIDE.md
-```
 
 ---
 
@@ -337,38 +284,6 @@ RecallOS/
 ### Blockchain
 - `GET /api/blockscout/transaction/:txHash` - Get transaction
 - `GET /api/blockscout/user/:userAddress/transactions` - User transactions
-
----
-
-## Configuration
-
-### Environment Variables
-
-**API (`api/.env`):**
-```bash
-DATABASE_URL=postgresql://user:pass@localhost:5432/recallos
-AI_PROVIDER=hybrid
-GEMINI_API_KEY=your_key
-SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
-RELAYER_PRIVATE_KEY=0x...
-MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
-REDIS_HOST=localhost
-REDIS_PORT=6379
-```
-
-**Client (`client/.env`):**
-```bash
-VITE_API_URL=http://localhost:3000
-VITE_CHAIN_ID=11155111
-VITE_WALLETCONNECT_PROJECT_ID=your_project_id
-```
-
-**Contract (`contract/.env`):**
-```bash
-SEPOLIA_RPC_URL=https://sepolia.infura.io/v3/YOUR_KEY
-DEPLOYER_PRIVATE_KEY=0x...
-ETHERSCAN_API_KEY=your_key
-```
 
 ---
 
@@ -657,80 +572,3 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 - **Blockchain Verification**: Immutable hashes
 
 ---
-
-## Roadmap
-
-### Phase 1 (Current)
-- ✅ Browser extension
-- ✅ Web client
-- ✅ Semantic search
-- ✅ Memory mesh
-- ✅ Blockchain anchoring
-- ✅ Gas deposit system
-- ✅ SDK
-- ✅ MCP server
-
-### Phase 2 (Q1 2025)
-- [ ] Mobile apps (iOS, Android)
-- [ ] Multi-chain support (Ethereum, Polygon, Arbitrum)
-- [ ] Enhanced AI features (GPT-4, Claude)
-- [ ] Collaborative memory sharing
-- [ ] Advanced analytics dashboard
-
-### Phase 3 (Q2 2025)
-- [ ] Decentralized storage (IPFS, Arweave)
-- [ ] Cross-device sync
-- [ ] Memory versioning
-- [ ] API rate limiting
-- [ ] Premium features
-
-### Phase 4 (Q3 2025)
-- [ ] Email integration
-- [ ] Slack/Discord bots
-- [ ] Twitter/social media capture
-- [ ] Calendar integration
-- [ ] Meeting transcription
-
----
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-## Support
-
-- **Documentation**: See `/docs` folder
-- **Issues**: GitHub Issues
-- **Discord**: [Join our Discord](#)
-- **Email**: support@recallos.io
-
----
-
-## Acknowledgments
-
-- OpenZeppelin for smart contract libraries
-- Prisma for excellent ORM
-- pgvector for vector similarity search
-- Google Gemini for AI capabilities
-- Ethereum community for blockchain infrastructure
-
----
-
-## Citation
-
-If you use RecallOS in your research, please cite:
-
-```bibtex
-@software{recallos2024,
-  title = {RecallOS: Decentralized Personal Memory System},
-  author = {RecallOS Team},
-  year = {2024},
-  url = {https://github.com/your-org/recallos}
-}
-```
-
----
-
-**Built by the RecallOS team**
