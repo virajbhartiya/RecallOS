@@ -2,9 +2,22 @@
   "manifest_version": 3,
   "name": "RecallOS",
   "version": "0.1.0",
+  "description": "Blockchain-verified, AI-powered knowledge graph for capturing and retrieving your digital context.",
+  "icons": {
+    "16": "logo.png",
+    "32": "logo.png",
+    "48": "logo.png",
+    "128": "logo.png"
+  },
   "action": {
     "default_title": "RecallOS",
-    "default_popup": "popup.html"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "logo.png",
+      "32": "logo.png",
+      "48": "logo.png",
+      "128": "logo.png"
+    }
   },
   "background": {
     "service_worker": "background.js",

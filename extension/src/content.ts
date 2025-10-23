@@ -1,6 +1,5 @@
 
 // Chrome extension types
-declare const chrome: any;
 
 interface ContextData {
   source: string;
@@ -1371,7 +1370,7 @@ function createRecallOSIcon(): HTMLElement {
   const icon = document.createElement('div');
   icon.id = 'recallos-extension-icon';
   icon.innerHTML = `
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http:
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" fill="currentColor"/>
       <path d="M19 15L19.5 17.5L22 18L19.5 18.5L19 21L18.5 18.5L16 18L18.5 17.5L19 15Z" fill="currentColor"/>
       <path d="M5 15L5.5 17.5L8 18L5.5 18.5L5 21L4.5 18.5L2 18L4.5 17.5L5 15Z" fill="currentColor"/>
@@ -1380,38 +1379,43 @@ function createRecallOSIcon(): HTMLElement {
   
   icon.style.cssText = `
     position: absolute !important;
-    right: 80px !important;
+    right: 12px !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
-    width: 24px !important;
-    height: 24px !important;
+    width: 32px !important;
+    height: 32px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    color: #8e8ea0 !important;
+    color: #10a37f !important;
     cursor: pointer !important;
-    border-radius: 6px !important;
+    border-radius: 8px !important;
     transition: all 0.2s ease !important;
     z-index: 99999 !important;
-    background: rgba(0, 0, 0, 0.1) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    padding: 2px !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    background: rgba(16, 163, 127, 0.1) !important;
+    border: 1px solid rgba(16, 163, 127, 0.2) !important;
+    padding: 0 !important;
+    box-shadow: 0 2px 12px rgba(16, 163, 127, 0.15) !important;
     visibility: visible !important;
     opacity: 1 !important;
     pointer-events: auto !important;
+    backdrop-filter: blur(8px) !important;
   `;
   
   icon.addEventListener('mouseenter', () => {
-    icon.style.color = '#10a37f';
-    icon.style.backgroundColor = 'rgba(16, 163, 127, 0.1)';
-    icon.style.transform = 'translateY(-50%) scale(1.1)';
+    icon.style.color = '#ffffff';
+    icon.style.backgroundColor = '#10a37f';
+    icon.style.borderColor = '#10a37f';
+    icon.style.transform = 'translateY(-50%) scale(1.05)';
+    icon.style.boxShadow = '0 4px 16px rgba(16, 163, 127, 0.3)';
   });
   
   icon.addEventListener('mouseleave', () => {
-    icon.style.color = '#8e8ea0';
-    icon.style.backgroundColor = 'transparent';
+    icon.style.color = '#10a37f';
+    icon.style.backgroundColor = 'rgba(16, 163, 127, 0.1)';
+    icon.style.borderColor = 'rgba(16, 163, 127, 0.2)';
     icon.style.transform = 'translateY(-50%) scale(1)';
+    icon.style.boxShadow = '0 2px 12px rgba(16, 163, 127, 0.15)';
   });
   
   icon.addEventListener('click', async () => {
@@ -1472,27 +1476,28 @@ async function showRecallOSStatus(): Promise<void> {
     position: fixed;
     top: 20px;
     right: 20px;
-    background: #343541;
+    background: rgba(16, 163, 127, 0.95);
     color: white;
-    padding: 12px 16px;
-    border-radius: 8px;
+    padding: 16px 20px;
+    border-radius: 12px;
     font-size: 14px;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 24px rgba(16, 163, 127, 0.3);
     z-index: 10000;
-    max-width: 300px;
-    border: 1px solid #565869;
+    max-width: 320px;
+    border: 1px solid rgba(16, 163, 127, 0.3);
+    backdrop-filter: blur(12px);
   `;
   
-  tooltip.innerHTML = `
-    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-      <div style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; animation: pulse 1s infinite;"></div>
-      <strong>RecallOS Extension</strong>
-    </div>
-    <div style="font-size: 12px; color: #c5c5d2;">
-      Checking status...
-    </div>
-  `;
+    tooltip.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+        <div style="width: 8px; height: 8px; border-radius: 50%; background: #ffffff; animation: pulse 1s infinite;"></div>
+        <strong>RecallOS Extension</strong>
+      </div>
+      <div style="font-size: 12px; color: rgba(255, 255, 255, 0.8);">
+        Checking status...
+      </div>
+    `;
   
   document.body.appendChild(tooltip);
   
@@ -1512,12 +1517,12 @@ async function showRecallOSStatus(): Promise<void> {
         <div style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColor};"></div>
         <strong>RecallOS Extension</strong>
       </div>
-      <div style="font-size: 12px; color: #c5c5d2;">
+      <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9);">
         <div>Wallet: ${walletStatus}</div>
         <div>API: ${apiStatus}</div>
         ${walletAddress ? `Address: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : ''}
       </div>
-      <div style="font-size: 11px; color: #8e8ea0; margin-top: 8px;">
+      <div style="font-size: 11px; color: rgba(255, 255, 255, 0.7); margin-top: 8px;">
         Memories are automatically injected as you type (1.5s delay). Click to check status.
       </div>
     `;
@@ -1528,7 +1533,7 @@ async function showRecallOSStatus(): Promise<void> {
         <div style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></div>
         <strong>RecallOS Extension</strong>
       </div>
-      <div style="font-size: 12px; color: #c5c5d2;">
+      <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9);">
         Error checking status
       </div>
     `;
@@ -1707,15 +1712,15 @@ function setupChatGPTIntegration(): void {
   
   if (chatGPTInput && !originalSendHandler) {
     
-    const inputHandler = (e) => {
+    const inputHandler = (e: Event) => {
       handleTyping();
     };
     
-    const keyupHandler = (e) => {
+    const keyupHandler = (e: Event) => {
       handleTyping();
     };
     
-    const pasteHandler = (e) => {
+    const pasteHandler = (e: Event) => {
       setTimeout(handleTyping, 100);
     };
     
@@ -1913,7 +1918,7 @@ function debugChatGPTElements(): void {
   findChatGPTElements();
   if (chatGPTInput) {
     
-    const inputHandler = (e) => {
+    const inputHandler = (e: Event) => {
       handleTyping();
     };
     
