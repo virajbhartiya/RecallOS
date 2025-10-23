@@ -33,7 +33,7 @@
     }
   ],
   "permissions": ["activeTab", "scripting", "tabs", "storage", "webNavigation"],
-  "host_permissions": ["<all_urls>", "*://chatgpt.com/*", "*://*.chatgpt.com/*", "*://openai.com/*", "*://*.openai.com/*"],
+  "host_permissions": ["<all_urls>", "*://chatgpt.com/*", "*://*.chatgpt.com/*", "*://openai.com/*", "*://*.openai.com/*", "*://claude.ai/*", "*://*.claude.ai/*", "*://anthropic.com/*", "*://*.anthropic.com/*"],
   "web_accessible_resources": [
     {
       "resources": ["content.js"],
