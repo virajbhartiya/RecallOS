@@ -1390,9 +1390,9 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           )
           SELECT id, summary, url, timestamp, hash, score
           FROM ranked
-          WHERE rn = 1 AND score > 0.01
+          WHERE rn = 1 AND score > 0.0
           ORDER BY score DESC
-          LIMIT ${limit}
+          LIMIT ${limit * 2}
         `);
         
         // Get full memory objects for the results
@@ -1401,13 +1401,57 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           where: { id: { in: memoryIds } }
         });
         
-        return rows.map(row => {
-          const fullMemory = fullMemories.find(m => m.id === row.id);
-          return {
-            ...fullMemory,
-            similarity_score: row.score
-          };
-        });
+        // Tokenize query for keyword boosting
+        const queryTokens = query
+          .toLowerCase()
+          .replace(/[^\w\s]/g, ' ')
+          .split(/\s+/)
+          .filter(token => token.length > 2);
+        
+        // Score and filter results
+        const scoredResults = rows
+          .map(row => {
+            const fullMemory = fullMemories.find(m => m.id === row.id);
+            if (!fullMemory) return null;
+            
+            // Calculate keyword match bonus
+            const title = (fullMemory.title || '').toLowerCase();
+            const summary = (fullMemory.summary || '').toLowerCase();
+            const content = (fullMemory.content || '').toLowerCase();
+            
+            let keywordBonus = 0;
+            let matchedTokens = 0;
+            
+            for (const token of queryTokens) {
+              const tokenRegex = new RegExp(`\\b${token}\\b`, 'i');
+              if (tokenRegex.test(title)) {
+                keywordBonus += 0.15;
+                matchedTokens++;
+              }
+              if (tokenRegex.test(summary)) {
+                keywordBonus += 0.1;
+                matchedTokens++;
+              }
+              if (tokenRegex.test(content)) {
+                keywordBonus += 0.05;
+                matchedTokens++;
+              }
+            }
+            
+            const coverageRatio = queryTokens.length > 0 ? matchedTokens / queryTokens.length : 0;
+            const finalScore = row.score + (keywordBonus * coverageRatio);
+            
+            return {
+              ...fullMemory,
+              similarity_score: finalScore
+            };
+          })
+          .filter((result): result is NonNullable<typeof result> => result !== null)
+          .filter(result => result.similarity_score >= 0.15)
+          .sort((a, b) => b.similarity_score - a.similarity_score)
+          .slice(0, limit);
+        
+        return scoredResults;
       }
 
       // Fallback: keyword search on metadata/title/summary
