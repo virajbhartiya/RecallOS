@@ -12,7 +12,7 @@ interface NotificationProviderProps {
 
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
   const openTxToast = async (_chainId: string, txHash: string) => {
-    // Simple implementation that opens Blockscout in a new tab
+    // Open Blockscout transaction explorer in a new tab
     const blockscoutUrl = `https://eth-sepolia.blockscout.com/tx/${txHash}`
     window.open(blockscoutUrl, '_blank')
   }

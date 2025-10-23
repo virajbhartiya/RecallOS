@@ -65,7 +65,7 @@ export class BlockscoutController {
       await blockscoutQueue.add('prefetch-transaction', { txHash, network })
 
       res.json({ 
-        message: 'Transaction prefetch initiated',
+        message: 'Blockscout transaction prefetch initiated',
         txHash,
         network 
       })
@@ -90,7 +90,7 @@ export class BlockscoutController {
       const cachedData = await BlockscoutPrefetchService.getCachedTransaction(txHash)
 
       if (!cachedData) {
-        res.status(404).json({ error: 'Transaction not found in cache' })
+        res.status(404).json({ error: 'Transaction not found in Blockscout cache' })
         return
       }
 
@@ -127,7 +127,7 @@ export class BlockscoutController {
       await blockscoutQueue.add('batch-prefetch', { transactions: validTransactions })
 
       res.json({ 
-        message: 'Batch prefetch initiated',
+        message: 'Blockscout batch prefetch initiated',
         count: validTransactions.length 
       })
     } catch (error) {
@@ -153,7 +153,7 @@ export class BlockscoutController {
       if (!cachedData) {
         res.json({ 
           status: 'not_found',
-          message: 'Transaction not in cache'
+          message: 'Transaction not in Blockscout cache'
         })
         return
       }
@@ -177,7 +177,7 @@ export class BlockscoutController {
     try {
       await blockscoutQueue.add('cleanup-old-pending', {})
 
-      res.json({ message: 'Cleanup job initiated' })
+      res.json({ message: 'Blockscout cleanup job initiated' })
     } catch (error) {
       console.error('Error triggering cleanup:', error)
       res.status(500).json({ error: 'Failed to trigger cleanup' })

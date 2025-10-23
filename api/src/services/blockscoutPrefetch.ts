@@ -219,7 +219,7 @@ export class BlockscoutPrefetchService {
       }
       
     } catch (error) {
-      console.error(`Failed to prefetch transaction ${txHash}:`, error)
+      console.error(`Failed to prefetch Blockscout transaction ${txHash}:`, error)
       // Schedule retry
       await this.scheduleRecheck(txHash, network, 30000) // Retry in 30 seconds
     }
@@ -276,7 +276,7 @@ export class BlockscoutPrefetchService {
         cached_at: cached.updated_at
       }
     } catch (error) {
-      console.error(`Failed to get cached transaction ${txHash}:`, error)
+      console.error(`Failed to get cached Blockscout transaction ${txHash}:`, error)
       return null
     }
   }
@@ -304,7 +304,7 @@ export class BlockscoutPrefetchService {
       const stats = await response.json()
       return parseInt(stats.total_blocks) || 0
     } catch (error) {
-      console.error(`Failed to get current block for ${network}:`, error)
+      console.error(`Failed to get current block from Blockscout for ${network}:`, error)
       return 0
     }
   }
