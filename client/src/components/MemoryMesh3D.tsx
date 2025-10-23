@@ -103,7 +103,7 @@ interface MemoryEdgeProps {
   relationType?: string
 }
 
-const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity, relationType }) => {
+const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
   const points = useMemo(() => [
     new THREE.Vector3(...start),
     new THREE.Vector3(...end)

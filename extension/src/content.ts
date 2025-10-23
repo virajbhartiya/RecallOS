@@ -1111,9 +1111,12 @@ document.addEventListener('mousemove', () => {
   }, 3000);
 });
 
-let isChatGPT = false;
-let chatGPTInput: HTMLTextAreaElement | null = null;
-let chatGPTSendButton: HTMLButtonElement | null = null;
+// AI Chat Platform Detection
+type AIChatPlatform = 'chatgpt' | 'claude' | 'none';
+
+let currentPlatform: AIChatPlatform = 'none';
+let chatInput: HTMLTextAreaElement | HTMLElement | null = null;
+let chatSendButton: HTMLButtonElement | null = null;
 let originalSendHandler: ((event: Event) => void) | null = null;
 let isProcessingMemory = false;
 let recallOSIcon: HTMLElement | null = null;
@@ -1121,9 +1124,20 @@ let typingTimeout: ReturnType<typeof setTimeout> | null = null;
 let lastTypedText = '';
 let isAutoInjecting = false;
 
-function detectChatGPT(): boolean {
+function detectAIChatPlatform(): AIChatPlatform {
   const hostname = window.location.hostname;
-  return hostname.includes('chatgpt.com') || hostname.includes('openai.com');
+  
+  // ChatGPT detection
+  if (hostname.includes('chatgpt.com') || hostname.includes('openai.com')) {
+    return 'chatgpt';
+  }
+  
+  // Claude detection
+  if (hostname.includes('claude.ai') || hostname.includes('anthropic.com')) {
+    return 'claude';
+  }
+  
+  return 'none';
 }
 
 async function pollSearchJob(jobId: string): Promise<string | null> {
@@ -1268,18 +1282,18 @@ async function getApiEndpointForMemory(): Promise<string> {
 }
 
 function injectMemorySummary(summary: string, originalMessage: string): void {
-  if (!chatGPTInput) return;
+  if (!chatInput) return;
   
   const combinedMessage = `[RecallOS Memory Context]\n${summary}\n\n[Your Question]\n${originalMessage}`;
   
-  if (chatGPTInput.tagName === 'TEXTAREA') {
-    (chatGPTInput as HTMLTextAreaElement).value = combinedMessage;
+  if (chatInput.tagName === 'TEXTAREA') {
+    (chatInput as HTMLTextAreaElement).value = combinedMessage;
     const inputEvent = new Event('input', { bubbles: true });
-    chatGPTInput.dispatchEvent(inputEvent);
-  } else if (chatGPTInput.contentEditable === 'true') {
-    chatGPTInput.textContent = combinedMessage;
+    chatInput.dispatchEvent(inputEvent);
+  } else if ((chatInput as HTMLElement).contentEditable === 'true') {
+    chatInput.textContent = combinedMessage;
     const inputEvent = new Event('input', { bubbles: true });
-    chatGPTInput.dispatchEvent(inputEvent);
+    chatInput.dispatchEvent(inputEvent);
   }
 }
 
@@ -1336,19 +1350,19 @@ async function autoInjectMemories(userText: string): Promise<void> {
 }
 
 function getCurrentInputText(): string {
-  if (!chatGPTInput) return '';
+  if (!chatInput) return '';
   
-  if (chatGPTInput.tagName === 'TEXTAREA') {
-    return (chatGPTInput as HTMLTextAreaElement).value?.trim() || '';
-  } else if (chatGPTInput.contentEditable === 'true') {
-    return chatGPTInput.textContent?.trim() || '';
+  if (chatInput.tagName === 'TEXTAREA') {
+    return (chatInput as HTMLTextAreaElement).value?.trim() || '';
+  } else if ((chatInput as HTMLElement).contentEditable === 'true') {
+    return chatInput.textContent?.trim() || '';
   }
   
   return '';
 }
 
 function handleTyping(): void {
-  if (!chatGPTInput) return;
+  if (!chatInput) return;
   
   const currentText = getCurrentInputText();
   
@@ -1512,15 +1526,17 @@ async function showRecallOSStatus(): Promise<void> {
     const overallStatus = walletAddress && apiHealthy ? 'Connected' : 'Not Connected';
     const statusColor = overallStatus === 'Connected' ? '#10a37f' : '#ef4444';
     
+    const platformName = currentPlatform === 'chatgpt' ? 'ChatGPT' : currentPlatform === 'claude' ? 'Claude' : 'Unknown';
+    
     tooltip.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
         <div style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColor};"></div>
-        <strong>RecallOS Extension</strong>
+        <strong>RecallOS on ${platformName}</strong>
       </div>
       <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9);">
         <div>Wallet: ${walletStatus}</div>
         <div>API: ${apiStatus}</div>
-        ${walletAddress ? `Address: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}` : ''}
+        ${walletAddress ? `<div>Address: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}</div>` : ''}
       </div>
       <div style="font-size: 11px; color: rgba(255, 255, 255, 0.7); margin-top: 8px;">
         Memories are automatically injected as you type (1.5s delay). Click to check status.
@@ -1546,57 +1562,87 @@ async function showRecallOSStatus(): Promise<void> {
   }, 6000);
 }
 
-function findChatGPTElements(): void {
-  const inputSelectors = [
-    'div[contenteditable="true"]',
-    'textarea[placeholder*="Ask anything"]',
-    'textarea[placeholder*="Message"]',
-    'textarea[placeholder*="Send a message"]',
-    'textarea[placeholder*="Type a message"]',
-    'textarea[role="textbox"]',
-    'textarea',
-    'input[type="text"]'
-  ];
+function findChatInputElements(): void {
+  let inputSelectors: string[] = [];
+  let buttonSelectors: string[] = [];
   
+  if (currentPlatform === 'chatgpt') {
+    inputSelectors = [
+      'div[contenteditable="true"]',
+      'textarea[placeholder*="Ask anything"]',
+      'textarea[placeholder*="Message"]',
+      'textarea[placeholder*="Send a message"]',
+      'textarea[placeholder*="Type a message"]',
+      'textarea[role="textbox"]',
+      'textarea',
+      'input[type="text"]'
+    ];
+    
+    buttonSelectors = [
+      'button[data-testid*="send"]',
+      'button[aria-label*="Send"]',
+      'button[title*="Send"]',
+      'button[aria-label*="Submit"]',
+      'button[type="submit"]',
+      'button:has(svg)',
+      'button[class*="send"]',
+      'button[class*="submit"]',
+      'button'
+    ];
+  } else if (currentPlatform === 'claude') {
+    inputSelectors = [
+      'div[contenteditable="true"][role="textbox"]',
+      'div[contenteditable="true"]',
+      'textarea[placeholder*="Reply"]',
+      'textarea[placeholder*="Talk to Claude"]',
+      'textarea[placeholder*="Message"]',
+      'textarea[placeholder*="Ask"]',
+      'div.ProseMirror',
+      'textarea',
+      'input[type="text"]'
+    ];
+    
+    buttonSelectors = [
+      'button[aria-label*="Send"]',
+      'button[title*="Send"]',
+      'button[aria-label*="Submit"]',
+      'button[type="submit"]',
+      'button:has(svg)',
+      'button[class*="send"]',
+      'button[class*="submit"]',
+      'button'
+    ];
+  }
+  
+  // Find input element
   for (const selector of inputSelectors) {
     const element = document.querySelector(selector) as HTMLElement;
     if (element && element.offsetParent !== null) {
-      chatGPTInput = element as any;
+      chatInput = element as any;
       break;
     }
   }
 
-  const buttonSelectors = [
-    'button[data-testid*="send"]',
-    'button[aria-label*="Send"]',
-    'button[title*="Send"]',
-    'button[aria-label*="Submit"]',
-    'button[type="submit"]',
-    'button:has(svg)',
-    'button[class*="send"]',
-    'button[class*="submit"]',
-    'button'
-  ];
-  
+  // Find send button
   for (const selector of buttonSelectors) {
     const element = document.querySelector(selector) as HTMLButtonElement;
     if (element && element.offsetParent !== null) {
-      chatGPTSendButton = element;
+      chatSendButton = element;
       break;
     }
   }
 }
 
-function setupChatGPTIntegration(): void {
-  if (!isChatGPT) return;
+function setupAIChatIntegration(): void {
+  if (currentPlatform === 'none') return;
   
   if (originalSendHandler) {
     return;
   }
   
-  findChatGPTElements();
+  findChatInputElements();
   
-  if (chatGPTInput && !recallOSIcon) {
+  if (chatInput && !recallOSIcon) {
     
     const containerSelectors = [
       'div[class*="input"]',
@@ -1611,7 +1657,7 @@ function setupChatGPTIntegration(): void {
     
     let inputContainer: Element | null = null;
     for (const selector of containerSelectors) {
-      const container = chatGPTInput.closest(selector);
+      const container = (chatInput as HTMLElement).closest(selector);
       if (container) {
         inputContainer = container;
         break;
@@ -1619,7 +1665,7 @@ function setupChatGPTIntegration(): void {
     }
     
     if (!inputContainer) {
-      inputContainer = chatGPTInput.parentElement;
+      inputContainer = (chatInput as HTMLElement).parentElement;
     }
     
     if (inputContainer) {
@@ -1639,9 +1685,9 @@ function setupChatGPTIntegration(): void {
       const ensureIconVisible = () => {
         if (!recallOSIcon || !document.body.contains(recallOSIcon)) {
           
-          findChatGPTElements();
+          findChatInputElements();
           
-          if (chatGPTInput) {
+          if (chatInput) {
             let newContainer: Element | null = null;
             const containerSelectors = [
               'div[class*="input"]',
@@ -1655,7 +1701,7 @@ function setupChatGPTIntegration(): void {
             ];
             
             for (const selector of containerSelectors) {
-              const container = chatGPTInput.closest(selector);
+              const container = (chatInput as HTMLElement).closest(selector);
               if (container) {
                 newContainer = container;
                 break;
@@ -1663,7 +1709,7 @@ function setupChatGPTIntegration(): void {
             }
             
             if (!newContainer) {
-              newContainer = chatGPTInput.parentElement;
+              newContainer = (chatInput as HTMLElement).parentElement;
             }
             
             if (newContainer && document.body.contains(newContainer)) {
@@ -1710,7 +1756,7 @@ function setupChatGPTIntegration(): void {
     } 
   }
   
-  if (chatGPTInput && !originalSendHandler) {
+  if (chatInput && !originalSendHandler) {
     
     const inputHandler = (e: Event) => {
       handleTyping();
@@ -1724,13 +1770,13 @@ function setupChatGPTIntegration(): void {
       setTimeout(handleTyping, 100);
     };
     
-    chatGPTInput.addEventListener('input', inputHandler, true);
-    chatGPTInput.addEventListener('keyup', keyupHandler, true);
-    chatGPTInput.addEventListener('paste', pasteHandler, true);
+    chatInput.addEventListener('input', inputHandler, true);
+    chatInput.addEventListener('keyup', keyupHandler, true);
+    chatInput.addEventListener('paste', pasteHandler, true);
     
-    if (chatGPTInput.contentEditable === 'true') {
+    if ((chatInput as HTMLElement).contentEditable === 'true') {
       document.addEventListener('input', (e) => {
-        if (e.target === chatGPTInput) {
+        if (e.target === chatInput) {
           handleTyping();
         }
       }, true);
@@ -1743,7 +1789,7 @@ function setupChatGPTIntegration(): void {
         });
       });
       
-      contentObserver.observe(chatGPTInput, {
+      contentObserver.observe(chatInput as Node, {
         childList: true,
         subtree: true,
         characterData: true
@@ -1753,8 +1799,10 @@ function setupChatGPTIntegration(): void {
     
     
     originalSendHandler = () => {}; 
-  } else if (!chatGPTInput) {
+  } else if (!chatInput) {
+    console.log('RecallOS: No chat input found for event listeners');
   } else if (originalSendHandler) {
+    console.log('RecallOS: Event listeners already attached');
   }
 }
 
@@ -1780,7 +1828,7 @@ function addRecallOSStyles(): void {
   document.head.appendChild(style);
 }
 
-function waitForChatGPTReady(): Promise<void> {
+function waitForAIChatReady(): Promise<void> {
   return new Promise((resolve) => {
     let attempts = 0;
     const maxAttempts = 5;
@@ -1805,29 +1853,29 @@ function waitForChatGPTReady(): Promise<void> {
 }
 
 function trySetupImmediately(): void {
-  setupChatGPTIntegration();
+  setupAIChatIntegration();
   
   if (!recallOSIcon) {
     setTimeout(() => {
-      setupChatGPTIntegration();
+      setupAIChatIntegration();
     }, 3000);
     
     setTimeout(() => {
-      setupChatGPTIntegration();
+      setupAIChatIntegration();
     }, 6000);
   }
 }
 
-function initChatGPTIntegration(): void {
-  isChatGPT = detectChatGPT();
+function initAIChatIntegration(): void {
+  currentPlatform = detectAIChatPlatform();
   
-  if (isChatGPT) {
+  if (currentPlatform !== 'none') {
     addRecallOSStyles();
     
     trySetupImmediately();
     
-    waitForChatGPTReady().then(() => {
-      setupChatGPTIntegration();
+    waitForAIChatReady().then(() => {
+      setupAIChatIntegration();
     });
     
     let setupTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -1854,7 +1902,7 @@ function initChatGPTIntegration(): void {
           
           if (hasNewChatElements && !setupTimeout) {
             setupTimeout = setTimeout(() => {
-              setupChatGPTIntegration();
+              setupAIChatIntegration();
               setupTimeout = null;
             }, 1000);
           }
@@ -1862,7 +1910,7 @@ function initChatGPTIntegration(): void {
       });
     });
     
-    waitForChatGPTReady().then(() => {
+    waitForAIChatReady().then(() => {
       isWaitingForReady = false;
       observer.observe(document.body, {
         childList: true,
@@ -1875,19 +1923,19 @@ function initChatGPTIntegration(): void {
     const retrySetup = () => {
       if (!recallOSIcon && !originalSendHandler && retryCount < maxRetries) {
         retryCount++;
-        setupChatGPTIntegration();
+        setupAIChatIntegration();
         setTimeout(retrySetup, 3000);
       } else if (retryCount >= maxRetries) {
       }
     };
     
-    waitForChatGPTReady().then(() => {
+    waitForAIChatReady().then(() => {
       setTimeout(retrySetup, 2000);
     });
     
     const continuousIconMonitor = () => {
-      if (!recallOSIcon && isChatGPT) {
-        setupChatGPTIntegration();
+      if (!recallOSIcon && currentPlatform !== 'none') {
+        setupAIChatIntegration();
       }
     };
     
@@ -1895,16 +1943,14 @@ function initChatGPTIntegration(): void {
   }
 }
 
-function debugChatGPTElements(): void {
-  
-  if (chatGPTInput) {
-  }
-  
-  if (recallOSIcon) {
-  }
+function debugAIChatElements(): void {
+  console.log('RecallOS Debug Info:');
+  console.log('Platform:', currentPlatform);
+  console.log('Chat Input:', chatInput);
+  console.log('RecallOS Icon:', recallOSIcon);
 }
 
-(window as any).debugRecallOS = debugChatGPTElements;
+(window as any).debugRecallOS = debugAIChatElements;
 
 (window as any).triggerRecallOS = async () => {
   const currentText = getCurrentInputText();
@@ -1915,18 +1961,19 @@ function debugChatGPTElements(): void {
 };
 
 (window as any).setupRecallOSListeners = () => {
-  findChatGPTElements();
-  if (chatGPTInput) {
-    
+  findChatInputElements();
+  if (chatInput) {
+    console.log('RecallOS: Setting up listeners');
     const inputHandler = (e: Event) => {
       handleTyping();
     };
     
-    chatGPTInput.addEventListener('input', inputHandler, true);
-    chatGPTInput.addEventListener('keyup', inputHandler, true);
-    chatGPTInput.addEventListener('paste', inputHandler, true);
+    chatInput.addEventListener('input', inputHandler, true);
+    chatInput.addEventListener('keyup', inputHandler, true);
+    chatInput.addEventListener('paste', inputHandler, true);
     
   } else {
+    console.log('RecallOS: No chat input found');
   }
 };
 
@@ -1955,13 +2002,13 @@ function debugChatGPTElements(): void {
     walletAddress,
     apiEndpoint,
     apiHealthy,
-    isChatGPT,
-    chatGPTInput: !!chatGPTInput,
+    platform: currentPlatform,
+    chatInput: !!chatInput,
     recallOSIcon: !!recallOSIcon
   };
 };
 
-initChatGPTIntegration();
+initAIChatIntegration();
 
 document.addEventListener('input', (e) => {
   const target = e.target as HTMLElement;
@@ -1969,10 +2016,11 @@ document.addEventListener('input', (e) => {
     target.contentEditable === 'true' || 
     target.tagName === 'TEXTAREA' ||
     target.closest('[data-testid*="textbox"]') ||
-    target.closest('div[contenteditable="true"]')
+    target.closest('div[contenteditable="true"]') ||
+    target.closest('div[role="textbox"]')
   )) {
-    if (!chatGPTInput || !document.body.contains(chatGPTInput)) {
-      chatGPTInput = target as any;
+    if (!chatInput || !document.body.contains(chatInput)) {
+      chatInput = target as any;
     }
     handleTyping();
   }
@@ -1984,10 +2032,11 @@ document.addEventListener('keyup', (e) => {
     target.contentEditable === 'true' || 
     target.tagName === 'TEXTAREA' ||
     target.closest('[data-testid*="textbox"]') ||
-    target.closest('div[contenteditable="true"]')
+    target.closest('div[contenteditable="true"]') ||
+    target.closest('div[role="textbox"]')
   )) {
-    if (!chatGPTInput || !document.body.contains(chatGPTInput)) {
-      chatGPTInput = target as any;
+    if (!chatInput || !document.body.contains(chatInput)) {
+      chatInput = target as any;
     }
     handleTyping();
   }
