@@ -1,6 +1,7 @@
 # RecallOS - Decentralized Personal Memory System
 
 > A blockchain-verified, AI-powered knowledge graph for capturing, organizing, and retrieving your digital context.
+<img width="1920" height="1080" alt="Screenshot 2025-10-24 at 1 38 06 AM" src="https://github.com/user-attachments/assets/c4d5a12a-fb3f-4e41-8c8a-4b02bb081884" />
 
 ## Quick Start
 
