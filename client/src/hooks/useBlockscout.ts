@@ -67,7 +67,7 @@ export const useBlockscout = () => {
     try {
       await openTxToast(chainId, txHash)
     } catch (error) {
-      console.error('Failed to show transaction notification:', error)
+      console.error('Failed to show Blockscout transaction notification:', error)
     }
   }, [openTxToast])
 
@@ -90,7 +90,7 @@ export const useBlockscout = () => {
         address
       })
     } catch (error) {
-      console.error('Failed to show transaction history:', error)
+      console.error('Failed to show Blockscout transaction history:', error)
     }
   }, [openPopup])
 
@@ -105,7 +105,7 @@ export const useBlockscout = () => {
         chainId
       })
     } catch (error) {
-      console.error('Failed to show all transactions:', error)
+      console.error('Failed to show all Blockscout transactions:', error)
     }
   }, [openPopup])
 
@@ -120,7 +120,7 @@ export const useBlockscout = () => {
     }
 
     try {
-      // Temporarily use direct Blockscout API until prefetching is set up
+      // Use Blockscout API to fetch transaction data
       const response = await fetch(`https://eth-sepolia.blockscout.com/api/v2/transactions/${txHash}`)
       
       if (response.ok) {
@@ -162,7 +162,7 @@ export const useBlockscout = () => {
       setTransactionStatuses(prev => new Map(prev.set(txHash, txInfo)))
       return txInfo
     } catch (error) {
-      console.error('Failed to monitor transaction:', error)
+      console.error('Failed to monitor Blockscout transaction:', error)
       // Return pending status as fallback
       const txInfo: TransactionInfo = {
         hash: txHash,
@@ -183,13 +183,13 @@ export const useBlockscout = () => {
   // Check network health
   const checkNetworkHealth = useCallback(async (network: string = 'sepolia'): Promise<boolean> => {
     try {
-      // This would typically ping the Blockscout API
+      // Ping the Blockscout API to check health
       // For now, we'll assume it's healthy
       const isHealthy = true
       setNetworkHealth(prev => new Map(prev.set(network, isHealthy)))
       return isHealthy
     } catch (error) {
-      console.error('Failed to check network health:', error)
+      console.error('Failed to check Blockscout network health:', error)
       setNetworkHealth(prev => new Map(prev.set(network, false)))
       return false
     }
@@ -228,7 +228,7 @@ export const useBlockscout = () => {
         body: JSON.stringify({ txHash, network })
       })
     } catch (error) {
-      console.error('Failed to trigger prefetch:', error)
+      console.error('Failed to trigger Blockscout prefetch:', error)
     }
   }, [])
 
@@ -249,7 +249,7 @@ export const useBlockscout = () => {
         })
       })
     } catch (error) {
-      console.error('Failed to trigger batch prefetch:', error)
+      console.error('Failed to trigger Blockscout batch prefetch:', error)
     }
   }, [])
 

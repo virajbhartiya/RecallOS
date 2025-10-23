@@ -131,7 +131,7 @@ const MemoryDetails: React.FC<{
       <div className="p-4 sm:p-6">
         {/* Header Section */}
         <div className="mb-6">
-          <h3 className="text-lg sm:text-xl font-light text-gray-900 mb-3 leading-tight break-words">
+          <h3 className="text-lg sm:text-xl font-light text-gray-900 mb-3 leading-tight break-words overflow-wrap-anywhere">
             {memory.title || 'Untitled Memory'}
           </h3>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-sm font-mono text-gray-500">
@@ -148,11 +148,11 @@ const MemoryDetails: React.FC<{
         </div>
 
         {/* Status and Importance Section */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <div className="flex flex-col gap-4 mb-6">
           {memory.tx_status && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="flex flex-col gap-2">
               <span className="text-sm font-mono text-gray-600">[STATUS]</span>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className={`px-3 py-1 text-sm font-mono uppercase tracking-wide border ${
                   memory.tx_status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-200' :
                   memory.tx_status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
@@ -179,7 +179,7 @@ const MemoryDetails: React.FC<{
             </div>
           )}
           {memory.importance_score && (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="flex flex-col gap-2">
               <span className="text-sm font-mono text-gray-600">[IMPORTANCE]</span>
               <div className="flex items-center gap-2">
                 <div className="w-20 bg-gray-200 h-2 border border-gray-300">
@@ -200,7 +200,7 @@ const MemoryDetails: React.FC<{
           <div className="mb-6">
             <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SUMMARY]</h4>
             <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4">
-              <p className="text-sm text-gray-700 leading-relaxed break-words">
+              <p className="text-sm text-gray-700 leading-relaxed break-words overflow-wrap-anywhere">
                 {memory.summary}
               </p>
             </div>
@@ -209,7 +209,7 @@ const MemoryDetails: React.FC<{
 
         {memory.content && (
           <div className="mb-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <div className="flex flex-col gap-2 mb-3">
               <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide">[CONTENT]</h4>
               <button
                 onClick={() => setExpandedContent(!expandedContent)}
@@ -219,7 +219,7 @@ const MemoryDetails: React.FC<{
               </button>
             </div>
             <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4">
-              <p className={`text-sm text-gray-700 leading-relaxed break-words ${expandedContent ? '' : 'line-clamp-6'}`}>
+              <p className={`text-sm text-gray-700 leading-relaxed break-words overflow-wrap-anywhere ${expandedContent ? '' : 'line-clamp-6'}`}>
                 {memory.content}
               </p>
             </div>
@@ -234,7 +234,7 @@ const MemoryDetails: React.FC<{
                 href={memory.url} 
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:text-blue-800 break-all hover:underline"
+                className="text-sm text-blue-600 hover:text-blue-800 break-all hover:underline overflow-wrap-anywhere"
               >
                 {memory.url}
               </a>
@@ -282,7 +282,7 @@ const MemoryDetails: React.FC<{
           <div className="mb-6">
             <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[METADATA]</h4>
             <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4 overflow-x-auto">
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words">
+              <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words overflow-wrap-anywhere">
                 {JSON.stringify(memory.page_metadata, null, 2)}
               </pre>
             </div>
@@ -891,7 +891,7 @@ export const Memories: React.FC = () => {
         {selectedMemory && (() => {
           return true
         })() && (
-          <div className="fixed inset-y-0 left-0 w-[300px] md:w-[320px] lg:w-[360px] border-r border-gray-200 bg-white/95 backdrop-blur-sm flex flex-col max-h-full z-30 shadow-sm">
+          <div className="fixed inset-y-0 left-0 w-[400px] md:w-[450px] lg:w-[500px] border-r border-gray-200 bg-white/95 backdrop-blur-sm flex flex-col max-h-full z-30 shadow-sm">
             <div className="px-3 sm:px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-mono uppercase tracking-wide text-gray-600">[MEMORY DETAILS]</h3>
