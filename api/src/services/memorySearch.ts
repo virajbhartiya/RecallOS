@@ -68,20 +68,24 @@ export async function searchMemories(params: {
   let embedding: number[];
   try {
     // Increase timeout for Gemini API calls - they can take longer
-    embedding = await withTimeout(aiProvider.generateEmbedding(normalized), 300000);
+    embedding = await withTimeout(aiProvider.generateEmbedding(normalized), 600000); // 10 minutes
   } catch (error) {
-    console.error('Error generating embedding:', error);
-    // Update search job status to failed if there's a job
+    // Try fallback embedding generation
     try {
-      const jobId = (global as any).__currentSearchJobId as string | undefined;
-      if (jobId) {
-        await setSearchJobResult(jobId, { status: 'failed' });
-        (global as any).__currentSearchJobId = undefined;
+      embedding = aiProvider.generateFallbackEmbedding(normalized);
+    } catch (fallbackError) {
+      // Update search job status to failed if there's a job
+      try {
+        const jobId = (global as any).__currentSearchJobId as string | undefined;
+        if (jobId) {
+          await setSearchJobResult(jobId, { status: 'failed' });
+          (global as any).__currentSearchJobId = undefined;
+        }
+      } catch (jobError) {
+        // Error updating search job status
       }
-    } catch (jobError) {
-      console.error('Error updating search job status:', jobError);
+      return { query: normalized, results: [], meta_summary: undefined, answer: undefined };
     }
-    return { query: normalized, results: [], meta_summary: undefined, answer: undefined };
   }
   const queryVecSql = vectorToSqlArray(embedding);
 
@@ -183,10 +187,14 @@ Return clean, readable plain text only.
 Memory summaries:
 ${bullets}`;
     try {
-      metaSummary = await withTimeout(aiProvider.generateContent(prompt), 10000);
+      metaSummary = await withTimeout(aiProvider.generateContent(prompt), 120000); // 2 minutes
     } catch (e) {
-      console.error('Error generating meta summary:', e);
-      metaSummary = undefined;
+      // Generate a simple fallback summary
+      try {
+        metaSummary = `Found ${filteredRows.length} relevant memories about "${normalized}". ${filteredRows.slice(0, 3).map((r, i) => `${r.title || 'Untitled'}`).join(', ')}${filteredRows.length > 3 ? ' and more.' : '.'}`;
+      } catch (fallbackError) {
+        metaSummary = undefined;
+      }
     }
   }
 
@@ -233,7 +241,7 @@ Return clean, readable plain text only.
 User query: "${normalized}"
 Evidence notes (ordered by relevance):
 ${bullets}`;
-      answer = await withTimeout(aiProvider.generateContent(ansPrompt), 15000);
+      answer = await withTimeout(aiProvider.generateContent(ansPrompt), 180000); // 3 minutes
       // Build citations map aligned with [n]
       const allCitations = filteredRows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
       // Keep only citations actually referenced in the answer/meta text, preserve first-seen order
@@ -255,7 +263,6 @@ ${bullets}`;
         ? order.map(n => allCitations.find(c => c.label === n)).filter((c): c is { label: number; memory_id: string; title: string | null; url: string | null } => Boolean(c))
         : [];
     } catch (error) {
-      console.error('Error generating search answer:', error);
       // Update search job status to failed if there's a job
       try {
         const jobId = (global as any).__currentSearchJobId as string | undefined;
@@ -264,7 +271,7 @@ ${bullets}`;
           (global as any).__currentSearchJobId = undefined;
         }
       } catch (jobError) {
-        console.error('Error updating search job status:', jobError);
+        // Error updating search job status
       }
       // Fallback: create a simple summary if AI generation fails
       answer = `Found ${filteredRows.length} relevant memories about "${normalized}". ${filteredRows.slice(0, 3).map((r, i) => `[${i + 1}] ${r.title || 'Untitled'}`).join(', ')}${filteredRows.length > 3 ? ' and more.' : '.'}`;
@@ -307,7 +314,7 @@ ${bullets}`;
     } else {
     }
   } catch (error) {
-    console.error('Error updating search job result:', error);
+    // Error updating search job result
   }
   
   return { query: normalized, results, meta_summary: metaSummary, answer, citations, context };
