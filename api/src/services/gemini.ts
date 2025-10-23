@@ -8,7 +8,7 @@ let nextAvailableAt = 0;
 const taskQueue: Array<{ run: QueueTask<any>; resolve: (v: any) => void; reject: (e: any) => void }> = [];
 
 // Default gap between requests; tuned for free-tier limits (~10 rpm). Adjust via Retry-After hints when returned
-let minIntervalMs = 3000; // Reduced from 7000ms to 3000ms for faster processing
+let minIntervalMs = 2000; // Further reduced to 2000ms for faster processing
 
 async function processQueue() {
   if (isProcessingQueue) return;
@@ -60,10 +60,34 @@ function extractRetryDelayMs(err: any): number | null {
   return null;
 }
 
-function runWithRateLimit<T>(task: QueueTask<T>): Promise<T> {
+function runWithRateLimit<T>(task: QueueTask<T>, timeoutMs: number = 60000, bypassRateLimit: boolean = false): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    taskQueue.push({ run: task, resolve, reject });
-    processQueue();
+    const timeoutId = setTimeout(() => {
+      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+    
+    const executeTask = async () => {
+      try {
+        const result = await task();
+        clearTimeout(timeoutId);
+        return result;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+      }
+    };
+    
+    if (bypassRateLimit) {
+      // Execute immediately without rate limiting for critical operations
+      executeTask().then(resolve).catch(reject);
+    } else {
+      taskQueue.push({ 
+        run: executeTask, 
+        resolve, 
+        reject 
+      });
+      processQueue();
+    }
   });
 }
 
@@ -81,14 +105,14 @@ export class GeminiService {
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      console.warn('GEMINI_API_KEY not set. Gemini service disabled.');
+      // GEMINI_API_KEY not set. Gemini service disabled.
       this.ai = null as any;
       return;
     }
     try {
       this.ai = new GoogleGenAI({ apiKey });
     } catch (error) {
-      console.error('Failed to initialize Gemini service:', error);
+      // Failed to initialize Gemini service
       this.ai = null as any;
     }
   }
@@ -151,7 +175,7 @@ Return clean, readable plain text only.`;
           this.ai.models.generateContent({
             model: this.getCurrentModel(),
             contents: enhancedPrompt,
-          })
+          }), 120000 // 2 minutes timeout
         );
         if (!response.text) throw new Error('No content generated from Gemini API');
         
@@ -160,7 +184,7 @@ Return clean, readable plain text only.`;
         return response.text;
       } catch (err) {
         lastError = err;
-        console.error(`Content generation error with ${this.getCurrentModel()}:`, err);
+        // Content generation error
         
         if (this.isRateLimitError(err)) {
           if (!this.switchToNextModel()) {
@@ -192,7 +216,7 @@ Return clean, readable plain text only.`;
           this.ai.models.embedContent({
             model: 'text-embedding-004',
             contents: text,
-          })
+          }), 180000, true // 3 minutes timeout for embeddings, bypass rate limit for critical operations
         );
         const values = response.embeddings?.[0]?.values;
         if (!values) throw new Error('No embedding generated from Gemini API');
@@ -202,7 +226,7 @@ Return clean, readable plain text only.`;
         return values;
       } catch (err) {
         lastError = err;
-        console.error(`Embedding error with ${this.getCurrentModel()}:`, err);
+        // Embedding error
         
         if (this.isRateLimitError(err)) {
           if (!this.switchToNextModel()) {
@@ -218,7 +242,7 @@ Return clean, readable plain text only.`;
 
     // Reset to original model if all models failed
     this.currentModelIndex = originalModelIndex;
-    console.error('All embedding generation attempts failed:', lastError);
+    // All embedding generation attempts failed
     throw lastError;
   }
 
@@ -284,7 +308,7 @@ Raw Content: ${rawText}
           this.ai.models.generateContent({
             model: this.getCurrentModel(),
             contents: prompt,
-          })
+          }), 120000 // 2 minutes timeout
         );
         if (!res.text) throw new Error('No summary generated from Gemini API');
         
@@ -293,7 +317,7 @@ Raw Content: ${rawText}
         return res.text.trim();
       } catch (err) {
         lastError = err;
-        console.error(`Summarization error with ${this.getCurrentModel()}:`, err);
+        // Summarization error
         
         if (this.isRateLimitError(err)) {
           if (!this.switchToNextModel()) {
@@ -373,7 +397,7 @@ Return ONLY the JSON object:`;
           this.ai.models.generateContent({
             model: this.getCurrentModel(),
             contents: prompt,
-          })
+          }), 120000 // 2 minutes timeout
         );
         if (!res.text) throw new Error('No metadata response from Gemini API');
 
@@ -394,7 +418,7 @@ Return ONLY the JSON object:`;
         }
         
         if (!jsonMatch) {
-          console.error('No JSON found in response:', res.text);
+          // No JSON found in response
           throw new Error('Invalid JSON in Gemini response');
         }
         
@@ -402,9 +426,7 @@ Return ONLY the JSON object:`;
         try {
           data = JSON.parse(jsonMatch[0]);
         } catch (parseError) {
-          console.error('JSON parse error:', parseError);
-          console.error('Raw response text:', res.text);
-          console.error('Extracted JSON:', jsonMatch[0]);
+          // JSON parse error
           
           // Try to fix common JSON issues
           let fixedJson = jsonMatch[0];
@@ -419,8 +441,7 @@ Return ONLY the JSON object:`;
           try {
             data = JSON.parse(fixedJson);
           } catch (secondError) {
-            console.error('Second JSON parse error:', secondError);
-            console.error('Fixed JSON:', fixedJson);
+            // Second JSON parse error
             
             // Return default metadata if all parsing fails
             this.resetToFirstModel();
@@ -455,7 +476,7 @@ Return ONLY the JSON object:`;
         };
       } catch (err) {
         lastError = err;
-        console.error(`Metadata extraction error with ${this.getCurrentModel()}:`, err);
+        // Metadata extraction error
         
         if (this.isRateLimitError(err)) {
           if (!this.switchToNextModel()) {
@@ -549,7 +570,7 @@ Be strict. Avoid weak or surface matches.
           this.ai.models.generateContent({
             model: this.getCurrentModel(),
             contents: prompt,
-          })
+          }), 120000 // 2 minutes timeout
         );
         if (!res.text) throw new Error('No relationship data from Gemini');
 
@@ -570,7 +591,7 @@ Be strict. Avoid weak or surface matches.
         }
         
         if (!jsonMatch) {
-          console.error('No JSON found in relationship response:', res.text);
+          // No JSON found in relationship response
           throw new Error('Invalid JSON response from Gemini');
         }
         
@@ -578,9 +599,7 @@ Be strict. Avoid weak or surface matches.
         try {
           data = JSON.parse(jsonMatch[0]);
         } catch (parseError) {
-          console.error('JSON parse error in relationship eval:', parseError);
-          console.error('Raw response text:', res.text);
-          console.error('Extracted JSON:', jsonMatch[0]);
+          // JSON parse error in relationship eval
           
           // Try to fix common JSON issues
           let fixedJson = jsonMatch[0];
@@ -590,7 +609,7 @@ Be strict. Avoid weak or surface matches.
           try {
             data = JSON.parse(fixedJson);
           } catch (secondError) {
-            console.error('Second JSON parse error in relationship eval:', secondError);
+            // Second JSON parse error in relationship eval
             // Return default relationship data
             this.resetToFirstModel();
             return {
@@ -612,7 +631,7 @@ Be strict. Avoid weak or surface matches.
         };
       } catch (err) {
         lastError = err;
-        console.error(`Relationship eval error with ${this.getCurrentModel()}:`, err);
+        // Relationship eval error
         
         if (this.isRateLimitError(err)) {
           if (!this.switchToNextModel()) {

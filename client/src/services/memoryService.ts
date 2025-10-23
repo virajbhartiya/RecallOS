@@ -83,7 +83,7 @@ export class MemoryService {
         } as Memory))
       }
     } catch (error) {
-      console.error('Error fetching memories from database:', error)
+      // Error fetching memories from database
     }
     
     // No fallback - return empty array if no transaction data found
@@ -203,7 +203,7 @@ export class MemoryService {
       }
       return { results: [], total: 0, page, limit, filters }
     } catch (error) {
-      console.error('Error in searchMemories:', error)
+      // Error in searchMemories
       return { results: [], total: 0, page, limit, filters }
     }
   }
@@ -313,7 +313,7 @@ export class MemoryService {
       }
       return { results: [], total: 0, page, limit, filters }
     } catch (error) {
-      console.error('Error in searchMemoriesWithEmbeddings:', error)
+      // Error in searchMemoriesWithEmbeddings
       return { results: [], total: 0, page, limit, filters }
     }
   }
@@ -368,7 +368,7 @@ export class MemoryService {
       }
       return { results: [], total: 0, page, limit, filters }
     } catch (error) {
-      console.error('Error in searchMemoriesHybrid:', error)
+      // Error in searchMemoriesHybrid
       return { results: [], total: 0, page, limit, filters }
     }
   }
@@ -409,7 +409,7 @@ export class MemoryService {
         }
       }
     } catch (error) {
-      console.error('Error fetching insights from database:', error)
+      // Error fetching insights from database
       // If user not found (404), try to create the user and then retry
       if (error && typeof error === 'object' && 'response' in error && (error as { response: { status: number } }).response?.status === 404) {
         try {
@@ -446,7 +446,7 @@ export class MemoryService {
             }
           }
         } catch (createError) {
-          console.error('Failed to create user for insights:', createError)
+          // Failed to create user for insights
         }
       }
     }
@@ -466,7 +466,7 @@ export class MemoryService {
         recent_activity: { last_7_days: count, last_30_days: count }
       }
     } catch (fallbackError) {
-      console.error('Fallback insights also failed:', fallbackError)
+      // Fallback insights also failed
       return {
         total_memories: 0,
         total_transactions: 0,
@@ -492,7 +492,7 @@ export class MemoryService {
         return data.memories
       }
     } catch (error) {
-      console.error('Error fetching recent memories from database:', error)
+      // Error fetching recent memories from database
     }
     
     // Fallback to recent memories endpoint (now returns full database data)
@@ -521,7 +521,7 @@ export class MemoryService {
         } as Memory))
       }
     } catch (error) {
-      console.error('Error fetching recent memories from API:', error)
+      // Error fetching recent memories from API
     }
     
     return []
@@ -557,14 +557,14 @@ export class MemoryService {
       const count = response.data?.data?.memoryCount
       return typeof count === 'number' ? count : parseInt(count) || 0
     } catch (error) {
-      console.error('Error fetching memory count:', error)
+      // Error fetching memory count
       // Fallback: try to get count from transactions endpoint
       try {
         const response = await getRequest(`${this.baseUrl}/transactions?userAddress=${normalizedAddress}&limit=1000`)
         const data = response.data?.data
         return Array.isArray(data?.memories) ? data.memories.length : 0
       } catch (fallbackError) {
-        console.error('Fallback count also failed:', fallbackError)
+        // Fallback count also failed
         return 0
       }
     }

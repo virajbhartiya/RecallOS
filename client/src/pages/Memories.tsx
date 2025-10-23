@@ -354,7 +354,7 @@ export const Memories: React.FC = () => {
       
       setHyperIndexData(hyperIndexMap)
     } catch (err) {
-      console.error('Error fetching HyperIndex data:', err)
+      // Error fetching HyperIndex data
     } finally {
       // setIsLoadingHyperIndex(false)
     }
@@ -390,7 +390,7 @@ export const Memories: React.FC = () => {
       }
     } catch (err) {
       setError('Failed to fetch memories')
-      console.error('Error fetching memories:', err)
+      // Error fetching memories
     } finally {
       setIsLoading(false)
     }
@@ -470,7 +470,7 @@ export const Memories: React.FC = () => {
         return
       }
       setSearchError('Failed to search memories')
-      console.error('Error searching memories:', err)
+      // Error searching memories
     } finally {
       setIsSearching(false)
     }
