@@ -162,7 +162,7 @@ export class MemoryService {
           memory: {
             id: result.memory_id,
             user_id: result.user_id || '',
-            source: result.source || 'unknown',
+            source: result.source || (result.url ? 'browser' : 'extension'),
             url: result.url,
             title: result.title,
             content: result.content || result.summary || '',
@@ -272,7 +272,7 @@ export class MemoryService {
           memory: {
             id: result.memory_id,
             user_id: result.user_id || '',
-            source: result.source || 'unknown',
+            source: result.source || (result.url ? 'browser' : 'extension'),
             url: result.url,
             title: result.title,
             content: result.content || result.summary || '',

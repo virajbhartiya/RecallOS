@@ -66,14 +66,16 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null)
   const [hovered, setHovered] = useState(false)
   
-  // Visible but simple point-like nodes
-  const baseSize = 0.04 + (importance * 0.02)
-  const size = isSelected ? baseSize + 0.015 : isHighlighted ? baseSize + 0.008 : baseSize
+  // Minimal point-like nodes with smaller base size
+  const baseSize = 0.02 + (importance * 0.01) // Reduced from 0.04 + 0.02
+  const size = isSelected ? baseSize + 0.025 : isHighlighted ? baseSize + 0.012 : baseSize // Enhanced selected prominence
   const opacity = inLatentSpace ? 1.0 : 0.8
   
   useFrame(() => {
     if (meshRef.current) {
-      meshRef.current.scale.setScalar(hovered ? 1.3 : 1)
+      // Enhanced hover effect for selected nodes
+      const hoverScale = isSelected ? 1.5 : isHighlighted ? 1.3 : 1.2
+      meshRef.current.scale.setScalar(hovered ? hoverScale : 1)
     }
   })
 
@@ -85,11 +87,11 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      <sphereGeometry args={[size, 6, 6]} />
+      <sphereGeometry args={[size, 8, 8]} />
       <meshBasicMaterial
         color={color}
         transparent
-        opacity={opacity}
+        opacity={isSelected ? 1.0 : opacity}
         depthWrite={true}
       />
     </mesh>
@@ -109,16 +111,16 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
     new THREE.Vector3(...end)
   ], [start, end])
 
-  // Very subtle lines - only show the strongest connections
+  // Ultra-minimal lines - only show the strongest connections
   const getLineColor = (similarity: number) => {
-    if (similarity > 0.8) return '#22c55e' // Green for very strong connections only
-    if (similarity > 0.6) return '#3b82f6' // Blue for strong connections
-    return '#f3f4f6' // Very light gray for everything else
+    if (similarity > 0.85) return '#22c55e' // Green for very strong connections only
+    if (similarity > 0.75) return '#3b82f6' // Blue for strong connections
+    return '#f8fafc' // Almost invisible gray for everything else
   }
 
   const color = getLineColor(similarity)
-  const opacity = similarity > 0.6 ? 0.3 + (similarity * 0.2) : 0.1 // Very subtle lines
-  const lineWidth = similarity > 0.6 ? 1 : 0.5 // Very thin lines
+  const opacity = similarity > 0.75 ? 0.2 + (similarity * 0.15) : 0.05 // Ultra-subtle lines
+  const lineWidth = similarity > 0.75 ? 0.8 : 0.3 // Ultra-thin lines
 
   return (
     <Line
@@ -156,9 +158,9 @@ const Scene: React.FC<SceneProps> = ({
   
   useEffect(() => {
     if (isCompactView) {
-      camera.position.set(3, 3, 3)
+      camera.position.set(2, 2, 2) // Closer to the tighter cluster
     } else {
-      camera.position.set(5, 5, 5)
+      camera.position.set(3.5, 3.5, 3.5) // Closer to the tighter cluster
     }
     camera.lookAt(0, 0, 0)
   }, [camera, isCompactView])
@@ -176,8 +178,8 @@ const Scene: React.FC<SceneProps> = ({
     const cy = (minY + maxY) / 2
     const spanX = Math.max(1e-6, maxX - minX)
     const spanY = Math.max(1e-6, maxY - minY)
-    const radius = isCompactView ? 2 : 4 // keep overall cluster tight
-    const zRadius = radius * 0.35
+    const radius = isCompactView ? 1.2 : 2.5 // significantly reduce spacing
+    const zRadius = radius * 0.4
 
     return meshData.nodes.map((n, i) => {
       const sourceType = memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
@@ -197,8 +199,8 @@ const Scene: React.FC<SceneProps> = ({
         const iz = ((n.importance_score ?? 0.5) - 0.5) * 2 * zRadius
         position = [nx, ny, iz]
       } else {
-        // Generate 3D position using spherical coordinates
-        const rr = (isCompactView ? radius * 0.6 : radius) + (i * 0.02)
+        // Generate 3D position using spherical coordinates with tighter clustering
+        const rr = (isCompactView ? radius * 0.4 : radius * 0.6) + (i * 0.01) // Much tighter clustering
         const theta = (i / Math.max(1, meshData.nodes.length)) * Math.PI * 2
         const phi = Math.acos(2 * Math.random() - 1)
         position = [
@@ -267,8 +269,9 @@ const Scene: React.FC<SceneProps> = ({
 
   return (
     <>
-      <ambientLight intensity={0.45} />
-      <directionalLight position={[8, 8, 6]} intensity={0.5} />
+      <ambientLight intensity={0.3} />
+      <directionalLight position={[8, 8, 6]} intensity={0.4} />
+      <pointLight position={[0, 0, 0]} intensity={0.2} color="#ffffff" />
       
       {nodes.map((node) => (
         <MemoryNode
@@ -398,7 +401,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
       <div className="w-full h-full overflow-hidden relative bg-white">
         <Canvas
           camera={{ 
-            position: isCompactView ? [3, 3, 3] : [5, 5, 5], 
+            position: isCompactView ? [2, 2, 2] : [3.5, 3.5, 3.5], 
             fov: isCompactView ? 75 : 60 
           }}
           style={{ background: 'transparent' }}

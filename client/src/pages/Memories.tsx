@@ -616,7 +616,7 @@ export const Memories: React.FC = () => {
                 [← HOME]
               </button>
               <div className="text-xs sm:text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
-                [3D LATENT SPACE]
+                [Memory Mesh]
               </div>
               {/* Mobile toggle for sidebar */}
               <button
