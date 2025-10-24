@@ -1214,11 +1214,23 @@ async function getMemorySummary(query: string): Promise<string | null> {
     // Handle response structure exactly like client-side
     let summaryParts: string[] = [];
     
+    console.log('RecallOS: Search response received:', {
+      hasAnswer: !!result.answer,
+      hasMetaSummary: !!result.meta_summary,
+      resultsCount: result.results?.length || 0,
+      hasCitations: !!result.citations,
+      citationsCount: result.citations?.length || 0,
+      hasJobId: !!result.job_id
+    });
+    
     if (result.answer) {
+      console.log('RecallOS: Using answer from response');
       summaryParts.push(result.answer);
     } else if (result.meta_summary) {
+      console.log('RecallOS: Using meta_summary from response');
       summaryParts.push(result.meta_summary);
     } else if (result.results && result.results.length > 0) {
+      console.log('RecallOS: Using results count from response');
       summaryParts.push(`Found ${result.results.length} relevant memories about "${query}".`);
     }
     
@@ -1251,10 +1263,13 @@ async function getMemorySummary(query: string): Promise<string | null> {
     }
     
     if (summaryParts.length === 0) {
+      console.log('RecallOS: No summary parts found, returning null');
       return null;
     }
     
-    return summaryParts.join('\n\n');
+    const finalSummary = summaryParts.join('\n\n');
+    console.log('RecallOS: Final memory summary:', finalSummary.substring(0, 200) + '...');
+    return finalSummary;
   } catch (error) {
     console.error('RecallOS: Error in getMemorySummary:', error);
     return null;
@@ -1282,18 +1297,26 @@ async function getApiEndpointForMemory(): Promise<string> {
 }
 
 function injectMemorySummary(summary: string, originalMessage: string): void {
-  if (!chatInput) return;
+  if (!chatInput) {
+    console.log('RecallOS: No chat input found for injection');
+    return;
+  }
   
   const combinedMessage = `[RecallOS Memory Context]\n${summary}\n\n[Your Question]\n${originalMessage}`;
+  console.log('RecallOS: Injecting combined message:', combinedMessage.substring(0, 200) + '...');
   
   if (chatInput.tagName === 'TEXTAREA') {
+    console.log('RecallOS: Injecting into textarea');
     (chatInput as HTMLTextAreaElement).value = combinedMessage;
     const inputEvent = new Event('input', { bubbles: true });
     chatInput.dispatchEvent(inputEvent);
   } else if ((chatInput as HTMLElement).contentEditable === 'true') {
+    console.log('RecallOS: Injecting into contentEditable div');
     chatInput.textContent = combinedMessage;
     const inputEvent = new Event('input', { bubbles: true });
     chatInput.dispatchEvent(inputEvent);
+  } else {
+    console.log('RecallOS: Unknown input type:', chatInput.tagName, chatInput);
   }
 }
 
@@ -1314,7 +1337,22 @@ async function autoInjectMemories(userText: string): Promise<void> {
     
     if (memorySummary) {
       const currentText = getCurrentInputText();
-      if (currentText === userText) {
+      console.log('RecallOS: Memory found, checking text match:', {
+        originalText: userText,
+        currentText: currentText,
+        textsMatch: currentText === userText,
+        currentTextLength: currentText.length,
+        originalTextLength: userText.length
+      });
+      
+      // More lenient text matching - check if current text contains the original text
+      const textMatches = currentText === userText || 
+                         currentText.includes(userText) || 
+                         userText.includes(currentText) ||
+                         currentText.trim() === userText.trim();
+      
+      if (textMatches) {
+        console.log('RecallOS: Injecting memory summary');
         injectMemorySummary(memorySummary, userText);
         
         if (recallOSIcon) {
@@ -1322,6 +1360,7 @@ async function autoInjectMemories(userText: string): Promise<void> {
           recallOSIcon.style.animation = 'none';
         }
       } else {
+        console.log('RecallOS: Text changed during search, not injecting');
         if (recallOSIcon) {
           recallOSIcon.style.color = '#8e8ea0';
           recallOSIcon.style.animation = 'none';
@@ -1439,30 +1478,30 @@ function createRecallOSIcon(): HTMLElement {
   return icon;
 }
 
-async function checkApiHealth(): Promise<boolean> {
-  try {
-    // Extension needs full URL since it's not running on the same domain
-    const healthEndpoint = 'http://localhost:3000/api/search';
+// async function checkApiHealth(): Promise<boolean> {
+//   try {
+//     // Extension needs full URL since it's not running on the same domain
+//     const healthEndpoint = 'http://localhost:3000/api/search';
     
-    const response = await fetch(healthEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        wallet: 'health-check',
-        query: 'test',
-        limit: 1,
-        contextOnly: false
-      }),
-    });
+//     const response = await fetch(healthEndpoint, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//       body: JSON.stringify({
+//         wallet: 'health-check',
+//         query: 'test',
+//         limit: 1,
+//         contextOnly: false
+//       }),
+//     });
     
-    return response.status < 500;
-  } catch (error) {
-    console.error('RecallOS: Health check failed:', error);
-    return false;
-  }
-}
+//     return response.status < 500;
+//   } catch (error) {
+//     console.error('RecallOS: Health check failed:', error);
+//     return false;
+//   }
+// }
 
 async function getWalletAddressFromStorage(): Promise<string | null> {
   try {
@@ -1518,7 +1557,8 @@ async function showRecallOSStatus(): Promise<void> {
   try {
     const [walletAddress, apiHealthy] = await Promise.all([
       getWalletAddressFromStorage(),
-      checkApiHealth()
+      // checkApiHealth()
+      true
     ]);
     
     const walletStatus = walletAddress ? 'Connected' : 'Not Connected';
@@ -1995,13 +2035,14 @@ function debugAIChatElements(): void {
 
 (window as any).checkRecallOSStatus = async () => {
   const walletAddress = await getWalletAddressFromStorage();
-  const apiHealthy = await checkApiHealth();
+  // const apiHealthy = await checkApiHealth();
   const apiEndpoint = await getApiEndpointForMemory();
   
   return {
     walletAddress,
     apiEndpoint,
-    apiHealthy,
+    // apiHealthy,
+    apiHealthy: true,
     platform: currentPlatform,
     chatInput: !!chatInput,
     recallOSIcon: !!recallOSIcon

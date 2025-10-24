@@ -136,3 +136,18 @@ model QueryRelatedMemory {
   @@unique([query_event_id, memory_id])
   @@map("query_related_memories")
 }
+
+model SearchCache {
+  id            String   @id @default(uuid()) @db.Uuid
+  wallet        String
+  query         String
+  query_hash    String   @unique
+  results       Json
+  meta_summary  String?
+  answer        String?
+  citations     Json?
+  job_id        String?
+  created_at    DateTime @default(now())
+  expires_at    DateTime
+  @@map("search_cache")
+}
