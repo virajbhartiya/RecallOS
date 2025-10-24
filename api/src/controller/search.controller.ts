@@ -2,12 +2,24 @@ import { Request, Response, NextFunction } from 'express';
 import AppError from '../utils/appError';
 import { searchMemories } from '../services/memorySearch';
 import { createSearchJob, getSearchJob } from '../services/searchJob';
+import { SearchCacheService } from '../services/searchCache';
 
 export const postSearch = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { wallet, query, limit, contextOnly } = req.body || {};
     if (!wallet || !query) return next(new AppError('wallet and query are required', 400));
     
+ 
+    if (!contextOnly) {
+      const cachedResult = await SearchCacheService.getCachedResult(wallet, query);
+      if (cachedResult) {
+        console.log('Returning cached search result for query:', query);
+
+        const delay = Math.random() * 1000 + 1500;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return res.status(200).json(cachedResult);
+      }
+    }
     
     // Only create job for async answer delivery if not in context-only mode
     let job = null;
@@ -30,6 +42,12 @@ export const postSearch = async (req: Request, res: Response, next: NextFunction
     
     if (job) {
       response.job_id = job.id;
+    }
+    
+    // Cache the result if not context-only
+    if (!contextOnly) {
+      await SearchCacheService.setCachedResult(wallet, query, response);
+      console.log('Cached search result for query:', query);
     }
     
     res.status(200).json(response);
@@ -78,6 +96,34 @@ export const getContext = async (req: Request, res: Response, next: NextFunction
       query: data.query,
       context: data.context || 'No relevant memories found.',
       resultCount: data.results.length
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const clearSearchCache = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { wallet } = req.params;
+    if (!wallet) return next(new AppError('wallet parameter is required', 400));
+    
+    await SearchCacheService.clearWalletCache(wallet);
+    
+    res.status(200).json({
+      message: 'Search cache cleared successfully',
+      wallet: wallet
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const cleanupSearchCache = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await SearchCacheService.cleanupExpiredCache();
+    
+    res.status(200).json({
+      message: 'Expired search cache entries cleaned up successfully'
     });
   } catch (err) {
     next(err);

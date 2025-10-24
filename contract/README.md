@@ -29,8 +29,8 @@ This directory contains the smart contract implementation for the RecallOS Memor
 
 ## Testing
 
-### Solidity Tests (Foundry)
-Run comprehensive Solidity tests using Foundry:
+### Solidity Tests (Hardhat)
+Run comprehensive Solidity tests using Hardhat:
 
 ```bash
 npm run test:solidity
@@ -43,7 +43,6 @@ These tests cover:
 - Error handling
 - Access control
 - Upgrade functionality
-- Fuzz testing
 
 ### TypeScript Tests (Node.js)
 Run TypeScript integration tests:

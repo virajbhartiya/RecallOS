@@ -17,6 +17,7 @@ import { routes } from './routes/index.route';
 import { prisma } from './lib/prisma';
 
 import { startContentWorker } from './workers/contentWorker';
+import { CacheCleanupService } from './services/cacheCleanup';
 
 dotenv.config();
 
@@ -65,6 +66,7 @@ async function testDatabaseConnection() {
 server.listen(port, async () => {
   await testDatabaseConnection();
   startContentWorker();
+  CacheCleanupService.startCleanupService();
 });
 process.on('unhandledRejection', (err: Error) => {
   console.error('Unhandled Rejection! 💥 Shutting down...');
