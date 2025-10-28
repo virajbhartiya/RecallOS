@@ -19,6 +19,24 @@ async function getApiEndpoint(): Promise<string> {
   }
 }
 
+async function isExtensionEnabled(): Promise<boolean> {
+  try {
+    const result = await chrome.storage.sync.get(['extensionEnabled']);
+    return result.extensionEnabled !== false; // Default to enabled
+  } catch (error) {
+    console.error('RecallOS: Error getting extension enabled state:', error);
+    return true; // Default to enabled on error
+  }
+}
+
+async function setExtensionEnabled(enabled: boolean): Promise<void> {
+  try {
+    await chrome.storage.sync.set({ extensionEnabled: enabled });
+  } catch (error) {
+    console.error('RecallOS: Error setting extension enabled state:', error);
+  }
+}
+
 async function getWalletAddress(): Promise<string | null> {
   try {
     const result = await chrome.storage.sync.get(['wallet_address']);
@@ -52,6 +70,13 @@ async function getWalletAddress(): Promise<string | null> {
 
 async function sendToBackend(data: ContextData): Promise<void> {
   try {
+    // Check if extension is enabled
+    const enabled = await isExtensionEnabled();
+    if (!enabled) {
+      console.log('RecallOS: Extension is disabled, skipping context capture');
+      return;
+    }
+
     const apiEndpoint = await getApiEndpoint();
     const walletAddress = await getWalletAddress();
 
@@ -149,6 +174,7 @@ chrome.runtime.onMessage.addListener(
       data?: ContextData;
       endpoint?: string;
       walletAddress?: string;
+      enabled?: boolean;
     },
     _sender: chrome.runtime.MessageSender,
     sendResponse: (response: unknown) => void
@@ -206,6 +232,30 @@ chrome.runtime.onMessage.addListener(
       getWalletAddress()
         .then(walletAddress => {
           sendResponse({ success: true, walletAddress });
+        })
+        .catch(error => {
+          sendResponse({ success: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message?.type === 'GET_EXTENSION_ENABLED') {
+      isExtensionEnabled()
+        .then(enabled => {
+          sendResponse({ success: true, enabled });
+        })
+        .catch(error => {
+          sendResponse({ success: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message?.type === 'SET_EXTENSION_ENABLED' && typeof message.enabled === 'boolean') {
+      setExtensionEnabled(message.enabled)
+        .then(() => {
+          sendResponse({ success: true, message: 'Extension state updated' });
         })
         .catch(error => {
           sendResponse({ success: false, error: error.message });
