@@ -33,19 +33,19 @@ interface ApiMemoryResponse {
 export class MemoryService {
   private static baseUrl = '/memory'
   
-  // Normalize wallet address to handle case sensitivity
+  // User IDs are case-sensitive identifiers provided by the API
   private static normalizeAddress(address: string): string {
-    return address.toLowerCase()
+    return address
   }
 
   static async getMemoriesWithTransactionDetails(
-    userAddress: string,
+    userId: string,
     status?: 'pending' | 'confirmed' | 'failed',
     limit?: number
   ): Promise<Memory[]> {
-    const normalizedAddress = this.normalizeAddress(userAddress)
+    const normalizedAddress = userId
     const params = new URLSearchParams()
-    params.append('userAddress', normalizedAddress)
+    params.append('userId', normalizedAddress)
     if (status) params.append('status', status)
     if (limit) params.append('limit', limit.toString())
     
@@ -62,7 +62,7 @@ export class MemoryService {
         // Map API response to Memory interface
         return data.memories.map((mem: ApiMemoryResponse) => ({
           id: mem.id || mem.hash,
-          user_id: userAddress,
+          user_id: userId,
           hash: mem.hash,
           timestamp: typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp,
           created_at: mem.created_at || new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toISOString(),
@@ -91,14 +91,14 @@ export class MemoryService {
     return []
   }
 
-  static async getMemoryMesh(userAddress: string, limit: number = 50, threshold: number = 0.3): Promise<MemoryMesh> {
-    const normalizedAddress = this.normalizeAddress(userAddress)
+  static async getMemoryMesh(userId: string, limit: number = 50, threshold: number = 0.3): Promise<MemoryMesh> {
+    const normalizedAddress = userId
     const response = await getRequest(`${this.baseUrl}/mesh/${normalizedAddress}?limit=${limit}&threshold=${threshold}`)
     return response.data?.data || { nodes: [], edges: [], clusters: {} }
   }
 
   static async searchMemories(
-    userAddress: string,
+    userId: string,
     query: string,
     filters: SearchFilters = {},
     page: number = 1,
@@ -106,11 +106,11 @@ export class MemoryService {
     signal?: AbortSignal
   ): Promise<MemorySearchResponse> {
     try {
-      const normalizedAddress = this.normalizeAddress(userAddress)
+      const normalizedAddress = userId
       
       // Use the working /search endpoint (POST)
       const response = await postRequest('/search', {
-        wallet: normalizedAddress,
+        userId: normalizedAddress,
         query,
         limit,
         contextOnly: false
@@ -209,18 +209,18 @@ export class MemoryService {
   }
 
   static async searchMemoriesWithEmbeddings(
-    userAddress: string,
+    userId: string,
     query: string,
     filters: SearchFilters = {},
     page: number = 1,
     limit: number = 10
   ): Promise<MemorySearchResponse> {
     try {
-      const normalizedAddress = this.normalizeAddress(userAddress)
+      const normalizedAddress = userId
       
       // Use the working /search endpoint (POST) - same as searchMemories
       const response = await postRequest('/search', {
-        wallet: normalizedAddress,
+        userId: normalizedAddress,
         query,
         limit,
         contextOnly: false
@@ -319,16 +319,16 @@ export class MemoryService {
   }
 
   static async searchMemoriesHybrid(
-    userAddress: string,
+    userId: string,
     query: string,
     filters: SearchFilters = {},
     page: number = 1,
     limit: number = 10
   ): Promise<MemorySearchResponse> {
     try {
-      const normalizedAddress = this.normalizeAddress(userAddress)
+      const normalizedAddress = userId
       const params = new URLSearchParams({
-        userAddress: normalizedAddress,
+        userId: normalizedAddress,
         query,
         page: page.toString(),
         limit: limit.toString()
@@ -373,10 +373,10 @@ export class MemoryService {
     }
   }
 
-  static async getMemoryInsights(userAddress: string): Promise<MemoryInsights> {
-    const normalizedAddress = this.normalizeAddress(userAddress)
+  static async getMemoryInsights(userId: string): Promise<MemoryInsights> {
+    const normalizedAddress = userId
     const params = new URLSearchParams()
-    params.append('userAddress', normalizedAddress)
+    params.append('userId', normalizedAddress)
     
     try {
       const response = await getRequest(`${this.baseUrl}/insights?${params.toString()}`)
@@ -418,7 +418,7 @@ export class MemoryService {
             content: 'User initialization',
             url: 'user-init',
             title: 'User Setup',
-            userAddress: userAddress,
+            userId: userId,
             metadata: { source: 'manual' }
           })
           
@@ -453,7 +453,7 @@ export class MemoryService {
     
     // Fallback: create basic insights from blockchain data
     try {
-      const count = await this.getUserMemoryCount(userAddress)
+      const count = await this.getUserMemoryCount(userId)
       return {
         total_memories: count,
         total_transactions: count,
@@ -481,12 +481,12 @@ export class MemoryService {
     }
   }
 
-  static async getRecentMemories(userAddress: string, count: number = 10): Promise<Memory[]> {
-    const normalizedAddress = this.normalizeAddress(userAddress)
+  static async getRecentMemories(userId: string, count: number = 10): Promise<Memory[]> {
+    const normalizedAddress = userId
     
     // First try the database endpoint for full data
     try {
-      const response = await getRequest(`${this.baseUrl}/transactions?userAddress=${normalizedAddress}&limit=${count}`)
+      const response = await getRequest(`${this.baseUrl}/transactions?userId=${normalizedAddress}&limit=${count}`)
       const data = response.data?.data
       if (Array.isArray(data?.memories) && data.memories.length > 0) {
         return data.memories
@@ -511,7 +511,7 @@ export class MemoryService {
           summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
           content: mem.content || '',
           source: mem.source || 'on_chain',
-          user_id: userAddress,
+          user_id: userId,
           url: mem.url,
           tx_status: mem.tx_status || 'confirmed',
           blockchain_network: mem.blockchain_network || 'sepolia',
@@ -528,11 +528,11 @@ export class MemoryService {
   }
 
   static async getUserMemories(
-    userAddress: string,
+    userId: string,
     page: number = 1,
     limit: number = 20
   ): Promise<{ memories: Memory[]; total: number; page: number; limit: number }> {
-    const response = await getRequest(`${this.baseUrl}/user/${userAddress}?page=${page}&limit=${limit}`)
+    const response = await getRequest(`${this.baseUrl}/user/${userId}?page=${page}&limit=${limit}`)
     const data = response.data?.data
     return data || { memories: [], total: 0, page, limit }
   }
@@ -550,8 +550,8 @@ export class MemoryService {
     return response.data?.data
   }
 
-  static async getUserMemoryCount(userAddress: string): Promise<number> {
-    const normalizedAddress = this.normalizeAddress(userAddress)
+  static async getUserMemoryCount(userId: string): Promise<number> {
+    const normalizedAddress = userId
     try {
       const response = await getRequest(`${this.baseUrl}/user/${normalizedAddress}/count`)
       const count = response.data?.data?.memoryCount
@@ -560,7 +560,7 @@ export class MemoryService {
       // Error fetching memory count
       // Fallback: try to get count from transactions endpoint
       try {
-        const response = await getRequest(`${this.baseUrl}/transactions?userAddress=${normalizedAddress}&limit=1000`)
+        const response = await getRequest(`${this.baseUrl}/transactions?userId=${normalizedAddress}&limit=1000`)
         const data = response.data?.data
         return Array.isArray(data?.memories) ? data.memories.length : 0
       } catch (fallbackError) {
@@ -585,11 +585,11 @@ export class MemoryService {
   }
 
   static async getMemorySnapshots(
-    userAddress: string,
+    userId: string,
     page: number = 1,
     limit: number = 20
   ): Promise<{ snapshots: unknown[]; total: number; page: number; limit: number }> {
-    const response = await getRequest(`${this.baseUrl}/snapshots/${userAddress}?page=${page}&limit=${limit}`)
+    const response = await getRequest(`${this.baseUrl}/snapshots/${userId}?page=${page}&limit=${limit}`)
     return response.data?.data || { snapshots: [], total: 0, page, limit }
   }
 
@@ -605,12 +605,12 @@ export class MemoryService {
     return response.data?.data || { tx_status: 'pending' }
   }
 
-  static async retryFailedTransactions(userAddress: string): Promise<{
+  static async retryFailedTransactions(userId: string): Promise<{
     retried_count: number
     success_count: number
     failed_count: number
   }> {
-    const response = await postRequest(`${this.baseUrl}/retry-failed`, { userAddress })
+    const response = await postRequest(`${this.baseUrl}/retry-failed`, { userId })
     return response.data?.data || { retried_count: 0, success_count: 0, failed_count: 0 }
   }
 

@@ -1,5 +1,4 @@
-
-// Chrome extension types
+import { getOrCreateUserId } from '@/lib/userId'
 
 interface ContextData {
   source: string;
@@ -1179,16 +1178,12 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
 
 async function getMemorySummary(query: string): Promise<string | null> {
   try {
-    const walletAddress = await getWalletAddressFromStorage();
-    if (!walletAddress) {
-      return null;
-    }
+    const userId = getOrCreateUserId();
 
-    // Extension needs full URL since it's not running on the same domain
     const searchEndpoint = 'http://localhost:3000/api/search';
     
     const requestBody = {
-      wallet: walletAddress.toLowerCase(),
+      userId: userId,
       query: query,
       limit: 5,
       contextOnly: false
@@ -1523,25 +1518,7 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
 //   }
 // }
 
-async function getWalletAddressFromStorage(): Promise<string | null> {
-  try {
-    const result = await chrome.storage.sync.get(['wallet_address']);
-    if (result.wallet_address) {
-      return result.wallet_address;
-    }
-    
-    const localWallet = localStorage.getItem('wallet_address');
-    if (localWallet) {
-      await chrome.storage.sync.set({ wallet_address: localWallet });
-      return localWallet;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('RecallOS: Error getting wallet address:', error);
-    return null;
-  }
-}
+async function getWalletAddressFromStorage(): Promise<string | null> { return null; }
 
 async function checkExtensionEnabled(): Promise<boolean> {
   try {

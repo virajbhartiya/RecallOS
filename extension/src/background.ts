@@ -1,3 +1,4 @@
+import { getOrCreateUserId } from '@/lib/userId'
 /// <reference types="chrome" />
 
 interface ContextData {
@@ -7,6 +8,10 @@ interface ContextData {
   content_snippet: string;
   timestamp: number;
   wallet_address?: string;
+  full_content?: string;
+  meaningful_content?: string;
+  content_summary?: string;
+  content_type?: string;
 }
 
 async function getApiEndpoint(): Promise<string> {
@@ -22,10 +27,10 @@ async function getApiEndpoint(): Promise<string> {
 async function isExtensionEnabled(): Promise<boolean> {
   try {
     const result = await chrome.storage.sync.get(['extensionEnabled']);
-    return result.extensionEnabled !== false; // Default to enabled
+    return result.extensionEnabled !== false;
   } catch (error) {
     console.error('RecallOS: Error getting extension enabled state:', error);
-    return true; // Default to enabled on error
+    return true;
   }
 }
 
@@ -37,36 +42,7 @@ async function setExtensionEnabled(enabled: boolean): Promise<void> {
   }
 }
 
-async function getWalletAddress(): Promise<string | null> {
-  try {
-    const result = await chrome.storage.sync.get(['wallet_address']);
-    if (result.wallet_address) {
-      return result.wallet_address;
-    }
-
-
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs[0]?.id) {
-      try {
-        const response = await chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'GET_WALLET_ADDRESS',
-        });
-        if (response?.walletAddress) {
-          await chrome.storage.sync.set({
-            wallet_address: response.walletAddress,
-          });
-          return response.walletAddress;
-        }
-      } catch (error) {
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('RecallOS: Error getting wallet address:', error);
-    return null;
-  }
-}
+async function getWalletAddress(): Promise<string | null> { return null; }
 
 async function sendToBackend(data: ContextData): Promise<void> {
   try {
@@ -78,7 +54,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
     }
 
     const apiEndpoint = await getApiEndpoint();
-    const walletAddress = await getWalletAddress();
+    const walletAddress = null;
 
     const privacyInfo = (data as any).privacy_extension_info;
     const hasPrivacyConflicts = privacyInfo?.detected || false;
@@ -99,7 +75,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
       content: content,
       url: data.url,
       title: data.title,
-      userAddress: walletAddress ? walletAddress.toLowerCase() : 'anonymous',
+      userId: getOrCreateUserId(),
       metadata: {
         source: data.source,
         timestamp: data.timestamp,
@@ -117,7 +93,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, userId: getOrCreateUserId() }),
     });
 
     if (!response.ok) {
@@ -215,30 +191,7 @@ chrome.runtime.onMessage.addListener(
 
       return true;
     }
-
-    if (message?.type === 'SET_WALLET_ADDRESS' && message.walletAddress) {
-      setWalletAddress(message.walletAddress)
-        .then(() => {
-          sendResponse({ success: true, message: 'Wallet address updated' });
-        })
-        .catch(error => {
-          sendResponse({ success: false, error: error.message });
-        });
-
-      return true;
-    }
-
-    if (message?.type === 'GET_WALLET_ADDRESS') {
-      getWalletAddress()
-        .then(walletAddress => {
-          sendResponse({ success: true, walletAddress });
-        })
-        .catch(error => {
-          sendResponse({ success: false, error: error.message });
-        });
-
-      return true;
-    }
+    
 
     if (message?.type === 'GET_EXTENSION_ENABLED') {
       isExtensionEnabled()

@@ -7,11 +7,11 @@ const router = Router();
 router.post('/process', MemoryController.processRawContent);
 router.post('/', MemoryController.storeMemory);
 router.post('/batch', MemoryController.storeMemoryBatch);
-router.get('/user/:userAddress', MemoryController.getUserMemories);
-router.get('/user/:userAddress/count', MemoryController.getUserMemoryCount);
-router.get('/user/:userAddress/memory/:index', MemoryController.getMemory);
-router.get('/user/:userAddress/recent', MemoryController.getRecentMemories);
-router.get('/user/:userAddress/by-url', MemoryController.getMemoriesByUrlHash);
+router.get('/user/:userId', MemoryController.getUserMemories);
+router.get('/user/:userId/count', MemoryController.getUserMemoryCount);
+router.get('/user/:userId/memory/:index', MemoryController.getMemory);
+router.get('/user/:userId/recent', MemoryController.getRecentMemories);
+router.get('/user/:userId/by-url', MemoryController.getMemoriesByUrlHash);
 router.get(
   '/user/:userAddress/by-timestamp',
   MemoryController.getMemoriesByTimestampRange
@@ -24,7 +24,7 @@ router.get(
   MemoryController.getMemoryTransactionStatus
 );
 router.post('/retry-failed', MemoryController.retryFailedTransactions);
-router.get('/mesh/:userAddress', MemoryController.getMemoryMesh);
+router.get('/mesh/:userId', MemoryController.getMemoryMesh);
 router.get('/relations/:memoryId', MemoryController.getMemoryWithRelations);
 router.get('/cluster/:memoryId', MemoryController.getMemoryCluster);
 router.get('/search-embeddings', MemoryController.searchMemoriesWithEmbeddings);
@@ -32,7 +32,7 @@ router.get('/search-hybrid', MemoryController.searchMemoriesHybrid);
 router.post('/process-mesh/:memoryId', MemoryController.processMemoryForMesh);
 router.get('/hash/:hash', MemoryController.getMemoryByHash);
 router.get('/exists/:hash', MemoryController.isMemoryStored);
-router.get('/snapshots/:userAddress', MemoryController.getMemorySnapshots);
+router.get('/snapshots/:userId', MemoryController.getMemorySnapshots);
 router.get('/snapshot/:snapshotId', MemoryController.getMemorySnapshot);
 router.post('/backfill-snapshots', MemoryController.backfillMemorySnapshots);
 router.get('/health', MemoryController.healthCheck);

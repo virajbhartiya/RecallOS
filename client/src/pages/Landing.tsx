@@ -1,6 +1,4 @@
 import React, { useEffect, useState } from 'react'
-import { useWallet } from '../contexts/WalletContext'
-import { WalletStatus } from '../components/WalletStatus'
 import { MemoryService } from '../services/memoryService'
 import { LoadingCard } from '../components/ui/loading-spinner'
 import type { Memory } from '../types/memory'
@@ -61,7 +59,8 @@ const MemoryPreviewCard: React.FC<{ memory: Memory }> = ({ memory }) => {
 }
 
 export const Landing = () => {
-  const { isConnected, address } = useWallet()
+  const isConnected = false
+  const address: string | null = null
   const [recentMemories, setRecentMemories] = useState<Memory[]>([])
   const [memoryCount, setMemoryCount] = useState(0)
   const [confirmedCount, setConfirmedCount] = useState(0)
@@ -120,14 +119,10 @@ export const Landing = () => {
           window.open('https://github.com/virajbhartiya/RecallOS', '_blank')
           break
         case 'm':
-          if (isConnected) {
-            window.location.href = '/memories'
-          }
+          window.location.href = '/memories'
           break
         case 'h':
-          if (isConnected) {
-            window.location.href = '/hyperindex'
-          }
+          window.location.href = '/hyperindex'
           break
         case 'w': {
           // Trigger wallet modal through WalletStatus component
@@ -162,9 +157,7 @@ export const Landing = () => {
               >
                 [G] GITHUB
               </button>
-              <div className="text-xs sm:text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
-                [TESTNET]
-              </div>
+              
             </div>
             <div className="flex items-center flex-wrap gap-2 sm:gap-4">
               <button 
@@ -189,7 +182,7 @@ export const Landing = () => {
                   </button>
                 </>
               )}
-              <WalletStatus variant="compact" showActions={true} />
+              
             </div>
           </div>
         </div>
@@ -242,10 +235,10 @@ export const Landing = () => {
               {/* Clear value proposition */}
               <div className="space-y-3">
                 <p className="text-xl text-gray-800 leading-relaxed font-primary font-medium">
-                  RecallOS is a browser extension that monitors your activity and creates a verifiable memory graph on the blockchain.
+                  RecallOS is a browser extension that monitors your activity and builds a personal memory graph for you.
                 </p>
                 <p className="text-base text-gray-600 leading-relaxed font-primary">
-                  Works with any LLM agent. Every click, scroll, and interaction is automatically captured, embedded, and anchored on-chain. 
+                  Works with any LLM agent. Every click, scroll, and interaction is automatically captured and embedded.
                   Your AI builds a persistent, searchable memory mesh that grows with you.
                 </p>
               </div>
@@ -275,16 +268,7 @@ export const Landing = () => {
                   <ConsoleButton
                     variant="outlined"
                     className="group relative overflow-hidden w-full sm:w-auto"
-                    onClick={() => {
-                      if (isConnected) {
-                        window.location.href = '/memories'
-                      } else {
-                        const walletButton = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement
-                        if (walletButton) {
-                          walletButton.click()
-                        }
-                      }
-                    }}
+                    onClick={() => { window.location.href = '/memories' }}
                   >
                     <span className="relative z-10 whitespace-nowrap">[M] VIEW MEMORIES</span>
                     <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></div>

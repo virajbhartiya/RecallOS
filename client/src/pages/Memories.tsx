@@ -1,16 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
-import { useWallet } from '@/contexts/WalletContext'
-import { WalletStatus } from '@/components/WalletStatus'
-import { WalletConnectionFlow } from '@/components/WalletConnectionFlow'
+ 
  
 import { MemoryService } from '@/services/memoryService'
 import { SearchService } from '@/services/search'
 import { MemoryMesh3D } from '@/components/MemoryMesh3D'
-import { useBlockscout } from '@/hooks/useBlockscout'
-import { TransactionStatusIndicator } from '@/components/TransactionStatusIndicator'
-import { HyperIndexService } from '@/services/hyperindexService'
+ 
 import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
+import { getOrCreateUserId } from '@/utils/userId'
 
 const MemoryCard: React.FC<{
   memory: Memory
@@ -50,25 +47,6 @@ const MemoryCard: React.FC<{
           <span className="truncate">{memory.title || 'Untitled Memory'}</span>
         </h3>
         <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-          {memory.tx_status && (
-            <div className={`w-1.5 h-1.5 rounded-full ${
-              memory.tx_status === 'confirmed' ? 'bg-green-500' :
-              memory.tx_status === 'pending' ? 'bg-yellow-500' :
-              'bg-red-500'
-            }`} title={memory.tx_status}></div>
-          )}
-          {memory.tx_hash && memory.tx_hash.startsWith('0x') && memory.tx_hash.length === 66 && onViewTransaction && (
-            <span
-              onClick={(e) => {
-                e.stopPropagation()
-                onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')
-              }}
-              className="text-xs text-blue-600 hover:text-blue-800 font-mono cursor-pointer"
-              title="View real transaction on Blockscout"
-            >
-              TX
-            </span>
-          )}
           {searchResult?.blended_score !== undefined && (
             <span className="text-xs text-gray-500 font-mono">
               {(searchResult.blended_score * 100).toFixed(0)}%
@@ -149,35 +127,6 @@ const MemoryDetails: React.FC<{
 
         {/* Status and Importance Section */}
         <div className="flex flex-col gap-4 mb-6">
-          {memory.tx_status && (
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-mono text-gray-600">[STATUS]</span>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`px-3 py-1 text-sm font-mono uppercase tracking-wide border ${
-                  memory.tx_status === 'confirmed' ? 'bg-green-100 text-green-800 border-green-200' :
-                  memory.tx_status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                  'bg-red-100 text-red-800 border-red-200'
-                }`}>
-                  {memory.tx_status}
-                </span>
-                {memory.tx_hash && memory.tx_hash.startsWith('0x') && memory.tx_hash.length === 66 && onViewTransaction && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onViewTransaction(memory.tx_hash!, memory.blockchain_network || 'sepolia')}
-                      className="text-xs font-mono text-blue-600 hover:text-blue-800 bg-blue-50 px-2 py-1 border border-blue-200 hover:border-blue-300 transition-all duration-200 whitespace-nowrap"
-                    >
-                      [VIEW TX]
-                    </button>
-                    <TransactionStatusIndicator 
-                      txHash={memory.tx_hash} 
-                      network={memory.blockchain_network || 'sepolia'}
-                      className="text-xs"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
           {memory.importance_score && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-mono text-gray-600">[IMPORTANCE]</span>
@@ -242,41 +191,7 @@ const MemoryDetails: React.FC<{
           </div>
         )}
 
-        {hyperIndexData && (
-          <div className="mb-6">
-            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[BLOCKCHAIN DATA]</h4>
-            <div className="bg-blue-50 border border-blue-200 p-3 sm:p-4">
-              <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-                {hyperIndexData.blockNumber && (
-                  <div>
-                    <div className="text-gray-500 uppercase tracking-wide">Block</div>
-                    <div className="text-gray-900 font-semibold">{hyperIndexData.blockNumber}</div>
-                  </div>
-                )}
-                {hyperIndexData.gasUsed && (
-                  <div>
-                    <div className="text-gray-500 uppercase tracking-wide">Gas Used</div>
-                    <div className="text-gray-900 font-semibold">{hyperIndexData.gasUsed}</div>
-                  </div>
-                )}
-                {hyperIndexData.gasPrice && (
-                  <div>
-                    <div className="text-gray-500 uppercase tracking-wide">Gas Price</div>
-                    <div className="text-gray-900 font-semibold">{hyperIndexData.gasPrice}</div>
-                  </div>
-                )}
-                {hyperIndexData.timestamp && (
-                  <div>
-                    <div className="text-gray-500 uppercase tracking-wide">Block Time</div>
-                    <div className="text-gray-900 font-semibold">
-                      {new Date(parseInt(hyperIndexData.timestamp) * 1000).toLocaleString()}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        
 
         {memory.page_metadata && (
           <div className="mb-6">
@@ -294,8 +209,7 @@ const MemoryDetails: React.FC<{
 }
 
 export const Memories: React.FC = () => {
-  const { isConnected, address } = useWallet()
-  const { showTransactionNotification, prefetchTransaction } = useBlockscout()
+  const userId = getOrCreateUserId()
   const [memories, setMemories] = useState<Memory[]>([])
   
   const [isLoading, setIsLoading] = useState(false)
@@ -331,43 +245,17 @@ export const Memories: React.FC = () => {
     return () => window.removeEventListener('resize', update)
   }, [])
 
-  const fetchHyperIndexData = useCallback(async (memoriesData: Memory[]) => {
-    if (!address || memoriesData.length === 0) return
-    
-    // setIsLoadingHyperIndex(true)
-    try {
-      const hyperIndexMemories = await HyperIndexService.getUserMemoryEvents(address, 100)
-      const hyperIndexMap: Record<string, any> = {}
-      
-      // Map HyperIndex data by memory hash or transaction hash
-      hyperIndexMemories.forEach(hiMemory => {
-        const key = hiMemory.hash || hiMemory.transactionHash
-        if (key) {
-          hyperIndexMap[key] = {
-            blockNumber: hiMemory.blockNumber,
-            gasUsed: hiMemory.gasUsed,
-            gasPrice: hiMemory.gasPrice,
-            timestamp: hiMemory.timestamp
-          }
-        }
-      })
-      
-      setHyperIndexData(hyperIndexMap)
-    } catch (err) {
-      // Error fetching HyperIndex data
-    } finally {
-      // setIsLoadingHyperIndex(false)
-    }
-  }, [address])
+  const fetchHyperIndexData = useCallback(async (_memoriesData: Memory[]) => {
+    return
+  }, [])
 
   const fetchMemories = useCallback(async () => {
-    if (!address) return
     
     setIsLoading(true)
     setError(null)
     
     try {
-      const memoriesData = await MemoryService.getMemoriesWithTransactionDetails(address)
+      const memoriesData = await MemoryService.getMemoriesWithTransactionDetails(userId)
       
       setMemories(memoriesData || [])
       
@@ -376,25 +264,14 @@ export const Memories: React.FC = () => {
         fetchHyperIndexData(memoriesData)
       }
       
-      const transactionsToPrefetch = (memoriesData || [])
-        .filter(memory => memory.tx_hash && memory.tx_hash.startsWith('0x'))
-        .map(memory => ({
-          txHash: memory.tx_hash!,
-          network: memory.blockchain_network || 'sepolia'
-        }))
       
-      if (transactionsToPrefetch.length > 0) {
-        transactionsToPrefetch.forEach(({ txHash, network }) => {
-          prefetchTransaction(txHash, network)
-        })
-      }
     } catch (err) {
       setError('Failed to fetch memories')
       // Error fetching memories
     } finally {
       setIsLoading(false)
     }
-  }, [address, prefetchTransaction, fetchHyperIndexData])
+  }, [userId, fetchHyperIndexData])
 
   const handleSelectMemory = (memory: Memory) => {
     // Enable memory selection from the list and highlight in mesh
@@ -432,7 +309,7 @@ export const Memories: React.FC = () => {
     query: string,
     filters: SearchFilters
   ) => {
-    if (!address || !query.trim()) return
+    if (!userId || !query.trim()) return
 
     // Cancel any existing search
     if (abortControllerRef.current) {
@@ -452,7 +329,7 @@ export const Memories: React.FC = () => {
       const signal = abortControllerRef.current?.signal
 
       // Use the working /api/search endpoint for all searches
-      const response = await MemoryService.searchMemories(address, query, filters, 1, 50, signal)
+      const response = await MemoryService.searchMemories(userId, query, filters, 1, 50, signal)
       
       // Check if the search was aborted before setting results
       if (signal?.aborted) return
@@ -483,7 +360,7 @@ export const Memories: React.FC = () => {
         setIsSearching(false)
       }
     }
-  }, [address])
+  }, [userId])
 
   const handleClearSearch = useCallback(() => {
     setSearchResults(null)
@@ -517,9 +394,9 @@ export const Memories: React.FC = () => {
     return () => { cancelled = true; clearInterval(interval) }
   }, [searchJobId, searchAnswer])
 
-  const handleViewTransaction = useCallback((txHash: string, network: string) => {
-    showTransactionNotification(txHash, network)
-  }, [showTransactionNotification])
+  const handleViewTransaction = useCallback((_txHash: string, _network: string) => {
+    return
+  }, [])
 
   
 
@@ -574,10 +451,8 @@ export const Memories: React.FC = () => {
   }, [searchQuery, handleSearch, handleClearSearch])
 
   useEffect(() => {
-    if (isConnected && address) {
-      fetchMemories()
-    }
-  }, [isConnected, address, fetchMemories])
+    fetchMemories()
+  }, [fetchMemories])
 
   // Cleanup effect to cancel any pending requests when component unmounts
   useEffect(() => {
@@ -588,15 +463,7 @@ export const Memories: React.FC = () => {
     }
   }, [])
 
-  if (!isConnected) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full mx-4">
-          <WalletConnectionFlow />
-        </div>
-      </div>
-    )
-  }
+  
 
   let currentMemories = getFilteredMemories()
   const currentResults = isSearchMode && searchResults && searchResults.results ? searchResults.results : null
@@ -626,11 +493,7 @@ export const Memories: React.FC = () => {
                 {isSidebarCollapsed ? '[SHOW]' : '[HIDE]'}
               </button>
             </div>
-            <div className="flex items-center space-x-4">
-              {address && address.startsWith('0x') && address.length === 42 && (
-                <WalletStatus variant="compact" showActions={true} />
-              )}
-            </div>
+            <div className="flex items-center space-x-4"></div>
           </div>
         </div>
       </header>
@@ -640,7 +503,7 @@ export const Memories: React.FC = () => {
         {/* Left Panel - Memory Mesh */}
         <div className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-auto bg-white border-b md:border-b-0 md:border-r border-gray-200">
         <MemoryMesh3D 
-          userAddress={address || undefined}
+          userAddress={userId || undefined}
           className="w-full h-full"
           onNodeClick={handleNodeClick}
           similarityThreshold={similarityThreshold}
@@ -956,19 +819,7 @@ export const Memories: React.FC = () => {
 
       
 
-      {/* Gas Deposit Section */}
       
-
-      {/* HyperIndex Link */}
-      <div className="fixed bottom-4 right-4 z-40">
-        <button
-          onClick={() => window.location.href = '/hyperindex'}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg transition-colors flex items-center gap-2 text-sm font-mono uppercase tracking-wide"
-        >
-          <Database className="w-4 h-4" />
-          HyperIndex
-        </button>
-      </div>
 
     </div>
   )

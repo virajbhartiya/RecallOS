@@ -11,15 +11,8 @@ interface TransactionPopupProviderProps {
 }
 
 export const TransactionPopupProvider: React.FC<TransactionPopupProviderProps> = ({ children }) => {
-  const openPopup = ({ chainId: _chainId, address }: { chainId: string; address?: string }) => {
-    // Open Blockscout explorer in a new tab
-    let blockscoutUrl = 'https://eth-sepolia.blockscout.com'
-    
-    if (address) {
-      blockscoutUrl = `https://eth-sepolia.blockscout.com/address/${address}`
-    }
-    
-    window.open(blockscoutUrl, '_blank')
+  const openPopup = (_opts: { chainId: string; address?: string }) => {
+    return
   }
 
   return (

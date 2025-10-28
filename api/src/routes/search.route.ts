@@ -6,7 +6,7 @@ const router = Router();
 router.post('/', postSearch);
 router.post('/context', getContext);
 router.get('/job/:id', getSearchJobStatus);
-router.delete('/cache/:wallet', clearSearchCache);
+router.delete('/cache/:userId', clearSearchCache);
 router.delete('/cache', cleanupSearchCache);
 
 export default router;

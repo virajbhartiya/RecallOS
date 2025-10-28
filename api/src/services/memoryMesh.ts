@@ -1144,10 +1144,10 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     }
   }
 
-  async getMemoryMesh(userId: string, limit: number = 50, similarityThreshold: number = 0.4): Promise<any> {
+  async getMemoryMesh(userId?: string, limit: number = 50, similarityThreshold: number = 0.4): Promise<any> {
     try {
       const memories = await prisma.memory.findMany({
-        where: { user_id: userId },
+        where: userId ? { user_id: userId } : {},
         include: {
           embeddings: true,
           related_memories: {
