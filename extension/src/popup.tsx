@@ -21,6 +21,7 @@ const Popup: React.FC = () => {
   const [gasBalance, setGasBalance] = useState<string | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const [extensionEnabled, setExtensionEnabled] = useState(true);
 
   useEffect(() => {
     loadSettings();
@@ -46,6 +47,13 @@ const Popup: React.FC = () => {
         });
         // Use the endpoint from the response for initial balance fetch
         await fetchBalances(walletResponse.walletAddress, endpointResponse.endpoint);
+      }
+
+      const extensionResponse = await chrome.runtime.sendMessage({
+        type: 'GET_EXTENSION_ENABLED',
+      });
+      if (extensionResponse.success) {
+        setExtensionEnabled(extensionResponse.enabled);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -211,6 +219,30 @@ const Popup: React.FC = () => {
     }
   };
 
+  const toggleExtension = async () => {
+    setIsLoading(true);
+    try {
+      const newState = !extensionEnabled;
+      const response = await chrome.runtime.sendMessage({
+        type: 'SET_EXTENSION_ENABLED',
+        enabled: newState,
+      });
+      if (response.success) {
+        setExtensionEnabled(newState);
+        setStatus({ 
+          message: `Extension ${newState ? 'enabled' : 'disabled'} successfully!`, 
+          type: 'success' 
+        });
+      } else {
+        setStatus({ message: `Error: ${response.error}`, type: 'error' });
+      }
+    } catch (error) {
+      setStatus({ message: `Error: ${error}`, type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const showStatus = (message: string, type: 'success' | 'error') => {
     setStatus({ message, type });
     setTimeout(() => {
@@ -234,6 +266,25 @@ const Popup: React.FC = () => {
       {/* Settings Card */}
       <Card>
         <CardContent className="p-4 space-y-3">
+          {/* Extension Toggle */}
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Extension Status</Label>
+              <div className="text-xs text-gray-600">
+                {extensionEnabled ? 'Active - Context injection enabled' : 'Disabled - No context injection'}
+              </div>
+            </div>
+            <Button
+              onClick={toggleExtension}
+              disabled={isLoading}
+              variant={extensionEnabled ? "destructive" : "default"}
+              size="sm"
+              className="min-w-[80px]"
+            >
+              {isLoading ? '...' : extensionEnabled ? 'Disable' : 'Enable'}
+            </Button>
+          </div>
+
           <div className="space-y-1">
             <Label htmlFor="apiEndpoint" className="text-sm">API Endpoint</Label>
             <Input
