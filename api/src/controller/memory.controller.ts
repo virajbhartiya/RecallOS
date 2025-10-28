@@ -1,20 +1,17 @@
 import { Request, Response } from 'express';
 
-import {
-  storeMemory,
-  storeMemoryBatch,
-  getMemory,
-  getUserMemories,
-  getUserMemoryCount,
-  isMemoryStored,
-  getMemoryOwner,
-  getMemoriesByUrlHash,
-  getMemoriesByTimestampRange,
-  getRecentMemories,
-  getMemoryByHash,
-  MemoryData,
-  hashUrl,
-} from '../services/blockchain';
+import { createHash } from 'crypto';
+
+function getRequestUserId(req: Request): string | undefined {
+  return (
+    (req.body?.userId as string | undefined) ||
+    (req.query?.userId as string | undefined) ||
+    (req.params?.userId as string | undefined) ||
+    (req.body?.userAddress as string | undefined) ||
+    (req.query?.userAddress as string | undefined) ||
+    (req.params?.userAddress as string | undefined)
+  );
+}
 
 import { prisma } from '../lib/prisma';
 
@@ -23,35 +20,29 @@ import { aiProvider } from '../services/aiProvider';
 import { memoryMeshService } from '../services/memoryMesh';
 import { searchMemories } from '../services/memorySearch';
 
-import { createHash } from 'crypto';
+function hashUrl(url: string): string {
+  return createHash('sha256').update(url).digest('hex');
+}
 
 export class MemoryController {
   static async processRawContent(req: Request, res: Response) {
     try {
-      const { content, url, title, userAddress, metadata } = req.body;
+      const { content, url, title, metadata } = req.body;
+      const userId = getRequestUserId(req);
 
 
 
-      if (!content || !userAddress) {
+      if (!content || !userId) {
         return res.status(400).json({
           success: false,
-          error: 'Content and userAddress are required',
+          error: 'Content and userId are required',
         });
       }
 
-      let user = await prisma.user.findFirst({
-        where: { 
-          wallet_address: {
-            equals: userAddress,
-            mode: 'insensitive'
-          }
-        },
-      });
+      let user = await prisma.user.findFirst({ where: { external_id: { equals: userId } } as any });
 
       if (!user) {
-        user = await prisma.user.create({
-          data: { wallet_address: userAddress.toLowerCase() },
-        });
+        user = await prisma.user.create({ data: { external_id: userId } as any });
       }
 
 
@@ -94,7 +85,7 @@ export class MemoryController {
           success: true,
           message: 'Duplicate memory detected, skipping creation',
           data: {
-            userAddress,
+            userId,
             existingMemoryId: existingMemory.id,
             memoryHash,
             urlHash,
@@ -128,37 +119,20 @@ export class MemoryController {
       });
 
 
-      const memoryData: MemoryData = {
-        hash: memoryHash,
-        urlHash: urlHash,
-        timestamp: timestamp,
-      };
+      // blockchain fields removed; retained local variables only
 
 
-      const blockchainResult = await storeMemoryBatch([memoryData], userAddress);
-
-      if (blockchainResult.success) {
-        await prisma.memory.update({
-          where: { id: memory.id },
-          data: {
-            tx_hash: blockchainResult.txHash,
-            block_number: blockchainResult.blockNumber
-              ? BigInt(blockchainResult.blockNumber)
-              : null,
-            gas_used: blockchainResult.gasUsed,
-            tx_status: 'confirmed' as any,
-            blockchain_network: 'sepolia',
-            confirmed_at: new Date(),
-          } as any,
-        });
-      } else {
-        await prisma.memory.update({
-          where: { id: memory.id },
-          data: {
-            tx_status: 'failed' as any,
-          } as any,
-        });
-      }
+      await prisma.memory.update({
+        where: { id: memory.id },
+        data: {
+          tx_status: 'confirmed' as any,
+          blockchain_network: null as any,
+          tx_hash: null,
+          block_number: null,
+          gas_used: null,
+          confirmed_at: new Date(),
+        } as any,
+      });
 
       setImmediate(async () => {
         // Always create snapshot even if mesh processing fails
@@ -188,22 +162,11 @@ export class MemoryController {
         success: true,
         message: 'Content processed and stored successfully',
         data: {
-          userAddress,
+          userId,
           memoryId: memory.id,
           memoryHash,
           urlHash,
-          blockchainResult,
-          transactionDetails: blockchainResult.success
-            ? {
-                txHash: blockchainResult.txHash,
-                blockNumber: blockchainResult.blockNumber,
-                gasUsed: blockchainResult.gasUsed,
-                status: 'confirmed',
-                network: 'sepolia',
-              }
-            : {
-                status: 'failed',
-              },
+          transactionDetails: null,
         },
       });
     } catch (error) {
@@ -226,21 +189,18 @@ export class MemoryController {
         });
       }
 
-      const { userAddress } = req.body;
+      const userId = getRequestUserId(req);
       
-      if (!userAddress) {
+      if (!userId) {
         return res.status(400).json({
           success: false,
-          error: 'User address is required',
+          error: 'userId is required',
         });
       }
 
-      const result = await storeMemory(hash, url, timestamp, userAddress);
-
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: 'Memory stored successfully',
+      res.status(410).json({
+        success: false,
+        error: 'On-chain functionality removed',
       });
     } catch (error) {
       console.error('Error storing memory:', error);
@@ -271,21 +231,18 @@ export class MemoryController {
         }
       }
 
-      const { userAddress } = req.body;
+      const userId = getRequestUserId(req);
       
-      if (!userAddress) {
+      if (!userId) {
         return res.status(400).json({
           success: false,
-          error: 'User address is required',
+          error: 'userId is required',
         });
       }
 
-      const result = await storeMemoryBatch(memories, userAddress);
-
-      res.status(200).json({
-        success: true,
-        data: result,
-        message: 'Memory batch stored successfully',
+      res.status(410).json({
+        success: false,
+        error: 'On-chain functionality removed',
       });
     } catch (error) {
       console.error('Error storing memory batch:', error);
@@ -307,12 +264,7 @@ export class MemoryController {
         });
       }
 
-      const memory = await getMemory(userAddress, parseInt(index));
-
-      res.status(200).json({
-        success: true,
-        data: memory,
-      });
+      return res.status(410).json({ success: false, error: 'On-chain functionality removed' });
     } catch (error) {
       console.error('Error getting memory:', error);
       res.status(500).json({
@@ -324,32 +276,16 @@ export class MemoryController {
 
   static async getUserMemories(req: Request, res: Response) {
     try {
-      const { userAddress } = req.params;
+      const userId = getRequestUserId(req);
 
-      if (!userAddress) {
+      if (!userId) {
         return res.status(400).json({
           success: false,
-          error: 'User address is required',
+          error: 'userId is required',
         });
       }
 
-      const memories = await getUserMemories(userAddress);
-
-      // Convert BigInt values to strings for JSON serialization
-      const serializedMemories = memories.map((memory: any) => ({
-        ...memory,
-        timestamp: memory.timestamp.toString(),
-        block_number: memory.block_number?.toString() || null,
-      }));
-
-      res.status(200).json({
-        success: true,
-        data: {
-          userAddress,
-          memories: serializedMemories,
-          count: memories.length,
-        },
-      });
+      return res.status(410).json({ success: false, error: 'On-chain functionality removed' });
     } catch (error) {
       console.error('Error getting user memories:', error);
       res.status(500).json({
@@ -370,15 +306,7 @@ export class MemoryController {
         });
       }
 
-      const exists = await isMemoryStored(hash);
-
-      res.status(200).json({
-        success: true,
-        data: {
-          hash,
-          exists,
-        },
-      });
+      return res.status(410).json({ success: false, error: 'On-chain functionality removed' });
     } catch (error) {
       console.error('Error checking if memory is stored:', error);
       res.status(500).json({
@@ -403,24 +331,7 @@ export class MemoryController {
 
       const urlHash = hashUrl(url as string);
 
-      const memories = await getMemoriesByUrlHash(userAddress, urlHash);
-
-      // Convert BigInt values to strings for JSON serialization
-      const serializedMemories = memories.map((memory: any) => ({
-        ...memory,
-        timestamp: memory.timestamp.toString(),
-        block_number: memory.block_number?.toString() || null,
-      }));
-
-      res.status(200).json({
-        success: true,
-        data: {
-          userAddress,
-          url,
-          memories: serializedMemories,
-          count: memories.length,
-        },
-      });
+      return res.status(410).json({ success: false, error: 'On-chain functionality removed' });
     } catch (error) {
       console.error('Error getting memories by URL:', error);
       res.status(500).json({
@@ -443,29 +354,7 @@ export class MemoryController {
         });
       }
 
-      const memories = await getMemoriesByTimestampRange(
-        userAddress,
-        parseInt(startTime as string),
-        parseInt(endTime as string)
-      );
-
-      // Convert BigInt values to strings for JSON serialization
-      const serializedMemories = memories.map((memory: any) => ({
-        ...memory,
-        timestamp: memory.timestamp.toString(),
-        block_number: memory.block_number?.toString() || null,
-      }));
-
-      res.status(200).json({
-        success: true,
-        data: {
-          userAddress,
-          startTime: parseInt(startTime as string),
-          endTime: parseInt(endTime as string),
-          memories: serializedMemories,
-          count: memories.length,
-        },
-      });
+      return res.status(410).json({ success: false, error: 'On-chain functionality removed' });
     } catch (error) {
       console.error('Error getting memories by timestamp range:', error);
       res.status(500).json({
@@ -490,9 +379,8 @@ export class MemoryController {
 
       const limit = count ? parseInt(count as string) : 10;
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress.toLowerCase() },
-      });
+      const userId = userAddress; // legacy param name; treat as external_id
+      const user = await prisma.user.findFirst({ where: { external_id: { equals: userId } } as any });
 
       if (user) {
         const memories = await prisma.memory.findMany({
@@ -529,7 +417,7 @@ export class MemoryController {
         return res.status(200).json({
           success: true,
           data: {
-            userAddress,
+            userId,
             count: limit,
             memories: serializedMemories,
             actualCount: memories.length,
@@ -543,7 +431,7 @@ export class MemoryController {
       res.status(200).json({
         success: true,
         data: {
-          userAddress,
+          userId,
           count: limit,
           memories,
           actualCount: memories.length,
@@ -606,13 +494,7 @@ export class MemoryController {
         });
       }
 
-      // Fallback to blockchain data if not found in database
-      const blockchainMemory = await getMemoryByHash(hash);
-
-      res.status(200).json({
-        success: true,
-        data: blockchainMemory,
-      });
+      return res.status(404).json({ success: false, error: 'Memory not found' });
     } catch (error) {
       console.error('Error getting memory by hash:', error);
       res.status(500).json({
@@ -633,8 +515,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress.toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (user) {
@@ -651,15 +538,7 @@ export class MemoryController {
         });
       }
 
-      const count = await getUserMemoryCount(userAddress);
-
-      res.status(200).json({
-        success: true,
-        data: {
-          userAddress,
-          memoryCount: count,
-        },
-      });
+      return res.status(200).json({ success: true, data: { userAddress, memoryCount: 0 } });
     } catch (error) {
       console.error('Error getting user memory count:', error);
       res.status(500).json({
@@ -691,7 +570,7 @@ export class MemoryController {
 
       // Use the semantic search functionality
       const searchResults = await searchMemories({
-        wallet: userAddress as string,
+        userId: userAddress as string,
         query: query as string,
         limit: parseInt(limit as string),
         enableReasoning: true,
@@ -756,14 +635,23 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: 'User not found',
+        return res.status(200).json({
+          success: true,
+          data: {
+            memories: [],
+            transactionStats: {},
+            totalMemories: 0,
+          },
         });
       }
 
@@ -875,34 +763,23 @@ export class MemoryController {
 
   static async getMemoriesWithTransactionDetails(req: Request, res: Response) {
     try {
-      const { userAddress, status, limit = 50 } = req.query;
+      const { userId, status, limit = 50 } = req.query as any;
 
-      if (!userAddress) {
-        return res.status(400).json({
-          success: false,
-          error: 'userAddress is required',
+      // Resolve internal user_id if provided
+      let internalUserId: string | undefined = undefined;
+      if (userId) {
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { external_id: userId as any },
+              { external_id: (userId as string).toLowerCase() as any },
+            ],
+          } as any,
         });
+        internalUserId = user?.id;
       }
 
-      const user = await prisma.user.findFirst({
-        where: { 
-          wallet_address: {
-            equals: userAddress as string,
-            mode: 'insensitive'
-          }
-        },
-      });
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: 'User not found',
-        });
-      }
-
-      const whereConditions: any = {
-        user_id: user.id,
-      };
+      const whereConditions: any = internalUserId ? { user_id: internalUserId } : {};
 
       if (status) {
         whereConditions.tx_status = status;
@@ -933,7 +810,7 @@ export class MemoryController {
       });
 
       const allMemories = await prisma.memory.findMany({
-        where: { user_id: user.id },
+        where: internalUserId ? { user_id: internalUserId } : {},
         select: { tx_status: true } as any,
       });
 
@@ -1039,8 +916,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (!user) {
@@ -1073,42 +955,22 @@ export class MemoryController {
 
       for (const memory of failedMemories) {
         try {
-          const memoryData: MemoryData = {
-            hash: memory.hash!,
-            urlHash: hashUrl(memory.url || 'unknown'),
-            timestamp: Number(memory.timestamp),
-          };
-
-
-          const blockchainResult = await storeMemoryBatch([memoryData], userAddress as string);
-
-          if (blockchainResult.success) {
-            await prisma.memory.update({
-              where: { id: memory.id },
-              data: {
-                tx_hash: blockchainResult.txHash,
-                block_number: blockchainResult.blockNumber
-                  ? BigInt(blockchainResult.blockNumber)
-                  : null,
-                gas_used: blockchainResult.gasUsed,
-                tx_status: 'confirmed' as any,
-                blockchain_network: 'sepolia',
-                confirmed_at: new Date(),
-              } as any,
-            });
-            retriedCount++;
-            results.push({
-              memoryId: memory.id,
-              status: 'success',
-              txHash: blockchainResult.txHash,
-            });
-          } else {
-            results.push({
-              memoryId: memory.id,
-              status: 'failed',
-              error: 'Blockchain storage failed',
-            });
-          }
+          await prisma.memory.update({
+            where: { id: memory.id },
+            data: {
+              tx_status: 'confirmed' as any,
+              blockchain_network: null as any,
+              tx_hash: null,
+              block_number: null,
+              gas_used: null,
+              confirmed_at: new Date(),
+            } as any,
+          });
+          retriedCount++;
+          results.push({
+            memoryId: memory.id,
+            status: 'success'
+          });
         } catch (error) {
           console.error(`❌ Error retrying memory ${memory.id}:`, error);
           results.push({
@@ -1139,30 +1001,26 @@ export class MemoryController {
 
   static async getMemoryMesh(req: Request, res: Response) {
     try {
-      const { userAddress } = req.params;
+      const { userId } = req.params as any;
 
       const { limit = 50, threshold = 0.3 } = req.query;
 
-      if (!userAddress) {
-        return res.status(400).json({
-          success: false,
-          error: 'userAddress is required',
+      // If no userId provided or not found, return mesh across all users
+      let internalUserId: string | undefined = undefined;
+      if (userId) {
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { external_id: userId as any },
+              { external_id: (userId as string).toLowerCase() as any },
+            ],
+          } as any,
         });
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress.toLowerCase() },
-      });
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: 'User not found',
-        });
+        internalUserId = user?.id;
       }
 
       const mesh = await memoryMeshService.getMemoryMesh(
-        user.id,
+        internalUserId,
         parseInt(limit as string),
         parseFloat(threshold as string)
       );
@@ -1193,8 +1051,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (!user) {
@@ -1233,8 +1096,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (!user) {
@@ -1285,8 +1153,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (!user) {
@@ -1433,8 +1306,8 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: { external_id: (userAddress as string) } as any,
       });
 
       if (!user) {
@@ -1721,8 +1594,8 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: { external_id: (userAddress as string) } as any,
       });
 
       if (!user) {
@@ -1777,8 +1650,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: userAddress.toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (!user) {
@@ -1846,8 +1724,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (!user) {
@@ -1905,8 +1788,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (!user) {
@@ -1997,14 +1885,7 @@ export class MemoryController {
 
   static async healthCheck(req: Request, res: Response) {
     try {
-      const testAddress = '0x0000000000000000000000000000000000000000';
-
-      await getUserMemoryCount(testAddress);
-      res.status(200).json({
-        success: true,
-        message: 'Blockchain connection is healthy',
-        timestamp: new Date().toISOString(),
-      });
+      res.status(200).json({ success: true, message: 'OK', timestamp: new Date().toISOString() });
     } catch (error) {
       res.status(503).json({
         success: false,
@@ -2025,8 +1906,13 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { wallet_address: (userAddress as string).toLowerCase() },
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userAddress as any },
+            { external_id: (userAddress as string).toLowerCase() as any },
+          ],
+        } as any,
       });
 
       if (!user) {

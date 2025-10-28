@@ -16,22 +16,22 @@ export class SearchCacheService {
   /**
    * Generate a hash for the search query to use as cache key
    */
-  private static generateQueryHash(wallet: string, query: string): string {
-    return crypto.createHash('sha256').update(`${wallet}:${query}`).digest('hex');
+  private static generateQueryHash(userId: string, query: string): string {
+    return crypto.createHash('sha256').update(`${userId}:${query}`).digest('hex');
   }
 
   /**
    * Check if a cached search result exists and is still valid
    */
-  static async getCachedResult(wallet: string, query: string): Promise<SearchCacheResult | null> {
+  static async getCachedResult(userId: string, query: string): Promise<SearchCacheResult | null> {
     try {
-      const queryHash = this.generateQueryHash(wallet, query);
+      const queryHash = this.generateQueryHash(userId, query);
       const now = new Date();
       
       const cachedResult = await prisma.searchCache.findFirst({
         where: {
           query_hash: queryHash,
-          wallet: wallet,
+          user_id: userId,
           expires_at: {
             gt: now
           }
@@ -63,12 +63,12 @@ export class SearchCacheService {
    * Store a search result in the cache with 30-minute expiry
    */
   static async setCachedResult(
-    wallet: string, 
+    userId: string, 
     query: string, 
     result: SearchCacheResult
   ): Promise<void> {
     try {
-      const queryHash = this.generateQueryHash(wallet, query);
+      const queryHash = this.generateQueryHash(userId, query);
       const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes from now
 
       await prisma.searchCache.upsert({
@@ -85,7 +85,7 @@ export class SearchCacheService {
           created_at: new Date()
         },
         create: {
-          wallet,
+          user_id: userId,
           query,
           query_hash: queryHash,
           results: result.results,
@@ -120,17 +120,17 @@ export class SearchCacheService {
   }
 
   /**
-   * Clear cache for a specific wallet
+   * Clear cache for a specific user
    */
-  static async clearWalletCache(wallet: string): Promise<void> {
+  static async clearUserCache(userId: string): Promise<void> {
     try {
       await prisma.searchCache.deleteMany({
         where: {
-          wallet: wallet
+          user_id: userId
         }
       });
     } catch (error) {
-      console.error('Error clearing wallet cache:', error);
+      console.error('Error clearing user cache:', error);
     }
   }
 }
