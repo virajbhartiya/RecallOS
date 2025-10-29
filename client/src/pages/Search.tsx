@@ -168,7 +168,7 @@ export const Search: React.FC = () => {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [showOnlyCited, setShowOnlyCited] = useState(true)
-  const [hyperIndexData, setHyperIndexData] = useState<Record<string, any>>({})
+  const [hyperIndexData, _setHyperIndexData] = useState<Record<string, any>>({})
 
   const fetchHyperIndexData = useCallback(async (_memories: Memory[]) => {
     return
