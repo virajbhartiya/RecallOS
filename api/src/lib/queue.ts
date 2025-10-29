@@ -1,5 +1,6 @@
-import { EventEmitter } from 'events';
+import { Queue, QueueEvents, JobsOptions, QueueOptions } from 'bullmq';
 import crypto from 'crypto';
+import { getRedisConnection } from '../utils/env';
 
 export interface ContentJobData {
   user_id: string;
@@ -16,92 +17,55 @@ export interface ContentJobData {
   };
 }
 
-interface Job {
-  id: string;
-  data: ContentJobData;
-  attempts: number;
-  maxAttempts: number;
-  status: 'pending' | 'processing' | 'completed' | 'failed';
-}
+const queueName = 'process-content';
 
-class InMemoryQueue extends EventEmitter {
-  private jobs: Map<string, Job> = new Map();
-  private processingJobs: Set<string> = new Set();
-  private processors: Map<string, (job: any) => Promise<any>> = new Map();
-  private isProcessing = false;
+const queueOptions: QueueOptions = {
+  connection: getRedisConnection(),
+  defaultJobOptions: {
+    removeOnComplete: 1000,
+    removeOnFail: 1000,
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2000 },
+  },
+};
 
-  async add(jobType: string, data: ContentJobData) {
-    const id = crypto.randomUUID();
-    const job: Job = {
-      id,
-      data,
-      attempts: 0,
-      maxAttempts: 3,
-      status: 'pending',
-    };
-    
-    this.jobs.set(id, job);
-    this.processNext();
-    
-    return { id };
-  }
-
-  process(jobType: string, handler: (job: any) => Promise<any>) {
-    this.processors.set(jobType, handler);
-  }
-
-  private async processNext() {
-    if (this.isProcessing) return;
-    
-    this.isProcessing = true;
-    
-    while (true) {
-      const pendingJob = Array.from(this.jobs.values()).find(
-        j => j.status === 'pending' && !this.processingJobs.has(j.id)
-      );
-      
-      if (!pendingJob) break;
-      
-      this.processingJobs.add(pendingJob.id);
-      pendingJob.status = 'processing';
-      
-      const processor = this.processors.get('process-content');
-      if (!processor) {
-        console.error('No processor found for job type: process-content');
-        break;
-      }
-      
-      try {
-        const result = await processor({ id: pendingJob.id, data: pendingJob.data });
-        pendingJob.status = 'completed';
-        this.emit('completed', { id: pendingJob.id }, result);
-        this.jobs.delete(pendingJob.id);
-      } catch (error) {
-        pendingJob.attempts++;
-        
-        if (pendingJob.attempts >= pendingJob.maxAttempts) {
-          pendingJob.status = 'failed';
-          this.emit('failed', { id: pendingJob.id }, error);
-          this.jobs.delete(pendingJob.id);
-        } else {
-          pendingJob.status = 'pending';
-          setTimeout(() => this.processNext(), 2000 * Math.pow(2, pendingJob.attempts - 1));
-        }
-      } finally {
-        this.processingJobs.delete(pendingJob.id);
-      }
-    }
-    
-    this.isProcessing = false;
-  }
-
-  on(event: string, listener: (...args: any[]) => void): this {
-    return super.on(event, listener);
-  }
-}
-
-export const contentQueue = new InMemoryQueue();
+export const contentQueue = new Queue<ContentJobData>(queueName, queueOptions);
+export const contentQueueEvents = new QueueEvents(queueName, { connection: getRedisConnection() });
 
 export const addContentJob = async (data: ContentJobData) => {
-  return await contentQueue.add('process-content', data);
+  const jobId = crypto.randomUUID();
+  const jobOptions: JobsOptions = {
+    jobId,
+  };
+  const job = await contentQueue.add(queueName, data, jobOptions);
+  console.log('[queue] added', { queue: queueName, jobId: job.id, user_id: data.user_id });
+  return { id: job.id };
 };
+
+contentQueueEvents.on('waiting', ({ jobId }) => {
+  console.log('[queue] waiting', { queue: queueName, jobId });
+});
+
+contentQueueEvents.on('active', ({ jobId }) => {
+  console.log('[queue] active', { queue: queueName, jobId });
+});
+
+contentQueueEvents.on('completed', ({ jobId }) => {
+  console.log('[queue] completed', { queue: queueName, jobId });
+});
+
+contentQueueEvents.on('failed', ({ jobId, failedReason }) => {
+  console.error('[queue] failed', { queue: queueName, jobId, reason: failedReason });
+});
+
+contentQueueEvents.on('stalled', ({ jobId }) => {
+  console.warn('[queue] stalled', { queue: queueName, jobId });
+});
+
+contentQueueEvents.on('removed', ({ jobId }) => {
+  console.log('[queue] removed', { queue: queueName, jobId });
+});
+
+contentQueueEvents.on('error', (err) => {
+  console.error('[queue] events error', err);
+});
