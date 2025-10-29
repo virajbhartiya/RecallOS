@@ -9,6 +9,7 @@ import {
 export const Landing = () => {
   const [isVisible, setIsVisible] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
+  const [headerBlurProgress, setHeaderBlurProgress] = useState(0)
 
   useEffect(() => {
     // Prevent browser from restoring previous scroll position and ensure top on load
@@ -27,8 +28,19 @@ export const Landing = () => {
       setMousePosition({ x: e.clientX, y: e.clientY })
     }
     
+    const handleScroll = () => {
+      const y = typeof window !== 'undefined' ? window.scrollY || 0 : 0
+      const progress = Math.max(0, Math.min(1, y / 120))
+      setHeaderBlurProgress(progress)
+    }
+    
     window.addEventListener('mousemove', handleMouseMove)
-    return () => window.removeEventListener('mousemove', handleMouseMove)
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    handleScroll()
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('scroll', handleScroll)
+    }
   }, [])
 
   return (
@@ -119,7 +131,21 @@ export const Landing = () => {
       `}</style>
 
       {/* Enhanced header with better navigation */}
-      <header className="fixed top-0 inset-x-0 z-40 transition-all duration-300">
+      <header className="fixed top-0 inset-x-0 z-40 transition-all duration-300" style={{
+        backgroundColor: `rgba(255,255,255, ${0.35 * headerBlurProgress})`,
+        borderBottom: `1px solid rgba(0,0,0, ${0.06 * headerBlurProgress})`
+      }}>
+        {/* Progressive blur overlay: strongest at top, fades to bottom */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backdropFilter: `saturate(180%) blur(${Math.round(headerBlurProgress * 16)}px)`,
+            WebkitBackdropFilter: `saturate(180%) blur(${Math.round(headerBlurProgress * 16)}px)`,
+            maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1), rgba(0,0,0,0))',
+            WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1), rgba(0,0,0,0))',
+            opacity: Math.min(1, headerBlurProgress * 1.2)
+          }}
+        />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
           <div className="flex items-center justify-between">
             {/* Enhanced Brand */}
@@ -413,8 +439,8 @@ export const Landing = () => {
                   Start Pro
                 </button>
                 <div className="mt-2 text-[11px] text-gray-600 text-center">7‑day money‑back guarantee</div>
-              </div>
-            </div>
+                    </div>
+                  </div>
 
             {/* Teams */}
             <div className="relative border border-gray-200 bg-white/80 backdrop-blur shadow-sm hover:shadow-md transition-shadow">
