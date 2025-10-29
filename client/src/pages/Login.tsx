@@ -35,6 +35,10 @@ export const Login = () => {
       })
       
       setUser(response.data.user)
+      // Persist JWT for Authorization header usage
+      if (response.data?.token) {
+        try { localStorage.setItem('auth_token', response.data.token) } catch {}
+      }
       
       // Redirect to memories page after successful login
       setTimeout(() => {
@@ -52,6 +56,7 @@ export const Login = () => {
     try {
       await axiosInstance.post('/auth/logout')
       setUser(null)
+      try { localStorage.removeItem('auth_token') } catch {}
       setEmail('')
       setPassword('')
       setError('')
