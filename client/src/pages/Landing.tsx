@@ -151,9 +151,23 @@ export const Landing = () => {
               </button>
               <button 
                 className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
+                onClick={() => window.location.href = '/memories'}
+              >
+                <span className="relative z-10">Memories</span>
+                <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
+              </button>
+              <button 
+                className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
                 onClick={() => window.location.href = '/pricing'}
               >
                 <span className="relative z-10">Pricing</span>
+                <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
+              </button>
+              <button 
+                className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
+                onClick={() => window.location.href = '/login'}
+              >
+                <span className="relative z-10">Login</span>
                 <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
               </button>
             </nav>
@@ -260,7 +274,7 @@ export const Landing = () => {
                   style={{
                     animation: isVisible ? 'slideInUp 1s ease-out' : 'none'
                   }}
-              >
+                >
                 <span className="block text-black">
                   <span className="align-baseline">A</span>
                   {' '}
@@ -268,7 +282,7 @@ export const Landing = () => {
                   {' '}
                   <span className="align-baseline">memory</span>
                 </span>
-                <span 
+                  <span 
                   className="block text-3xl sm:text-4xl lg:text-5xl font-normal mt-2"
                     style={{
                       animation: isVisible ? 'slideInUp 1s ease-out 0.2s both' : 'none'
@@ -276,7 +290,7 @@ export const Landing = () => {
                   >
                   for everything you see
                   </span>
-                <span 
+                  <span 
                   className="block text-2xl sm:text-3xl lg:text-4xl font-light mt-1"
                     style={{
                       animation: isVisible ? 'slideInUp 1s ease-out 0.4s both' : 'none'
@@ -293,7 +307,7 @@ export const Landing = () => {
                   style={{
                     animation: isVisible ? 'slideInUp 1s ease-out 0.6s both' : 'none'
                   }}
-            >
+                >
               RecallOS is your photographic memory for the web, capturing text, links and context as you browse so you can find it in seconds.
             </p>
 
@@ -305,7 +319,7 @@ export const Landing = () => {
                   }}
                 >
               <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-                <ConsoleButton 
+                  <ConsoleButton 
                     variant="console_key" 
                   className="group relative overflow-hidden flex-1 sm:flex-none sm:min-w-[160px] rounded-none px-4 py-2 transition-all duration-200 hover:shadow-md"
                   onClick={() => window.open('https://github.com/virajbhartiya/RecallOS/releases/latest', '_blank')}
@@ -313,12 +327,12 @@ export const Landing = () => {
                   <span className="relative z-10 whitespace-nowrap text-sm sm:text-base font-medium">Get the Extension</span>
                     <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
                   </ConsoleButton>
-                <ConsoleButton
+                  <ConsoleButton
                     variant="outlined"
                   className="group relative overflow-hidden flex-1 sm:flex-none sm:min-w-[160px] rounded-none px-4 py-2 transition-all duration-200 hover:shadow-md"
-                  onClick={() => window.location.href = '/docs'}
+                  onClick={() => window.location.href = '/memories'}
                   >
-                  <span className="relative z-10 whitespace-nowrap text-sm sm:text-base font-medium">See Recall in action</span>
+                  <span className="relative z-10 whitespace-nowrap text-sm sm:text-base font-medium">Open Memories</span>
                     <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
                   </ConsoleButton>
               </div>
