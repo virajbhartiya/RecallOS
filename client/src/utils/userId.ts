@@ -1,8 +1,17 @@
 export function getOrCreateUserId(): string {
   try {
     const key = 'user_id';
+    const overrideKey = 'user_id_override';
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    // Optional override to match extension's ID in development
+    const override = localStorage.getItem(overrideKey);
+    if (override && uuidRe.test(override)) {
+      return override;
+    }
+
     let id = localStorage.getItem(key);
-    if (id && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    if (id && uuidRe.test(id)) {
       return id;
     }
     id = generateUuidV4();

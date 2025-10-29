@@ -32,9 +32,20 @@ export class MemoryController {
       // Use authenticated user ID if available, otherwise fall back to request body
       const userId = req.user?.externalId || getRequestUserId(req);
 
+      console.log('[memory/process] inbound', {
+        ts: new Date().toISOString(),
+        auth: !!req.user,
+        authUserId: req.user?.externalId,
+        fallbackUserId: !req.user ? userId : undefined,
+        url: typeof url === 'string' ? url.slice(0, 200) : undefined,
+        title: typeof title === 'string' ? title.slice(0, 200) : undefined,
+        contentLen: typeof content === 'string' ? content.length : undefined,
+      });
+
 
 
       if (!content || !userId) {
+        console.log('[memory/process] rejected', { reason: 'missing_content_or_user', hasContent: !!content, hasUserId: !!userId });
         return res.status(400).json({
           success: false,
           error: 'Content and userId are required',
@@ -45,13 +56,19 @@ export class MemoryController {
 
       if (!user) {
         user = await prisma.user.create({ data: { external_id: userId } as any });
+        console.log('[memory/process] user_created', { userId: user.id, externalId: user.external_id });
       }
 
+      console.log('[memory/process] user_resolved', { userId: user.id, externalId: user.external_id });
 
+
+      const aiStart = Date.now();
+      console.log('[memory/process] ai_start', { ts: new Date().toISOString(), tasks: ['summarizeContent', 'extractContentMetadata'] });
       const [summary, extractedMetadata] = await Promise.all([
         aiProvider.summarizeContent(content, metadata),
         aiProvider.extractContentMetadata(content, metadata),
       ]);
+      console.log('[memory/process] ai_done', { ms: Date.now() - aiStart, hasSummary: !!summary, hasExtracted: !!extractedMetadata });
 
 
       const memoryHash =
@@ -96,6 +113,7 @@ export class MemoryController {
         });
       }
 
+      const dbCreateStart = Date.now();
       const memory = await prisma.memory.create({
         data: {
           user_id: user.id,
@@ -119,11 +137,13 @@ export class MemoryController {
           },
         },
       });
+      console.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id, userId: user.id });
 
 
       // blockchain fields removed; retained local variables only
 
 
+      const dbUpdateStart = Date.now();
       await prisma.memory.update({
         where: { id: memory.id },
         data: {
@@ -135,10 +155,12 @@ export class MemoryController {
           confirmed_at: new Date(),
         } as any,
       });
+      console.log('[memory/process] db_memory_updated', { ms: Date.now() - dbUpdateStart, memoryId: memory.id, status: 'confirmed' });
 
       setImmediate(async () => {
         // Always create snapshot even if mesh processing fails
         try {
+          const snapStart = Date.now();
           const summaryHash =
             '0x' + createHash('sha256').update(summary).digest('hex');
 
@@ -150,16 +172,21 @@ export class MemoryController {
               summary_hash: summaryHash,
             },
           });
+          console.log('[memory/process] snapshot_created', { ms: Date.now() - snapStart, memoryId: memory.id });
         } catch (snapshotError) {
           console.error(`Error creating snapshot for memory ${memory.id}:`, snapshotError);
         }
 
         try {
+          const meshStart = Date.now();
+          console.log('[memory/process] mesh_start', { memoryId: memory.id, userId: user.id });
           await memoryMeshService.processMemoryForMesh(memory.id, user.id);
+          console.log('[memory/process] mesh_done', { ms: Date.now() - meshStart, memoryId: memory.id });
         } catch (meshError) {
           console.error(`Error processing memory ${memory.id} for mesh:`, meshError);
         }
       });
+      console.log('[memory/process] done', { memoryId: memory.id });
       res.status(200).json({
         success: true,
         message: 'Content processed and stored successfully',
