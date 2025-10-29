@@ -358,6 +358,93 @@ export const Landing = () => {
           </div>
         </div>
       </Section>
+
+      {/* Pricing Section */}
+      <div id="pricing">
+      <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10 sm:mb-12">
+            <h2 className="text-3xl sm:text-4xl font-light">Pricing</h2>
+            <p className="mt-2 text-sm sm:text-base text-gray-600">Simple plans that grow with you. Billed monthly.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
+            {/* Free */}
+            <div className="relative border border-gray-200 bg-white/80 backdrop-blur shadow-sm hover:shadow-md transition-shadow">
+              <div className="p-5 sm:p-6 border-b border-gray-200">
+                <div className="text-xs uppercase tracking-wider text-gray-600">Free</div>
+                <div className="mt-2 flex items-end gap-1">
+                  <div className="text-2xl font-semibold text-black">$0</div>
+                  <div className="text-xs text-gray-600 mb-1">/mo</div>
+                </div>
+                <div className="mt-1 text-sm text-gray-600">Personal basics</div>
+              </div>
+              <ul className="p-5 sm:p-6 text-sm text-gray-700 space-y-2 border-b border-gray-200">
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Automatic capture</li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Local search</li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Up to 500 memories</li>
+              </ul>
+              <div className="p-5 sm:p-6">
+                <button className="w-full border border-black text-black px-4 py-2 text-sm tracking-wide hover:bg-black hover:text-white transition-colors rounded-none" onClick={() => (window.location.href = '/login')}>
+                  Get Started
+                </button>
+              </div>
+            </div>
+
+            {/* Pro - featured */}
+            <div className="relative border-2 border-black bg-white shadow-md hover:shadow-lg transition-shadow">
+              <div className="absolute -top-3 left-4 bg-black text-white text-[10px] uppercase tracking-wider px-2 py-1">Most popular</div>
+              <div className="p-6 sm:p-7 border-b border-gray-200">
+                <div className="text-xs uppercase tracking-wider text-gray-700">Pro</div>
+                <div className="mt-2 flex items-end gap-1">
+                  <div className="text-3xl font-semibold text-black">$8</div>
+                  <div className="text-xs text-gray-600 mb-1">/mo</div>
+                </div>
+                <div className="mt-1 text-sm text-gray-700">Everything you need for speed</div>
+              </div>
+              <ul className="p-6 sm:p-7 text-sm text-gray-800 space-y-2 border-b border-gray-200">
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Unlimited memories</li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Faster processing</li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Priority queue</li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Smart search boosts</li>
+              </ul>
+              <div className="p-6 sm:p-7">
+                <button className="w-full bg-black text-white px-4 py-2 text-sm tracking-wide hover:opacity-90 transition-opacity rounded-none" onClick={() => (window.location.href = '/login?plan=pro')}>
+                  Start Pro
+                </button>
+                <div className="mt-2 text-[11px] text-gray-600 text-center">7‑day money‑back guarantee</div>
+              </div>
+            </div>
+
+            {/* Teams */}
+            <div className="relative border border-gray-200 bg-white/80 backdrop-blur shadow-sm hover:shadow-md transition-shadow">
+              <div className="p-5 sm:p-6 border-b border-gray-200">
+                <div className="text-xs uppercase tracking-wider text-gray-600">Teams</div>
+                <div className="mt-2 flex items-end gap-1">
+                  <div className="text-2xl font-semibold text-black">$20</div>
+                  <div className="text-xs text-gray-600 mb-1">/user</div>
+                </div>
+                <div className="mt-1 text-sm text-gray-600">For small teams</div>
+              </div>
+              <ul className="p-5 sm:p-6 text-sm text-gray-700 space-y-2 border-b border-gray-200">
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Shared spaces</li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Access controls</li>
+                <li className="flex items-start gap-2"><span className="mt-1 h-1.5 w-1.5 bg-black" /> Usage analytics</li>
+              </ul>
+              <div className="p-5 sm:p-6">
+                <button className="w-full border border-black text-black px-4 py-2 text-sm tracking-wide hover:bg-black hover:text-white transition-colors rounded-none" onClick={() => (window.location.href = '/contact')}>
+                  Contact Sales
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 text-center text-xs text-gray-600">
+            Prices shown in USD. Cancel anytime.
+          </div>
+        </div>
+      </Section>
+      </div>
     </div>
   )
 }
