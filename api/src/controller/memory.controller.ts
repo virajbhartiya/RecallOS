@@ -140,8 +140,6 @@ export class MemoryController {
       console.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id, userId: user.id });
 
 
-      // blockchain fields removed; retained local variables only
-
 
       const dbUpdateStart = Date.now();
       await prisma.memory.update({
