@@ -471,6 +471,72 @@ export const Landing = () => {
         </div>
       </Section>
       </div>
+
+      {/* Footer */}
+      <footer className="bg-white/80 backdrop-blur">
+        <div className="h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
+            {/* Brand + Newsletter */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold text-lg font-mono">R</div>
+                <div className="text-sm text-gray-800 font-medium">RecallOS</div>
+              </div>
+              <p className="text-sm text-gray-600">A searchable memory for everything you see online.</p>
+              <div className="mt-3">
+                <div className="flex">
+                  <input
+                    type="email"
+                    placeholder="Your email"
+                    className="w-full border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black rounded-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        window.location.href = '/login?subscribe=1'
+                      }
+                    }}
+                  />
+                  <button
+                    className="ml-2 border border-black px-3 py-2 text-sm hover:bg-black hover:text-white transition-colors rounded-none"
+                    onClick={() => (window.location.href = '/login?subscribe=1')}
+                  >
+                    Subscribe
+                  </button>
+                </div>
+                <div className="mt-2 text-[11px] text-gray-500">Occasional updates. Unsubscribe anytime.</div>
+              </div>
+              <div className="flex items-center gap-4 pt-2">
+                <button onClick={() => window.open('https://github.com/virajbhartiya/RecallOS','_blank')} className="block text-sm text-gray-700 hover:underline text-left">GitHub</button>
+                <button onClick={() => window.open('https://x.com','_blank')} className="block text-sm text-gray-700 hover:underline text-left">X</button>
+              </div>
+            </div>
+
+            {/* Columns (only existing routes) */}
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-700">Product</div>
+              <div className="mt-3 space-y-2 text-sm text-gray-700">
+                <button className="block hover:underline text-left" onClick={() => (window.location.href = '/memories')}>Memories</button>
+                <button className="block hover:underline text-left" onClick={() => (window.location.href = '/search')}>Search</button>
+                <button className="block hover:underline text-left" onClick={() => (window.location.href = '/login')}>Download</button>
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-gray-700">Resources</div>
+              <div className="mt-3 space-y-2 text-sm text-gray-700">
+                <button className="block hover:underline text-left" onClick={() => (window.location.href = '/docs')}>Docs</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-[12px] text-gray-600">
+            <div>© {new Date().getFullYear()} RecallOS. All rights reserved.</div>
+            <div className="flex flex-wrap gap-4">
+              <button className="block hover:underline" onClick={() => window.open('https://github.com/virajbhartiya/RecallOS','_blank')}>GitHub</button>
+            </div>
+          </div>
+        </div>
+      </footer>
+
     </div>
   )
 }
