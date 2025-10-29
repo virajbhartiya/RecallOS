@@ -1,11 +1,12 @@
 import { Router } from 'express';
 
 import { MemoryController } from '../controller/memory.controller';
+import { submitContent } from '../controller/content.controller';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/process', authenticateToken, MemoryController.processRawContent);
+router.post('/process', authenticateToken, submitContent);
 router.post('/', authenticateToken, MemoryController.storeMemory);
 router.post('/batch', authenticateToken, MemoryController.storeMemoryBatch);
 router.get('/user/:userId', authenticateToken, MemoryController.getUserMemories);
