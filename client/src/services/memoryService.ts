@@ -33,11 +33,7 @@ interface ApiMemoryResponse {
 
 export class MemoryService {
   private static baseUrl = '/memory'
-  
-  // User IDs are case-sensitive identifiers provided by the API
-  private static normalizeAddress(address: string): string {
-    return address
-  }
+
 
   static async getMemoriesWithTransactionDetails(
     userId: string,

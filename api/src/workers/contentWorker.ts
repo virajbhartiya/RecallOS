@@ -1,19 +1,16 @@
-import { contentQueue, ContentJobData } from '../lib/queue';
-
+import { Worker } from 'bullmq';
+import { ContentJobData } from '../lib/queue';
 import { aiProvider } from '../services/aiProvider';
-
 import { memoryMeshService } from '../services/memoryMesh';
-
 import { prisma } from '../lib/prisma';
-
 import { createHash } from 'crypto';
+import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../utils/env';
 
 export const startContentWorker = () => {
-  contentQueue.process('process-content', async (job: any) => {
-    const { user_id, raw_text, metadata } = job.data as ContentJobData;
-
-    try {
-
+  const worker = new Worker<ContentJobData>(
+    'process-content',
+    async (job) => {
+      const { user_id, raw_text, metadata } = job.data as ContentJobData;
       const summary = await aiProvider.summarizeContent(raw_text, metadata);
 
       if (metadata?.memory_id) {
@@ -80,24 +77,25 @@ export const startContentWorker = () => {
         }
       }
 
-
       return {
         success: true,
         contentId: metadata?.memory_id || 'memory_processed',
         memoryId: metadata?.memory_id || null,
         summary: summary.substring(0, 100) + '...',
       };
-    } catch (error) {
-      console.error(`Error processing content for user ${user_id}:`, error);
-      throw error;
+    },
+    {
+      connection: getRedisConnection(),
+      concurrency: getQueueConcurrency(),
+      limiter: getQueueLimiter(),
+    }
+  );
+
+  worker.on('failed', (job, err) => {
+    if (job) {
+      console.error(`Job ${job.id} failed:`, err.message);
+    } else {
+      console.error('Worker failure:', err.message);
     }
   });
-  
-  contentQueue.on('completed', (job: any, result: any) => {
-  });
-  
-  contentQueue.on('failed', (job: any, err: any) => {
-    console.error(`Job ${job.id} failed:`, err.message);
-  });
-  
 };

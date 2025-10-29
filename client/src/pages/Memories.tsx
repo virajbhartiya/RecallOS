@@ -5,7 +5,7 @@ import { MemoryService } from '@/services/memoryService'
 import { SearchService } from '@/services/search'
 import { MemoryMesh3D } from '@/components/MemoryMesh3D'
  
-import { Database } from 'lucide-react'
+// removed unused Database import
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
 import { getOrCreateUserId, getOrCreateAuthToken } from '@/utils/userId'
 
@@ -23,7 +23,7 @@ const MemoryCard: React.FC<{
     gasUsed?: string
     gasPrice?: string
   }
-}> = ({ memory, isSelected, onSelect, onViewTransaction, searchResult, hyperIndexData }) => {
+}> = ({ memory, isSelected, onSelect, onViewTransaction: _onViewTransaction, searchResult, hyperIndexData }) => {
   const getSourceColorLocal = (source?: string) => {
     const s = (source || '').toLowerCase()
     if (s.includes('extension') || s.includes('browser')) return '#0ea5e9'
@@ -87,7 +87,7 @@ const MemoryDetails: React.FC<{
     gasPrice?: string
     timestamp?: string
   }
-}> = ({ memory, expandedContent, setExpandedContent, onViewTransaction, hyperIndexData }) => {
+}> = ({ memory, expandedContent, setExpandedContent, onViewTransaction: _onViewTransaction, hyperIndexData: _hyperIndexData }) => {
   if (!memory) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -230,7 +230,7 @@ export const Memories: React.FC = () => {
   const [isSearching, setIsSearching] = useState(false)
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [showOnlyCited, setShowOnlyCited] = useState(true)
-  const [hyperIndexData, setHyperIndexData] = useState<Record<string, any>>({})
+  const [hyperIndexData, _setHyperIndexData] = useState<Record<string, any>>({})
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 

@@ -44,6 +44,20 @@ async function setExtensionEnabled(enabled: boolean): Promise<void> {
 
 async function getWalletAddress(): Promise<string | null> { return null; }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      controller.signal.aborted
+        ? reject(new DOMException('Aborted', 'AbortError'))
+        : undefined
+    ),
+  ])
+    .finally(() => clearTimeout(timeout)) as Promise<T>;
+}
+
 async function sendToBackend(data: ContextData): Promise<void> {
   try {
     // Check if extension is enabled
@@ -98,18 +112,23 @@ async function sendToBackend(data: ContextData): Promise<void> {
       headers['Authorization'] = `Bearer ${authToken}`;
     }
 
-    const response = await fetch(apiEndpoint, {
+    const controller = new AbortController();
+    const fetchPromise = fetch(apiEndpoint, {
       method: 'POST',
       headers,
       credentials: 'include',
+      keepalive: true,
       body: JSON.stringify({ ...payload, userId: getOrCreateUserId() }),
+      signal: controller.signal,
     });
 
-    if (!response.ok) {
+    const response = await withTimeout(fetchPromise, 4000).catch((_e) => null);
+
+    if (response && !response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const result = await response.json();
+    // Fire-and-forget: do not wait on response body; API queues work and returns 202 quickly
   } catch (error) {
     console.error('RecallOS: Error sending to backend:', error);
   }
