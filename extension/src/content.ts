@@ -1,4 +1,4 @@
-import { getOrCreateUserId } from '@/lib/userId'
+import { getOrCreateUserId, getAuthToken, getOrCreateAuthToken } from '@/lib/userId'
 
 interface ContextData {
   source: string;
@@ -1148,11 +1148,29 @@ function detectAIChatPlatform(): AIChatPlatform {
 
 async function pollSearchJob(jobId: string): Promise<string | null> {
   try {
-    const response = await fetch(`https://api.recallos.xyz/api/search/job/${jobId}`, {
+    // Derive API base from extension settings
+    let apiBase = 'http://localhost:3000/api';
+    try {
+      const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+      const endpoint = cfg?.apiEndpoint as string | undefined;
+      if (endpoint) {
+        const u = new URL(endpoint);
+        apiBase = `${u.protocol}//${u.host}/api`;
+      }
+    } catch {}
+    // Get or create auth token
+    const authToken = await getOrCreateAuthToken();
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    const response = await fetch(`${apiBase}/search/job/${jobId}`, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers,
       credentials: 'include',
     });
     
@@ -1180,8 +1198,17 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
 async function getMemorySummary(query: string): Promise<string | null> {
   try {
     const userId = getOrCreateUserId();
-
-    const searchEndpoint = 'https://api.recallos.xyz/api/search';
+    // Derive API base from extension settings
+    let apiBase = 'http://localhost:3000/api';
+    try {
+      const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+      const endpoint = cfg?.apiEndpoint as string | undefined;
+      if (endpoint) {
+        const u = new URL(endpoint);
+        apiBase = `${u.protocol}//${u.host}/api`;
+      }
+    } catch {}
+    const searchEndpoint = `${apiBase}/search`;
     
     const requestBody = {
       userId: userId,
@@ -1190,12 +1217,20 @@ async function getMemorySummary(query: string): Promise<string | null> {
       contextOnly: false
     };
         
+    // Get or create auth token
+    const authToken = await getOrCreateAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(searchEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers,
       credentials: 'include',
       body: JSON.stringify(requestBody),
     });
