@@ -13,6 +13,64 @@ export function getOrCreateUserId(): string {
   }
 }
 
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem('auth_token');
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string): void {
+  try {
+    localStorage.setItem('auth_token', token);
+  } catch (error) {
+    console.error('Failed to store auth token:', error);
+  }
+}
+
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem('auth_token');
+  } catch (error) {
+    console.error('Failed to clear auth token:', error);
+  }
+}
+
+export async function getOrCreateAuthToken(): Promise<string | null> {
+  try {
+    let token = getAuthToken();
+    if (token) {
+      return token;
+    }
+    
+    const userId = getOrCreateUserId();
+    const baseURL = (import.meta.env.VITE_SERVER_URL || 'http://localhost:3000') + '/api';
+    const response = await fetch(`${baseURL}/auth/extension-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to get auth token:', response.status, response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.token) {
+      setAuthToken(data.token);
+      return data.token;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+}
+
 function generateUuidV4(): string {
   if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
     const buf = new Uint8Array(16);

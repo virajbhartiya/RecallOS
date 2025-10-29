@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { AuthenticatedRequest } from '../middleware/auth';
 
 import { createHash } from 'crypto';
 
@@ -25,10 +26,11 @@ function hashUrl(url: string): string {
 }
 
 export class MemoryController {
-  static async processRawContent(req: Request, res: Response) {
+  static async processRawContent(req: AuthenticatedRequest, res: Response) {
     try {
       const { content, url, title, metadata } = req.body;
-      const userId = getRequestUserId(req);
+      // Use authenticated user ID if available, otherwise fall back to request body
+      const userId = req.user?.externalId || getRequestUserId(req);
 
 
 
@@ -364,22 +366,21 @@ export class MemoryController {
     }
   }
 
-  static async getRecentMemories(req: Request, res: Response) {
+  static async getRecentMemories(req: AuthenticatedRequest, res: Response) {
     try {
       const { userAddress } = req.params;
-
       const { count } = req.query;
+      const userId = req.user?.externalId || userAddress;
 
-      if (!userAddress) {
+      if (!userId) {
         return res.status(400).json({
           success: false,
-          error: 'User address is required',
+          error: 'User ID is required',
         });
       }
 
       const limit = count ? parseInt(count as string) : 10;
 
-      const userId = userAddress; // legacy param name; treat as external_id
       const user = await prisma.user.findFirst({ where: { external_id: { equals: userId } } as any });
 
       if (user) {
@@ -624,22 +625,23 @@ export class MemoryController {
     }
   }
 
-  static async getMemoryInsights(req: Request, res: Response) {
+  static async getMemoryInsights(req: AuthenticatedRequest, res: Response) {
     try {
       const { userAddress } = req.query;
+      const userId = req.user?.externalId || userAddress;
 
-      if (!userAddress) {
+      if (!userId) {
         return res.status(400).json({
           success: false,
-          error: 'userAddress is required',
+          error: 'User ID is required',
         });
       }
 
       const user = await prisma.user.findFirst({
         where: {
           OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
+            { external_id: userId as any },
+            { external_id: (userId as string).toLowerCase() as any },
           ],
         } as any,
       });
@@ -761,25 +763,37 @@ export class MemoryController {
     }
   }
 
-  static async getMemoriesWithTransactionDetails(req: Request, res: Response) {
+  static async getMemoriesWithTransactionDetails(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userId, status, limit = 50 } = req.query as any;
+      const { status, limit = 50 } = req.query as any;
+      const userId = req.user?.externalId || getRequestUserId(req);
 
-      // Resolve internal user_id if provided
-      let internalUserId: string | undefined = undefined;
-      if (userId) {
-        const user = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { external_id: userId as any },
-              { external_id: (userId as string).toLowerCase() as any },
-            ],
-          } as any,
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          error: 'User ID is required',
         });
-        internalUserId = user?.id;
       }
 
-      const whereConditions: any = internalUserId ? { user_id: internalUserId } : {};
+      // Resolve internal user_id
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: userId as any },
+            { external_id: (userId as string).toLowerCase() as any },
+          ],
+        } as any,
+      });
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+        });
+      }
+      
+      const internalUserId = user.id;
+      const whereConditions: any = { user_id: internalUserId };
 
       if (status) {
         whereConditions.tx_status = status;

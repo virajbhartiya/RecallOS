@@ -5,7 +5,7 @@ import { MemoryService } from '../services/memoryService'
 import { LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
 import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse, SearchResult } from '../types/memory'
-import { getOrCreateUserId } from '@/utils/userId'
+import { getOrCreateUserId, getOrCreateAuthToken } from '@/utils/userId'
 
 const SearchResultCard: React.FC<{ 
   result: SearchResult
@@ -186,6 +186,9 @@ export const Search: React.FC = () => {
     setSearchResults(null)
 
     try {
+      // Ensure we have an auth token before making requests
+      await getOrCreateAuthToken()
+
       let response: MemorySearchResponse
 
       if (useSemantic) {

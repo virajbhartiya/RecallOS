@@ -1,4 +1,4 @@
-import { getOrCreateUserId } from '@/lib/userId'
+import { getOrCreateUserId, getAuthToken, getOrCreateAuthToken } from '@/lib/userId'
 /// <reference types="chrome" />
 
 interface ContextData {
@@ -17,10 +17,10 @@ interface ContextData {
 async function getApiEndpoint(): Promise<string> {
   try {
     const result = await chrome.storage.sync.get(['apiEndpoint']);
-    return result.apiEndpoint || 'https://api.recallos.xyz/api/memory/process';
+    return result.apiEndpoint || 'http://localhost:3000/api/memory/process';
   } catch (error) {
     console.error('RecallOS: Error getting API endpoint from storage:', error);
-    return 'https://api.recallos.xyz/api/memory/process';
+    return 'http://localhost:3000/api/memory/process';
   }
 }
 
@@ -88,11 +88,19 @@ async function sendToBackend(data: ContextData): Promise<void> {
     };
 
 
+    // Get or create auth token
+    const authToken = await getOrCreateAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(apiEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
       credentials: 'include',
       body: JSON.stringify({ ...payload, userId: getOrCreateUserId() }),
     });
