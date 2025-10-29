@@ -133,11 +133,6 @@ export const startContentWorker = () => {
     }
   );
 
-  worker.on('failed', (job, err) => {
-    if (job) {
-      console.error(`Job ${job.id} failed:`, err.message);
-    } else {
-      console.error('Worker failure:', err.message);
-    }
-  });
+  // Silence per-job failure logs to reduce noise; failures still surface to BullMQ
+  // events if you attach listeners elsewhere.
 };
