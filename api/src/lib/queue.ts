@@ -38,32 +38,11 @@ export const addContentJob = async (data: ContentJobData) => {
     jobId,
   };
   const job = await contentQueue.add(queueName, data, jobOptions);
-  console.log('[queue] added', { queue: queueName, jobId: job.id, user_id: data.user_id });
   return { id: job.id };
 };
 
-contentQueueEvents.on('waiting', ({ jobId }) => {
-  console.log('[queue] waiting', { queue: queueName, jobId });
-});
-
-contentQueueEvents.on('active', ({ jobId }) => {
-  console.log('[queue] active', { queue: queueName, jobId });
-});
-
-contentQueueEvents.on('completed', ({ jobId }) => {
-  console.log('[queue] completed', { queue: queueName, jobId });
-});
-
 contentQueueEvents.on('failed', ({ jobId, failedReason }) => {
   console.error('[queue] failed', { queue: queueName, jobId, reason: failedReason });
-});
-
-contentQueueEvents.on('stalled', ({ jobId }) => {
-  console.warn('[queue] stalled', { queue: queueName, jobId });
-});
-
-contentQueueEvents.on('removed', ({ jobId }) => {
-  console.log('[queue] removed', { queue: queueName, jobId });
 });
 
 contentQueueEvents.on('error', (err) => {
