@@ -1,10 +1,21 @@
 import path from 'path'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
+import fs from 'fs'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   base: './',
+  server: {
+    https: process.env.VITE_HTTPS_ENABLE === 'true'
+      ? {
+          key: fs.readFileSync(process.env.VITE_HTTPS_KEY_PATH || './certs/app.recallos.test+3-key.pem'),
+          cert: fs.readFileSync(process.env.VITE_HTTPS_CERT_PATH || './certs/app.recallos.test+3.pem'),
+        }
+      : undefined,
+    host: process.env.VITE_DEV_HOST || 'localhost',
+    port: Number(process.env.VITE_DEV_PORT || 5173),
+  },
   build: {
     chunkSizeWarningLimit: 1500,
   },

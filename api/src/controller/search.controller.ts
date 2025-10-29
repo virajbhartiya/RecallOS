@@ -1,17 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../middleware/auth';
 import AppError from '../utils/appError';
 import { searchMemories } from '../services/memorySearch';
 import { createSearchJob, getSearchJob } from '../services/searchJob';
 import { SearchCacheService } from '../services/searchCache';
 
-export const postSearch = async (req: Request, res: Response, next: NextFunction) => {
+export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { userId, query, limit, contextOnly } = req.body || {};
-    if (!userId || !query) return next(new AppError('userId and query are required', 400));
+    // Use authenticated user ID if available, otherwise use provided userId
+    const actualUserId = req.user?.externalId || userId;
+    if (!actualUserId || !query) return next(new AppError('userId and query are required', 400));
     
  
     if (!contextOnly) {
-      const cachedResult = await SearchCacheService.getCachedResult(userId, query);
+      const cachedResult = await SearchCacheService.getCachedResult(actualUserId, query);
       if (cachedResult) {
         console.log('Returning cached search result for query:', query);
 
@@ -28,7 +31,7 @@ export const postSearch = async (req: Request, res: Response, next: NextFunction
       ;(global as any).__currentSearchJobId = job.id;
     }
     
-    const data = await searchMemories({ userId, query, limit, contextOnly });
+    const data = await searchMemories({ userId: actualUserId, query, limit, contextOnly });
     
     // Return response with appropriate fields
     const response: any = { 
@@ -46,7 +49,7 @@ export const postSearch = async (req: Request, res: Response, next: NextFunction
     
     // Cache the result if not context-only
     if (!contextOnly) {
-      await SearchCacheService.setCachedResult(userId, query, response);
+      await SearchCacheService.setCachedResult(actualUserId, query, response);
       console.log('Cached search result for query:', query);
     }
     

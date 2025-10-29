@@ -7,7 +7,7 @@ import { MemoryMesh3D } from '@/components/MemoryMesh3D'
  
 import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
-import { getOrCreateUserId } from '@/utils/userId'
+import { getOrCreateUserId, getOrCreateAuthToken } from '@/utils/userId'
 
 const MemoryCard: React.FC<{
   memory: Memory
@@ -255,6 +255,9 @@ export const Memories: React.FC = () => {
     setError(null)
     
     try {
+      // Ensure we have an auth token before making requests
+      await getOrCreateAuthToken()
+      
       const memoriesData = await MemoryService.getMemoriesWithTransactionDetails(userId)
       
       setMemories(memoriesData || [])
@@ -327,6 +330,9 @@ export const Memories: React.FC = () => {
 
     try {
       const signal = abortControllerRef.current?.signal
+
+      // Ensure we have an auth token before making requests
+      await getOrCreateAuthToken()
 
       // Use the working /api/search endpoint for all searches
       const response = await MemoryService.searchMemories(userId, query, filters, 1, 50, signal)
