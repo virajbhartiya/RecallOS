@@ -24,8 +24,8 @@ const queueOptions: QueueOptions = {
   defaultJobOptions: {
     removeOnComplete: 1000,
     removeOnFail: 1000,
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 2000 },
+    attempts: 1,
+    backoff: { type: 'exponential', delay: 5000 },
   },
 };
 
