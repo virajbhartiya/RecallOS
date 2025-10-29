@@ -11,8 +11,6 @@ const TableOfContents: React.FC<{ onSectionClick: (id: string) => void }> = ({ o
     { id: 'web-client', title: 'Web Client' },
     { id: 'search', title: 'Search & AI Answers' },
     { id: 'memory-mesh', title: 'Memory Mesh' },
-    { id: 'blockchain', title: 'Blockchain Verification' },
-    { id: 'gas-deposits', title: 'Gas Deposits' },
     { id: 'api-reference', title: 'API Reference' },
     { id: 'troubleshooting', title: 'Troubleshooting' },
     { id: 'faq', title: 'FAQ' },
@@ -83,16 +81,13 @@ export const Docs = () => {
   const faqs = [
     {
       question: 'Is my data private?',
-      answer: 'Yes! All your memories are tied to your wallet address and only you can access them. We don\'t track your browsing or share your data with third parties. The blockchain only stores cryptographic hashes, not your actual content.',
+      answer: 'Yes! Your memories are stored in your private account and only you can access them. We don\'t track your browsing or share your data with third parties.',
     },
     {
       question: 'How much does it cost?',
-      answer: 'RecallOS is free to use. You only need to deposit a small amount of ETH (0.01 ETH recommended) to cover blockchain gas fees for storing memory hashes on-chain. This deposit lasts for hundreds or thousands of memories.',
+      answer: 'RecallOS is free to use.',
     },
-    {
-      question: 'What happens if I lose my wallet?',
-      answer: 'Your memories are permanently tied to your wallet address. If you lose access to your wallet, you won\'t be able to access your memories. Always backup your wallet recovery phrase securely.',
-    },
+    
     {
       question: 'Can I export my memories?',
       answer: 'Yes! You can export your memories as JSON data at any time. You can also use our SDK to programmatically access all your memories.',
@@ -101,10 +96,7 @@ export const Docs = () => {
       question: 'Does the extension slow down my browser?',
       answer: 'No. The extension is designed to be lightweight and only captures content when you switch tabs or load new pages. It doesn\'t monitor your activity in real-time.',
     },
-    {
-      question: 'Why blockchain?',
-      answer: 'Blockchain provides immutable proof that you captured a specific piece of content at a specific time. This is useful for research, learning verification, and creating an auditable record of your knowledge journey.',
-    },
+    
     {
       question: 'Can I delete memories?',
       answer: 'You can delete memories from the database, but the cryptographic hash will remain on the blockchain permanently. This is by design to ensure the integrity of the verification system.',
@@ -125,10 +117,7 @@ export const Docs = () => {
       question: 'How does hybrid search work?',
       answer: 'Hybrid search combines keyword matching (40% weight) with semantic search using vector embeddings (60% weight) to provide comprehensive results with relevance scoring.',
     },
-    {
-      question: 'Can I retry failed blockchain transactions?',
-      answer: 'Yes! The Memories page includes a "Retry Failed" button that automatically retries failed blockchain transactions. You can also monitor transaction status in real-time.',
-    },
+    
   ]
 
   return (
@@ -173,7 +162,6 @@ export const Docs = () => {
                   <li><strong>Automatically captures</strong> what you read with our browser extension</li>
                   <li><strong>AI-summarizes</strong> content using Google Gemini for quick recall</li>
                   <li><strong>Builds connections</strong> between related memories using semantic analysis and memory mesh</li>
-                  <li><strong>Verifies on blockchain</strong> using Sepolia testnet for permanent proof</li>
                   <li><strong>Searches semantically</strong> using vector embeddings and hybrid search</li>
                   <li><strong>Integrates with ChatGPT</strong> to automatically inject relevant memories into conversations</li>
                 </ul>
@@ -186,34 +174,24 @@ export const Docs = () => {
               </h2>
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium mb-2">1. Connect Your Wallet</h3>
+                  <h3 className="text-lg font-medium mb-2">1. Create Your User ID</h3>
                   <p className="text-gray-700 mb-3">
-                    RecallOS uses your Ethereum wallet to identify you. No passwords needed!
+                    RecallOS uses a simple user ID to associate your memories across the extension and web client.
                   </p>
                   <InfoBox type="tip">
-                    If you don't have a wallet, we recommend <a href="https://metamask.io" target="_blank" rel="noopener noreferrer" className="underline">MetaMask</a> or <a href="https://rainbow.me" target="_blank" rel="noopener noreferrer" className="underline">Rainbow</a>.
+                    The user ID is your unique identifier for accessing your memories. It's automatically generated when you first install the extension.
                   </InfoBox>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-medium mb-2">2. Deposit Gas (One-time)</h3>
-                  <p className="text-gray-700 mb-3">
-                    Deposit a small amount of ETH (0.01 ETH recommended) to pay for blockchain transactions. This covers hundreds of memories.
-                  </p>
-                  <CodeBlock code="// Your memories are stored on-chain, so we need a small gas deposit
-                  // This is a one-time deposit that lasts a long time
-                  // You can withdraw your deposit anytime" />
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-medium mb-2">3. Install Browser Extension</h3>
+                  <h3 className="text-lg font-medium mb-2">2. Install Browser Extension</h3>
                   <p className="text-gray-700 mb-3">
                     For automatic capture, install our Chrome/Brave extension. Or manually add memories through the web interface.
                   </p>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-medium mb-2">4. Start Capturing</h3>
+                  <h3 className="text-lg font-medium mb-2">3. Start Capturing</h3>
                   <p className="text-gray-700">
                     Browse the web normally. RecallOS captures pages automatically (with extension) or you can manually add content through the web client.
                   </p>
@@ -246,9 +224,7 @@ export const Docs = () => {
                 </div>
                 <div className="bg-white border border-gray-200 p-4">
                   <h3 className="font-medium mb-2">Blockchain Verification</h3>
-                  <p className="text-sm text-gray-600">
-                    Every memory hash is stored on Sepolia testnet with gas deposit system for permanent verification.
-                  </p>
+                  
                 </div>
                 <div className="bg-white border border-gray-200 p-4">
                   <h3 className="font-medium mb-2">ChatGPT Integration</h3>
@@ -287,7 +263,7 @@ export const Docs = () => {
                 <ol className="list-decimal list-inside space-y-2 text-gray-700">
                   <li>Build the extension from source or install from Chrome Web Store</li>
                   <li>Configure API endpoint (default: http://localhost:3000/api/memory/process)</li>
-                  <li>Enter your wallet address or connect wallet</li>
+                  
                   <li>Start browsing and using ChatGPT!</li>
                 </ol>
 
@@ -318,7 +294,7 @@ export const Docs = () => {
 
                 <h3 className="text-lg font-medium mt-6">Configuration</h3>
                 <CodeBlock code={`API Endpoint: http://localhost:3000/api/memory/processRawContent
-Wallet Address: 0xYourWalletAddress
+User ID: your-user-id
 ChatGPT Integration: Automatic (1.5s delay)`} />
               </div>
             </section>
@@ -329,7 +305,7 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
               </h2>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  Use the web interface to manually add memories, view your collection, search, and manage blockchain transactions.
+                  Use the web interface to manually add memories, view your collection, and search.
                 </p>
 
                 <h3 className="text-lg font-medium">Main Pages</h3>
@@ -337,13 +313,13 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
                   <div className="bg-white border border-gray-200 p-3">
                     <h4 className="font-medium text-sm">Landing</h4>
                     <p className="text-xs text-gray-600 mt-1">
-                      Welcome page with wallet connection and system overview.
+                      Welcome page with system overview.
                     </p>
                   </div>
                   <div className="bg-white border border-gray-200 p-3">
                     <h4 className="font-medium text-sm">Memories</h4>
                     <p className="text-xs text-gray-600 mt-1">
-                      Browse memories with filters, view transaction status, retry failed operations, and explore memory mesh.
+                      Browse memories with filters and explore the memory mesh.
                     </p>
                   </div>
                   <div className="bg-white border border-gray-200 p-3">
@@ -353,10 +329,7 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
                     </p>
                   </div>
                   <div className="bg-white border border-gray-200 p-3">
-                    <h4 className="font-medium text-sm">HyperIndex</h4>
-                    <p className="text-xs text-gray-600 mt-1">
-                      View blockchain data and transaction details from the HyperIndex integration.
-                    </p>
+                    
                   </div>
                 </div>
               </div>
@@ -404,7 +377,7 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
 
                 <h3 className="text-lg font-medium mt-6">Example Queries</h3>
                 <div className="space-y-2">
-                  <CodeBlock code={`"blockchain smart contracts"\n"how to deploy on Sepolia"\n"React hooks best practices"\n"what did I learn about GraphQL?"`} />
+                  <CodeBlock code={`"React hooks best practices"\n"semantic search"\n"what did I learn about GraphQL?"`} />
                 </div>
 
                 <InfoBox type="tip">
@@ -413,18 +386,7 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
 
                 <h3 className="text-lg font-medium mt-6">AI Answer Format</h3>
                 <div className="bg-white border border-gray-200 p-4">
-                  <p className="text-sm text-gray-700 mb-2">
-                    <strong>Question:</strong> "What did I learn about blockchain?"
-                  </p>
-                  <p className="text-sm text-gray-700">
-                    <strong>Answer:</strong> Based on your memories, you explored Ethereum smart contracts [1], studied Solidity programming [2], and deployed contracts on testnets [3].
-                  </p>
-                  <div className="mt-3 text-xs text-gray-600">
-                    <p><strong>Citations:</strong></p>
-                    <p>[1] Ethereum Smart Contracts Guide (85% relevance)</p>
-                    <p>[2] Solidity Tutorial - Advanced Patterns (78% relevance)</p>
-                    <p>[3] Deploying to Sepolia Testnet (92% relevance)</p>
-                  </div>
+                  
                 </div>
               </div>
             </section>
@@ -488,144 +450,7 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
               </div>
             </section>
 
-            <section id="blockchain">
-              <h2 className="text-2xl font-light font-editorial mb-4 border-b border-gray-200 pb-2">
-                Blockchain Verification
-              </h2>
-              <div className="space-y-4">
-                <p className="text-gray-700">
-                  Every memory is anchored on the Sepolia testnet using a gas deposit system for permanent, verifiable proof.
-                </p>
-
-                <h3 className="text-lg font-medium">What's Stored On-Chain?</h3>
-                <ul className="list-disc list-inside space-y-2 text-gray-700">
-                  <li><strong>Memory Hash:</strong> SHA-256 hash of the AI-generated summary</li>
-                  <li><strong>URL Hash:</strong> Keccak-256 hash of the original URL</li>
-                  <li><strong>Timestamp:</strong> Unix timestamp of capture</li>
-                  <li><strong>User Address:</strong> Wallet address of the memory owner</li>
-                </ul>
-
-                <InfoBox type="warning">
-                  Your actual content is NOT stored on-chain, only cryptographic hashes. This preserves privacy while enabling verification.
-                </InfoBox>
-
-                <h3 className="text-lg font-medium mt-6">Gas Deposit System</h3>
-                <p className="text-gray-700">
-                  Instead of approving each transaction individually, you deposit ETH once and the system handles gas automatically:
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-gray-700">
-                  <li>Deposit ETH to the smart contract (one-time setup)</li>
-                  <li>Authorized relayer submits transactions on your behalf</li>
-                  <li>Gas costs deducted from your deposit with 20% buffer</li>
-                  <li>Withdraw unused balance anytime (1 ETH/day limit)</li>
-                </ul>
-
-                <h3 className="text-lg font-medium mt-6">Transaction Management</h3>
-                <p className="text-gray-700 mb-2">
-                  Every memory shows its blockchain transaction status:
-                </p>
-                <div className="bg-white border border-gray-200 p-3 font-mono text-xs">
-                  <p>tx_hash: 0x789abc...</p>
-                  <p>block_number: 12345</p>
-                  <p>gas_used: 100000</p>
-                  <p>status: confirmed/pending/failed</p>
-                  <p>network: sepolia</p>
-                </div>
-
-                <h3 className="text-lg font-medium mt-6">Smart Contract Features</h3>
-                <ul className="list-disc list-inside space-y-2 text-gray-700">
-                  <li><strong>Batch Storage:</strong> Store multiple memories in one transaction</li>
-                  <li><strong>Gas Optimization:</strong> Efficient storage with minimal gas usage</li>
-                  <li><strong>Relayer Authorization:</strong> Secure system for automated transactions</li>
-                  <li><strong>Withdrawal Limits:</strong> Daily limits to prevent abuse</li>
-                </ul>
-
-                <h3 className="text-lg font-medium mt-6">Why Blockchain?</h3>
-                <ul className="list-disc list-inside space-y-2 text-gray-700">
-                  <li>Permanent, immutable record of what you learned</li>
-                  <li>Verifiable proof of capture timestamp</li>
-                  <li>Decentralized - not controlled by any single entity</li>
-                  <li>Useful for research, academic citations, legal evidence</li>
-                </ul>
-              </div>
-            </section>
-
-            <section id="gas-deposits">
-              <h2 className="text-2xl font-light font-editorial mb-4 border-b border-gray-200 pb-2">
-                Gas Deposits
-              </h2>
-              <div className="space-y-4">
-                <p className="text-gray-700">
-                  RecallOS uses a gas deposit system so you don't need to approve every blockchain transaction. The system automatically handles gas payments from your deposit.
-                </p>
-
-                <h3 className="text-lg font-medium">How It Works</h3>
-                <ol className="list-decimal list-inside space-y-2 text-gray-700">
-                  <li>You deposit ETH to the smart contract (one-time setup)</li>
-                  <li>Authorized relayer submits transactions on your behalf</li>
-                  <li>Gas costs are deducted from your deposit with 20% buffer</li>
-                  <li>You can withdraw unused balance anytime (1 ETH/day limit)</li>
-                </ol>
-
-                <h3 className="text-lg font-medium mt-6">Deposit Management</h3>
-                <p className="text-gray-700">
-                  The system includes several safety features:
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-gray-700">
-                  <li><strong>Minimum Deposit:</strong> 0.001 ETH to prevent dust transactions</li>
-                  <li><strong>Daily Withdrawal Limit:</strong> 1 ETH per day maximum</li>
-                  <li><strong>Gas Buffer:</strong> 20% buffer on gas estimates for price fluctuations</li>
-                  <li><strong>Balance Tracking:</strong> Real-time balance updates and transaction history</li>
-                </ul>
-
-                <h3 className="text-lg font-medium mt-6">Recommended Deposits</h3>
-                <div className="bg-white border border-gray-200 p-4">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200">
-                        <th className="text-left py-2">Usage Level</th>
-                        <th className="text-left py-2">Recommended Deposit</th>
-                        <th className="text-left py-2">Approximate Memories</th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-gray-700">
-                      <tr className="border-b border-gray-100">
-                        <td className="py-2">Light (5-10/day)</td>
-                        <td className="py-2">0.01 ETH</td>
-                        <td className="py-2">~300-500 memories</td>
-                      </tr>
-                      <tr className="border-b border-gray-100">
-                        <td className="py-2">Medium (20-50/day)</td>
-                        <td className="py-2">0.05 ETH</td>
-                        <td className="py-2">~1500-2500 memories</td>
-                      </tr>
-                      <tr>
-                        <td className="py-2">Heavy (100+/day)</td>
-                        <td className="py-2">0.1 ETH</td>
-                        <td className="py-2">~3000-5000 memories</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                <InfoBox type="tip">
-                  Gas prices on Sepolia testnet are very low. A small deposit goes a long way! The system also supports batch transactions for efficiency.
-                </InfoBox>
-
-                <h3 className="text-lg font-medium mt-6">Transaction Management</h3>
-                <p className="text-gray-700">
-                  The web client provides comprehensive transaction management:
-                </p>
-                <ul className="list-disc list-inside space-y-1 text-gray-700">
-                  <li>View current balance and transaction history</li>
-                  <li>See estimated gas costs for future operations</li>
-                  <li>Retry failed transactions automatically</li>
-                  <li>Monitor transaction status in real-time</li>
-                  <li>Withdraw unused balance with daily limits</li>
-                </ul>
-              </div>
-            </section>
-
+            
             <section id="api-reference">
               <h2 className="text-2xl font-light font-editorial mb-4 border-b border-gray-200 pb-2">
                 API Reference
@@ -654,21 +479,16 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
                     </div>
                   </div>
                   <div className="bg-white border border-gray-200 p-3">
-                    <h4 className="font-medium text-sm">Blockchain & Deposits</h4>
-                    <div className="text-xs text-gray-600 mt-1 space-y-1">
-                      <p><code>GET /api/deposit/balance/:userAddress</code> - Check gas balance</p>
-                      <p><code>GET /api/deposit/address</code> - Get contract address</p>
-                      <p><code>GET /api/deposit/estimate</code> - Get gas estimates</p>
-                    </div>
+                    
                   </div>
                 </div>
 
                 <h3 className="text-lg font-medium mt-6">Authentication</h3>
                 <p className="text-gray-700">
-                  The API uses wallet-based authentication. Include your wallet address in requests:
+                  The API uses userId. Include your userId in requests:
                 </p>
                 <CodeBlock code={`{
-  "userAddress": "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6",
+  "userId": "your-user-id",
   "content": "Your content here",
   "url": "https://example.com"
 }`} />
@@ -704,7 +524,7 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
                   <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
                     <li>Check extension is enabled in Chrome</li>
                     <li>Verify API endpoint is correct in extension settings</li>
-                    <li>Ensure wallet address is configured</li>
+                    
                     <li>Check browser console for errors (F12)</li>
                     <li>Content must be &gt; 50 characters</li>
                   </ul>
@@ -714,42 +534,13 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
                   <h3 className="text-lg font-medium mb-2">Search returns no results</h3>
                   <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
                     <li>Verify you have memories stored (check Memories page)</li>
-                    <li>Ensure wallet address matches your connected wallet</li>
+                    
                     <li>Wait for embeddings to be generated (5-30 seconds after capture)</li>
                     <li>Try a different search query or more general terms</li>
                   </ul>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Blockchain transaction failed</h3>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-                    <li>Check you have sufficient gas deposit balance</li>
-                    <li>Verify the relayer is authorized (should be automatic)</li>
-                    <li>Check Sepolia network status on Etherscan</li>
-                    <li>Use "Retry Failed" button in Memories page</li>
-                    <li>Contact support if issue persists</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-medium mb-2">AI processing is slow</h3>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-                    <li>Gemini API may be rate-limited during peak hours</li>
-                    <li>Large content takes longer to process</li>
-                    <li>Check your internet connection</li>
-                    <li>Consider using Ollama locally for faster processing</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Memory mesh visualization is empty</h3>
-                  <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
-                    <li>You need at least 5-10 memories for connections to form</li>
-                    <li>Wait for mesh processing to complete (async, up to 30 seconds)</li>
-                    <li>Lower the similarity threshold in mesh settings</li>
-                    <li>Check that embeddings were generated successfully</li>
-                  </ul>
-                </div>
+                
               </div>
             </section>
 

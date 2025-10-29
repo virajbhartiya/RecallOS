@@ -16,27 +16,21 @@ type SearchResult = {
 function normalizeText(text: string): string {
   return text
     .trim()
-    // Remove common punctuation that can confuse embeddings
     .replace(/[?!.,;:()]/g, ' ')
-    // Normalize whitespace
     .replace(/\s+/g, ' ')
-    // Remove extra spaces
     .trim()
-    // Limit length
     .slice(0, 8000);
 }
 
 function tokenizeQuery(query: string): string[] {
-  // Extract meaningful tokens from the query
   return query
     .toLowerCase()
-    .replace(/[^\w\s]/g, ' ') // Remove punctuation
+    .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
-    .filter(token => token.length > 2) // Filter out short tokens
-    .filter(token => !STOP_WORDS.has(token)); // Remove stop words
+    .filter(token => token.length > 2)
+    .filter(token => !STOP_WORDS.has(token));
 }
 
-// Common stop words to filter out
 const STOP_WORDS = new Set([
   'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'for', 'from',
   'has', 'he', 'in', 'is', 'it', 'its', 'of', 'on', 'that', 'the',
@@ -49,7 +43,6 @@ function sha256Hex(input: string): string {
 }
 
 function vectorToSqlArray(values: number[]): string {
-  // pgvector accepts array literal cast to vector
   const clamped = values.map(v => Number.isFinite(v) ? v : 0);
   return `ARRAY[${clamped.join(',')}]::vector`;
 }
@@ -62,13 +55,13 @@ async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 }
 
 export async function searchMemories(params: {
-  wallet: string;
+  userId: string;
   query: string;
   limit?: number;
   enableReasoning?: boolean;
   contextOnly?: boolean;
 }): Promise<{ query: string; results: SearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string }>{
-  const { wallet, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', contextOnly = false } = params;
+  const { userId, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', contextOnly = false } = params;
 
   if (!aiProvider.isInitialized) {
     console.error('AI Provider not initialized. Check GEMINI_API_KEY or AI_PROVIDER configuration.');
@@ -77,22 +70,18 @@ export async function searchMemories(params: {
 
   const normalized = normalizeText(query);
 
-  const walletNorm = (wallet || '').toLowerCase();
-  const user = await prisma.user.findFirst({ where: { wallet_address: walletNorm } });
+  const user = await prisma.user.findFirst({ where: { external_id: { equals: userId } } as any });
   if (!user) {
     return { query: normalized, results: [], meta_summary: undefined };
   }
 
   let embedding: number[];
   try {
-    // Increase timeout for Gemini API calls - they can take longer
     embedding = await withTimeout(aiProvider.generateEmbedding(normalized), 600000); // 10 minutes
   } catch (error) {
-    // Try fallback embedding generation
     try {
       embedding = aiProvider.generateFallbackEmbedding(normalized);
     } catch (fallbackError) {
-      // Update search job status to failed if there's a job
       try {
         const jobId = (global as any).__currentSearchJobId as string | undefined;
         if (jobId) {
@@ -211,11 +200,11 @@ export async function searchMemories(params: {
     try {
       await prisma.queryEvent.create({
         data: {
-          wallet,
+          user_id: userId,
           query: normalized,
           embedding_hash: embeddingHash,
           meta_summary: null,
-        },
+        } as any,
       });
     } catch {}
     return { query: normalized, results: [], meta_summary: undefined, answer: undefined, context: undefined };
@@ -349,16 +338,16 @@ ${bullets}`;
 
   const created = await prisma.queryEvent.create({
     data: {
-      wallet,
+      user_id: userId,
       query: normalized,
       embedding_hash: embeddingHash,
       meta_summary: (answer || metaSummary) || null,
-    },
+    } as any,
   });
 
   if (filteredRows.length) {
     await prisma.queryRelatedMemory.createMany({
-      data: filteredRows.map((r, idx) => ({ query_event_id: created.id, memory_id: r.id, rank: idx + 1, score: r.score })),
+      data: filteredRows.map((r, idx) => ({ query_event_id: created.id, memory_id: r.id, rank: idx + 1, score: r.score })) as any,
       skipDuplicates: true,
     });
   }

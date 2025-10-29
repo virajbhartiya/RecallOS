@@ -572,3 +572,18 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 - **Blockchain Verification**: Immutable hashes
 
 ---
+
+## Cookies, CORS, and Local HTTPS
+
+- API issues `HttpOnly; Secure; SameSite=None` session cookies on your domain.
+- CORS echoes only allowlisted origins and enables `credentials: true`.
+- SPA uses `axios` with `withCredentials: true`; extension uses `fetch` with `credentials: 'include'`.
+
+### Environment variables
+- API: `SESSION_COOKIE_NAME`, `COOKIE_DOMAIN`, `CORS_ALLOWED_ORIGINS`, `EXTENSION_IDS`, `COOKIE_SECURE`, `HTTPS_ENABLE`, `HTTPS_KEY_PATH`, `HTTPS_CERT_PATH`.
+- Client: `VITE_SERVER_URL`, `VITE_HTTPS_ENABLE`, `VITE_HTTPS_KEY_PATH`, `VITE_HTTPS_CERT_PATH`, `VITE_DEV_HOST`, `VITE_DEV_PORT`.
+
+### Local HTTPS (mkcert)
+See `cookie.plan.md` for the full step-by-step. For dev HTTPS:
+- API: set `HTTPS_ENABLE=true` and point to mkcert key/cert.
+- Client: set `VITE_HTTPS_ENABLE=true` and point to mkcert key/cert.

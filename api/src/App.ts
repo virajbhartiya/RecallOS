@@ -7,6 +7,8 @@ import cors from 'cors';
 import compression from 'compression';
 
 import http from 'http';
+import fs from 'fs';
+import https from 'https';
 
 import dotenv from 'dotenv';
 
@@ -17,13 +19,28 @@ import { routes } from './routes/index.route';
 import { prisma } from './lib/prisma';
 
 import { startContentWorker } from './workers/contentWorker';
-import { CacheCleanupService } from './services/cacheCleanup';
 
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 
-const server = http.createServer(app);
+let server: http.Server | https.Server;
+if (process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true') {
+  try {
+    const keyPath = process.env.HTTPS_KEY_PATH || './certs/api.recallos.test+3-key.pem';
+    const certPath = process.env.HTTPS_CERT_PATH || './certs/api.recallos.test+3.pem';
+    const httpsOptions = {
+      key: fs.readFileSync(keyPath),
+      cert: fs.readFileSync(certPath),
+    };
+    server = https.createServer(httpsOptions, app);
+  } catch (_e) {
+    server = http.createServer(app);
+  }
+} else {
+  server = http.createServer(app);
+}
 
 const port = process.env.PORT || 3000;
 
@@ -35,9 +52,18 @@ process.on('uncaughtException', (err: Error) => {
 app.use(morgan('dev'));
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
+import { getAllowedOrigins } from './utils/env';
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      const allowlist = getAllowedOrigins();
+      if (!origin) return callback(null, true);
+      if (allowlist.has(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 app.use(compression());
@@ -66,7 +92,6 @@ async function testDatabaseConnection() {
 server.listen(port, async () => {
   await testDatabaseConnection();
   startContentWorker();
-  CacheCleanupService.startCleanupService();
 });
 process.on('unhandledRejection', (err: Error) => {
   console.error('Unhandled Rejection! 💥 Shutting down...');

@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { BalanceCard } from '@/components/BalanceCard';
-import { DepositModal } from '@/components/DepositModal';
+import { getAuthToken, setAuthToken, clearAuthToken } from '@/lib/userId';
+ 
 
 interface StatusMessage {
   message: string;
@@ -14,13 +14,14 @@ interface StatusMessage {
 
 const Popup: React.FC = () => {
   const [apiEndpoint, setApiEndpoint] = useState('');
-  const [walletAddress, setWalletAddress] = useState('');
+  const [authToken, setAuthTokenState] = useState('');
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [ethBalance, setEthBalance] = useState<string | null>(null);
-  const [gasBalance, setGasBalance] = useState<string | null>(null);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
-  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const [ethBalance] = useState<string | null>(null);
+  const [gasBalance] = useState<string | null>(null);
+  const [isDepositModalOpen] = useState(false);
+  const [isBalanceLoading] = useState(false);
+  const [extensionEnabled, setExtensionEnabled] = useState(true);
 
   useEffect(() => {
     loadSettings();
@@ -31,21 +32,21 @@ const Popup: React.FC = () => {
       const endpointResponse = await chrome.runtime.sendMessage({
         type: 'GET_ENDPOINT',
       });
-      if (endpointResponse.success) {
+      if (endpointResponse && endpointResponse.success) {
         setApiEndpoint(endpointResponse.endpoint);
       }
 
-      const walletResponse = await chrome.runtime.sendMessage({
-        type: 'GET_WALLET_ADDRESS',
+      // Load auth token from localStorage
+      const token = getAuthToken();
+      if (token) {
+        setAuthTokenState(token);
+      }
+
+      const extensionResponse = await chrome.runtime.sendMessage({
+        type: 'GET_EXTENSION_ENABLED',
       });
-      if (walletResponse.success && walletResponse.walletAddress) {
-        setWalletAddress(walletResponse.walletAddress);
-        setStatus({
-          message: `Connected: ${walletResponse.walletAddress.substring(0, 10)}...`,
-          type: 'success'
-        });
-        // Use the endpoint from the response for initial balance fetch
-        await fetchBalances(walletResponse.walletAddress, endpointResponse.endpoint);
+      if (extensionResponse && extensionResponse.success) {
+        setExtensionEnabled(extensionResponse.enabled);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -53,48 +54,7 @@ const Popup: React.FC = () => {
     }
   };
 
-  const fetchBalances = async (address: string, endpoint?: string) => {
-    setIsBalanceLoading(true);
-    try {
-      // Fetch ETH balance
-      if (typeof window !== 'undefined' && window.ethereum) {
-        const balance = await window.ethereum.request({
-          method: 'eth_getBalance',
-          params: [address, 'latest']
-        }) as string;
-        const ethBalance = (parseInt(balance, 16) / Math.pow(10, 18)).toFixed(4);
-        setEthBalance(ethBalance);
-      }
-
-      // Fetch gas balance from API
-      const currentEndpoint = endpoint || apiEndpoint;
-      if (currentEndpoint) {
-        const baseUrl = currentEndpoint.replace('/api/memory/process', '');
-        const response = await fetch(`${baseUrl}/api/deposit/balance/${address}`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success) {
-            setGasBalance(data.data.balance);
-          }
-        } else {
-          console.warn('Failed to fetch gas balance:', response.status);
-        }
-      } else {
-        console.warn('No API endpoint configured for gas balance fetch');
-      }
-    } catch (error) {
-      console.error('Error fetching balances:', error);
-      setStatus({ message: 'Failed to fetch balances', type: 'error' });
-    } finally {
-      setIsBalanceLoading(false);
-    }
-  };
-
-  const refreshBalances = async () => {
-    if (walletAddress) {
-      await fetchBalances(walletAddress, apiEndpoint);
-    }
-  };
+  
 
   const saveEndpoint = async () => {
     const endpoint = apiEndpoint.trim();
@@ -121,25 +81,17 @@ const Popup: React.FC = () => {
     }
   };
 
-  const saveWalletAddress = async () => {
-    const wallet = walletAddress.trim();
-    if (!wallet) {
-      setStatus({ message: 'Please enter a wallet address', type: 'error' });
+  const saveAuthToken = async () => {
+    const token = authToken.trim();
+    if (!token) {
+      setStatus({ message: 'Please enter an auth token', type: 'error' });
       return;
     }
 
     setIsLoading(true);
     try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'SET_WALLET_ADDRESS',
-        walletAddress: wallet,
-      });
-      if (response.success) {
-        setStatus({ message: 'Wallet address saved successfully!', type: 'success' });
-        await fetchBalances(wallet);
-      } else {
-        setStatus({ message: `Error: ${response.error}`, type: 'error' });
-      }
+      setAuthToken(token);
+      setStatus({ message: 'Auth token saved successfully!', type: 'success' });
     } catch (error) {
       setStatus({ message: `Error: ${error}`, type: 'error' });
     } finally {
@@ -147,67 +99,44 @@ const Popup: React.FC = () => {
     }
   };
 
-  const depositGas = async (amount: string) => {
-    if (!walletAddress || !window.ethereum) {
-      throw new Error('Wallet not connected');
-    }
-
+  const clearAuthToken = async () => {
+    setIsLoading(true);
     try {
-      // Get contract address
-      const baseUrl = apiEndpoint.replace('/api/memory/process', '');
-      const response = await fetch(`${baseUrl}/api/deposit/address`);
-      const data = await response.json();
-      
-      if (!data.success) {
-        throw new Error('Failed to get contract address');
-      }
-
-      const contractAddress = data.data.contractAddress;
-      const amountWei = (parseFloat(amount) * Math.pow(10, 18)).toString(16);
-      
-      const depositGasFunctionSelector = '0xae9bb692';
-      
-      const txHash = await window.ethereum.request({
-        method: 'eth_sendTransaction',
-        params: [{
-          from: walletAddress,
-          to: contractAddress,
-          value: `0x${amountWei}`,
-          data: depositGasFunctionSelector,
-          gas: '0xea60'
-        }]
-      });
-
-      await new Promise((resolve, reject) => {
-        const checkTransaction = async () => {
-          try {
-            const receipt = await window.ethereum!.request({
-              method: 'eth_getTransactionReceipt',
-              params: [txHash]
-            }) as { status: string };
-            
-            if (receipt) {
-              if (receipt.status === '0x1') {
-                resolve(receipt);
-              } else {
-                console.error('Transaction failed with receipt:', receipt);
-                reject(new Error(`Transaction failed: ${receipt.status}`));
-              }
-            } else {
-              setTimeout(checkTransaction, 2000);
-            }
-          } catch (error) {
-            reject(error);
-          }
-        }
-        checkTransaction();
-      });
-
-      await refreshBalances();
-      setStatus({ message: 'Gas deposited successfully!', type: 'success' });
+      clearAuthToken();
+      setAuthTokenState('');
+      setStatus({ message: 'Auth token cleared successfully!', type: 'success' });
     } catch (error) {
-      console.error('Error depositing gas:', error);
-      throw error;
+      setStatus({ message: `Error: ${error}`, type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  
+
+  
+
+  const toggleExtension = async () => {
+    setIsLoading(true);
+    try {
+      const newState = !extensionEnabled;
+      const response = await chrome.runtime.sendMessage({
+        type: 'SET_EXTENSION_ENABLED',
+        enabled: newState,
+      });
+      if (response.success) {
+        setExtensionEnabled(newState);
+        setStatus({ 
+          message: `Extension ${newState ? 'enabled' : 'disabled'} successfully!`, 
+          type: 'success' 
+        });
+      } else {
+        setStatus({ message: `Error: ${response.error}`, type: 'error' });
+      }
+    } catch (error) {
+      setStatus({ message: `Error: ${error}`, type: 'error' });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -221,19 +150,30 @@ const Popup: React.FC = () => {
   return (
     <div className="w-80 p-4 bg-background text-foreground space-y-3">
       {/* Balance Card */}
-      {walletAddress && (
-        <BalanceCard
-          ethBalance={ethBalance}
-          gasBalance={gasBalance}
-          isLoading={isBalanceLoading}
-          onRefresh={refreshBalances}
-          onDeposit={() => setIsDepositModalOpen(true)}
-        />
-      )}
+      
 
       {/* Settings Card */}
       <Card>
         <CardContent className="p-4 space-y-3">
+          {/* Extension Toggle */}
+          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Extension Status</Label>
+              <div className="text-xs text-gray-600">
+                {extensionEnabled ? 'Active - Context injection enabled' : 'Disabled - No context injection'}
+              </div>
+            </div>
+            <Button
+              onClick={toggleExtension}
+              disabled={isLoading}
+              variant={extensionEnabled ? "destructive" : "default"}
+              size="sm"
+              className="min-w-[80px]"
+            >
+              {isLoading ? '...' : extensionEnabled ? 'Disable' : 'Enable'}
+            </Button>
+          </div>
+
           <div className="space-y-1">
             <Label htmlFor="apiEndpoint" className="text-sm">API Endpoint</Label>
             <Input
@@ -247,16 +187,38 @@ const Popup: React.FC = () => {
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="walletAddress" className="text-sm">Wallet Address</Label>
+            <Label htmlFor="authToken" className="text-sm">Auth Token (Optional)</Label>
             <Input
-              id="walletAddress"
-              type="text"
-              placeholder="Enter wallet address manually"
-              value={walletAddress}
-              onChange={(e) => setWalletAddress(e.target.value)}
+              id="authToken"
+              type="password"
+              placeholder="Enter your auth token"
+              value={authToken}
+              onChange={(e) => setAuthTokenState(e.target.value)}
               className="h-8"
             />
+            <div className="flex gap-2">
+              <Button 
+                onClick={saveAuthToken} 
+                disabled={isLoading}
+                size="sm"
+                variant="outline"
+                className="flex-1"
+              >
+                Save Token
+              </Button>
+              <Button 
+                onClick={clearAuthToken} 
+                disabled={isLoading}
+                size="sm"
+                variant="outline"
+                className="flex-1"
+              >
+                Clear
+              </Button>
+            </div>
           </div>
+
+          
 
           <div className="flex gap-2 pt-1">
             <Button 
@@ -267,15 +229,7 @@ const Popup: React.FC = () => {
             >
               Save Config
             </Button>
-            <Button 
-              onClick={saveWalletAddress} 
-              disabled={isLoading}
-              variant="secondary"
-              size="sm"
-              className="flex-1"
-            >
-              Save Wallet
-            </Button>
+            
           </div>
 
           {status && (
@@ -290,13 +244,7 @@ const Popup: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Deposit Modal */}
-      <DepositModal
-        isOpen={isDepositModalOpen}
-        onClose={() => setIsDepositModalOpen(false)}
-        onDeposit={depositGas}
-        isLoading={isLoading}
-      />
+      
     </div>
   );
 };

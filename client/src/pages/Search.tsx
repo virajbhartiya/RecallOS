@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from 'react'
-import { useWallet } from '../contexts/WalletContext'
 import { MemorySearch } from '../components/MemorySearch'
 import { MemoryService } from '../services/memoryService'
-import { HyperIndexService } from '../services/hyperindexService'
+ 
 import { LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
 import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse, SearchResult } from '../types/memory'
+import { getOrCreateUserId, getOrCreateAuthToken } from '@/utils/userId'
 
 const SearchResultCard: React.FC<{ 
   result: SearchResult
@@ -161,43 +161,18 @@ const SearchResultCard: React.FC<{
 }
 
 export const Search: React.FC = () => {
-  const { isConnected, address } = useWallet()
+  const address = getOrCreateUserId()
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [showOnlyCited, setShowOnlyCited] = useState(true)
-  const [hyperIndexData, setHyperIndexData] = useState<Record<string, any>>({})
+  const [hyperIndexData, _setHyperIndexData] = useState<Record<string, any>>({})
 
-  const fetchHyperIndexData = useCallback(async (memories: Memory[]) => {
-    if (!address || memories.length === 0) return
-    
-    // setIsLoadingHyperIndex(true)
-    try {
-      const hyperIndexMemories = await HyperIndexService.getUserMemoryEvents(address, 100)
-      const hyperIndexMap: Record<string, any> = {}
-      
-      // Map HyperIndex data by memory hash or transaction hash
-      hyperIndexMemories.forEach(hiMemory => {
-        const key = hiMemory.hash || hiMemory.transactionHash
-        if (key) {
-          hyperIndexMap[key] = {
-            blockNumber: hiMemory.blockNumber,
-            gasUsed: hiMemory.gasUsed,
-            gasPrice: hiMemory.gasPrice,
-            timestamp: hiMemory.timestamp
-          }
-        }
-      })
-      
-      setHyperIndexData(hyperIndexMap)
-    } catch (err) {
-      console.error('Error fetching HyperIndex data:', err)
-    } finally {
-      // setIsLoadingHyperIndex(false)
-    }
-  }, [address])
+  const fetchHyperIndexData = useCallback(async (_memories: Memory[]) => {
+    return
+  }, [])
 
   const handleSearch = useCallback(async (
     query: string, 
@@ -211,6 +186,9 @@ export const Search: React.FC = () => {
     setSearchResults(null)
 
     try {
+      // Ensure we have an auth token before making requests
+      await getOrCreateAuthToken()
+
       let response: MemorySearchResponse
 
       if (useSemantic) {
@@ -278,20 +256,7 @@ export const Search: React.FC = () => {
     )
   }
 
-  if (!isConnected) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-2xl font-mono font-bold text-gray-900 mb-4">
-            [CONNECTION REQUIRED]
-          </h2>
-          <p className="text-gray-600 font-mono">
-            Please connect your wallet to search memories
-          </p>
-        </div>
-      </div>
-    )
-  }
+  
 
   return (
     <div className="min-h-screen bg-gray-50">

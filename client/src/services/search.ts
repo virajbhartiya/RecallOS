@@ -15,13 +15,13 @@ type ApiSearchResult = {
 
 export class SearchService {
   static async semanticSearch(
-    wallet: string,
+    userId: string,
     query: string,
     limit: number = 10,
     contextOnly: boolean = false,
     signal?: AbortSignal
   ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string; job_id?: string }> {
-    const res = await postRequest('/search', { wallet, query, limit, contextOnly }, undefined, signal)
+    const res = await postRequest('/search', { userId, query, limit, contextOnly }, undefined, signal)
     if (!res || res.status >= 400) throw new Error('Search request failed')
     return res.data
   }
@@ -54,12 +54,12 @@ export class SearchService {
    * ```
    */
   static async getContextForAI(
-    wallet: string,
+    userId: string,
     query: string,
     limit: number = 10,
     signal?: AbortSignal
   ): Promise<{ query: string; context: string; results: ApiSearchResult[] }> {
-    const res = await postRequest('/search', { wallet, query, limit, contextOnly: true }, undefined, signal)
+    const res = await postRequest('/search', { userId, query, limit, contextOnly: true }, undefined, signal)
     if (!res || res.status >= 400) throw new Error('Context search request failed')
     return {
       query: res.data.query,
@@ -69,20 +69,20 @@ export class SearchService {
   }
 
   static async semanticSearchMapped(
-    wallet: string,
+    userId: string,
     query: string,
     filters: SearchFilters = {},
     page: number = 1,
     limit: number = 10,
     signal?: AbortSignal
   ): Promise<MemorySearchResponse> {
-    const data = await this.semanticSearch(wallet, query, limit, false, signal)
+    const data = await this.semanticSearch(userId, query, limit, false, signal)
     const results: SearchResult[] = (data.results || [])
       .map((r) => {
         const createdAtIso = new Date(r.timestamp * 1000).toISOString()
             const memory: Memory = {
               id: r.memory_id,
-              user_id: wallet,
+              user_id: userId,
               source: 'browser',
               url: r.url || undefined,
               title: r.title || 'Untitled Memory',

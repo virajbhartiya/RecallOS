@@ -1,17 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../middleware/auth';
 import AppError from '../utils/appError';
 import { searchMemories } from '../services/memorySearch';
 import { createSearchJob, getSearchJob } from '../services/searchJob';
 import { SearchCacheService } from '../services/searchCache';
 
-export const postSearch = async (req: Request, res: Response, next: NextFunction) => {
+export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    const { wallet, query, limit, contextOnly } = req.body || {};
-    if (!wallet || !query) return next(new AppError('wallet and query are required', 400));
+    const { userId, query, limit, contextOnly } = req.body || {};
+    // Use authenticated user ID if available, otherwise use provided userId
+    const actualUserId = req.user?.externalId || userId;
+    if (!actualUserId || !query) return next(new AppError('userId and query are required', 400));
     
  
     if (!contextOnly) {
-      const cachedResult = await SearchCacheService.getCachedResult(wallet, query);
+      const cachedResult = await SearchCacheService.getCachedResult(actualUserId, query);
       if (cachedResult) {
         console.log('Returning cached search result for query:', query);
 
@@ -28,7 +31,7 @@ export const postSearch = async (req: Request, res: Response, next: NextFunction
       ;(global as any).__currentSearchJobId = job.id;
     }
     
-    const data = await searchMemories({ wallet, query, limit, contextOnly });
+    const data = await searchMemories({ userId: actualUserId, query, limit, contextOnly });
     
     // Return response with appropriate fields
     const response: any = { 
@@ -46,7 +49,7 @@ export const postSearch = async (req: Request, res: Response, next: NextFunction
     
     // Cache the result if not context-only
     if (!contextOnly) {
-      await SearchCacheService.setCachedResult(wallet, query, response);
+      await SearchCacheService.setCachedResult(actualUserId, query, response);
       console.log('Cached search result for query:', query);
     }
     
@@ -87,10 +90,10 @@ export const getSearchJobStatus = async (req: Request, res: Response, next: Next
 
 export const getContext = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { wallet, query, limit } = req.body || {};
-    if (!wallet || !query) return next(new AppError('wallet and query are required', 400));
+    const { userId: ctxUserId, query, limit } = req.body || {};
+    if (!ctxUserId || !query) return next(new AppError('userId and query are required', 400));
     
-    const data = await searchMemories({ wallet, query, limit, contextOnly: true });
+    const data = await searchMemories({ userId: ctxUserId, query, limit, contextOnly: true });
     
     res.status(200).json({
       query: data.query,
@@ -104,14 +107,14 @@ export const getContext = async (req: Request, res: Response, next: NextFunction
 
 export const clearSearchCache = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { wallet } = req.params;
-    if (!wallet) return next(new AppError('wallet parameter is required', 400));
-    
-    await SearchCacheService.clearWalletCache(wallet);
-    
+    const { userId } = req.params as { userId?: string };
+    if (!userId) return next(new AppError('userId parameter is required', 400));
+
+    await SearchCacheService.clearUserCache(userId);
+
     res.status(200).json({
       message: 'Search cache cleared successfully',
-      wallet: wallet
+      userId: userId
     });
   } catch (err) {
     next(err);

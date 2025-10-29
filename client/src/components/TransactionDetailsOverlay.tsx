@@ -66,7 +66,7 @@ export const TransactionDetailsOverlay: React.FC<TransactionDetailsOverlayProps>
             <button
               onClick={() => {
                 setIsLoading(true)
-                monitorTransaction(txHash, network).then((info) => {
+                monitorTransaction(txHash, network).then((info: TransactionInfo) => {
                   setTxInfo(info)
                   setIsLoading(false)
                 })
