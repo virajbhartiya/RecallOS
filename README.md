@@ -581,7 +581,7 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 
 ### Environment variables
 - API: `SESSION_COOKIE_NAME`, `COOKIE_DOMAIN`, `CORS_ALLOWED_ORIGINS`, `EXTENSION_IDS`, `COOKIE_SECURE`, `HTTPS_ENABLE`, `HTTPS_KEY_PATH`, `HTTPS_CERT_PATH`.
-- Client: `VITE_SERVER_URL`, `VITE_HTTPS_ENABLE`, `VITE_HTTPS_KEY_PATH`, `VITE_HTTPS_CERT_PATH`, `VITE_DEV_HOST`, `VITE_DEV_PORT`.
+- Client: `c
 
 ### Local HTTPS (mkcert)
 See `cookie.plan.md` for the full step-by-step. For dev HTTPS:
