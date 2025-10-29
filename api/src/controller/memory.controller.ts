@@ -1040,25 +1040,29 @@ export class MemoryController {
     }
   }
 
-  static async getMemoryMesh(req: Request, res: Response) {
+  static async getMemoryMesh(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userId } = req.params as any;
-
+      const { userId: paramUserId } = req.params as any;
       const { limit = 50, threshold = 0.3 } = req.query;
 
-      // If no userId provided or not found, return mesh across all users
-      let internalUserId: string | undefined = undefined;
-      if (userId) {
-        const user = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { external_id: userId as any },
-              { external_id: (userId as string).toLowerCase() as any },
-            ],
-          } as any,
-        });
-        internalUserId = user?.id;
+      // Enforce authenticated user scoping
+      const effectiveExternalId = req.user?.externalId || paramUserId;
+      if (!effectiveExternalId) {
+        return res.status(400).json({ success: false, error: 'User ID is required' });
       }
+      if (req.user?.externalId && paramUserId && paramUserId !== req.user.externalId) {
+        return res.status(403).json({ success: false, error: 'Forbidden: mismatched user' });
+      }
+
+      const user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { external_id: effectiveExternalId as any },
+            { external_id: (effectiveExternalId as string).toLowerCase() as any },
+          ],
+        } as any,
+      });
+      const internalUserId: string | undefined = user?.id;
 
       const mesh = await memoryMeshService.getMemoryMesh(
         internalUserId,
