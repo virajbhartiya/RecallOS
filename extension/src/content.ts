@@ -1148,11 +1148,12 @@ function detectAIChatPlatform(): AIChatPlatform {
 
 async function pollSearchJob(jobId: string): Promise<string | null> {
   try {
-    const response = await fetch(`http://localhost:3000/api/search/job/${jobId}`, {
+    const response = await fetch(`https://api.recallos.xyz/api/search/job/${jobId}`, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
       },
+      credentials: 'include',
     });
     
     if (!response.ok) {
@@ -1180,7 +1181,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
   try {
     const userId = getOrCreateUserId();
 
-    const searchEndpoint = 'http://localhost:3000/api/search';
+    const searchEndpoint = 'https://api.recallos.xyz/api/search';
     
     const requestBody = {
       userId: userId,
@@ -1195,6 +1196,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify(requestBody),
     });
     

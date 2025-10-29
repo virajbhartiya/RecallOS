@@ -17,10 +17,10 @@ interface ContextData {
 async function getApiEndpoint(): Promise<string> {
   try {
     const result = await chrome.storage.sync.get(['apiEndpoint']);
-    return result.apiEndpoint || 'http://localhost:3000/api/memory/process';
+    return result.apiEndpoint || 'https://api.recallos.xyz/api/memory/process';
   } catch (error) {
     console.error('RecallOS: Error getting API endpoint from storage:', error);
-    return 'http://localhost:3000/api/memory/process';
+    return 'https://api.recallos.xyz/api/memory/process';
   }
 }
 
@@ -93,6 +93,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
       headers: {
         'Content-Type': 'application/json',
       },
+      credentials: 'include',
       body: JSON.stringify({ ...payload, userId: getOrCreateUserId() }),
     });
 

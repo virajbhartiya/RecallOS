@@ -58,6 +58,8 @@ typings/
 
 # dotenv environment variables file
 .env
+.env.development
+.env.production
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -83,7 +85,15 @@ package-lock.json
 !.env.example
 
 .env
+.env.development
+.env.production
 dist/
+
+# HTTPS certificates for local development
+certs/
+*.pem
+*.key
+*.crt
 
 # HyperIndex generated files and build artifacts
 hyperindex/generated/
