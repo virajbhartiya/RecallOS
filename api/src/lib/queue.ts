@@ -24,8 +24,8 @@ const queueOptions: QueueOptions = {
   defaultJobOptions: {
     removeOnComplete: 1000,
     removeOnFail: 1000,
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 2000 },
+    attempts: 1,
+    backoff: { type: 'exponential', delay: 5000 },
   },
 };
 
@@ -41,10 +41,5 @@ export const addContentJob = async (data: ContentJobData) => {
   return { id: job.id };
 };
 
-contentQueueEvents.on('failed', ({ jobId, failedReason }) => {
-  console.error('[queue] failed', { queue: queueName, jobId, reason: failedReason });
-});
-
-contentQueueEvents.on('error', (err) => {
-  console.error('[queue] events error', err);
-});
+// Quiet queue event handlers to avoid noisy logs in production. Attach your own
+// listeners elsewhere if you need telemetry.
