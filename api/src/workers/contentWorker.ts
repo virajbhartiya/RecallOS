@@ -11,7 +11,6 @@ export const startContentWorker = () => {
     'process-content',
     async (job) => {
       const { user_id, raw_text, metadata } = job.data as ContentJobData;
-      console.log('[queue] processing', { queue: 'process-content', jobId: job.id, user_id });
       const summary = await aiProvider.summarizeContent(raw_text, metadata);
 
       if (metadata?.memory_id) {
@@ -91,12 +90,6 @@ export const startContentWorker = () => {
       limiter: getQueueLimiter(),
     }
   );
-
-  worker.on('completed', (job) => {
-    if (job) {
-      console.log('[queue] worker completed', { queue: 'process-content', jobId: job.id });
-    }
-  });
 
   worker.on('failed', (job, err) => {
     if (job) {
