@@ -13,6 +13,83 @@ export function getOrCreateUserId(): string {
   }
 }
 
+export function getAuthToken(): string | null {
+  try {
+    return localStorage.getItem('auth_token');
+  } catch {
+    return null;
+  }
+}
+
+export function setAuthToken(token: string): void {
+  try {
+    localStorage.setItem('auth_token', token);
+  } catch (error) {
+    console.error('Failed to store auth token:', error);
+  }
+}
+
+export function clearAuthToken(): void {
+  try {
+    localStorage.removeItem('auth_token');
+  } catch (error) {
+    console.error('Failed to clear auth token:', error);
+  }
+}
+
+export async function getOrCreateAuthToken(): Promise<string | null> {
+  try {
+    // Try chrome.storage.local first (works in service worker), then fallback to localStorage
+    try {
+      const stored = await chrome.storage?.local?.get?.(['auth_token']);
+      if (stored && stored.auth_token) {
+        return stored.auth_token as string;
+      }
+    } catch {}
+
+    let token = getAuthToken();
+    if (token) return token;
+
+    const userId = getOrCreateUserId();
+
+    // Derive API base from stored endpoint (popup setting) or default to local dev
+    let apiBase = 'http://localhost:3000/api';
+    try {
+      const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+      const endpoint = cfg?.apiEndpoint as string | undefined;
+      if (endpoint) {
+        // Extract origin + "/api" from something like http://host:3000/api/memory/process
+        const u = new URL(endpoint);
+        apiBase = `${u.protocol}//${u.host}/api`;
+      }
+    } catch {}
+
+    const response = await fetch(`${apiBase}/auth/extension-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to get auth token:', response.status, response.statusText);
+      return null;
+    }
+
+    const data = await response.json();
+    if (data.token) {
+      // Store in both chrome.storage.local and localStorage for access in different contexts
+      try { await chrome.storage?.local?.set?.({ auth_token: data.token }); } catch {}
+      setAuthToken(data.token);
+      return data.token;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+}
+
 function generateUuidV4(): string {
   if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
     const buf = new Uint8Array(16);

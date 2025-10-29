@@ -124,6 +124,9 @@ export const Landing = () => {
         case 'h':
           window.location.href = '/hyperindex'
           break
+        case 'l':
+          window.location.href = '/login'
+          break
         case 'w': {
           // Trigger wallet modal through WalletStatus component
           const walletButton = document.querySelector('[data-wallet-trigger]') as HTMLButtonElement
@@ -156,6 +159,12 @@ export const Landing = () => {
                 onClick={() => window.open('https://github.com/virajbhartiya/RecallOS', '_blank')}
               >
                 [G] GITHUB
+              </button>
+              <button 
+                className="text-xs sm:text-sm font-mono text-gray-600 uppercase tracking-wide hover:text-black transition-colors cursor-pointer"
+                onClick={() => window.location.href = '/login'}
+              >
+                [L] LOGIN
               </button>
               
             </div>

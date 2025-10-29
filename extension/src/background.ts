@@ -1,4 +1,4 @@
-import { getOrCreateUserId } from '@/lib/userId'
+import { getOrCreateUserId, getAuthToken, getOrCreateAuthToken } from '@/lib/userId'
 /// <reference types="chrome" />
 
 interface ContextData {
@@ -88,11 +88,20 @@ async function sendToBackend(data: ContextData): Promise<void> {
     };
 
 
+    // Get or create auth token
+    const authToken = await getOrCreateAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(apiEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers,
+      credentials: 'include',
       body: JSON.stringify({ ...payload, userId: getOrCreateUserId() }),
     });
 

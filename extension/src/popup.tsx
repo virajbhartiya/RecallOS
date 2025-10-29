@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { getAuthToken, setAuthToken, clearAuthToken } from '@/lib/userId';
  
 
 interface StatusMessage {
@@ -13,6 +14,7 @@ interface StatusMessage {
 
 const Popup: React.FC = () => {
   const [apiEndpoint, setApiEndpoint] = useState('');
+  const [authToken, setAuthTokenState] = useState('');
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [ethBalance] = useState<string | null>(null);
@@ -33,7 +35,12 @@ const Popup: React.FC = () => {
       if (endpointResponse && endpointResponse.success) {
         setApiEndpoint(endpointResponse.endpoint);
       }
-      // Wallet removed
+
+      // Load auth token from localStorage
+      const token = getAuthToken();
+      if (token) {
+        setAuthTokenState(token);
+      }
 
       const extensionResponse = await chrome.runtime.sendMessage({
         type: 'GET_EXTENSION_ENABLED',
@@ -67,6 +74,37 @@ const Popup: React.FC = () => {
       } else {
         setStatus({ message: `Error: ${response.error}`, type: 'error' });
       }
+    } catch (error) {
+      setStatus({ message: `Error: ${error}`, type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveAuthToken = async () => {
+    const token = authToken.trim();
+    if (!token) {
+      setStatus({ message: 'Please enter an auth token', type: 'error' });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      setAuthToken(token);
+      setStatus({ message: 'Auth token saved successfully!', type: 'success' });
+    } catch (error) {
+      setStatus({ message: `Error: ${error}`, type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const clearAuthToken = async () => {
+    setIsLoading(true);
+    try {
+      clearAuthToken();
+      setAuthTokenState('');
+      setStatus({ message: 'Auth token cleared successfully!', type: 'success' });
     } catch (error) {
       setStatus({ message: `Error: ${error}`, type: 'error' });
     } finally {
@@ -146,6 +184,38 @@ const Popup: React.FC = () => {
               onChange={(e) => setApiEndpoint(e.target.value)}
               className="h-8"
             />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="authToken" className="text-sm">Auth Token (Optional)</Label>
+            <Input
+              id="authToken"
+              type="password"
+              placeholder="Enter your auth token"
+              value={authToken}
+              onChange={(e) => setAuthTokenState(e.target.value)}
+              className="h-8"
+            />
+            <div className="flex gap-2">
+              <Button 
+                onClick={saveAuthToken} 
+                disabled={isLoading}
+                size="sm"
+                variant="outline"
+                className="flex-1"
+              >
+                Save Token
+              </Button>
+              <Button 
+                onClick={clearAuthToken} 
+                disabled={isLoading}
+                size="sm"
+                variant="outline"
+                className="flex-1"
+              >
+                Clear
+              </Button>
+            </div>
           </div>
 
           
