@@ -41,10 +41,5 @@ export const addContentJob = async (data: ContentJobData) => {
   return { id: job.id };
 };
 
-contentQueueEvents.on('failed', ({ jobId, failedReason }) => {
-  console.error('[queue] failed', { queue: queueName, jobId, reason: failedReason });
-});
-
-contentQueueEvents.on('error', (err) => {
-  console.error('[queue] events error', err);
-});
+// Quiet queue event handlers to avoid noisy logs in production. Attach your own
+// listeners elsewhere if you need telemetry.
