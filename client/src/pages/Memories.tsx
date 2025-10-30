@@ -2,8 +2,8 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
  
  
 import { MemoryService } from '@/services/memoryService'
-import { SearchService } from '@/services/search'
 import { MemoryMesh3D } from '@/components/MemoryMesh3D'
+import { SearchService } from '@/services/search'
  
 // removed unused Database import
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
@@ -191,8 +191,8 @@ const MemoryDetails: React.FC<{
           </div>
         )}
 
-        
 
+        
         {memory.page_metadata && (
           <div className="mb-6">
             <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[METADATA]</h4>
@@ -215,7 +215,6 @@ export const Memories: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const similarityThreshold = 0.3
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [clickedNodeId, setClickedNodeId] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [expandedContent, setExpandedContent] = useState(false)
@@ -234,16 +233,8 @@ export const Memories: React.FC = () => {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Track viewport for responsive behavior
-  useEffect(() => {
-    const update = () => {
-      const mobile = window.innerWidth < 768
-      setIsSidebarCollapsed(mobile) // auto-collapse on mobile
-    }
-    update()
-    window.addEventListener('resize', update)
-    return () => window.removeEventListener('resize', update)
-  }, [])
+  // Track viewport for responsive behavior (no sidebars now)
+  useEffect(() => {}, [])
 
   const fetchHyperIndexData = useCallback(async (_memoriesData: Memory[]) => {
     return
@@ -491,13 +482,7 @@ export const Memories: React.FC = () => {
               <div className="text-xs sm:text-sm font-mono text-blue-600 uppercase tracking-wide bg-blue-50 px-2 py-1 border border-blue-200">
                 [Memory Mesh]
               </div>
-              {/* Mobile toggle for sidebar */}
-              <button
-                onClick={() => setIsSidebarCollapsed((v) => !v)}
-                className="md:hidden text-xs font-mono text-gray-600 hover:text-black bg-white px-2 py-1 border border-gray-200 hover:border-gray-300 transition-colors"
-              >
-                {isSidebarCollapsed ? '[SHOW]' : '[HIDE]'}
-              </button>
+              
             </div>
             <div className="flex items-center space-x-4"></div>
           </div>
@@ -518,31 +503,31 @@ export const Memories: React.FC = () => {
         >
 
           {/* 3D Memory Mesh Canvas */}
-          <MemoryMesh3D 
-            userAddress={userId || undefined}
-            className="w-full h-full"
-            onNodeClick={handleNodeClick}
-            similarityThreshold={similarityThreshold}
-            selectedMemoryId={clickedNodeId || undefined}
-            highlightedMemoryIds={[
-              ...(isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory.id) : []),
-              ...(clickedNodeId ? [clickedNodeId] : []),
-              ...(selectedMemory ? [selectedMemory.id] : [])
-            ]}
-            memorySources={{
-              ...Object.fromEntries(memories.map(m => [m.id, m.source || ''])),
-              ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.source || '']))
-            }}
-            memoryUrls={{
-              ...Object.fromEntries(memories.map(m => [m.id, m.url || ''])),
-              ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.url || '']))
-            }}
-          />
+        <MemoryMesh3D
+          userAddress={userId || undefined}
+          className="w-full h-full"
+          onNodeClick={handleNodeClick}
+          similarityThreshold={similarityThreshold}
+          selectedMemoryId={clickedNodeId || undefined}
+          highlightedMemoryIds={[
+            ...(isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory.id) : []),
+            ...(clickedNodeId ? [clickedNodeId] : []),
+            ...(selectedMemory ? [selectedMemory.id] : [])
+          ]}
+          memorySources={{
+            ...Object.fromEntries(memories.map(m => [m.id, m.source || ''])),
+            ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.source || '']))
+          }}
+          memoryUrls={{
+            ...Object.fromEntries(memories.map(m => [m.id, m.url || ''])),
+            ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.url || '']))
+          }}
+        />
 
           {/* Corner brand/label */}
           <div className="pointer-events-none absolute left-4 top-3 text-[11px] font-semibold tracking-tight text-gray-500">
             memory mesh
-          </div>
+      </div>
 
           {/* Legend Overlay (top-right, light) */}
           <div className="absolute right-4 top-3 z-20 max-w-[220px] text-[11px]">
@@ -584,269 +569,9 @@ export const Memories: React.FC = () => {
           </div>
         </div>
 
-        {/* Collapse/Expand Button */}
-        <button
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className={`hidden md:block fixed right-[300px] top-1/2 transform -translate-y-1/2 z-40 bg-white border border-gray-200 border-r-0 rounded-l px-2 py-4 hover:bg-gray-50 transition-all duration-200 shadow-sm ${isSidebarCollapsed ? 'translate-x-[300px]' : ''}`}
-        >
-          <svg 
-            className={`w-4 h-4 text-gray-600 transition-transform duration-200 ${isSidebarCollapsed ? 'rotate-180' : ''}`} 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
+        
 
-        {/* Right Panel - Search & Memory List (overlay) */}
-        <div className={`fixed inset-y-0 right-0 ${isSidebarCollapsed ? 'translate-x-full' : 'translate-x-0'} w-[300px] md:w-[300px] border-l border-gray-200 bg-white flex flex-col transition-transform duration-300 overflow-hidden z-30 shadow-sm`}> 
-          {/* Search Controls */}
-          <div className="border-b border-gray-200 bg-gray-50 flex-shrink-0 p-3">
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <input
-                  type="text"
-                  placeholder={isSearching ? "Searching..." : "Search memories..."}
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value)
-                    // Don't disable input while searching to allow continued typing
-                  }}
-                  className={`w-full text-xs px-3 py-2 border focus:outline-none focus:ring-1 focus:ring-black bg-white ${
-                    isSearching 
-                      ? 'border-blue-300 text-gray-700' 
-                      : 'border-gray-200 text-gray-900'
-                  }`}
-                />
-                {isSearching && (
-                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2">
-                    <div className="w-3 h-3 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={() => {
-                  // Cancel any pending search
-                  if (abortControllerRef.current) {
-                    abortControllerRef.current.abort()
-                  }
-                  setSearchQuery('')
-                  handleClearSearch()
-                }}
-                className="text-xs px-3 py-2 border font-mono uppercase tracking-wide transition-colors text-gray-600 hover:text-black border-gray-200 hover:bg-gray-100"
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-
-          {/* Memory List Header */}
-          <div className="px-4 py-3 border-b border-gray-200 bg-white flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xs font-mono uppercase tracking-wide text-gray-600">
-                  {isSearchMode ? '[SEARCH RESULTS]' : '[MEMORIES]'}
-                </h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  {isSearchMode ? (
-                    isSearching ? (
-                      <span className="flex items-center gap-1">
-                        <div className="w-2 h-2 border border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                        Searching...
-                      </span>
-                    ) : (searchResults ? (
-                      showOnlyCited && searchCitations && searchCitations.length > 0 ? 
-                        `Showing ${currentMemories.length} cited memories (of ${searchResults.total} total) for "${searchQuery}"` :
-                        `${searchResults.total} results for "${searchQuery}"`
-                    ) : 'No search')
-                  ) : (
-                    `${(memories || []).length} total`
-                  )}
-                </p>
-              </div>
-            </div>
-            {isSearchMode && (searchAnswer || searchMeta) && !isSearching && (
-              <div className="mt-3 text-[11px] bg-blue-50 border border-blue-200 p-3 rounded">
-                <div className="space-y-2">
-                  <span className="block">
-                    {searchAnswer || searchMeta}
-                  </span>
-                  {searchCitations && searchCitations.length > 0 && (
-                    <div className="text-[11px] text-gray-700 gap-2 flex flex-wrap">
-                      {searchCitations.slice(0,6).map(c => (
-                        <button
-                          key={c.label}
-                          onClick={() => handleCitationClick(c.memory_id)}
-                          className="underline decoration-dotted hover:text-blue-700 text-left"
-                          title={c.title || c.url || ''}
-                        >
-                          [{c.label}] {c.title || 'Open memory'}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {/* Show Only Cited Memories Toggle */}
-            {isSearchMode && searchCitations && searchCitations.length > 0 && (
-              <div className="mt-2">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showOnlyCited}
-                    onChange={(e) => setShowOnlyCited(e.target.checked)}
-                    className="border-gray-300"
-                  />
-                  <span className="text-[11px] font-mono text-gray-700">
-                    Show only cited memories ({searchCitations.length} cited)
-                  </span>
-                </label>
-              </div>
-            )}
-          </div>
-
-          {/* Memory List */}
-          <div className="flex-1 overflow-y-auto p-3 w-full">
-            <div className="max-w-[268px] mx-auto w-full">
-            {isLoading ? (
-              <div className="space-y-2 w-full flex flex-col items-center">
-                {Array.from({ length: 8 }).map((_, index) => (
-                  <div key={index} className="w-[92%] text-left p-3 bg-gray-100 animate-pulse border border-gray-200 mx-auto">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
-                        <div className="h-3 bg-gray-300 rounded w-32"></div>
-                      </div>
-                      <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                        <div className="w-1.5 h-1.5 rounded-full bg-gray-300"></div>
-                        <div className="h-2 bg-gray-300 rounded w-4"></div>
-                      </div>
-                    </div>
-                    <div className="h-2 bg-gray-300 rounded w-full mb-1"></div>
-                    <div className="h-2 bg-gray-300 rounded w-3/4"></div>
-                  </div>
-                ))}
-              </div>
-            ) : isSearching ? (
-              <div className="space-y-3 w-full flex flex-col items-center">
-                {/* Search Status */}
-                <div className="bg-blue-50 border border-blue-200 p-3 rounded w-[92%] mx-auto">
-                  <div className="flex items-center gap-2 text-sm text-blue-700 justify-center">
-                    <div className="w-3 h-3 border border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-                    <span className="truncate">Querying memories...</span>
-                  </div>
-                </div>
-
-              </div>
-            ) : error ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-red-600 mb-4">{error}</p>
-                <button
-                  onClick={fetchMemories}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 px-4 py-2 rounded-lg transition-colors border border-blue-200"
-                >
-                  Retry
-                </button>
-              </div>
-            ) : searchError ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <p className="text-sm text-red-600 mb-4">{searchError}</p>
-                <button
-                  onClick={handleClearSearch}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-800 bg-blue-50 px-4 py-2 rounded-lg transition-colors border border-blue-200"
-                >
-                  Clear Search
-                </button>
-              </div>
-            ) : (currentMemories || []).length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                {isSearching ? (
-                  <>
-                    <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                    </div>
-                    <p className="text-sm text-gray-600">Searching memories...</p>
-                  </>
-                ) : (
-                  <>
-                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.009-5.824-2.709M15 6.291A7.962 7.962 0 0012 5c-2.34 0-4.29-1.009-5.824-2.709" />
-                      </svg>
-                    </div>
-                    <p className="text-sm text-gray-500">
-                      {isSearchMode ? (
-                        showOnlyCited && searchCitations && searchCitations.length > 0 
-                          ? 'No cited memories found' 
-                          : 'No memories found matching your search'
-                      ) : 'No memories found'}
-                    </p>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {(currentMemories || []).map((memory) => {
-                  const searchResult = currentResults?.find(r => r.memory.id === memory.id)
-                  const memoryHyperIndexData = hyperIndexData[memory.tx_hash || memory.id]
-                  return (
-                    <MemoryCard
-                      key={memory.id}
-                      memory={memory}
-                      isSelected={selectedMemory?.id === memory.id}
-                      onSelect={handleSelectMemory}
-                      onViewTransaction={handleViewTransaction}
-                      searchResult={searchResult}
-                      hyperIndexData={memoryHyperIndexData}
-                    />
-                  )
-                })}
-              </div>
-            )}
-            </div>
-          </div>
-        </div>
-
-        {/* Memory Details Sidebar */}
-        {selectedMemory && (() => {
-          return true
-        })() && (
-          <div className="fixed inset-y-0 left-0 w-[400px] md:w-[450px] lg:w-[500px] border-r border-gray-200 bg-white/95 backdrop-blur-sm flex flex-col max-h-full z-30 shadow-sm">
-            <div className="px-3 sm:px-4 py-3 border-b border-gray-200 bg-gray-50 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-mono uppercase tracking-wide text-gray-600">[MEMORY DETAILS]</h3>
-                <button
-                  onClick={() => setSelectedMemory(null)}
-                  className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full p-1 transition-all duration-200 flex-shrink-0"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-            <MemoryDetails
-              memory={selectedMemory}
-              expandedContent={expandedContent}
-              setExpandedContent={setExpandedContent}
-              onViewTransaction={handleViewTransaction}
-              hyperIndexData={selectedMemory ? hyperIndexData[selectedMemory.tx_hash || selectedMemory.id] : undefined}
-            />
-          </div>
-        )}
+        
 
       </div>
 
