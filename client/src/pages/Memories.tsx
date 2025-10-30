@@ -507,28 +507,82 @@ export const Memories: React.FC = () => {
       {/* Main Content */}
       <div className="flex flex-col md:flex-row h-[calc(100vh-65px)] relative">
         {/* Left Panel - Memory Mesh */}
-        <div className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-auto bg-white border-b md:border-b-0 md:border-r border-gray-200">
-        <MemoryMesh3D 
-          userAddress={userId || undefined}
-          className="w-full h-full"
-          onNodeClick={handleNodeClick}
-          similarityThreshold={similarityThreshold}
-          selectedMemoryId={clickedNodeId || undefined}
-          highlightedMemoryIds={[
-            ...(isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory.id) : []),
-            ...(clickedNodeId ? [clickedNodeId] : []),
-            ...(selectedMemory ? [selectedMemory.id] : [])
-          ]}
-          memorySources={{
-            ...Object.fromEntries(memories.map(m => [m.id, m.source || ''])),
-            ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.source || '']))
+        <div
+          className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-auto md:min-h-[calc(100vh-65px)] border-b md:border-b-0 bg-white"
+          style={{
+            backgroundImage:
+              'radial-gradient(rgba(0,0,0,0.04) 1px, transparent 1px)',
+            backgroundSize: '18px 18px',
+            backgroundPosition: '0 0',
           }}
-          memoryUrls={{
-            ...Object.fromEntries(memories.map(m => [m.id, m.url || ''])),
-            ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.url || '']))
-          }}
-        />
-      </div>
+        >
+
+          {/* 3D Memory Mesh Canvas */}
+          <MemoryMesh3D 
+            userAddress={userId || undefined}
+            className="w-full h-full"
+            onNodeClick={handleNodeClick}
+            similarityThreshold={similarityThreshold}
+            selectedMemoryId={clickedNodeId || undefined}
+            highlightedMemoryIds={[
+              ...(isSearchMode && searchResults && searchResults.results ? searchResults.results.map(r => r.memory.id) : []),
+              ...(clickedNodeId ? [clickedNodeId] : []),
+              ...(selectedMemory ? [selectedMemory.id] : [])
+            ]}
+            memorySources={{
+              ...Object.fromEntries(memories.map(m => [m.id, m.source || ''])),
+              ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.source || '']))
+            }}
+            memoryUrls={{
+              ...Object.fromEntries(memories.map(m => [m.id, m.url || ''])),
+              ...Object.fromEntries((searchResults?.results || []).map(r => [r.memory.id, r.memory.url || '']))
+            }}
+          />
+
+          {/* Corner brand/label */}
+          <div className="pointer-events-none absolute left-4 top-3 text-[11px] font-semibold tracking-tight text-gray-500">
+            memory mesh
+          </div>
+
+          {/* Legend Overlay (top-right, light) */}
+          <div className="absolute right-4 top-3 z-20 max-w-[220px] text-[11px]">
+            <div className="bg-white/95 backdrop-blur-sm border border-gray-200 text-gray-700 p-3 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className="uppercase tracking-wide text-gray-600">Legend</span>
+              </div>
+              <div className="mt-2 space-y-2">
+                <div className="space-y-1">
+                  <div className="text-gray-500">Statistics</div>
+                  <div className="flex items-center justify-between">
+                    <span>Memories</span>
+                    <span className="font-mono">{memories.length}</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-gray-500">Nodes</div>
+                  <div className="grid grid-cols-2 gap-x-3">
+                    <span className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-blue-500" /> Document</span>
+                    <span className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-emerald-500" /> Memory</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-gray-500">Connections</div>
+                  <div className="grid grid-cols-2 gap-x-3">
+                    <span className="flex items-center gap-2"><span className="inline-block w-4 h-[1px] bg-gray-400" /> Doc → Memory</span>
+                    <span className="flex items-center gap-2"><span className="inline-block w-4 h-[1px] bg-blue-400" /> Similarity</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="text-gray-500">Similarity</div>
+                  <div className="grid grid-cols-2 gap-x-3">
+                    <span className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-gray-300" /> Weak</span>
+                    <span className="flex items-center gap-2"><span className="inline-block w-2 h-2 rounded-full bg-gray-700" /> Strong</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         {/* Collapse/Expand Button */}
         <button
