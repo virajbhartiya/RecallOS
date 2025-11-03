@@ -7,8 +7,11 @@ datasource db {
 }
 model User {
   id              String   @id @default(uuid()) @db.Uuid
-  wallet_address  String   @unique
+  external_id     String?  @unique
+  email           String?  @unique
+  password_hash   String?
   created_at      DateTime @default(now())
+  updated_at      DateTime @default(now()) @updatedAt
   memories        Memory[]
   memory_snapshots MemorySnapshot[]
   @@map("users")
@@ -114,7 +117,7 @@ model MemoryEmbedding {
 /// Each search query event (stores only hashed embedding reference)
 model QueryEvent {
   id             String   @id @default(uuid()) @db.Uuid
-  wallet         String
+  user_id        String
   query          String
   embedding_hash String
   meta_summary   String?
@@ -139,7 +142,7 @@ model QueryRelatedMemory {
 
 model SearchCache {
   id            String   @id @default(uuid()) @db.Uuid
-  wallet        String
+  user_id       String
   query         String
   query_hash    String   @unique
   results       Json

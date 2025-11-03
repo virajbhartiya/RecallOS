@@ -12,7 +12,16 @@ export const submitContent = async (
   next: NextFunction
 ) => {
   try {
-    const { user_id, raw_text, metadata } = req.body;
+    const user_id = (req.body.user_id || (req as any).user?.id || req.body.userId) as string | undefined;
+    const raw_text = (req.body.raw_text || req.body.content || req.body.full_content || req.body.meaningful_content) as string | undefined;
+    const metadata = {
+      ...(req.body.metadata || {}),
+      url: req.body.url || req.body.metadata?.url,
+      title: req.body.title || req.body.metadata?.title,
+      source: req.body.source || req.body.metadata?.source,
+      content_type: req.body.content_type || req.body.metadata?.content_type,
+      content_summary: req.body.content_summary || req.body.metadata?.content_summary,
+    } as Record<string, unknown>;
 
     if (!user_id || !raw_text) {
       return next(new AppError('user_id and raw_text are required', 400));

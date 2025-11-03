@@ -19,25 +19,25 @@ interface MemoryMesh3DProps {
 }
 
 const nodeColors = {
-  manual: '#6366f1',
-  on_chain: '#10b981',
-  onchain: '#10b981',
-  'on-chain': '#10b981',
-  browser: '#0ea5e9',
-  extension: '#0ea5e9',
-  reasoning: '#f59e0b',
-  ai: '#f59e0b'
+  manual: '#22c55e',
+  on_chain: '#22c55e',
+  onchain: '#22c55e',
+  'on-chain': '#22c55e',
+  browser: '#3b82f6',
+  extension: '#3b82f6',
+  reasoning: '#a855f7',
+  ai: '#a855f7'
 } as Record<string, string>
 
 const resolveNodeColor = (rawType?: string, url?: string): string => {
   const key = (rawType || '').toLowerCase()
   const href = (url || '').toLowerCase()
   if (href) {
-    if (/github\.com|gitlab\.com|bitbucket\.org/.test(href)) return '#6366f1'
-    if (/npmjs\.com|pypi\.org|crates\.io|rubygems\.org/.test(href)) return '#ec4899'
-    if (/docs\.|developer\.|readthedocs|mdn\.|dev\.docs|learn\./.test(href)) return '#8b5cf6'
-    if (/youtube\.com|youtu\.be|vimeo\.com/.test(href)) return '#ef4444'
-    if (/mail\.google\.com|gmail\.com|outlook\.live\.com/.test(href)) return '#10b981'
+    if (/github\.com|gitlab\.com|bitbucket\.org/.test(href)) return '#3b82f6'
+    if (/npmjs\.com|pypi\.org|crates\.io|rubygems\.org/.test(href)) return '#22c55e'
+    if (/docs\.|developer\.|readthedocs|mdn\.|dev\.docs|learn\./.test(href)) return '#22c55e'
+    if (/youtube\.com|youtu\.be|vimeo\.com/.test(href)) return '#3b82f6'
+    if (/mail\.google\.com|gmail\.com|outlook\.live\.com/.test(href)) return '#22c55e'
   }
   return nodeColors[key] || '#6b7280'
 }
@@ -66,10 +66,10 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null)
   const [hovered, setHovered] = useState(false)
   
-  // Minimal point-like nodes with smaller base size
-  const baseSize = 0.02 + (importance * 0.01) // Reduced from 0.04 + 0.02
-  const size = isSelected ? baseSize + 0.025 : isHighlighted ? baseSize + 0.012 : baseSize // Enhanced selected prominence
-  const opacity = inLatentSpace ? 1.0 : 0.8
+  // Supermemory-like tiny nodes
+  const baseSize = 0.012 + (importance * 0.006)
+  const size = isSelected ? baseSize + 0.02 : isHighlighted ? baseSize + 0.008 : baseSize
+  const opacity = inLatentSpace ? 0.95 : 0.75
   
   useFrame(() => {
     if (meshRef.current) {
@@ -87,12 +87,13 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      <sphereGeometry args={[size, 8, 8]} />
+      <sphereGeometry args={[size, 12, 12]} />
       <meshBasicMaterial
         color={color}
         transparent
         opacity={isSelected ? 1.0 : opacity}
         depthWrite={true}
+        toneMapped={false}
       />
     </mesh>
   )
@@ -111,16 +112,16 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
     new THREE.Vector3(...end)
   ], [start, end])
 
-  // Ultra-minimal lines - only show the strongest connections
+  // Ultra-thin lines with stronger blue for high similarity
   const getLineColor = (similarity: number) => {
-    if (similarity > 0.85) return '#22c55e' // Green for very strong connections only
-    if (similarity > 0.75) return '#3b82f6' // Blue for strong connections
-    return '#f8fafc' // Almost invisible gray for everything else
+    if (similarity > 0.85) return '#3b82f6'
+    if (similarity > 0.75) return '#60a5fa'
+    return '#cbd5e1'
   }
 
   const color = getLineColor(similarity)
-  const opacity = similarity > 0.75 ? 0.2 + (similarity * 0.15) : 0.05 // Ultra-subtle lines
-  const lineWidth = similarity > 0.75 ? 0.8 : 0.3 // Ultra-thin lines
+  const opacity = similarity > 0.75 ? 0.25 + (similarity * 0.1) : 0.12
+  const lineWidth = similarity > 0.75 ? 0.6 : 0.25
 
   return (
     <Line
@@ -398,7 +399,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
 
   return (
     <div className={`w-full h-full ${className}`}>
-      <div className="w-full h-full overflow-hidden relative bg-white">
+      <div className="w-full h-full overflow-hidden relative bg-transparent">
         <Canvas
           camera={{ 
             position: isCompactView ? [2, 2, 2] : [3.5, 3.5, 3.5], 
@@ -427,44 +428,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
             rotateSpeed={0.5}
           />
         </Canvas>
-        
-        {/* Controls overlay */}
-        <div className="absolute top-3 right-3 flex flex-col gap-2">
-          <button
-            onClick={() => setIsCompactView(!isCompactView)}
-            className={`text-[10px] font-mono px-2 py-1 border transition-colors ${
-              isCompactView 
-                ? 'bg-blue-100 text-blue-800 border-blue-300' 
-                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-            }`}
-            title="Toggle compact view (Press C)"
-          >
-            {isCompactView ? '[COMPACT]' : '[EXPANDED]'}
-          </button>
-        </div>
 
-        {/* Help overlay */}
-        <div className="absolute top-3 left-3 text-[9px] font-mono bg-white/90 border border-gray-200 px-2 py-1 shadow-sm">
-          <div className="text-gray-600">
-            <div>Mouse: Orbit • Scroll: Zoom • C: Toggle view</div>
-          </div>
-        </div>
-
-        {/* Info overlay */}
-        <div className="absolute bottom-3 right-3 text-[10px] font-mono bg-white border border-gray-200 px-3 py-2 shadow-sm">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <div className="w-1.5 h-1.5 bg-blue-500" />
-              <span className="font-medium text-gray-700 uppercase tracking-wide">[3D LATENT SPACE]</span>
-            </div>
-            {meshData?.metadata && (
-              <div className="flex flex-col gap-0.5 text-[9px] text-gray-500 pl-3.5 font-mono">
-                <div>{meshData.metadata.projection_method || 'UMAP'} • {meshData.metadata.nodes_in_latent_space || 0}/{meshData.metadata.total_nodes || 0} nodes</div>
-                <div>{meshData.metadata.detected_clusters || 0} clusters • {isCompactView ? 'Compact' : 'Expanded'} 3D view</div>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   )
