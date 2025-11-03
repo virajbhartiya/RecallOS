@@ -1,5 +1,4 @@
-
-// Chrome extension types
+import { getOrCreateUserId, getAuthToken, getOrCreateAuthToken } from '@/lib/userId'
 
 interface ContextData {
   source: string;
@@ -779,13 +778,20 @@ function isLocalhost(): boolean {
          hostname.endsWith('.local');
 }
 
-function sendContextToBackground() {
+async function sendContextToBackground() {
   try {
     if (!chrome.runtime?.id) {
       return;
     }
     
     if (isLocalhost()) {
+      return;
+    }
+    
+    // Check if extension is enabled
+    const enabled = await checkExtensionEnabled();
+    if (!enabled) {
+      console.log('RecallOS: Extension is disabled, skipping context capture');
       return;
     }
     
@@ -1142,11 +1148,30 @@ function detectAIChatPlatform(): AIChatPlatform {
 
 async function pollSearchJob(jobId: string): Promise<string | null> {
   try {
-    const response = await fetch(`http://localhost:3000/api/search/job/${jobId}`, {
+    // Derive API base from extension settings
+    let apiBase = 'http://localhost:3000/api';
+    try {
+      const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+      const endpoint = cfg?.apiEndpoint as string | undefined;
+      if (endpoint) {
+        const u = new URL(endpoint);
+        apiBase = `${u.protocol}//${u.host}/api`;
+      }
+    } catch {}
+    // Get or create auth token
+    const authToken = await getOrCreateAuthToken();
+    const headers: Record<string, string> = {
+      'Accept': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    const response = await fetch(`${apiBase}/search/job/${jobId}`, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-      },
+      headers,
+      credentials: 'include',
     });
     
     if (!response.ok) {
@@ -1172,27 +1197,41 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
 
 async function getMemorySummary(query: string): Promise<string | null> {
   try {
-    const walletAddress = await getWalletAddressFromStorage();
-    if (!walletAddress) {
-      return null;
-    }
-
-    // Extension needs full URL since it's not running on the same domain
-    const searchEndpoint = 'http://localhost:3000/api/search';
+    const userId = getOrCreateUserId();
+    // Derive API base from extension settings
+    let apiBase = 'http://localhost:3000/api';
+    try {
+      const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+      const endpoint = cfg?.apiEndpoint as string | undefined;
+      if (endpoint) {
+        const u = new URL(endpoint);
+        apiBase = `${u.protocol}//${u.host}/api`;
+      }
+    } catch {}
+    const searchEndpoint = `${apiBase}/search`;
     
     const requestBody = {
-      wallet: walletAddress.toLowerCase(),
+      userId: userId,
       query: query,
       limit: 5,
       contextOnly: false
     };
         
+    // Get or create auth token
+    const authToken = await getOrCreateAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
     const response = await fetch(searchEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers,
+      credentials: 'include',
       body: JSON.stringify(requestBody),
     });
     
@@ -1325,6 +1364,13 @@ async function autoInjectMemories(userText: string): Promise<void> {
   
   if (userText.includes('[RecallOS Memory Context]')) return;
   
+  // Check if extension is enabled
+  const enabled = await checkExtensionEnabled();
+  if (!enabled) {
+    console.log('RecallOS: Extension is disabled, skipping memory injection');
+    return;
+  }
+  
   isAutoInjecting = true;
   
   try {
@@ -1419,7 +1465,7 @@ function handleTyping(): void {
   }, 1500); 
 }
 
-function createRecallOSIcon(): HTMLElement {
+async function createRecallOSIcon(): Promise<HTMLElement> {
   const icon = document.createElement('div');
   icon.id = 'recallos-extension-icon';
   icon.innerHTML = `
@@ -1429,6 +1475,12 @@ function createRecallOSIcon(): HTMLElement {
       <path d="M5 15L5.5 17.5L8 18L5.5 18.5L5 21L4.5 18.5L2 18L4.5 17.5L5 15Z" fill="currentColor"/>
     </svg>
   `;
+  
+  // Check if extension is enabled to set initial state
+  const enabled = await checkExtensionEnabled();
+  const baseColor = enabled ? '#10a37f' : '#8e8ea0';
+  const bgColor = enabled ? 'rgba(16, 163, 127, 0.1)' : 'rgba(142, 142, 160, 0.1)';
+  const borderColor = enabled ? 'rgba(16, 163, 127, 0.2)' : 'rgba(142, 142, 160, 0.2)';
   
   icon.style.cssText = `
     position: absolute !important;
@@ -1440,17 +1492,17 @@ function createRecallOSIcon(): HTMLElement {
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    color: #10a37f !important;
+    color: ${baseColor} !important;
     cursor: pointer !important;
     border-radius: 8px !important;
     transition: all 0.2s ease !important;
     z-index: 99999 !important;
-    background: rgba(16, 163, 127, 0.1) !important;
-    border: 1px solid rgba(16, 163, 127, 0.2) !important;
+    background: ${bgColor} !important;
+    border: 1px solid ${borderColor} !important;
     padding: 0 !important;
-    box-shadow: 0 2px 12px rgba(16, 163, 127, 0.15) !important;
+    box-shadow: 0 2px 12px ${enabled ? 'rgba(16, 163, 127, 0.15)' : 'rgba(142, 142, 160, 0.15)'} !important;
     visibility: visible !important;
-    opacity: 1 !important;
+    opacity: ${enabled ? '1' : '0.6'} !important;
     pointer-events: auto !important;
     backdrop-filter: blur(8px) !important;
   `;
@@ -1503,25 +1555,20 @@ function createRecallOSIcon(): HTMLElement {
 //   }
 // }
 
-async function getWalletAddressFromStorage(): Promise<string | null> {
+async function getWalletAddressFromStorage(): Promise<string | null> { return null; }
+
+async function checkExtensionEnabled(): Promise<boolean> {
   try {
-    const result = await chrome.storage.sync.get(['wallet_address']);
-    if (result.wallet_address) {
-      return result.wallet_address;
-    }
-    
-    const localWallet = localStorage.getItem('wallet_address');
-    if (localWallet) {
-      await chrome.storage.sync.set({ wallet_address: localWallet });
-      return localWallet;
-    }
-    
-    return null;
+    const response = await chrome.runtime.sendMessage({
+      type: 'GET_EXTENSION_ENABLED',
+    });
+    return response.success ? response.enabled : true; // Default to enabled on error
   } catch (error) {
-    console.error('RecallOS: Error getting wallet address:', error);
-    return null;
+    console.error('RecallOS: Error checking extension enabled state:', error);
+    return true; // Default to enabled on error
   }
 }
+
 
 async function showRecallOSStatus(): Promise<void> {
   const tooltip = document.createElement('div');
@@ -1555,16 +1602,18 @@ async function showRecallOSStatus(): Promise<void> {
   document.body.appendChild(tooltip);
   
   try {
-    const [walletAddress, apiHealthy] = await Promise.all([
+    const [walletAddress, apiHealthy, extensionEnabled] = await Promise.all([
       getWalletAddressFromStorage(),
       // checkApiHealth()
-      true
+      true,
+      checkExtensionEnabled()
     ]);
     
     const walletStatus = walletAddress ? 'Connected' : 'Not Connected';
     const apiStatus = apiHealthy ? 'Connected' : 'Not Connected';
-    const overallStatus = walletAddress && apiHealthy ? 'Connected' : 'Not Connected';
-    const statusColor = overallStatus === 'Connected' ? '#10a37f' : '#ef4444';
+    const extensionStatus = extensionEnabled ? 'Enabled' : 'Disabled';
+    const overallStatus = walletAddress && apiHealthy && extensionEnabled ? 'Active' : 'Inactive';
+    const statusColor = overallStatus === 'Active' ? '#10a37f' : '#ef4444';
     
     const platformName = currentPlatform === 'chatgpt' ? 'ChatGPT' : currentPlatform === 'claude' ? 'Claude' : 'Unknown';
     
@@ -1574,12 +1623,13 @@ async function showRecallOSStatus(): Promise<void> {
         <strong>RecallOS on ${platformName}</strong>
       </div>
       <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9);">
+        <div>Extension: ${extensionStatus}</div>
         <div>Wallet: ${walletStatus}</div>
         <div>API: ${apiStatus}</div>
         ${walletAddress ? `<div>Address: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}</div>` : ''}
       </div>
       <div style="font-size: 11px; color: rgba(255, 255, 255, 0.7); margin-top: 8px;">
-        Memories are automatically injected as you type (1.5s delay). Click to check status.
+        ${extensionEnabled ? 'Memories are automatically injected as you type (1.5s delay).' : 'Extension is disabled. Click the popup to enable.'}
       </div>
     `;
   } catch (error) {
@@ -1719,8 +1769,10 @@ function setupAIChatIntegration(): void {
         existingIcon.remove();
       }
       
-      recallOSIcon = createRecallOSIcon();
-      inputContainer.appendChild(recallOSIcon);
+      createRecallOSIcon().then(icon => {
+        recallOSIcon = icon;
+        inputContainer.appendChild(recallOSIcon);
+      });
       
       const ensureIconVisible = () => {
         if (!recallOSIcon || !document.body.contains(recallOSIcon)) {
@@ -1758,8 +1810,10 @@ function setupAIChatIntegration(): void {
                 existingIcon.remove();
               }
               
-              recallOSIcon = createRecallOSIcon();
-              newContainer.appendChild(recallOSIcon);
+              createRecallOSIcon().then(icon => {
+                recallOSIcon = icon;
+                newContainer.appendChild(recallOSIcon);
+              });
             }
           }
         }

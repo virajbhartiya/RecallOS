@@ -1,21 +1,22 @@
 import axios from 'axios'
-import { getLocalStorage } from './helper'
 
-const baseURL = (import.meta.env.VITE_SERVER_URL || 'http://localhost:3000') + '/api'
+const baseURL = import.meta.env.DEV
+  ? '/api'
+  : `${import.meta.env.VITE_SERVER_URL || ''}/api`
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
   timeout: 30000, // Increased to 30 seconds for search requests
+  withCredentials: true,
 })
 
+// Add auth token to requests
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = getLocalStorage('jwt')
-
+    const token = localStorage.getItem('auth_token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
-
     return config
   },
   (error) => {

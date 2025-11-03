@@ -1,3 +1,4 @@
+import { getOrCreateUserId, getAuthToken, getOrCreateAuthToken } from '@/lib/userId'
 /// <reference types="chrome" />
 
 interface ContextData {
@@ -7,6 +8,10 @@ interface ContextData {
   content_snippet: string;
   timestamp: number;
   wallet_address?: string;
+  full_content?: string;
+  meaningful_content?: string;
+  content_summary?: string;
+  content_type?: string;
 }
 
 async function getApiEndpoint(): Promise<string> {
@@ -19,41 +24,51 @@ async function getApiEndpoint(): Promise<string> {
   }
 }
 
-async function getWalletAddress(): Promise<string | null> {
+async function isExtensionEnabled(): Promise<boolean> {
   try {
-    const result = await chrome.storage.sync.get(['wallet_address']);
-    if (result.wallet_address) {
-      return result.wallet_address;
-    }
-
-
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tabs[0]?.id) {
-      try {
-        const response = await chrome.tabs.sendMessage(tabs[0].id, {
-          type: 'GET_WALLET_ADDRESS',
-        });
-        if (response?.walletAddress) {
-          await chrome.storage.sync.set({
-            wallet_address: response.walletAddress,
-          });
-          return response.walletAddress;
-        }
-      } catch (error) {
-      }
-    }
-
-    return null;
+    const result = await chrome.storage.sync.get(['extensionEnabled']);
+    return result.extensionEnabled !== false;
   } catch (error) {
-    console.error('RecallOS: Error getting wallet address:', error);
-    return null;
+    console.error('RecallOS: Error getting extension enabled state:', error);
+    return true;
   }
+}
+
+async function setExtensionEnabled(enabled: boolean): Promise<void> {
+  try {
+    await chrome.storage.sync.set({ extensionEnabled: enabled });
+  } catch (error) {
+    console.error('RecallOS: Error setting extension enabled state:', error);
+  }
+}
+
+async function getWalletAddress(): Promise<string | null> { return null; }
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      controller.signal.aborted
+        ? reject(new DOMException('Aborted', 'AbortError'))
+        : undefined
+    ),
+  ])
+    .finally(() => clearTimeout(timeout)) as Promise<T>;
 }
 
 async function sendToBackend(data: ContextData): Promise<void> {
   try {
+    // Check if extension is enabled
+    const enabled = await isExtensionEnabled();
+    if (!enabled) {
+      console.log('RecallOS: Extension is disabled, skipping context capture');
+      return;
+    }
+
     const apiEndpoint = await getApiEndpoint();
-    const walletAddress = await getWalletAddress();
+    const walletAddress = null;
 
     const privacyInfo = (data as any).privacy_extension_info;
     const hasPrivacyConflicts = privacyInfo?.detected || false;
@@ -74,7 +89,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
       content: content,
       url: data.url,
       title: data.title,
-      userAddress: walletAddress ? walletAddress.toLowerCase() : 'anonymous',
+      userId: getOrCreateUserId(),
       metadata: {
         source: data.source,
         timestamp: data.timestamp,
@@ -87,19 +102,33 @@ async function sendToBackend(data: ContextData): Promise<void> {
     };
 
 
-    const response = await fetch(apiEndpoint, {
+    // Get or create auth token
+    const authToken = await getOrCreateAuthToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (authToken) {
+      headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    const controller = new AbortController();
+    const fetchPromise = fetch(apiEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+      headers,
+      credentials: 'include',
+      keepalive: true,
+      body: JSON.stringify({ ...payload, userId: getOrCreateUserId() }),
+      signal: controller.signal,
     });
 
-    if (!response.ok) {
+    const response = await withTimeout(fetchPromise, 4000).catch((_e) => null);
+
+    if (response && !response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    const result = await response.json();
+    // Fire-and-forget: do not wait on response body; API queues work and returns 202 quickly
   } catch (error) {
     console.error('RecallOS: Error sending to backend:', error);
   }
@@ -149,6 +178,7 @@ chrome.runtime.onMessage.addListener(
       data?: ContextData;
       endpoint?: string;
       walletAddress?: string;
+      enabled?: boolean;
     },
     _sender: chrome.runtime.MessageSender,
     sendResponse: (response: unknown) => void
@@ -189,11 +219,12 @@ chrome.runtime.onMessage.addListener(
 
       return true;
     }
+    
 
-    if (message?.type === 'SET_WALLET_ADDRESS' && message.walletAddress) {
-      setWalletAddress(message.walletAddress)
-        .then(() => {
-          sendResponse({ success: true, message: 'Wallet address updated' });
+    if (message?.type === 'GET_EXTENSION_ENABLED') {
+      isExtensionEnabled()
+        .then(enabled => {
+          sendResponse({ success: true, enabled });
         })
         .catch(error => {
           sendResponse({ success: false, error: error.message });
@@ -202,10 +233,10 @@ chrome.runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'GET_WALLET_ADDRESS') {
-      getWalletAddress()
-        .then(walletAddress => {
-          sendResponse({ success: true, walletAddress });
+    if (message?.type === 'SET_EXTENSION_ENABLED' && typeof message.enabled === 'boolean') {
+      setExtensionEnabled(message.enabled)
+        .then(() => {
+          sendResponse({ success: true, message: 'Extension state updated' });
         })
         .catch(error => {
           sendResponse({ success: false, error: error.message });
