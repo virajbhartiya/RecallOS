@@ -15,6 +15,13 @@ export default defineConfig({
       : undefined,
     host: process.env.VITE_DEV_HOST || 'localhost',
     port: Number(process.env.VITE_DEV_PORT || 5173),
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   build: {
     chunkSizeWarningLimit: 1500,
