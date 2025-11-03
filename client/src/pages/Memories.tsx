@@ -9,211 +9,11 @@ import { SearchService } from '@/services/search'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
 import { getOrCreateUserId, getOrCreateAuthToken } from '@/utils/userId'
 
-const MemoryCard: React.FC<{
-  memory: Memory
-  isSelected: boolean
-  onSelect: (memory: Memory) => void
-  onViewTransaction?: (txHash: string, network: string) => void
-  searchResult?: {
-    search_type?: 'keyword' | 'semantic' | 'hybrid'
-    blended_score?: number
-  }
-  hyperIndexData?: {
-    blockNumber?: string
-    gasUsed?: string
-    gasPrice?: string
-  }
-}> = ({ memory, isSelected, onSelect, onViewTransaction: _onViewTransaction, searchResult, hyperIndexData }) => {
-  const getSourceColorLocal = (source?: string) => {
-    const s = (source || '').toLowerCase()
-    if (s.includes('extension') || s.includes('browser')) return '#0ea5e9'
-    if (s.includes('on_chain') || s.includes('on-chain') || s.includes('onchain')) return '#22c55e'
-    if (s.includes('manual')) return '#8b5cf6'
-    if (s.includes('reason') || s.includes('ai')) return '#f59e0b'
-    return '#94a3b8'
-  }
-  return (
-    <button
-      onClick={() => onSelect(memory)}
-      className={`w-full text-left p-3 transition-all duration-200 group border ${
-        isSelected
-          ? 'bg-blue-50 border-blue-200'
-          : 'hover:bg-gray-50 border-gray-200 hover:border-gray-300 bg-white'
-      }`}
-    >
-      <div className="flex items-center justify-between mb-1.5">
-        <h3 className="text-xs font-medium text-gray-900 truncate group-hover:text-black transition-colors flex items-center gap-2">
-          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getSourceColorLocal(memory.source) }} />
-          <span className="truncate">{memory.title || 'Untitled Memory'}</span>
-        </h3>
-        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-          {searchResult?.blended_score !== undefined && (
-            <span className="text-xs text-gray-500 font-mono">
-              {(searchResult.blended_score * 100).toFixed(0)}%
-            </span>
-          )}
-        </div>
-      </div>
-      
-      <div className="flex items-center gap-2 text-[10px] text-gray-500 mb-1.5 font-mono">
-        <span>{memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'No date'}</span>
-        <span>•</span>
-        <span className="uppercase">{memory.source}</span>
-        {hyperIndexData?.blockNumber && (
-          <>
-            <span>•</span>
-            <span className="text-blue-600">Block {hyperIndexData.blockNumber}</span>
-          </>
-        )}
-      </div>
-      
-      {(memory.summary || memory.content) && (
-        <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">
-          {memory.summary || (memory.content && memory.content.slice(0, 80) + (memory.content.length > 80 ? '...' : ''))}
-        </p>
-      )}
-    </button>
-  )
-}
-
-const MemoryDetails: React.FC<{
-  memory: Memory | null
-  expandedContent: boolean
-  setExpandedContent: (expanded: boolean) => void
-  onViewTransaction?: (txHash: string, network: string) => void
-  hyperIndexData?: {
-    blockNumber?: string
-    gasUsed?: string
-    gasPrice?: string
-    timestamp?: string
-  }
-}> = ({ memory, expandedContent, setExpandedContent, onViewTransaction: _onViewTransaction, hyperIndexData: _hyperIndexData }) => {
-  if (!memory) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-gray-100 border border-gray-200 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.009-5.824-2.709M15 6.291A7.962 7.962 0 0012 5c-2.34 0-4.29 1.009-5.824 2.709" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-light text-gray-900 mb-2">[SELECT A MEMORY]</h3>
-          <p className="text-sm font-mono text-gray-500">Click a node in the latent space to view its details.</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="p-4 sm:p-6">
-        {/* Header Section */}
-        <div className="mb-6">
-          <h3 className="text-lg sm:text-xl font-light text-gray-900 mb-3 leading-tight break-words overflow-wrap-anywhere">
-            {memory.title || 'Untitled Memory'}
-          </h3>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 text-sm font-mono text-gray-500">
-            <span>{memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'NO DATE'}</span>
-            {memory.source && (
-              <>
-                <span className="hidden sm:inline">•</span>
-                <span className="font-mono uppercase text-xs bg-gray-100 px-2 py-1 border border-gray-200 w-fit">
-                  [{memory.source}]
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Status and Importance Section */}
-        <div className="flex flex-col gap-4 mb-6">
-          {memory.importance_score && (
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-mono text-gray-600">[IMPORTANCE]</span>
-              <div className="flex items-center gap-2">
-                <div className="w-20 bg-gray-200 h-2 border border-gray-300">
-                  <div 
-                    className="bg-blue-500 h-2 transition-all duration-300" 
-                    style={{ width: `${memory.importance_score * 100}%` }}
-                  ></div>
-                </div>
-                <span className="text-sm font-mono text-gray-600">
-                  {Math.round(memory.importance_score * 100)}%
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {memory.summary && (
-          <div className="mb-6">
-            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SUMMARY]</h4>
-            <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4">
-              <p className="text-sm text-gray-700 leading-relaxed break-words overflow-wrap-anywhere">
-                {memory.summary}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {memory.content && (
-          <div className="mb-6">
-            <div className="flex flex-col gap-2 mb-3">
-              <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide">[CONTENT]</h4>
-              <button
-                onClick={() => setExpandedContent(!expandedContent)}
-                className="text-sm font-mono text-blue-600 hover:text-black bg-blue-50 px-3 py-1 border border-blue-200 hover:border-black transition-all duration-200 w-fit"
-              >
-                {expandedContent ? '[COLLAPSE]' : '[EXPAND]'}
-              </button>
-            </div>
-            <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4">
-              <p className={`text-sm text-gray-700 leading-relaxed break-words overflow-wrap-anywhere ${expandedContent ? '' : 'line-clamp-6'}`}>
-                {memory.content}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {memory.url && memory.url !== 'unknown' && (
-          <div className="mb-6">
-            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[SOURCE URL]</h4>
-            <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4">
-              <a
-                href={memory.url} 
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:text-blue-800 break-all hover:underline overflow-wrap-anywhere"
-              >
-                {memory.url}
-              </a>
-            </div>
-          </div>
-        )}
-
-
-        
-        {memory.page_metadata && (
-          <div className="mb-6">
-            <h4 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-3">[METADATA]</h4>
-            <div className="bg-gray-50 border border-gray-200 p-3 sm:p-4 overflow-x-auto">
-              <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words overflow-wrap-anywhere">
-                {JSON.stringify(memory.page_metadata, null, 2)}
-              </pre>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export const Memories: React.FC = () => {
   const userId = getOrCreateUserId()
   const [memories, setMemories] = useState<Memory[]>([])
   
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  
   const similarityThreshold = 0.3
   const [clickedNodeId, setClickedNodeId] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
@@ -231,15 +31,14 @@ export const Memories: React.FC = () => {
   
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
   const [searchAnswer, setSearchAnswer] = useState<string | null>(null)
-  const [searchMeta, setSearchMeta] = useState<string | null>(null)
+  
   const [searchJobId, setSearchJobId] = useState<string | null>(null)
   const [searchCitations, setSearchCitations] = useState<Array<{ label: number; memory_id: string; title: string | null; url: string | null }> | null>(null)
-  const [searchError, setSearchError] = useState<string | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
-  const [isSearching, setIsSearching] = useState(false)
+  
   const [searchQuery, setSearchQuery] = useState<string>('')
-  const [showOnlyCited, setShowOnlyCited] = useState(true)
-  const [hyperIndexData, _setHyperIndexData] = useState<Record<string, any>>({})
+  const [showOnlyCited] = useState(true)
+  
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -252,8 +51,7 @@ export const Memories: React.FC = () => {
 
   const fetchMemories = useCallback(async () => {
     
-    setIsLoading(true)
-    setError(null)
+    
     
     try {
       // Ensure we have an auth token before making requests
@@ -270,19 +68,13 @@ export const Memories: React.FC = () => {
       
       
     } catch (err) {
-      setError('Failed to fetch memories')
       // Error fetching memories
     } finally {
-      setIsLoading(false)
+      
     }
   }, [userId, fetchHyperIndexData])
 
-  const handleSelectMemory = (memory: Memory) => {
-    // Enable memory selection from the list and highlight in mesh
-    setSelectedMemory(memory)
-    setExpandedContent(false)
-    setClickedNodeId(memory.id)
-  }
+  
 
   const handleNodeClick = (memoryId: string) => {
     // Find the memory information
@@ -311,15 +103,7 @@ export const Memories: React.FC = () => {
     }
   }, [memories, dialogSearchResults])
 
-  const handleCitationClick = (memoryId: string) => {
-    // Select and highlight a memory from citations
-    const memoryInfo = memories.find(m => m.id === memoryId)
-    if (memoryInfo) {
-      setSelectedMemory(memoryInfo)
-      setExpandedContent(false)
-    }
-    setClickedNodeId(memoryId)
-  }
+  
 
   
 
@@ -336,10 +120,8 @@ export const Memories: React.FC = () => {
 
     abortControllerRef.current = new AbortController()
 
-    setSearchError(null)
     setSearchResults(null)
     setIsSearchMode(true)
-    setIsSearching(true)
     setSearchAnswer(null)
     setSearchCitations(null)
 
@@ -358,7 +140,6 @@ export const Memories: React.FC = () => {
       // Set all the response data immediately
       setSearchResults(response)
       setSearchAnswer(response.answer || null)
-      setSearchMeta(response.meta_summary || null)
       setSearchCitations(response.citations || null)
       
       // Only set job_id for polling if we don't have an immediate answer
@@ -373,12 +154,12 @@ export const Memories: React.FC = () => {
       }
       // Only set error if not aborted
       if (!abortControllerRef.current?.signal.aborted) {
-        setSearchError('Failed to search memories')
+        
       }
     } finally {
       // Only set searching to false if not aborted
       if (!abortControllerRef.current?.signal.aborted) {
-        setIsSearching(false)
+        
       }
     }
   }, [userId])
@@ -386,12 +167,9 @@ export const Memories: React.FC = () => {
   const handleClearSearch = useCallback(() => {
     setSearchResults(null)
     setSearchAnswer(null)
-    setSearchMeta(null)
     setSearchJobId(null)
     setSearchCitations(null)
-    setSearchError(null)
     setIsSearchMode(false)
-    setIsSearching(false)
     setSearchQuery('')
   }, [])
 
@@ -415,9 +193,7 @@ export const Memories: React.FC = () => {
     return () => { cancelled = true; clearInterval(interval) }
   }, [searchJobId, searchAnswer])
 
-  const handleViewTransaction = useCallback((_txHash: string, _network: string) => {
-    return
-  }, [])
+  
 
   
 
@@ -587,7 +363,6 @@ export const Memories: React.FC = () => {
   
 
   let currentMemories = getFilteredMemories()
-  const currentResults = isSearchMode && searchResults && searchResults.results ? searchResults.results : null
   currentMemories = [...(currentMemories || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return (
