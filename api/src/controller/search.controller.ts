@@ -3,7 +3,6 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import AppError from '../utils/appError';
 import { searchMemories } from '../services/memorySearch';
 import { createSearchJob, getSearchJob } from '../services/searchJob';
-import { SearchCacheService } from '../services/searchCache';
 
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
@@ -11,18 +10,6 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
     // Use authenticated user ID if available, otherwise use provided userId
     const actualUserId = req.user?.externalId || userId;
     if (!actualUserId || !query) return next(new AppError('userId and query are required', 400));
-    
- 
-    if (!contextOnly) {
-      const cachedResult = await SearchCacheService.getCachedResult(actualUserId, query);
-      if (cachedResult) {
-        console.log('Returning cached search result for query:', query);
-
-        const delay = Math.random() * 1000 + 1500;
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return res.status(200).json(cachedResult);
-      }
-    }
     
     // Only create job for async answer delivery if not in context-only mode
     let job = null;
@@ -45,12 +32,6 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
     
     if (job) {
       response.job_id = job.id;
-    }
-    
-    // Cache the result if not context-only
-    if (!contextOnly) {
-      await SearchCacheService.setCachedResult(actualUserId, query, response);
-      console.log('Cached search result for query:', query);
     }
     
     res.status(200).json(response);
@@ -105,32 +86,5 @@ export const getContext = async (req: Request, res: Response, next: NextFunction
   }
 };
 
-export const clearSearchCache = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { userId } = req.params as { userId?: string };
-    if (!userId) return next(new AppError('userId parameter is required', 400));
-
-    await SearchCacheService.clearUserCache(userId);
-
-    res.status(200).json({
-      message: 'Search cache cleared successfully',
-      userId: userId
-    });
-  } catch (err) {
-    next(err);
-  }
-};
-
-export const cleanupSearchCache = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    await SearchCacheService.cleanupExpiredCache();
-    
-    res.status(200).json({
-      message: 'Expired search cache entries cleaned up successfully'
-    });
-  } catch (err) {
-    next(err);
-  }
-};
 
 
