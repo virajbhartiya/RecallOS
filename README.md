@@ -1,6 +1,6 @@
-# RecallOS - Decentralized Personal Memory System
+# RecallOS - Personal Memory System
 
-> A blockchain-verified, AI-powered knowledge graph for capturing, organizing, and retrieving your digital context.
+> An AI-powered knowledge graph for capturing, organizing, and retrieving your digital context.
 <img width="1920" height="1080" alt="Screenshot 2025-10-24 at 1 38 06 AM" src="https://github.com/user-attachments/assets/c4d5a12a-fb3f-4e41-8c8a-4b02bb081884" />
 
 ## Quick Start
@@ -9,7 +9,6 @@
 - Node.js 18+
 - PostgreSQL 14+ with pgvector extension
 - Redis (for background jobs)
-- Ethereum wallet (for deposits)
 - Gemini API key or Ollama (for AI)
 
 ### 1. Database Setup
@@ -40,10 +39,12 @@ npm install
 cp .env.example .env
 # Edit .env with your values:
 # - DATABASE_URL
+# - REDIS_URL
 # - GEMINI_API_KEY (or OLLAMA_BASE_URL)
-# - SEPOLIA_RPC_URL
-# - RELAYER_PRIVATE_KEY
-# - MEMORY_REGISTRY_CONTRACT_ADDRESS=0xde662d9c6a0bb41ad82b3550177feaf4e43bd602
+# - JWT_SECRET
+# - SESSION_COOKIE_NAME
+# - COOKIE_DOMAIN
+# - CORS_ALLOWED_ORIGINS
 
 # Run migrations
 npm run db:migrate
@@ -65,7 +66,6 @@ npm install
 cp .env.example .env
 # Edit .env with:
 # - VITE_API_URL=http://localhost:3000
-# - VITE_WALLETCONNECT_PROJECT_ID
 
 # Start development server
 npm run dev
@@ -91,31 +91,8 @@ npm run build
 
 # Configure extension:
 # 1. Click extension icon
-# 2. Enter API endpoint: http://localhost:3000/api/memory/processRawContent
-# 3. Connect wallet
-```
-
----
-
-## Contract Addresses
-
-### Sepolia Testnet (Current Deployment)
-
-**Network:** Sepolia (Chain ID: 11155111)  
-**Deployment Date:** October 21, 2025
-
-| Component | Address | Description |
-|-----------|---------|-------------|
-| **Proxy (Main Contract)** | `0x40b55b9634fcf2454c138fa5ed914ac7044f931b` | Use this address for all integrations |
-| **Contract Owner** | `0x01b7b2bC30c958bA3bC0852bF1BD4efB165281Ba` | Deployer address |
-
-**Block Explorer:** [Etherscan](https://sepolia.etherscan.io/address/0x40b55b9634fcf2454c138fa5ed914ac7044f931b)
-
-### Environment Configuration
-
-Add to your `.env` file:
-```bash
-MEMORY_REGISTRY_CONTRACT_ADDRESS=0x40b55b9634fcf2454c138fa5ed914ac7044f931b
+# 2. Enter API endpoint: http://localhost:3000/api/memory/process
+# 3. Extension will automatically authenticate
 ```
 
 ---
@@ -134,32 +111,33 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0x40b55b9634fcf2454c138fa5ed914ac7044f931b
                      ┌─────────────▼─────────────┐
                      │   Express.js API Server   │
                      │  (Controllers & Routes)   │
+                     │   Authentication (JWT)    │
                      └─────────────┬─────────────┘
                                    │
          ┌─────────────┬───────────┼───────────┬─────────────┐
          │             │           │           │             │
-     ┌────▼─────┐ ┌────▼─────┐┌────▼─────┐┌────▼─────┐  ┌────▼─────┐
-     │ Memory   │ │ Search   ││ Content  ││ Deposit  │  │Blockscout│
-     │Controller│ │Controller││Controller││Controller│  │Controller│
-     └────┬─────┘ └────┬─────┘└────┬─────┘└────┬─────┘  └────┬─────┘
-          │            │           │           │             │
-          └────────────┴───────────┴───────────┴─────────────┘
+     ┌────▼─────┐ ┌────▼─────┐┌────▼─────┐ ┌────▼─────┐
+     │ Memory   │ │ Search   ││ Content  │ │   Auth   │
+     │Controller│ │Controller││Controller│ │Controller│
+     └────┬─────┘ └────┬─────┘└────┬─────┘ └────┬─────┘
+          │            │           │            │
+          └────────────┴───────────┴────────────┘
                                    │
          ┌─────────────┬───────────┼───────────┬─────────────┐
          │             │           │           │             │
-    ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼─────┐  ┌────▼─────┐
-    │   AI    │  │ Memory  │ │ Memory  │ │Blockchain│  │Blockscout│
-    │Provider │  │  Mesh   │ │ Search  │ │ Service  │  │  Prefetch│
-    └────┬────┘  └────┬────┘ └────┬────┘ └────┬─────┘  └────┬─────┘
-         │            │           │           │             │
-         └────────────┴───────────┴───────────┴─────────────┘
+    ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼─────┐
+    │   AI    │  │ Memory  │ │ Memory  │ │   JWT    │
+    │Provider │  │  Mesh   │ │ Search  │ │  Utils   │
+    └────┬────┘  └────┬────┘ └────┬────┘ └────┬─────┘
+         │            │           │           │
+         └────────────┴───────────┴───────────┘
                                     │
           ┌─────────────┬───────────┼───────────┬─────────────┐
           │             │           │           │             │
-     ┌────▼─────┐  ┌────▼─────┐ ┌────▼────┐ ┌────▼─────┐  ┌────▼──────┐
-     │PostgreSQL│  │ pgvector │ │  Redis  │ │ Sepolia  │  │ Blockscout│
-     │ Database │  │Embeddings│ │ Queue   │ │Blockchain│  │   API     │
-     └──────────┘  └──────────┘ └─────────┘ └──────────┘  └───────────┘
+     ┌────▼─────┐  ┌────▼─────┐ ┌────▼────┐
+     │PostgreSQL│  │ pgvector │ │  Redis  │
+     │ Database │  │Embeddings│ │ Queue   │
+     └──────────┘  └──────────┘ └─────────┘
 ```
 
 ---
@@ -191,17 +169,17 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0x40b55b9634fcf2454c138fa5ed914ac7044f931b
 - **Hybrid Mode**: Blends keyword (40%) + semantic (60%) search
 - **Context Export**: Format results for ChatGPT/Claude
 
-### 5. Blockchain Verification
-- **Sepolia Testnet**: On-chain memory hash storage
-- **Gas Deposits**: Users deposit ETH, relayer submits transactions
-- **Transaction Tracking**: Full tx_hash, block_number, gas_used
-- **Immutable Proof**: Verifiable capture timestamps
+### 5. User Authentication
+- **JWT-based Auth**: Secure token-based authentication
+- **Email/Password**: Traditional login and registration
+- **Session Cookies**: HttpOnly, Secure cookies for web clients
+- **Extension Auth**: Automatic token generation for browser extensions
+- **User Isolation**: All memories are user-scoped and protected
 
 ### 6. Analytics & Insights
-- **Memory Stats**: Total count, confirmed transactions
+- **Memory Stats**: Total count, processing status
 - **Topic Analysis**: Top topics, categories, sentiment distribution
-- **Transaction Monitoring**: Track pending/confirmed/failed states
-- **Retry Failed**: Automatic retry of failed blockchain writes
+- **Processing Monitoring**: Track processing states and status
 
 ---
 
@@ -211,8 +189,6 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0x40b55b9634fcf2454c138fa5ed914ac7044f931b
 - React 18 with TypeScript
 - Vite build tool
 - Tailwind CSS
-- wagmi + viem for Web3
-- ConnectKit for wallet connection
 - Three.js + React Three Fiber for 3D graph
 - @xyflow/react for 2D graph
 
@@ -220,8 +196,9 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0x40b55b9634fcf2454c138fa5ed914ac7044f931b
 - Node.js + Express.js
 - TypeScript
 - Prisma ORM
-- Bull queue (Redis)
-- Ethers.js v6
+- BullMQ (Redis) for job queue
+- JWT for authentication
+- bcryptjs for password hashing
 
 ### Database
 - PostgreSQL 14+
@@ -233,57 +210,52 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0x40b55b9634fcf2454c138fa5ed914ac7044f931b
 - Ollama (local alternative)
 - Deterministic fallback embeddings
 
-### Blockchain
-- Ethereum Sepolia testnet
-- Solidity 0.8.24
-- OpenZeppelin upgradeable contracts
-- Hardhat development environment
-
 ### Tools
 - ESBuild (extension bundling)
 - Jest (API testing)
-- Foundry (contract testing)
 - Prettier (code formatting)
 
 ---
 
 ## API Endpoints
 
+### Authentication
+- `POST /api/auth/register` - Register new user (email/password)
+- `POST /api/auth/login` - Login with email/password
+- `POST /api/auth/logout` - Logout and clear session
+- `GET /api/auth/me` - Get current authenticated user
+- `POST /api/auth/extension-token` - Generate token for extension
+- `POST /api/auth/session` - Set session cookie (demo)
+- `DELETE /api/auth/session` - Clear session cookie
+
 ### Memory Management
-- `POST /api/memory/processRawContent` - Store new memory
-- `GET /api/memory/:userAddress/recent` - Get recent memories
-- `GET /api/memory/:userAddress/count` - Get memory count
-- `GET /api/memory/getMemoryByHash/:hash` - Get memory by hash
-- `GET /api/memory/insights` - Analytics and insights
-- `GET /api/memory/transaction-details` - Memories with blockchain data
-- `POST /api/memory/retry-failed` - Retry failed transactions
+- `POST /api/memory/process` - Queue content for processing (authenticated)
+- `POST /api/memory/` - Store new memory (authenticated)
+- `POST /api/memory/batch` - Store multiple memories (authenticated)
+- `GET /api/memory/user/:userId/recent` - Get recent memories (authenticated)
+- `GET /api/memory/user/:userId/count` - Get memory count (authenticated)
+- `GET /api/memory/user/:userId/memory/:index` - Get memory by index (authenticated)
+- `GET /api/memory/hash/:hash` - Get memory by hash (authenticated)
+- `GET /api/memory/insights` - Analytics and insights (authenticated)
+- `GET /api/memory/transactions` - Memories with transaction details (authenticated)
+- `POST /api/memory/retry-failed` - Retry failed transactions (authenticated)
 
 ### Memory Mesh
-- `GET /api/memory/:userAddress/mesh` - Get full graph
-- `GET /api/memory/:memoryId/with-relations` - Get memory with edges
-- `GET /api/memory/:memoryId/cluster` - Get memory cluster
+- `GET /api/memory/mesh/:userId` - Get full graph (authenticated)
+- `GET /api/memory/relations/:memoryId` - Get memory with edges (authenticated)
+- `GET /api/memory/cluster/:memoryId` - Get memory cluster (authenticated)
 
 ### Search
-- `POST /api/search` - Semantic search with AI answer
+- `POST /api/search` - Semantic search with AI answer (authenticated)
 - `GET /api/search/job/:id` - Search job status
 - `POST /api/search/context` - Context-only search
-- `GET /api/memory/search` - Keyword search
-- `GET /api/memory/search-embed` - Semantic search with filters
-- `GET /api/memory/search-hybrid` - Hybrid search
+- `GET /api/memory/search` - Keyword search (authenticated)
+- `GET /api/memory/search-embeddings` - Semantic search with filters (authenticated)
+- `GET /api/memory/search-hybrid` - Hybrid search (authenticated)
 
 ### Content Queue
-- `POST /api/content/submit` - Queue content for processing
-- `GET /api/content/:user_id` - Get processed content
-
-### Gas Deposits
-- `GET /api/deposit/:userAddress/balance` - Check balance
-- `GET /api/deposit/contract-address` - Get contract address
-- `GET /api/deposit/estimate` - Estimate gas cost
-- `GET /api/deposit/:userAddress/info` - Complete deposit info
-
-### Blockchain
-- `GET /api/blockscout/transaction/:txHash` - Get transaction
-- `GET /api/blockscout/user/:userAddress/transactions` - User transactions
+- `POST /api/content/submit` - Queue content for processing (authenticated)
+- `GET /api/content/:user_id` - Get processed content (authenticated)
 
 ---
 
@@ -298,7 +270,7 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0x40b55b9634fcf2454c138fa5ed914ac7044f931b
 4. Check web client to see captured memories
 
 **Via Web Client:**
-1. Connect wallet
+1. Register or login to your account
 2. Navigate to Memories page
 3. Click "Add Memory" button
 4. Paste content or URL
@@ -309,14 +281,14 @@ MEMORY_REGISTRY_CONTRACT_ADDRESS=0x40b55b9634fcf2454c138fa5ed914ac7044f931b
 import { createRecallOSClient } from '@recallos/sdk'
 
 const client = createRecallOSClient({
-  baseURL: 'http://localhost:3000'
+  baseURL: 'http://localhost:3000',
+  token: 'your-jwt-token'
 })
 
-await client.memory.processRawContent({
+await client.memory.process({
   content: 'Your content here...',
   url: 'https://example.com',
   title: 'Example Page',
-  userAddress: '0xYourWalletAddress',
   metadata: { source: 'sdk' }
 })
 ```
@@ -325,7 +297,7 @@ await client.memory.processRawContent({
 
 **Web Client:**
 1. Navigate to Search page
-2. Enter query: "blockchain smart contracts"
+2. Enter query: "machine learning algorithms"
 3. View AI-generated answer with citations
 4. Click citations to view source memories
 5. Export context for ChatGPT if needed
@@ -334,9 +306,9 @@ await client.memory.processRawContent({
 ```bash
 curl -X POST http://localhost:3000/api/search \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -d '{
-    "wallet": "0xYourWalletAddress",
-    "query": "blockchain",
+    "query": "machine learning",
     "limit": 10
   }'
 ```
@@ -344,8 +316,7 @@ curl -X POST http://localhost:3000/api/search \
 **SDK:**
 ```typescript
 const results = await client.search.search({
-  wallet: '0xYourWalletAddress',
-  query: 'blockchain',
+  query: 'machine learning',
   limit: 10
 })
 
@@ -365,29 +336,40 @@ console.log(results.citations) // Source memories
 
 **API:**
 ```bash
-curl http://localhost:3000/api/memory/0xYourWalletAddress/mesh?limit=50&threshold=0.3
+curl http://localhost:3000/api/memory/mesh/YOUR_USER_ID?limit=50&threshold=0.3 \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
 
-### Managing Gas Deposits
+### Authentication
 
 **Web Client:**
-1. Navigate to Deposit Manager
-2. View current balance
-3. Click "Deposit" to add funds
-4. Approve transaction in wallet
-5. Monitor balance decreases as memories are stored
-6. Withdraw unused balance anytime (1 ETH/day limit)
+1. Navigate to Login page
+2. Register with email/password or login with existing account
+3. Session cookie is automatically set
+4. All API requests include authentication automatically
 
-**Smart Contract:**
-```solidity
-// Deposit (from user wallet)
-contract.depositGas{ value: 0.01 ether }()
+**API:**
+```bash
+# Register
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword"
+  }'
 
-// Check balance
-uint256 balance = contract.getUserGasBalance(userAddress)
+# Login
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "securepassword"
+  }' \
+  -c cookies.txt
 
-// Withdraw
-contract.withdrawGas(amountInWei)
+# Use session cookie for authenticated requests
+curl http://localhost:3000/api/memory/insights \
+  -b cookies.txt
 ```
 
 ---
@@ -400,12 +382,6 @@ contract.withdrawGas(amountInWei)
 ```bash
 cd api
 npm test
-```
-
-**Smart Contract:**
-```bash
-cd contract
-npx hardhat test
 ```
 
 ### Code Formatting
@@ -442,28 +418,6 @@ npm run db:reset
 npm run db:studio
 ```
 
-### Blockchain Development
-
-```bash
-cd contract
-
-# Compile contracts
-npx hardhat compile
-
-# Deploy to local network
-npx hardhat node
-npx hardhat run scripts/deploy.ts --network localhost
-
-# Deploy to Sepolia
-npx hardhat run scripts/deploy.ts --network sepolia
-
-# Verify on Etherscan
-npx hardhat run scripts/verify.ts --network sepolia
-
-# Upgrade contract (UUPS)
-npx hardhat run scripts/upgrade.ts --network sepolia
-```
-
 ---
 
 ## Deployment
@@ -488,13 +442,6 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 3. Upload to Chrome Web Store Developer Dashboard
 4. Submit for review
 
-### Smart Contract
-1. Deploy to Sepolia: See [contract/DEPLOYMENT_GUIDE.md](contract/DEPLOYMENT_GUIDE.md)
-2. Verify on Etherscan
-3. Authorize relayer address
-4. Fund relayer wallet
-5. Update API with contract address
-
 ---
 
 ## Troubleshooting
@@ -502,23 +449,23 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 ### Extension not capturing
 - Check extension is enabled
 - Verify API endpoint is correct
-- Check wallet address is set
+- Check authentication token is set
 - Look for errors in browser console
 - Ensure content is > 50 characters
 
 ### Search returns no results
 - Verify user has memories stored
-- Check wallet address matches
+- Check authentication token is valid
 - Ensure embeddings were generated
 - Review API logs for errors
 - Try different search query
 
-### Blockchain transaction failed
-- Check user has sufficient gas deposit
-- Verify relayer is authorized
-- Check Sepolia network status
-- Review transaction on Etherscan
-- Retry failed transaction via UI
+### Authentication failed
+- Verify email and password are correct
+- Check JWT_SECRET is set in API environment
+- Ensure cookies are enabled in browser
+- Check CORS configuration allows your origin
+- Review API logs for authentication errors
 
 ### AI processing slow
 - Gemini API may be rate-limited
@@ -553,23 +500,18 @@ npx hardhat run scripts/upgrade.ts --network sepolia
 - **Relations capacity**: 10M+ edges
 - **Query performance**: < 100ms
 
-### Blockchain
-- **Confirmation**: 15-30 seconds on Sepolia
-- **Gas per memory**: 50k-100k gas
-- **Batch savings**: ~30% for 10+ memories
-
 ---
 
 ## Security
 
-- **Authentication**: Wallet-based, no passwords
-- **Data Isolation**: User-scoped queries
-- **SQL Injection**: Prevented via Prisma
+- **Authentication**: JWT-based with secure password hashing (bcryptjs)
+- **Session Management**: HttpOnly, Secure cookies for web clients
+- **Data Isolation**: User-scoped queries with authentication middleware
+- **SQL Injection**: Prevented via Prisma ORM
 - **XSS**: React auto-escaping
+- **CORS**: Allowlisted origins with credentials support
 - **Rate Limiting**: To be implemented
-- **Gas Deposits**: Daily withdrawal limits
-- **Private Keys**: Never logged or exposed
-- **Blockchain Verification**: Immutable hashes
+- **Password Security**: Hashed with 12 salt rounds
 
 ---
 
