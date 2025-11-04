@@ -3,23 +3,57 @@ import { getCookieDomain, getSessionCookieName, isCookieSecure } from './env';
 
 export function setAuthCookie(res: Response, value: string, maxAgeMs: number = 1000 * 60 * 60 * 24 * 30): void {
   const name = getSessionCookieName();
-  res.cookie(name, value, {
+  const cookieDomain = getCookieDomain();
+  const isLocalhost = process.env.NODE_ENV !== 'production' || !cookieDomain || cookieDomain === '.recallos.xyz';
+  
+  const cookieOptions: any = {
     httpOnly: true,
-    secure: isCookieSecure(),
-    sameSite: 'none',
-    domain: getCookieDomain(),
+    secure: isLocalhost ? false : isCookieSecure(),
+    sameSite: isLocalhost ? 'lax' : 'none',
     path: '/',
     maxAge: maxAgeMs,
-  } as any);
+  };
+  
+  // For localhost, don't set domain (scoped to exact host:port)
+  // For production, set domain if provided
+  if (!isLocalhost && cookieDomain) {
+    cookieOptions.domain = cookieDomain;
+  }
+  
+  // Log cookie settings for debugging
+  console.log('[AuthCookie] Setting cookie:', {
+    name,
+    domain: cookieOptions.domain || 'localhost (no domain)',
+    path: cookieOptions.path,
+    httpOnly: cookieOptions.httpOnly,
+    secure: cookieOptions.secure,
+    sameSite: cookieOptions.sameSite,
+    isLocalhost,
+  });
+  
+  res.cookie(name, value, cookieOptions);
 }
 
 export function clearAuthCookie(res: Response): void {
   const name = getSessionCookieName();
+  const cookieDomain = getCookieDomain();
+  
+  // Clear cookie with domain if set
+  if (cookieDomain && cookieDomain !== '.recallos.xyz') {
+    res.clearCookie(name, {
+      httpOnly: true,
+      secure: isCookieSecure(),
+      sameSite: 'none',
+      domain: cookieDomain,
+      path: '/',
+    } as any);
+  }
+  
+  // Also clear without domain (for localhost)
   res.clearCookie(name, {
     httpOnly: true,
-    secure: isCookieSecure(),
-    sameSite: 'none',
-    domain: getCookieDomain(),
+    secure: false,
+    sameSite: 'lax',
     path: '/',
   } as any);
 }

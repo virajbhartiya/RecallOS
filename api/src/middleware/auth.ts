@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
+import { getSessionCookieName } from '../utils/env';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -16,7 +17,12 @@ export async function authenticateToken(
   next: NextFunction
 ): Promise<void> {
   try {
-    const token = extractTokenFromHeader(req.headers.authorization);
+    let token = extractTokenFromHeader(req.headers.authorization);
+    
+    if (!token) {
+      const cookieName = getSessionCookieName();
+      token = (req.cookies && req.cookies[cookieName]) || null;
+    }
     
     if (!token) {
       res.status(401).json({ message: 'No token provided' });
@@ -36,6 +42,7 @@ export async function authenticateToken(
     });
 
     if (!user) {
+      console.error('Auth middleware: User not found for userId:', payload.userId);
       res.status(401).json({ message: 'User not found' });
       return;
     }
@@ -58,7 +65,12 @@ export function optionalAuth(
   res: Response,
   next: NextFunction
 ): void {
-  const token = extractTokenFromHeader(req.headers.authorization);
+  let token = extractTokenFromHeader(req.headers.authorization);
+  
+  if (!token) {
+    const cookieName = getSessionCookieName();
+    token = (req.cookies && req.cookies[cookieName]) || null;
+  }
   
   if (!token) {
     next();

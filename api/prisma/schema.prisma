@@ -39,22 +39,10 @@ model Memory {
   blockchain_network String? @default("sepolia")
   confirmed_at    DateTime?
   user            User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  embeddings      Embedding[]
   related_memories MemoryRelation[] @relation("MemoryRelations")
   related_to_memories MemoryRelation[] @relation("RelatedMemories")
-  memory_embeddings MemoryEmbedding[]
   query_related_memories QueryRelatedMemory[]
   @@map("memories")
-}
-model Embedding {
-  id              String   @id @default(uuid()) @db.Uuid
-  memory_id       String   @db.Uuid
-  vector          Float[]  
-  model_name      String
-  embedding_type  String   @default("content") 
-  created_at      DateTime @default(now())
-  memory          Memory   @relation(fields: [memory_id], references: [id], onDelete: Cascade)
-  @@map("embeddings")
 }
 model MemoryRelation {
   id              String   @id @default(uuid()) @db.Uuid
@@ -99,19 +87,6 @@ model BlockscoutTransaction {
   last_checked_at       DateTime @default(now())
   check_count           Int      @default(0)
   @@map("blockscout_transactions")
-}
-
-/// Semantic search: pgvector-backed embeddings per memory
-model MemoryEmbedding {
-  id         String   @id @default(uuid()) @db.Uuid
-  memory_id  String   @db.Uuid
-  /// pgvector column (use Unsupported until Prisma adds native type)
-  embedding  Unsupported("vector")
-  dim        Int
-  model      String
-  created_at DateTime @default(now())
-  memory     Memory   @relation(fields: [memory_id], references: [id], onDelete: Cascade)
-  @@map("memory_embeddings")
 }
 
 /// Each search query event (stores only hashed embedding reference)

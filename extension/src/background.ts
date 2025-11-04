@@ -1,4 +1,4 @@
-import { getOrCreateUserId, getAuthToken, getOrCreateAuthToken } from '@/lib/userId'
+import { getUserId, requireAuthToken, clearAuthToken } from '@/lib/userId'
 /// <reference types="chrome" />
 
 interface ContextData {
@@ -19,7 +19,6 @@ async function getApiEndpoint(): Promise<string> {
     const result = await chrome.storage.sync.get(['apiEndpoint']);
     return result.apiEndpoint || 'http://localhost:3000/api/memory/process';
   } catch (error) {
-    console.error('RecallOS: Error getting API endpoint from storage:', error);
     return 'http://localhost:3000/api/memory/process';
   }
 }
@@ -29,7 +28,6 @@ async function isExtensionEnabled(): Promise<boolean> {
     const result = await chrome.storage.sync.get(['extensionEnabled']);
     return result.extensionEnabled !== false;
   } catch (error) {
-    console.error('RecallOS: Error getting extension enabled state:', error);
     return true;
   }
 }
@@ -38,7 +36,7 @@ async function setExtensionEnabled(enabled: boolean): Promise<void> {
   try {
     await chrome.storage.sync.set({ extensionEnabled: enabled });
   } catch (error) {
-    console.error('RecallOS: Error setting extension enabled state:', error);
+    // Ignore errors
   }
 }
 
@@ -63,7 +61,6 @@ async function sendToBackend(data: ContextData): Promise<void> {
     // Check if extension is enabled
     const enabled = await isExtensionEnabled();
     if (!enabled) {
-      console.log('RecallOS: Extension is disabled, skipping context capture');
       return;
     }
 
@@ -85,11 +82,18 @@ async function sendToBackend(data: ContextData): Promise<void> {
       return;
     }
 
+    let userId: string
+    try {
+      userId = await getUserId()
+    } catch (error) {
+      return;
+    }
+
     const payload = {
       content: content,
       url: data.url,
       title: data.title,
-      userId: getOrCreateUserId(),
+      userId: userId,
       metadata: {
         source: data.source,
         timestamp: data.timestamp,
@@ -102,15 +106,18 @@ async function sendToBackend(data: ContextData): Promise<void> {
     };
 
 
-    // Get or create auth token
-    const authToken = await getOrCreateAuthToken();
+    // Require authentication token
+    let authToken: string
+    try {
+      authToken = await requireAuthToken()
+    } catch (error) {
+      return;
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
     };
-    
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    }
 
     const controller = new AbortController();
     const fetchPromise = fetch(apiEndpoint, {
@@ -118,19 +125,24 @@ async function sendToBackend(data: ContextData): Promise<void> {
       headers,
       credentials: 'include',
       keepalive: true,
-      body: JSON.stringify({ ...payload, userId: getOrCreateUserId() }),
+      body: JSON.stringify({ ...payload, userId: userId }),
       signal: controller.signal,
     });
 
     const response = await withTimeout(fetchPromise, 4000).catch((_e) => null);
 
     if (response && !response.ok) {
+      // Handle 401 - clear invalid token
+      if (response.status === 401) {
+        await chrome.storage?.local?.remove?.('auth_token');
+        clearAuthToken();
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
     // Fire-and-forget: do not wait on response body; API queues work and returns 202 quickly
   } catch (error) {
-    console.error('RecallOS: Error sending to backend:', error);
+    // Ignore errors
   }
 }
 
@@ -167,12 +179,12 @@ async function setWalletAddress(walletAddress: string): Promise<void> {
   try {
     await chrome.storage.sync.set({ wallet_address: walletAddress });
   } catch (error) {
-    console.error('RecallOS: Error setting wallet address:', error);
+    // Ignore errors
   }
 }
 
 chrome.runtime.onMessage.addListener(
-  (
+  async (
     message: {
       type?: string;
       data?: ContextData;
@@ -189,7 +201,6 @@ chrome.runtime.onMessage.addListener(
           sendResponse({ success: true, message: 'Context sent to backend' });
         })
         .catch(error => {
-          console.error('RecallOS: Failed to send context:', error);
           sendResponse({ success: false, error: error.message });
         });
 
@@ -206,6 +217,17 @@ chrome.runtime.onMessage.addListener(
         });
 
       return true;
+    }
+
+    if (message?.type === 'SYNC_AUTH_TOKEN') {
+      try {
+        const token = (message as any).token;
+        if (token) {
+          await chrome.storage.local.set({ auth_token: token });
+        }
+      } catch (error) {
+        // Ignore errors
+      }
     }
 
     if (message?.type === 'GET_ENDPOINT') {

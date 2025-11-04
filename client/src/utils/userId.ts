@@ -1,25 +1,32 @@
-export function getOrCreateUserId(): string {
+export function getAuthenticatedUserId(): string | null {
   try {
-    const key = 'user_id';
-    const overrideKey = 'user_id_override';
-    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-    // Optional override to match extension's ID in development
-    const override = localStorage.getItem(overrideKey);
-    if (override && uuidRe.test(override)) {
-      return override;
+    const token = getAuthToken();
+    if (!token) return null;
+    
+    // Parse JWT token to get user ID
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.userId) {
+        return payload.userId;
+      }
+      if (payload.externalId) {
+        return payload.externalId;
+      }
+    } catch (e) {
+      // Invalid token format
     }
-
-    let id = localStorage.getItem(key);
-    if (id && uuidRe.test(id)) {
-      return id;
-    }
-    id = generateUuidV4();
-    localStorage.setItem(key, id);
-    return id;
+    return null;
   } catch {
-    return generateUuidV4();
+    return null;
   }
+}
+
+export function getUserId(): string {
+  const authUserId = getAuthenticatedUserId();
+  if (!authUserId) {
+    throw new Error('User not authenticated. Please log in.');
+  }
+  return authUserId;
 }
 
 export function getAuthToken(): string | null {
@@ -33,6 +40,20 @@ export function getAuthToken(): string | null {
 export function setAuthToken(token: string): void {
   try {
     localStorage.setItem('auth_token', token);
+    
+    // Also sync to chrome.storage for extension access
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+        chrome.runtime.sendMessage(chrome.runtime.id, {
+          type: 'SYNC_AUTH_TOKEN',
+          token: token
+        }).catch(() => {
+          // Extension might not be installed or not ready
+        });
+      }
+    } catch (e) {
+      // Not in extension context or extension not available
+    }
   } catch (error) {
     console.error('Failed to store auth token:', error);
   }
@@ -46,64 +67,25 @@ export function clearAuthToken(): void {
   }
 }
 
-export async function getOrCreateAuthToken(): Promise<string | null> {
+export function requireAuthToken(): string {
+  const token = getAuthToken();
+  if (!token) {
+    throw new Error('Authentication required. Please log in.');
+  }
+  
+  // Verify token is still valid
   try {
-    let token = getAuthToken();
-    if (token) {
-      return token;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const exp = payload.exp * 1000;
+    if (exp <= Date.now()) {
+      clearAuthToken();
+      throw new Error('Authentication token expired. Please log in again.');
     }
-    
-    const userId = getOrCreateUserId();
-    const baseURL = (import.meta.env.VITE_SERVER_URL || 'http://localhost:3000') + '/api';
-    const response = await fetch(`${baseURL}/auth/extension-token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId }),
-    });
-
-    if (!response.ok) {
-      console.error('Failed to get auth token:', response.status, response.statusText);
-      return null;
-    }
-
-    const data = await response.json();
-    if (data.token) {
-      setAuthToken(data.token);
-      return data.token;
-    }
-    return null;
-  } catch (error) {
-    console.error('Error getting auth token:', error);
-    return null;
+    return token;
+  } catch (e) {
+    clearAuthToken();
+    throw new Error('Invalid authentication token. Please log in again.');
   }
-}
-
-function generateUuidV4(): string {
-  if (typeof crypto !== 'undefined' && 'getRandomValues' in crypto) {
-    const buf = new Uint8Array(16);
-    crypto.getRandomValues(buf);
-    buf[6] = (buf[6] & 0x0f) | 0x40;
-    buf[8] = (buf[8] & 0x3f) | 0x80;
-    const bth = Array.from(buf).map((b) => b.toString(16).padStart(2, '0'));
-    return (
-      bth[0] + bth[1] + bth[2] + bth[3] + '-' +
-      bth[4] + bth[5] + '-' +
-      bth[6] + bth[7] + '-' +
-      bth[8] + bth[9] + '-' +
-      bth[10] + bth[11] + bth[12] + bth[13] + bth[14] + bth[15]
-    );
-  }
-  let d = new Date().getTime();
-  if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
-    d += performance.now();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = (d + Math.random() * 16) % 16 | 0;
-    d = Math.floor(d / 16);
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-  });
 }
 
 

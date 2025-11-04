@@ -7,11 +7,24 @@ import { SearchService } from '@/services/search'
  
 // removed unused Database import
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
-import { getOrCreateUserId, getOrCreateAuthToken } from '@/utils/userId'
+import { getUserId, requireAuthToken } from '@/utils/userId'
+import { useNavigate } from 'react-router-dom'
 
 export const Memories: React.FC = () => {
-  const userId = getOrCreateUserId()
+  const navigate = useNavigate()
   const [memories, setMemories] = useState<Memory[]>([])
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+  
+  useEffect(() => {
+    try {
+      const id = getUserId()
+      setUserId(id)
+      setIsAuthenticated(true)
+    } catch (error) {
+      navigate('/login')
+    }
+  }, [navigate])
   
   
   const similarityThreshold = 0.3
@@ -50,12 +63,11 @@ export const Memories: React.FC = () => {
   }, [])
 
   const fetchMemories = useCallback(async () => {
-    
-    
+    if (!userId) return
     
     try {
-      // Ensure we have an auth token before making requests
-      await getOrCreateAuthToken()
+      // Require authentication
+      requireAuthToken()
       
       const memoriesData = await MemoryService.getMemoriesWithTransactionDetails(userId)
       
@@ -73,8 +85,6 @@ export const Memories: React.FC = () => {
       
     }
   }, [userId, fetchHyperIndexData])
-
-  
 
   const handleNodeClick = (memoryId: string) => {
     // Find the memory information
@@ -128,8 +138,8 @@ export const Memories: React.FC = () => {
     try {
       const signal = abortControllerRef.current?.signal
 
-      // Ensure we have an auth token before making requests
-      await getOrCreateAuthToken()
+      // Require authentication
+      requireAuthToken()
 
       // Use the working /api/search endpoint for all searches
       const response = await MemoryService.searchMemories(userId, query, filters, 1, 50, signal)
@@ -239,7 +249,7 @@ export const Memories: React.FC = () => {
 
     try {
       const signal = dialogAbortControllerRef.current?.signal
-      await getOrCreateAuthToken()
+      requireAuthToken()
 
       const response = await MemoryService.searchMemories(userId, query, {}, 1, 50, signal)
       
@@ -360,7 +370,9 @@ export const Memories: React.FC = () => {
     }
   }, [])
 
-  
+  if (!isAuthenticated || !userId) {
+    return null
+  }
 
   let currentMemories = getFilteredMemories()
   currentMemories = [...(currentMemories || [])].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())

@@ -1,6 +1,8 @@
 import { prisma } from '../lib/prisma';
 import { aiProvider } from './aiProvider';
 import { UMAP } from 'umap-js';
+import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant';
+import { randomUUID } from 'crypto';
 
 export class MemoryMeshService {
   private relationshipCache = new Map<string, any>();
@@ -9,6 +11,10 @@ export class MemoryMeshService {
   constructor() {
     // Clean cache every hour
     setInterval(() => this.cleanCache(), 60 * 60 * 1000);
+    // Ensure Qdrant collection exists on startup
+    ensureCollection().catch((error) => {
+      console.error('Failed to ensure Qdrant collection:', error);
+    });
   }
 
   private cleanCache(): void {
@@ -65,24 +71,25 @@ export class MemoryMeshService {
     type: string
   ): Promise<void> {
     try {
+      await ensureCollection();
       const embedding = await aiProvider.generateEmbedding(text);
 
-      // Create regular embedding record
-      await prisma.embedding.create({
-        data: {
-          memory_id: memoryId,
-          vector: embedding,
-          model_name: 'text-embedding-004',
-          embedding_type: type,
-        },
+      const pointId = randomUUID();
+      await qdrantClient.upsert(COLLECTION_NAME, {
+        wait: true,
+        points: [
+          {
+            id: pointId,
+            vector: embedding,
+            payload: {
+              memory_id: memoryId,
+              embedding_type: type,
+              model_name: 'text-embedding-004',
+              created_at: new Date().toISOString(),
+            },
+          },
+        ],
       });
-
-      // Also create MemoryEmbedding record for search functionality for ALL types
-      const embeddingArray = `[${embedding.join(',')}]`;
-      await prisma.$executeRaw`
-        INSERT INTO memory_embeddings (id, memory_id, embedding, dim, model, created_at)
-        VALUES (gen_random_uuid(), ${memoryId}::uuid, ${embeddingArray}::vector, ${embedding.length}, 'text-embedding-004', NOW())
-      `;
     } catch (error) {
       console.error(
         `Error creating ${type} embedding for memory ${memoryId}:`,
@@ -98,25 +105,37 @@ export class MemoryMeshService {
     limit: number = 5
   ): Promise<any[]> {
     try {
+      await ensureCollection();
+      
       const memory = await prisma.memory.findUnique({
         where: { id: memoryId },
-        include: { embeddings: true },
       });
 
-      if (!memory || !memory.embeddings.length) {
+      if (!memory) {
         return [];
       }
 
-      const contentEmbedding = memory.embeddings.find(
-        (e: any) => e.embedding_type === 'content'
-      );
+      const contentEmbeddingResult = await qdrantClient.scroll(COLLECTION_NAME, {
+        filter: {
+          must: [
+            { key: 'memory_id', match: { value: memoryId } },
+            { key: 'embedding_type', match: { value: 'content' } },
+          ],
+        },
+        limit: 1,
+      });
 
-      if (!contentEmbedding) {
+      if (!contentEmbeddingResult.points || contentEmbeddingResult.points.length === 0) {
+        return [];
+      }
+
+      const contentEmbeddingPoint = contentEmbeddingResult.points[0];
+      if (!contentEmbeddingPoint.vector || !Array.isArray(contentEmbeddingPoint.vector)) {
         return [];
       }
 
       const similarMemories = await this.findSimilarMemories(
-        contentEmbedding.vector,
+        contentEmbeddingPoint.vector as number[],
         userId,
         memoryId,
         limit,
@@ -140,28 +159,69 @@ export class MemoryMeshService {
     baseMemory?: any
   ): Promise<any[]> {
     try {
-      const whereConditions: any = {
-        user_id: userId,
-        id: { not: excludeMemoryId },
-        embeddings: { some: { embedding_type: 'content' } },
-      };
+      await ensureCollection();
 
-      // If pre-filtered memory IDs are provided, only search within those
+      let userMemoryIds: Set<string>;
+      
       if (preFilteredMemoryIds && preFilteredMemoryIds.length > 0) {
-        whereConditions.id = { 
-          in: preFilteredMemoryIds,
-          not: excludeMemoryId 
-        };
+        const filteredIds = preFilteredMemoryIds.filter(id => id !== excludeMemoryId);
+        const userMemories = await prisma.memory.findMany({
+          where: {
+            user_id: userId,
+            id: { in: filteredIds },
+          },
+          select: { id: true },
+        });
+        userMemoryIds = new Set(userMemories.map(m => m.id));
+      } else {
+        const userMemories = await prisma.memory.findMany({
+          where: {
+            user_id: userId,
+            id: { not: excludeMemoryId },
+          },
+          select: { id: true },
+        });
+        userMemoryIds = new Set(userMemories.map(m => m.id));
+      }
+
+      if (userMemoryIds.size === 0) {
+        return [];
+      }
+
+      const searchResult = await qdrantClient.search(COLLECTION_NAME, {
+        vector: queryVector,
+        filter: {
+          must: [
+            { key: 'embedding_type', match: { value: 'content' } },
+            { key: 'memory_id', match: { any: Array.from(userMemoryIds) } },
+          ],
+          must_not: [
+            { key: 'memory_id', match: { value: excludeMemoryId } },
+          ],
+        },
+        limit: limit * 3,
+        with_payload: true,
+      });
+
+      if (!searchResult || searchResult.length === 0) {
+        return [];
+      }
+
+      const memoryIds = searchResult
+        .map(result => result.payload?.memory_id as string)
+        .filter((id): id is string => !!id && id !== excludeMemoryId);
+
+      if (memoryIds.length === 0) {
+        return [];
       }
 
       const memories = await prisma.memory.findMany({
-        where: whereConditions,
-        include: {
-          embeddings: {
-            where: { embedding_type: 'content' },
-          },
+        where: {
+          id: { in: memoryIds },
         },
       });
+
+      const memoryMap = new Map(memories.map(m => [m.id, m]));
 
       const baseHost = (() => {
         try {
@@ -174,52 +234,51 @@ export class MemoryMeshService {
       const baseIsGitHub = /^github\.com$/i.test(baseHost);
       const baseTopics: string[] = baseMemory?.page_metadata?.topics || [];
 
-      const similarities = memories.map((memory: any) => {
-        const embedding = memory.embeddings[0];
+      const similarities = searchResult
+        .map((result) => {
+          const memoryId = result.payload?.memory_id as string;
+          const memory = memoryMap.get(memoryId);
+          if (!memory) return null;
 
-        if (!embedding) return { memory, similarity: 0 };
+          let similarity = result.score || 0;
 
-        let similarity = this.cosineSimilarity(queryVector, embedding.vector);
+          const candidateHost = (() => {
+            try {
+              return memory.url ? new URL(memory.url).hostname : '';
+            } catch (e) {
+              return '';
+            }
+          })();
+          const candidateIsGoogleMeet = /(^|\.)meet\.google\.com$/i.test(candidateHost);
+          const candidateIsGitHub = /^github\.com$/i.test(candidateHost);
+          const candidateTopics: string[] = ((memory.page_metadata as any)?.topics || []);
 
-        // Domain-aware adjustments
-        const candidateHost = (() => {
-          try {
-            return memory.url ? new URL(memory.url).hostname : '';
-          } catch (e) {
-            return '';
+          if ((baseIsGoogleMeet && candidateIsGitHub) || (baseIsGitHub && candidateIsGoogleMeet)) {
+            similarity = Math.max(0, similarity - 0.4);
           }
-        })();
-        const candidateIsGoogleMeet = /(^|\.)meet\.google\.com$/i.test(candidateHost);
-        const candidateIsGitHub = /^github\.com$/i.test(candidateHost);
-        const candidateTopics: string[] = (memory.page_metadata?.topics || []);
 
-        // Penalize Meet <-> GitHub cross-links unless very high similarity
-        if ((baseIsGoogleMeet && candidateIsGitHub) || (baseIsGitHub && candidateIsGoogleMeet)) {
-          similarity = Math.max(0, similarity - 0.4);
-        }
-
-        // Boost GitHub <-> GitHub for Filecoin-related items
-        const hasFilecoin = (arr: string[]) => arr.some(t => /filecoin/i.test(t));
-        const pathIncludesFilecoin = (urlStr?: string) => {
-          if (!urlStr) return false;
-          try { return /filecoin/i.test(new URL(urlStr).pathname); } catch { return false; }
-        };
-        if (baseIsGitHub && candidateIsGitHub) {
-          if (hasFilecoin(baseTopics) && hasFilecoin(candidateTopics)) {
-            similarity = Math.min(1, similarity + 0.2);
-          } else if (pathIncludesFilecoin(baseMemory?.url) && pathIncludesFilecoin(memory.url)) {
-            similarity = Math.min(1, similarity + 0.2);
+          const hasFilecoin = (arr: string[]) => arr.some(t => /filecoin/i.test(t));
+          const pathIncludesFilecoin = (urlStr?: string) => {
+            if (!urlStr) return false;
+            try { return /filecoin/i.test(new URL(urlStr).pathname); } catch { return false; }
+          };
+          if (baseIsGitHub && candidateIsGitHub) {
+            if (hasFilecoin(baseTopics) && hasFilecoin(candidateTopics)) {
+              similarity = Math.min(1, similarity + 0.2);
+            } else if (pathIncludesFilecoin(baseMemory?.url) && pathIncludesFilecoin(memory.url)) {
+              similarity = Math.min(1, similarity + 0.2);
+            }
           }
-        }
 
-        return { memory, similarity };
-      });
+          return { memory, similarity };
+        })
+        .filter((item): item is { memory: any; similarity: number } => item !== null);
 
       return similarities
-        .filter((item: any) => item.similarity >= 0.3)
-        .sort((a: any, b: any) => b.similarity - a.similarity)
+        .filter((item) => item.similarity >= 0.3)
+        .sort((a, b) => b.similarity - a.similarity)
         .slice(0, limit)
-        .map((item: any) => ({
+        .map((item) => ({
           ...item.memory,
           similarity_score: item.similarity,
         }));
@@ -259,15 +318,24 @@ export class MemoryMeshService {
     try {
       const memory = await prisma.memory.findUnique({
         where: { id: memoryId },
-        include: { embeddings: true },
       });
 
       if (!memory) {
         throw new Error(`Memory ${memoryId} not found`);
       }
 
-      // Proceed if we have either embeddings or rich metadata/content to compute non-embedding relations
-      const hasEmbeddings = Array.isArray(memory.embeddings) && memory.embeddings.length > 0;
+      await ensureCollection();
+      
+      const embeddingResult = await qdrantClient.scroll(COLLECTION_NAME, {
+        filter: {
+          must: [
+            { key: 'memory_id', match: { value: memoryId } },
+          ],
+        },
+        limit: 1,
+      });
+
+      const hasEmbeddings = embeddingResult.points && embeddingResult.points.length > 0;
       const hasMetadata = !!memory.page_metadata;
       const hasContent = !!memory.content;
       if (!hasEmbeddings && !hasMetadata && !hasContent) {
@@ -1076,21 +1144,35 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
   private async computeLatentSpaceProjection(memories: any[]): Promise<Map<string, { x: number; y: number }>> {
     try {
-      // Extract embeddings for memories that have them
-      const memoriesWithEmbeddings = memories.filter(m => m.embeddings && m.embeddings.length > 0);
-      
-      if (memoriesWithEmbeddings.length < 3) {
-        // Not enough data for UMAP, use fallback positioning
+      await ensureCollection();
+
+      if (memories.length < 3) {
         return new Map();
       }
 
-      // Get content embeddings (prefer content type, fallback to any)
+      const memoryIds = memories.map(m => m.id);
+      
+      const embeddingResult = await qdrantClient.scroll(COLLECTION_NAME, {
+        filter: {
+          must: [
+            { key: 'memory_id', match: { any: memoryIds } },
+            { key: 'embedding_type', match: { value: 'content' } },
+          ],
+        },
+        limit: memoryIds.length,
+        with_payload: true,
+        with_vector: true,
+      });
+
+      if (!embeddingResult.points || embeddingResult.points.length < 3) {
+        return new Map();
+      }
+
       const embeddingData: { id: string; vector: number[] }[] = [];
-      for (const memory of memoriesWithEmbeddings) {
-        const contentEmb = memory.embeddings.find((e: any) => e.embedding_type === 'content');
-        const embedding = contentEmb || memory.embeddings[0];
-        if (embedding && embedding.vector) {
-          embeddingData.push({ id: memory.id, vector: embedding.vector });
+      for (const point of embeddingResult.points) {
+        const memoryId = point.payload?.memory_id as string;
+        if (memoryId && point.vector && Array.isArray(point.vector)) {
+          embeddingData.push({ id: memoryId, vector: point.vector as number[] });
         }
       }
 
@@ -1149,7 +1231,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       const memories = await prisma.memory.findMany({
         where: userId ? { user_id: userId } : {},
         include: {
-          embeddings: true,
           related_memories: {
             where: {
               similarity_score: {
@@ -1218,53 +1299,95 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         };
       });
 
-      // Create edges based on proximity in latent space
+      // Create edges based on proximity in latent space with metadata boosts
       const rawEdges: any[] = [];
-      
-      // For each node, find its k-nearest neighbors in latent space
-      const k = 5; // Connect to 5 nearest neighbors
-      
+
+      // Utility: domain extraction
+      const getDomain = (url?: string | null) => {
+        try {
+          if (!url) return null;
+          const u = new URL(url);
+          return u.hostname.replace(/^www\./, '');
+        } catch {
+          return null;
+        }
+      };
+
+      // Dynamic neighborhood size and degree constraints
+      const nodeCount = nodes.length;
+      const k = Math.min(8, Math.max(3, Math.floor(Math.sqrt(Math.max(1, nodeCount)))));
+      const minDegree = Math.min(3, Math.max(1, Math.floor(k / 2)));
+      const maxDistance = 1200; // based on layout scaling
+
+      // Precompute quick metadata maps
+      const nodeIdToDomain = new Map<string, string | null>(
+        nodes.map(n => [n.id, getDomain((n as any).url)])
+      );
+      const nodeIdToSource = new Map<string, string | null>(
+        nodes.map(n => [n.id, (n as any).type || null])
+      );
+      const nodeIdToTimestamp = new Map<string, number | null>(
+        nodes.map(n => [n.id, (n as any).timestamp ? Number((n as any).timestamp) : null])
+      );
+
+      // Build edges
       nodes.forEach((node, i) => {
         if (!latentCoords.has(node.id)) return; // Skip nodes without embeddings
-        
+
         const nodeCoord = latentCoords.get(node.id)!;
-        
-        // Calculate distances to all other nodes
-        const distances: Array<{ targetId: string; distance: number; hasEmbedding: boolean }> = [];
-        
+        const distances: Array<{ targetId: string; distance: number }> = [];
+
         nodes.forEach((otherNode, j) => {
-          if (i === j) return; // Skip self
-          
-          if (latentCoords.has(otherNode.id)) {
-            const otherCoord = latentCoords.get(otherNode.id)!;
-            const dx = nodeCoord.x - otherCoord.x;
-            const dy = nodeCoord.y - otherCoord.y;
-            const distance = Math.sqrt(dx * dx + dy * dy);
-            
-            distances.push({
-              targetId: otherNode.id,
-              distance,
-              hasEmbedding: true
-            });
-          }
+          if (i === j) return;
+          if (!latentCoords.has(otherNode.id)) return;
+
+          const otherCoord = latentCoords.get(otherNode.id)!;
+          const dx = nodeCoord.x - otherCoord.x;
+          const dy = nodeCoord.y - otherCoord.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          distances.push({ targetId: otherNode.id, distance });
         });
-        
+
         // Sort by distance and take k nearest
         distances.sort((a, b) => a.distance - b.distance);
         const nearest = distances.slice(0, k);
-        
-        // Create edges to nearest neighbors
-        nearest.forEach(({ targetId, distance }) => {
-          // Convert distance to similarity score (closer = higher similarity)
-          const maxDistance = 1200; // Based on our scale
-          const similarityScore = Math.max(0, 1 - (distance / maxDistance));
-          
+
+        // Ensure at least minDegree connections even if distances are large
+        const chosen = nearest.length >= minDegree ? nearest : distances.slice(0, minDegree);
+
+        chosen.forEach(({ targetId, distance }) => {
+          // Base similarity from latent distance
+          const baseSim = Math.max(0, 1 - distance / maxDistance);
+
+          // Metadata boosts
+          let boost = 0;
+          const srcA = nodeIdToSource.get(node.id);
+          const srcB = nodeIdToSource.get(targetId);
+          if (srcA && srcB && srcA === srcB) boost += 0.05;
+
+          const domA = nodeIdToDomain.get(node.id);
+          const domB = nodeIdToDomain.get(targetId);
+          if (domA && domB && domA === domB) boost += 0.07;
+
+          const tsA = nodeIdToTimestamp.get(node.id);
+          const tsB = nodeIdToTimestamp.get(targetId);
+          if (tsA && tsB) {
+            const dt = Math.abs(tsA - tsB); // seconds
+            if (dt <= 60 * 60) boost += 0.06; // within 1h
+            else if (dt <= 24 * 60 * 60) boost += 0.04; // within 1 day
+            else if (dt <= 7 * 24 * 60 * 60) boost += 0.02; // within 1 week
+          }
+
+        	// Final similarity with cap
+          const similarityScore = Math.max(0, Math.min(1, baseSim + boost));
+          if (similarityScore < 0.05) return; // ignore extremely weak links
+
           rawEdges.push({
             source: node.id,
             target: targetId,
             relation_type: 'semantic',
             similarity_score: similarityScore,
-            distance: distance
+            distance
           });
         });
       });
@@ -1279,7 +1402,53 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         }
       });
       
-      const edges = Array.from(edgeMap.values()).filter(e => e.similarity_score > 0.1);
+      // Normalize scores and enforce degree caps
+      let edges = Array.from(edgeMap.values()).filter(e => e.similarity_score > 0.1);
+
+      // Per-node degree control
+      const degreeMap = new Map<string, number>();
+      const incrementDegree = (id: string) => degreeMap.set(id, (degreeMap.get(id) || 0) + 1);
+
+      // Prefer higher similarity edges when enforcing maxDegree
+      const maxDegree = Math.min(12, Math.max(5, Math.floor(k * 2)));
+      edges = edges
+        .sort((a, b) => b.similarity_score - a.similarity_score)
+        .filter(edge => {
+          const dA = degreeMap.get(edge.source) || 0;
+          const dB = degreeMap.get(edge.target) || 0;
+          if (dA >= maxDegree || dB >= maxDegree) return false;
+          incrementDegree(edge.source);
+          incrementDegree(edge.target);
+          return true;
+        });
+
+      // Ensure minimum degree by adding closest edges if needed
+      const idToNeighbors = new Map<string, any[]>(nodes.map(n => [n.id, [] as any[]]));
+      edges.forEach(e => {
+        idToNeighbors.get(e.source)!.push(e);
+        idToNeighbors.get(e.target)!.push({ ...e, source: e.target, target: e.source });
+      });
+      nodes.forEach(n => {
+        const deg = (idToNeighbors.get(n.id) || []).length;
+        if (deg >= minDegree || !latentCoords.has(n.id)) return;
+        // find closest candidates not already connected
+        const nCoord = latentCoords.get(n.id)!;
+        const currentlyConnected = new Set((idToNeighbors.get(n.id) || []).map(e => e.target));
+        const candidates = nodes
+          .filter(o => o.id !== n.id && latentCoords.has(o.id) && !currentlyConnected.has(o.id))
+          .map(o => {
+            const oCoord = latentCoords.get(o.id)!;
+            const dx = nCoord.x - oCoord.x;
+            const dy = nCoord.y - oCoord.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            const baseSim = Math.max(0, 1 - distance / maxDistance);
+            return { source: n.id, target: o.id, distance, similarity_score: baseSim, relation_type: 'semantic' };
+          })
+          .sort((a, b) => a.distance - b.distance)
+          .slice(0, minDegree - deg)
+          .filter(c => c.similarity_score > 0.05);
+        candidates.forEach(c => edges.push(c));
+      });
 
       // No force-directed layout needed - using latent space coordinates from UMAP
       const layoutNodes = nodes;
@@ -1376,52 +1545,95 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       }
 
       if (queryEmbedding) {
-        // Use the semantic search with MemoryEmbedding table
-        const queryVecSql = `ARRAY[${queryEmbedding.join(',')}]::vector`;
-        const rows = await prisma.$queryRawUnsafe<Array<{ id: string; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; score: number }>>(`
-          WITH ranked AS (
-            SELECT 
-              m.id, m.summary, m.url, m.timestamp, m.hash,
-              GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}))) AS score,
-              ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY me.embedding <=> ${queryVecSql}) AS rn
-            FROM memory_embeddings me
-            JOIN memories m ON m.id = me.memory_id
-            WHERE m.user_id = '${userId}'::uuid
-          )
-          SELECT id, summary, url, timestamp, hash, score
-          FROM ranked
-          WHERE rn = 1 AND score > 0.0
-          ORDER BY score DESC
-          LIMIT ${limit * 2}
-        `);
-        
-        // Get full memory objects for the results
-        const memoryIds = rows.map(row => row.id);
-        const fullMemories = await prisma.memory.findMany({
-          where: { id: { in: memoryIds } }
+        await ensureCollection();
+
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
         });
-        
-        // Tokenize query for keyword boosting
+
+        if (!user) {
+          return [];
+        }
+
+        const userMemories = await prisma.memory.findMany({
+          where: { user_id: userId },
+          select: { id: true },
+        });
+
+        const userMemoryIds = userMemories.map(m => m.id);
+
+        if (userMemoryIds.length === 0) {
+          return [];
+        }
+
+        const filter: any = {
+          must: [
+            { key: 'memory_id', match: { any: userMemoryIds } },
+          ],
+        };
+
+        if (preFilteredMemoryIds && preFilteredMemoryIds.length > 0) {
+          filter.must.push({
+            key: 'memory_id',
+            match: { any: preFilteredMemoryIds },
+          });
+        }
+
+        const searchResult = await qdrantClient.search(COLLECTION_NAME, {
+          vector: queryEmbedding,
+          filter,
+          limit: limit * 2,
+          with_payload: true,
+        });
+
+        if (!searchResult || searchResult.length === 0) {
+          return [];
+        }
+
+        const memoryIds = searchResult
+          .map(result => result.payload?.memory_id as string)
+          .filter((id): id is string => !!id);
+
+        if (memoryIds.length === 0) {
+          return [];
+        }
+
+        const fullMemories = await prisma.memory.findMany({
+          where: { id: { in: memoryIds } },
+        });
+
+        const memoryMap = new Map(fullMemories.map(m => [m.id, m]));
+        const scoreMap = new Map<string, number>();
+
+        searchResult.forEach((result) => {
+          const memoryId = result.payload?.memory_id as string;
+          if (memoryId) {
+            const existingScore = scoreMap.get(memoryId);
+            const newScore = result.score || 0;
+            if (!existingScore || newScore > existingScore) {
+              scoreMap.set(memoryId, newScore);
+            }
+          }
+        });
+
         const queryTokens = query
           .toLowerCase()
           .replace(/[^\w\s]/g, ' ')
           .split(/\s+/)
           .filter(token => token.length > 2);
-        
-        // Score and filter results
-        const scoredResults = rows
-          .map(row => {
-            const fullMemory = fullMemories.find(m => m.id === row.id);
+
+        const scoredResults = Array.from(scoreMap.entries())
+          .map(([memoryId, semanticScore]) => {
+            const fullMemory = memoryMap.get(memoryId);
             if (!fullMemory) return null;
-            
-            // Calculate keyword match bonus
+
             const title = (fullMemory.title || '').toLowerCase();
             const summary = (fullMemory.summary || '').toLowerCase();
             const content = (fullMemory.content || '').toLowerCase();
-            
+
             let keywordBonus = 0;
             let matchedTokens = 0;
-            
+
             for (const token of queryTokens) {
               const tokenRegex = new RegExp(`\\b${token}\\b`, 'i');
               if (tokenRegex.test(title)) {
@@ -1437,20 +1649,20 @@ Be strict about relevance - only mark as relevant if there's substantial concept
                 matchedTokens++;
               }
             }
-            
+
             const coverageRatio = queryTokens.length > 0 ? matchedTokens / queryTokens.length : 0;
-            const finalScore = row.score + (keywordBonus * coverageRatio);
-            
+            const finalScore = semanticScore + (keywordBonus * coverageRatio);
+
             return {
               ...fullMemory,
-              similarity_score: finalScore
+              similarity_score: finalScore,
             };
           })
           .filter((result): result is NonNullable<typeof result> => result !== null)
           .filter(result => result.similarity_score >= 0.15)
           .sort((a, b) => b.similarity_score - a.similarity_score)
           .slice(0, limit);
-        
+
         return scoredResults;
       }
 
@@ -1488,10 +1700,22 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
   async getMemoryWithRelations(memoryId: string, userId: string): Promise<any> {
     try {
+      await ensureCollection();
+      
+      const embeddingResult = await qdrantClient.scroll(COLLECTION_NAME, {
+        filter: {
+          must: [
+            { key: 'memory_id', match: { value: memoryId } },
+          ],
+        },
+        limit: 1,
+      });
+
+      const hasEmbeddings = embeddingResult.points && embeddingResult.points.length > 0;
+
       const memory = await prisma.memory.findUnique({
         where: { id: memoryId },
         include: {
-          embeddings: true,
           related_memories: {
             include: {
               related_memory: {
@@ -1536,7 +1760,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           incoming_relations: memory.related_to_memories.length,
           total_relations:
             memory.related_memories.length + memory.related_to_memories.length,
-          has_embeddings: memory.embeddings.length > 0,
+          has_embeddings: hasEmbeddings,
         },
       };
     } catch (error) {
