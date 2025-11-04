@@ -1,4 +1,4 @@
-import { getOrCreateUserId, getAuthToken, getOrCreateAuthToken } from '@/lib/userId'
+import { getUserId, requireAuthToken } from '@/lib/userId'
 
 interface ContextData {
   source: string;
@@ -791,7 +791,6 @@ async function sendContextToBackground() {
     // Check if extension is enabled
     const enabled = await checkExtensionEnabled();
     if (!enabled) {
-      console.log('RecallOS: Extension is disabled, skipping context capture');
       return;
     }
     
@@ -822,17 +821,13 @@ async function sendContextToBackground() {
       { type: 'CAPTURE_CONTEXT', data: contextData },
       response => {
         if (chrome.runtime.lastError) {
-          console.error(
-            'RecallOS: Error sending to background:',
-            chrome.runtime.lastError
-          );
           return;
         }
       }
     );
     lastCaptureTime = now;
   } catch (error) {
-    console.error('RecallOS: Error capturing context:', error);
+    // Ignore errors
   }
 }
 if (document.readyState === 'loading') {
@@ -867,10 +862,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const walletAddress = localStorage.getItem('wallet_address');
       sendResponse({ walletAddress });
     } catch (error) {
-      console.error(
-        'RecallOS: Error getting wallet address from localStorage:',
-        error
-      );
       sendResponse({ walletAddress: null });
     }
     return true;
@@ -1158,15 +1149,19 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
         apiBase = `${u.protocol}//${u.host}/api`;
       }
     } catch {}
-    // Get or create auth token
-    const authToken = await getOrCreateAuthToken();
+    // Require authentication token
+    let authToken: string
+    try {
+      authToken = await requireAuthToken()
+    } catch (error) {
+      console.error('RecallOS: Authentication required. Please log in through the web client first.');
+      return null;
+    }
+
     const headers: Record<string, string> = {
       'Accept': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
     };
-    
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    }
 
     const response = await fetch(`${apiBase}/search/job/${jobId}`, {
       method: 'GET',
@@ -1175,7 +1170,6 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
     });
     
     if (!response.ok) {
-      console.error('RecallOS: Job polling failed:', response.status, response.statusText);
       return null;
     }
 
@@ -1184,20 +1178,23 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
     if (result.status === 'completed' && result.answer) {
       return result.answer;
     } else if (result.status === 'failed') {
-      console.error('RecallOS: Search job failed');
       return null;
     }
     
     return null; // Still pending
   } catch (error) {
-    console.error('RecallOS: Error polling search job:', error);
     return null;
   }
 }
 
 async function getMemorySummary(query: string): Promise<string | null> {
   try {
-    const userId = getOrCreateUserId();
+    let userId: string
+    try {
+      userId = await getUserId()
+    } catch (error) {
+      return null;
+    }
     // Derive API base from extension settings
     let apiBase = 'http://localhost:3000/api';
     try {
@@ -1217,16 +1214,20 @@ async function getMemorySummary(query: string): Promise<string | null> {
       contextOnly: false
     };
         
-    // Get or create auth token
-    const authToken = await getOrCreateAuthToken();
+    // Require authentication token
+    let authToken: string
+    try {
+      authToken = await requireAuthToken()
+    } catch (error) {
+      console.error('RecallOS: Authentication required. Please log in through the web client first.');
+      return null;
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
+      'Authorization': `Bearer ${authToken}`,
     };
-    
-    if (authToken) {
-      headers['Authorization'] = `Bearer ${authToken}`;
-    }
 
     const response = await fetch(searchEndpoint, {
       method: 'POST',

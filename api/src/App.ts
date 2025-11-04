@@ -6,6 +6,8 @@ import cors from 'cors';
 
 import compression from 'compression';
 
+import cookieParser from 'cookie-parser';
+
 import http from 'http';
 import fs from 'fs';
 import https from 'https';
@@ -24,6 +26,7 @@ dotenv.config();
 
 const app = express();
 app.set('trust proxy', 1);
+app.use(cookieParser());
 
 let server: http.Server | https.Server;
 if (process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true') {

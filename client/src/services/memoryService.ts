@@ -1,5 +1,5 @@
 import { getRequest, postRequest } from '../utility/generalServices'
-import { getOrCreateAuthToken } from '../utils/userId'
+import { requireAuthToken } from '../utils/userId'
 import type {
   Memory,
   MemoryInsights,
@@ -47,8 +47,8 @@ export class MemoryService {
     if (limit) params.append('limit', limit.toString())
     
     try {
-      // Ensure we have an auth token
-      await getOrCreateAuthToken()
+      // Require authentication
+      requireAuthToken()
       
       const response = await getRequest(`${this.baseUrl}/transactions?${params.toString()}`)
       const data = response.data?.data
@@ -108,8 +108,8 @@ export class MemoryService {
     try {
       const normalizedAddress = userId
       
-      // Ensure we have an auth token
-      await getOrCreateAuthToken()
+      // Require authentication
+      requireAuthToken()
       
       // Use the working /search endpoint (POST)
       const response = await postRequest('/search', {

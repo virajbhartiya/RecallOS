@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg15
+    image: postgres:15
     container_name: recallos_db
     restart: unless-stopped
     environment:
@@ -19,6 +19,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - recallos_network
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: recallos_qdrant
+    restart: unless-stopped
+    ports:
+      - '6333:6333'
+      - '6334:6334'
+    volumes:
+      - recallos_qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:6333/health']
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - recallos_network
 
@@ -41,6 +58,8 @@ services:
 
 volumes:
   recallos_data:
+    driver: local
+  recallos_qdrant_data:
     driver: local
   recallos_redis_data:
     driver: local

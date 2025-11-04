@@ -1,4 +1,3 @@
-CREATE EXTENSION IF NOT EXISTS vector;
 -- CreateTable
 CREATE TABLE "users" (
     "id" UUID NOT NULL,
@@ -33,18 +32,6 @@ CREATE TABLE "memories" (
     "confirmed_at" TIMESTAMP(3),
 
     CONSTRAINT "memories_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "embeddings" (
-    "id" UUID NOT NULL,
-    "memory_id" UUID NOT NULL,
-    "vector" DOUBLE PRECISION[],
-    "model_name" TEXT NOT NULL,
-    "embedding_type" TEXT NOT NULL DEFAULT 'content',
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "embeddings_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -93,18 +80,6 @@ CREATE TABLE "blockscout_transactions" (
     "check_count" INTEGER NOT NULL DEFAULT 0,
 
     CONSTRAINT "blockscout_transactions_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "memory_embeddings" (
-    "id" UUID NOT NULL,
-    "memory_id" UUID NOT NULL,
-    "embedding" vector NOT NULL,
-    "dim" INTEGER NOT NULL,
-    "model" TEXT NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "memory_embeddings_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -176,9 +151,6 @@ CREATE UNIQUE INDEX "search_cache_query_hash_key" ON "search_cache"("query_hash"
 ALTER TABLE "memories" ADD CONSTRAINT "memories_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "embeddings" ADD CONSTRAINT "embeddings_memory_id_fkey" FOREIGN KEY ("memory_id") REFERENCES "memories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "memory_relations" ADD CONSTRAINT "memory_relations_memory_id_fkey" FOREIGN KEY ("memory_id") REFERENCES "memories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -186,9 +158,6 @@ ALTER TABLE "memory_relations" ADD CONSTRAINT "memory_relations_related_memory_i
 
 -- AddForeignKey
 ALTER TABLE "memory_snapshots" ADD CONSTRAINT "memory_snapshots_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "memory_embeddings" ADD CONSTRAINT "memory_embeddings_memory_id_fkey" FOREIGN KEY ("memory_id") REFERENCES "memories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "query_related_memories" ADD CONSTRAINT "query_related_memories_query_event_id_fkey" FOREIGN KEY ("query_event_id") REFERENCES "query_events"("id") ON DELETE CASCADE ON UPDATE CASCADE;

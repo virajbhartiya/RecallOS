@@ -1,11 +1,12 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { MemorySearch } from '../components/MemorySearch'
 import { MemoryService } from '../services/memoryService'
  
 import { LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
 import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse, SearchResult } from '../types/memory'
-import { getOrCreateUserId, getOrCreateAuthToken } from '@/utils/userId'
+import { getUserId, requireAuthToken } from '@/utils/userId'
+import { useNavigate } from 'react-router-dom'
 
 const SearchResultCard: React.FC<{ 
   result: SearchResult
@@ -161,14 +162,26 @@ const SearchResultCard: React.FC<{
 }
 
 export const Search: React.FC = () => {
-  const address = getOrCreateUserId()
+  const navigate = useNavigate()
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [address, setAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [showOnlyCited, setShowOnlyCited] = useState(true)
   const [hyperIndexData, _setHyperIndexData] = useState<Record<string, any>>({})
+
+  useEffect(() => {
+    try {
+      const id = getUserId()
+      setAddress(id)
+      setIsAuthenticated(true)
+    } catch (error) {
+      navigate('/login')
+    }
+  }, [navigate])
 
   const fetchHyperIndexData = useCallback(async (_memories: Memory[]) => {
     return
@@ -186,8 +199,8 @@ export const Search: React.FC = () => {
     setSearchResults(null)
 
     try {
-      // Ensure we have an auth token before making requests
-      await getOrCreateAuthToken()
+      // Require authentication
+      requireAuthToken()
 
       let response: MemorySearchResponse
 
@@ -229,15 +242,15 @@ export const Search: React.FC = () => {
     setError(null)
   }, [])
 
-  const handleSelectMemory = (memory: Memory) => {
+  const handleSelectMemory = useCallback((memory: Memory) => {
     setSelectedMemory(memory)
     setIsPopupOpen(true)
-  }
+  }, [])
 
-  const handleClosePopup = () => {
+  const handleClosePopup = useCallback(() => {
     setIsPopupOpen(false)
     setSelectedMemory(null)
-  }
+  }, [])
 
   // Filter results to show only cited memories
   const getFilteredResults = () => {
@@ -256,7 +269,9 @@ export const Search: React.FC = () => {
     )
   }
 
-  
+  if (!isAuthenticated || !address) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
