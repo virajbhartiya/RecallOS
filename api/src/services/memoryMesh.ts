@@ -1142,7 +1142,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     return nodes;
   }
 
-  private async computeLatentSpaceProjection(memories: any[]): Promise<Map<string, { x: number; y: number }>> {
+  private async computeLatentSpaceProjection(memories: any[]): Promise<Map<string, { x: number; y: number; z: number }>> {
     try {
       await ensureCollection();
 
@@ -1168,7 +1168,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         return new Map();
       }
 
-      const embeddingData: { id: string; vector: number[] }[] = [];
+      let embeddingData: { id: string; vector: number[] }[] = [];
       for (const point of embeddingResult.points) {
         const memoryId = point.payload?.memory_id as string;
         if (memoryId && point.vector && Array.isArray(point.vector)) {
@@ -1180,41 +1180,59 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         return new Map();
       }
 
-      // Create embedding matrix for UMAP
+      embeddingData = embeddingData.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
       const embeddingMatrix = embeddingData.map(e => e.vector);
 
-      // Configure UMAP for latent space visualization with better clustering
+      const makeSeed = (ids: string[]): number => {
+        let h = 2166136261;
+        for (const id of ids) {
+          for (let i = 0; i < id.length; i++) {
+            h ^= id.charCodeAt(i);
+            h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+          }
+        }
+        return h >>> 0;
+      };
+      const mulberry32 = (seed: number) => () => {
+        let t = (seed += 0x6d2b79f5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      const seededRandom = mulberry32(makeSeed(embeddingData.map(e => e.id)));
+
       const umap = new UMAP({
-        nComponents: 2,
-        nEpochs: 400, // More epochs for better convergence
-        nNeighbors: Math.min(10, Math.max(3, Math.floor(embeddingMatrix.length / 3))), // Fewer neighbors = tighter clusters
-        minDist: 0.1, // Smaller minDist = tighter packing, clearer clusters
-        spread: 1.5, // Smaller spread = more compact clusters
-        random: Math.random
+        nComponents: 3,
+        nEpochs: 400,
+        nNeighbors: Math.min(10, Math.max(3, Math.floor(embeddingMatrix.length / 3))),
+        minDist: 0.1,
+        spread: 1.5,
+        random: seededRandom
       });
 
       const projection = umap.fit(embeddingMatrix);
 
-      // Normalize coordinates to a reasonable range and center at origin
-      const coords = projection.map(p => ({ x: p[0], y: p[1] }));
+      const coords = projection.map(p => ({ x: p[0], y: p[1], z: p[2] ?? 0 }));
       
-      // Find bounds
       const xCoords = coords.map(c => c.x);
       const yCoords = coords.map(c => c.y);
       const xMin = Math.min(...xCoords);
       const xMax = Math.max(...xCoords);
       const yMin = Math.min(...yCoords);
       const yMax = Math.max(...yCoords);
+      const zCoords = coords.map(c => c.z);
+      const zMin = Math.min(...zCoords);
+      const zMax = Math.max(...zCoords);
       
-      // Scale and center
-      const scale = 1200; // Scale to fit viewport
+      const scale = 1200;
       const normalized = coords.map(c => ({
-        x: ((c.x - xMin) / (xMax - xMin) - 0.5) * scale,
-        y: ((c.y - yMin) / (yMax - yMin) - 0.5) * scale
+        x: ((c.x - xMin) / (xMax - xMin || 1) - 0.5) * scale,
+        y: ((c.y - yMin) / (yMax - yMin || 1) - 0.5) * scale,
+        z: ((c.z - zMin) / (zMax - zMin || 1) - 0.5) * (scale * 0.6)
       }));
 
-      // Create map of memory ID to coordinates
-      const coordMap = new Map<string, { x: number; y: number }>();
+      const coordMap = new Map<string, { x: number; y: number; z: number }>();
       embeddingData.forEach((data, index) => {
         coordMap.set(data.id, normalized[index]);
       });
@@ -1258,25 +1276,35 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         take: limit,
       });
 
-      // Compute latent space projection using UMAP on embeddings
       const latentCoords = await this.computeLatentSpaceProjection(memories);
 
-      // Create nodes from memories with latent space positioning
       const nodes = memories.map((memory: any, index: number) => {
-        let x, y;
-        
-        // Use latent space coordinates if available
+        let x, y, z;
+
         if (latentCoords.has(memory.id)) {
           const coords = latentCoords.get(memory.id)!;
           x = coords.x;
           y = coords.y;
+          z = (coords as any).z ?? 0;
         } else {
-          // Fallback: grid-based distribution for memories without embeddings
           const gridSize = Math.ceil(Math.sqrt(memories.length));
           const row = Math.floor(index / gridSize);
           const col = index % gridSize;
-          x = (col - gridSize / 2) * 200 + (Math.random() - 0.5) * 100;
-          y = (row - gridSize / 2) * 200 + (Math.random() - 0.5) * 100;
+          const jitter = (seed: string, salt: string) => {
+            let h = 2166136261;
+            const s = seed + '|' + salt;
+            for (let i = 0; i < s.length; i++) {
+              h ^= s.charCodeAt(i);
+              h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+            }
+            return ((h >>> 0) % 1000) / 1000 - 0.5;
+          };
+          const jx = jitter(memory.id, 'x');
+          const jy = jitter(memory.id, 'y');
+          x = (col - gridSize / 2) * 200 + jx * 100;
+          y = (row - gridSize / 2) * 200 + jy * 100;
+          const jz = jitter(memory.id, 'z');
+          z = jz * 300;
         }
         
         return {
@@ -1290,6 +1318,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           x,
           y,
           hasEmbedding: latentCoords.has(memory.id),
+          z,
           clusterId: undefined as number | undefined,
           layout: {
             isLatentSpace: latentCoords.has(memory.id),
@@ -1299,10 +1328,8 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         };
       });
 
-      // Create edges based on proximity in latent space with metadata boosts
       const rawEdges: any[] = [];
 
-      // Utility: domain extraction
       const getDomain = (url?: string | null) => {
         try {
           if (!url) return null;
@@ -1313,13 +1340,11 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         }
       };
 
-      // Dynamic neighborhood size and degree constraints
       const nodeCount = nodes.length;
       const k = Math.min(8, Math.max(3, Math.floor(Math.sqrt(Math.max(1, nodeCount)))));
       const minDegree = Math.min(3, Math.max(1, Math.floor(k / 2)));
-      const maxDistance = 1200; // based on layout scaling
+      const maxDistance = 1200;
 
-      // Precompute quick metadata maps
       const nodeIdToDomain = new Map<string, string | null>(
         nodes.map(n => [n.id, getDomain((n as any).url)])
       );
@@ -1330,9 +1355,8 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         nodes.map(n => [n.id, (n as any).timestamp ? Number((n as any).timestamp) : null])
       );
 
-      // Build edges
       nodes.forEach((node, i) => {
-        if (!latentCoords.has(node.id)) return; // Skip nodes without embeddings
+        if (!latentCoords.has(node.id)) return;
 
         const nodeCoord = latentCoords.get(node.id)!;
         const distances: Array<{ targetId: string; distance: number }> = [];
@@ -1344,22 +1368,19 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           const otherCoord = latentCoords.get(otherNode.id)!;
           const dx = nodeCoord.x - otherCoord.x;
           const dy = nodeCoord.y - otherCoord.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
+          const dz = ((nodeCoord as any).z ?? 0) - ((otherCoord as any).z ?? 0);
+          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
           distances.push({ targetId: otherNode.id, distance });
         });
 
-        // Sort by distance and take k nearest
         distances.sort((a, b) => a.distance - b.distance);
         const nearest = distances.slice(0, k);
 
-        // Ensure at least minDegree connections even if distances are large
         const chosen = nearest.length >= minDegree ? nearest : distances.slice(0, minDegree);
 
         chosen.forEach(({ targetId, distance }) => {
-          // Base similarity from latent distance
           const baseSim = Math.max(0, 1 - distance / maxDistance);
 
-          // Metadata boosts
           let boost = 0;
           const srcA = nodeIdToSource.get(node.id);
           const srcB = nodeIdToSource.get(targetId);
@@ -1372,15 +1393,14 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           const tsA = nodeIdToTimestamp.get(node.id);
           const tsB = nodeIdToTimestamp.get(targetId);
           if (tsA && tsB) {
-            const dt = Math.abs(tsA - tsB); // seconds
-            if (dt <= 60 * 60) boost += 0.06; // within 1h
-            else if (dt <= 24 * 60 * 60) boost += 0.04; // within 1 day
-            else if (dt <= 7 * 24 * 60 * 60) boost += 0.02; // within 1 week
+            const dt = Math.abs(tsA - tsB);
+            if (dt <= 60 * 60) boost += 0.06;
+            else if (dt <= 24 * 60 * 60) boost += 0.04;
+            else if (dt <= 7 * 24 * 60 * 60) boost += 0.02;
           }
 
-        	// Final similarity with cap
           const similarityScore = Math.max(0, Math.min(1, baseSim + boost));
-          if (similarityScore < 0.05) return; // ignore extremely weak links
+          if (similarityScore < 0.05) return;
 
           rawEdges.push({
             source: node.id,
@@ -1392,7 +1412,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         });
       });
 
-      // Remove duplicate edges (keep the one with higher similarity)
       const edgeMap = new Map<string, any>();
       rawEdges.forEach(edge => {
         const key = [edge.source, edge.target].sort().join('_');
