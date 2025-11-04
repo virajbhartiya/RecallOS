@@ -169,18 +169,23 @@ const Scene: React.FC<SceneProps> = ({
   const nodes = useMemo(() => {
     if (!meshData?.nodes?.length) return []
 
-    // Normalize backend XY coordinates into a compact cube around the origin
+    // Normalize backend XYZ coordinates into a compact cube around the origin
     const finiteNodes = meshData.nodes.filter((nn) => Number.isFinite(nn.x) && Number.isFinite(nn.y))
     const minX = finiteNodes.length ? Math.min(...finiteNodes.map((nn) => nn.x)) : 0
     const maxX = finiteNodes.length ? Math.max(...finiteNodes.map((nn) => nn.x)) : 1
     const minY = finiteNodes.length ? Math.min(...finiteNodes.map((nn) => nn.y)) : 0
     const maxY = finiteNodes.length ? Math.max(...finiteNodes.map((nn) => nn.y)) : 1
+    const finiteZ = meshData.nodes.filter((nn: any) => Number.isFinite((nn as any).z)) as Array<any>
+    const minZ = finiteZ.length ? Math.min(...finiteZ.map((nn: any) => (nn as any).z)) : 0
+    const maxZ = finiteZ.length ? Math.max(...finiteZ.map((nn: any) => (nn as any).z)) : 1
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
+    const cz = (minZ + maxZ) / 2
     const spanX = Math.max(1e-6, maxX - minX)
     const spanY = Math.max(1e-6, maxY - minY)
+    const spanZ = Math.max(1e-6, maxZ - minZ)
     const radius = isCompactView ? 1.2 : 2.5 // significantly reduce spacing
-    const zRadius = radius * 0.4
+    const zRadius = radius * 0.8
 
     return meshData.nodes.map((n, i) => {
       const sourceType = memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
@@ -196,8 +201,13 @@ const Scene: React.FC<SceneProps> = ({
         // Normalize XY into [-radius, radius]
         const nx = ((n.x - cx) / spanX) * radius * 2
         const ny = ((n.y - cy) / spanY) * radius * 2
-        // Z from importance (centered around 0)
-        const iz = ((n.importance_score ?? 0.5) - 0.5) * 2 * zRadius
+        // Prefer backend Z if present; fallback to importance
+        let iz: number
+        if (Number.isFinite((n as any).z)) {
+          iz = (((n as any).z - cz) / spanZ) * zRadius * 2
+        } else {
+          iz = ((n.importance_score ?? 0.5) - 0.5) * 2 * zRadius
+        }
         position = [nx, ny, iz]
       } else {
         // Generate 3D position using spherical coordinates with tighter clustering
