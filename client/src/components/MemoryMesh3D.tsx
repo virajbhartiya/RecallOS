@@ -340,6 +340,52 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isCompactView, setIsCompactView] = useState(false)
+  const controlsRef = useRef<any>(null)
+
+  // Re-center orbit target at the cursor on drag start
+  useEffect(() => {
+    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null
+    if (!canvas) return
+
+    const handlePointerDown = (evt: PointerEvent) => {
+      if (!controlsRef.current) return
+      const rect = canvas.getBoundingClientRect()
+      const x = ((evt.clientX - rect.left) / rect.width) * 2 - 1
+      const y = -(((evt.clientY - rect.top) / rect.height) * 2 - 1)
+
+      // Access the most recent renderer/camera via three provided on global THREE
+      // We compute the ray manually using the canvas' current WebGL renderer if available
+      // Fallback to window globals if needed via three.js
+      const renderer = (canvas as any).__r3f?.root?.store?.getState?.().gl
+      const camera = (canvas as any).__r3f?.root?.store?.getState?.().camera
+      if (!renderer || !camera) return
+
+      const mouse = new THREE.Vector2(x, y)
+      const raycaster = new THREE.Raycaster()
+      raycaster.setFromCamera(mouse, camera)
+
+      const dir = new THREE.Vector3()
+      camera.getWorldDirection(dir)
+      const currentTarget: THREE.Vector3 = controlsRef.current.target?.clone?.() || new THREE.Vector3(0, 0, 0)
+      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(dir, currentTarget)
+      const hitPoint = new THREE.Vector3()
+
+      const intersection = raycaster.ray.intersectPlane(plane, hitPoint)
+      if (intersection) {
+        controlsRef.current.target.copy(intersection)
+        controlsRef.current.update()
+      }
+    }
+
+    canvas.addEventListener('pointerdown', handlePointerDown, { passive: true })
+    return () => canvas.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
+  // Ensure zooming focuses the point under the cursor
+  useEffect(() => {
+    if (!controlsRef.current) return
+    controlsRef.current.zoomToCursor = true
+  }, [controlsRef])
 
   useEffect(() => {
     const fetchMeshData = async () => {
@@ -429,7 +475,9 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
         <Canvas
           camera={{ 
             position: isCompactView ? [1.0, 1.0, 1.0] : [1.4, 1.4, 1.4], 
-            fov: isCompactView ? 75 : 60 
+            fov: isCompactView ? 75 : 60,
+            near: 0.0001,
+            far: 1000000000
           }}
           style={{ background: 'transparent' }}
           dpr={[1, 1.75]} // keep crisp but not noisy
@@ -444,11 +492,13 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
             isCompactView={isCompactView}
           />
           <OrbitControls
+            ref={controlsRef}
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
-            minDistance={isCompactView ? 0.3 : 0.6}
-            maxDistance={isCompactView ? 20 : 40}
+            zoomToCursor={true}
+            minDistance={0}
+            maxDistance={Infinity}
             zoomSpeed={1.2}
             panSpeed={0.8}
             rotateSpeed={0.5}
