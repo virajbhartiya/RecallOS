@@ -99,7 +99,7 @@ const Popup: React.FC = () => {
     }
   };
 
-  const clearAuthToken = async () => {
+  const handleClearAuthToken = async () => {
     setIsLoading(true);
     try {
       clearAuthToken();
@@ -207,7 +207,7 @@ const Popup: React.FC = () => {
                 Save Token
               </Button>
               <Button 
-                onClick={clearAuthToken} 
+                onClick={handleClearAuthToken} 
                 disabled={isLoading}
                 size="sm"
                 variant="outline"
@@ -256,13 +256,3 @@ if (container) {
   root.render(<Popup />);
 }
 
-// Add ethereum type declaration for extension context
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
-      on: (event: string, callback: (...args: unknown[]) => void) => void
-      removeAllListeners: (event: string) => void
-    }
-  }
-}

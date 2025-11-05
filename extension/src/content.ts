@@ -857,15 +857,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!chrome.runtime?.id) {
     return false;
   }
-  if (message.type === 'GET_WALLET_ADDRESS') {
-    try {
-      const walletAddress = localStorage.getItem('wallet_address');
-      sendResponse({ walletAddress });
-    } catch (error) {
-      sendResponse({ walletAddress: null });
-    }
-    return true;
-  }
   if (message.type === 'CAPTURE_CONTEXT_NOW') {
     hasUserActivity = true;
     if (!isLocalhost()) {
@@ -898,29 +889,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       isMonitoring: !!captureInterval,
     });
     return true;
-  }
-});
-window.addEventListener('message', event => {
-  if (event.data.type === 'WALLET_ADDRESS' && event.data.walletAddress) {
-    chrome.storage.sync.set(
-      { wallet_address: event.data.walletAddress },
-      () => {
-      }
-    );
-  }
-});
-setInterval(() => {
-  try {
-    const walletAddress = localStorage.getItem('wallet_address');
-    if (walletAddress) {
-      chrome.storage.sync.set({ wallet_address: walletAddress }, () => {
-      });
-    }
-  } catch (error) {}
-}, 2000);
-chrome.storage.sync.get(['wallet_address'], result => {
-  if (result.wallet_address) {
-  } else {
   }
 });
 function calculateContentHash(content: string): string {
@@ -1316,15 +1284,6 @@ async function getMemorySummary(query: string): Promise<string | null> {
   }
 }
 
-async function getWalletAddressForMemory(): Promise<string | null> {
-  try {
-    const result = await chrome.storage.sync.get(['wallet_address']);
-    return result.wallet_address || null;
-  } catch (error) {
-    console.error('RecallOS: Error getting wallet address:', error);
-    return null;
-  }
-}
 
 async function getApiEndpointForMemory(): Promise<string> {
   try {
@@ -1556,7 +1515,6 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
 //   }
 // }
 
-async function getWalletAddressFromStorage(): Promise<string | null> { return null; }
 
 async function checkExtensionEnabled(): Promise<boolean> {
   try {
@@ -1603,17 +1561,15 @@ async function showRecallOSStatus(): Promise<void> {
   document.body.appendChild(tooltip);
   
   try {
-    const [walletAddress, apiHealthy, extensionEnabled] = await Promise.all([
-      getWalletAddressFromStorage(),
+    const [apiHealthy, extensionEnabled] = await Promise.all([
       // checkApiHealth()
       true,
       checkExtensionEnabled()
     ]);
     
-    const walletStatus = walletAddress ? 'Connected' : 'Not Connected';
     const apiStatus = apiHealthy ? 'Connected' : 'Not Connected';
     const extensionStatus = extensionEnabled ? 'Enabled' : 'Disabled';
-    const overallStatus = walletAddress && apiHealthy && extensionEnabled ? 'Active' : 'Inactive';
+    const overallStatus = apiHealthy && extensionEnabled ? 'Active' : 'Inactive';
     const statusColor = overallStatus === 'Active' ? '#10a37f' : '#ef4444';
     
     const platformName = currentPlatform === 'chatgpt' ? 'ChatGPT' : currentPlatform === 'claude' ? 'Claude' : 'Unknown';
@@ -1625,9 +1581,7 @@ async function showRecallOSStatus(): Promise<void> {
       </div>
       <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9);">
         <div>Extension: ${extensionStatus}</div>
-        <div>Wallet: ${walletStatus}</div>
         <div>API: ${apiStatus}</div>
-        ${walletAddress ? `<div>Address: ${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}</div>` : ''}
       </div>
       <div style="font-size: 11px; color: rgba(255, 255, 255, 0.7); margin-top: 8px;">
         ${extensionEnabled ? 'Memories are automatically injected as you type (1.5s delay).' : 'Extension is disabled. Click the popup to enable.'}
@@ -2089,12 +2043,10 @@ function debugAIChatElements(): void {
 };
 
 (window as any).checkRecallOSStatus = async () => {
-  const walletAddress = await getWalletAddressFromStorage();
   // const apiHealthy = await checkApiHealth();
   const apiEndpoint = await getApiEndpointForMemory();
   
   return {
-    walletAddress,
     apiEndpoint,
     // apiHealthy,
     apiHealthy: true,
