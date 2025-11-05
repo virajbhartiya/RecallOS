@@ -791,33 +791,44 @@ export class MemoryController {
   static async getMemoriesWithTransactionDetails(req: AuthenticatedRequest, res: Response) {
     try {
       const { status, limit = 50 } = req.query as any;
-      const userId = req.user?.externalId || getRequestUserId(req);
-
-      if (!userId) {
-        return res.status(400).json({
-          success: false,
-          error: 'User ID is required',
-        });
-      }
-
-      // Resolve internal user_id
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userId as any },
-            { external_id: (userId as string).toLowerCase() as any },
-          ],
-        } as any,
-      });
       
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: 'User not found',
-        });
-      }
+      // Use authenticated user's internal ID if available, otherwise try to resolve from query param
+      let internalUserId: string | undefined;
       
-      const internalUserId = user.id;
+      if (req.user?.id) {
+        // User is authenticated, use their internal ID directly
+        internalUserId = req.user.id;
+      } else {
+        // Try to resolve from query param (could be external_id or internal id)
+        const userId = req.user?.externalId || getRequestUserId(req);
+        
+        if (!userId) {
+          return res.status(400).json({
+            success: false,
+            error: 'User ID is required',
+          });
+        }
+
+        // Try to find user by external_id first, then by internal id
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { external_id: userId as any },
+              { external_id: (userId as string).toLowerCase() as any },
+              { id: userId as any },
+            ],
+          } as any,
+        });
+        
+        if (!user) {
+          return res.status(404).json({
+            success: false,
+            error: 'User not found',
+          });
+        }
+        
+        internalUserId = user.id;
+      }
       const whereConditions: any = { user_id: internalUserId };
 
       if (status) {
