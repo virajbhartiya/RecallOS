@@ -64,7 +64,6 @@ export class MemoryController {
           id: true,
           title: true,
           url: true,
-          hash: true,
           timestamp: true,
           created_at: true,
           summary: true,
@@ -103,9 +102,6 @@ export class MemoryController {
       console.log('[memory/process] ai_done', { ms: Date.now() - aiStart, hasSummary: !!summary, hasExtracted: !!extractedMetadata });
 
 
-      const memoryHash =
-        '0x' + createHash('sha256').update(summary).digest('hex');
-
       const urlHash = hashUrl(url || 'unknown');
 
       const timestamp = Math.floor(Date.now() / 1000);
@@ -121,7 +117,6 @@ export class MemoryController {
           title: title || 'Untitled',
           content: content,
           summary: summary,
-          hash: memoryHash,
           canonical_text: canonicalText,
           canonical_hash: canonicalHash,
           timestamp: BigInt(timestamp),
@@ -180,7 +175,6 @@ export class MemoryController {
         data: {
           userId: user.id,
           memoryId: memory.id,
-          memoryHash,
           urlHash,
           transactionDetails: null,
         },
@@ -196,14 +190,6 @@ export class MemoryController {
 
   static async storeMemory(req: AuthenticatedRequest, res: Response) {
     try {
-      const { hash, url, timestamp } = req.body;
-
-      if (!hash || !url || !timestamp) {
-        return res.status(400).json({
-          success: false,
-          error: 'Hash, URL, and timestamp are required',
-        });
-      }
 
       if (!req.user?.id) {
         return res.status(401).json({
@@ -237,10 +223,10 @@ export class MemoryController {
       }
 
       for (const memory of memories) {
-        if (!memory.hash || !memory.urlHash || !memory.timestamp) {
+        if (!memory.urlHash || !memory.timestamp) {
           return res.status(400).json({
             success: false,
-            error: 'Each memory must have hash, urlHash, and timestamp',
+            error: 'Each memory must have urlHash and timestamp',
           });
         }
       }
@@ -312,26 +298,6 @@ export class MemoryController {
     }
   }
 
-  static async isMemoryStored(req: Request, res: Response) {
-    try {
-      const { hash } = req.params;
-
-      if (!hash) {
-        return res.status(400).json({
-          success: false,
-          error: 'Memory hash is required',
-        });
-      }
-
-      return res.status(410).json({ success: false, error: 'On-chain functionality removed' });
-    } catch (error) {
-      console.error('Error checking if memory is stored:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to check if memory is stored',
-      });
-    }
-  }
 
   static async getMemoriesByUrlHash(req: AuthenticatedRequest, res: Response) {
     try {
@@ -414,7 +380,6 @@ export class MemoryController {
             id: true,
             title: true,
             url: true,
-            hash: true,
             timestamp: true,
             created_at: true,
             summary: true,
@@ -464,56 +429,6 @@ export class MemoryController {
     }
   }
 
-  static async getMemoryByHash(req: Request, res: Response) {
-    try {
-      const { hash } = req.params;
-
-      if (!hash) {
-        return res.status(400).json({
-          success: false,
-          error: 'Memory hash is required',
-        });
-      }
-
-      // First try to get full memory details from database
-      const memory = await prisma.memory.findUnique({
-        where: { hash: hash },
-        select: {
-          id: true,
-          title: true,
-          url: true,
-          hash: true,
-          timestamp: true,
-          created_at: true,
-          summary: true,
-          content: true,
-          source: true,
-          page_metadata: true,
-        } as any,
-      });
-
-      if (memory) {
-        // Convert BigInt values to strings for JSON serialization
-        const serializedMemory = {
-          ...memory,
-          timestamp: memory.timestamp ? memory.timestamp.toString() : null,
-        };
-
-        return res.status(200).json({
-          success: true,
-          data: serializedMemory,
-        });
-      }
-
-      return res.status(404).json({ success: false, error: 'Memory not found' });
-    } catch (error) {
-      console.error('Error getting memory by hash:', error);
-      res.status(500).json({
-        success: false,
-        error: error.message || 'Failed to get memory by hash',
-      });
-    }
-  }
 
   static async getUserMemoryCount(req: AuthenticatedRequest, res: Response) {
     try {
@@ -604,7 +519,6 @@ export class MemoryController {
         summary: result.summary,
         url: result.url,
         timestamp: result.timestamp,
-        hash: null as string | null,
         content: result.summary, // Use summary as content for display
         source: 'browser',
         user_id: user.id,

@@ -159,7 +159,6 @@ export async function searchMemories(params: {
       summary: memory.summary,
       url: memory.url,
       timestamp: memory.timestamp,
-      hash: memory.hash,
       content: memory.content,
       score: semanticScore,
     };
