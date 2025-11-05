@@ -67,7 +67,7 @@ export async function searchMemories(params: {
 
   const normalized = normalizeText(query);
 
-  const user = await prisma.user.findFirst({ where: { external_id: { equals: userId } } as any });
+  const user = await prisma.user.findFirst({ where: { OR: [ { external_id: userId } as any, { id: userId } as any ] } as any });
   if (!user) {
     return { query: normalized, results: [], meta_summary: undefined };
   }
