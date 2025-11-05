@@ -20,15 +20,9 @@ interface ApiMemoryResponse {
   content?: string
   source?: string
   url?: string
-  tx_status?: string
-  blockchain_network?: string
   page_metadata?: Record<string, unknown>
   access_count?: number
   last_accessed?: string
-  tx_hash?: string
-  block_number?: string | number
-  gas_used?: string
-  confirmed_at?: string
 }
 
 export class MemoryService {
@@ -36,11 +30,9 @@ export class MemoryService {
 
 
   static async getMemoriesWithTransactionDetails(
-    status?: 'pending' | 'confirmed' | 'failed',
     limit?: number
   ): Promise<Memory[]> {
     const params = new URLSearchParams()
-    if (status) params.append('status', status)
     if (limit) params.append('limit', limit.toString())
     
     try {
@@ -55,7 +47,7 @@ export class MemoryService {
         throw new Error(response.data?.error || 'API returned error')
       }
       
-      // API returns: { success: true, data: { memories: [...], transactionStats: {...}, totalMemories: number } }
+      // API returns: { success: true, data: { memories: [...], totalMemories: number } }
       const data = response.data?.data
       const memories = data?.memories || []
       
@@ -76,15 +68,9 @@ export class MemoryService {
           content: mem.content || '',
           source: mem.source || 'extension',
           url: mem.url,
-          tx_status: mem.tx_status || 'confirmed',
-          blockchain_network: mem.blockchain_network || 'sepolia',
           page_metadata: mem.page_metadata,
           access_count: mem.access_count || 0,
           last_accessed: mem.last_accessed || new Date().toISOString(),
-          tx_hash: mem.tx_hash,
-          block_number: mem.block_number ? (typeof mem.block_number === 'string' ? parseInt(mem.block_number) : mem.block_number) : undefined,
-          gas_used: mem.gas_used,
-          confirmed_at: mem.confirmed_at
         } as Memory))
       }
       
@@ -141,7 +127,6 @@ export class MemoryService {
           title?: string;
           content?: string;
           summary?: string;
-          avail_hash?: string;
           timestamp: number;
           created_at?: string;
           full_content?: string;
@@ -156,12 +141,6 @@ export class MemoryService {
           importance_score?: number;
           access_count?: number;
           last_accessed?: string;
-          tx_hash?: string;
-          block_number?: number;
-          gas_used?: string;
-          tx_status?: 'pending' | 'confirmed' | 'failed';
-          blockchain_network?: string;
-          confirmed_at?: string;
           score: number;
         }) => ({
           memory: {
@@ -172,7 +151,6 @@ export class MemoryService {
             title: result.title,
             content: result.content || result.summary || '',
             summary: result.summary,
-            hash: result.avail_hash,
             timestamp: result.timestamp,
             created_at: result.created_at || new Date(result.timestamp * 1000).toISOString(),
             full_content: result.full_content,
@@ -180,12 +158,6 @@ export class MemoryService {
             importance_score: result.importance_score,
             access_count: result.access_count || 0,
             last_accessed: result.last_accessed || new Date().toISOString(),
-            tx_hash: result.tx_hash,
-            block_number: result.block_number,
-            gas_used: result.gas_used,
-            tx_status: result.tx_status,
-            blockchain_network: result.blockchain_network,
-            confirmed_at: result.confirmed_at
           },
           similarity_score: result.score,
           relevance_score: result.score,
@@ -249,7 +221,6 @@ export class MemoryService {
           title?: string;
           content?: string;
           summary?: string;
-          avail_hash?: string;
           timestamp: number;
           created_at?: string;
           full_content?: string;
@@ -264,12 +235,6 @@ export class MemoryService {
           importance_score?: number;
           access_count?: number;
           last_accessed?: string;
-          tx_hash?: string;
-          block_number?: number;
-          gas_used?: string;
-          tx_status?: 'pending' | 'confirmed' | 'failed';
-          blockchain_network?: string;
-          confirmed_at?: string;
           score: number;
         }) => ({
           memory: {
@@ -280,7 +245,6 @@ export class MemoryService {
             title: result.title,
             content: result.content || result.summary || '',
             summary: result.summary,
-            hash: result.avail_hash,
             timestamp: result.timestamp,
             created_at: result.created_at || new Date(result.timestamp * 1000).toISOString(),
             full_content: result.full_content,
@@ -288,12 +252,6 @@ export class MemoryService {
             importance_score: result.importance_score,
             access_count: result.access_count || 0,
             last_accessed: result.last_accessed || new Date().toISOString(),
-            tx_hash: result.tx_hash,
-            block_number: result.block_number,
-            gas_used: result.gas_used,
-            tx_status: result.tx_status,
-            blockchain_network: result.blockchain_network,
-            confirmed_at: result.confirmed_at
           },
           similarity_score: result.score,
           relevance_score: result.score,
@@ -390,10 +348,6 @@ export class MemoryService {
       if (data) {
         return {
           total_memories: data.totalMemories || 0,
-          total_transactions: data.totalMemories || 0, // Total transactions = total memories
-          confirmed_transactions: data.transactionStatusDistribution?.confirmed || 0,
-          pending_transactions: data.transactionStatusDistribution?.pending || 0,
-          failed_transactions: data.transactionStatusDistribution?.failed || 0,
           categories: data.topCategories?.reduce((acc: Record<string, number>, cat: { category: string; count: number }) => {
             acc[cat.category] = cat.count
             return acc
@@ -426,10 +380,6 @@ export class MemoryService {
           if (retryData) {
             return {
               total_memories: retryData.totalMemories || 0,
-              total_transactions: retryData.totalMemories || 0, // Total transactions = total memories
-              confirmed_transactions: retryData.transactionStatusDistribution?.confirmed || 0,
-              pending_transactions: retryData.transactionStatusDistribution?.pending || 0,
-              failed_transactions: retryData.transactionStatusDistribution?.failed || 0,
               categories: retryData.topCategories?.reduce((acc: Record<string, number>, cat: { category: string; count: number }) => {
                 acc[cat.category] = cat.count
                 return acc
@@ -449,15 +399,11 @@ export class MemoryService {
       }
     }
     
-    // Fallback: create basic insights from blockchain data
+    // Fallback: create basic insights
     try {
       const count = await this.getUserMemoryCount()
       return {
         total_memories: count,
-        total_transactions: count,
-        confirmed_transactions: count,
-        pending_transactions: 0,
-        failed_transactions: 0,
         categories: { 'extension': count },
         sentiment_distribution: { positive: 0, negative: 0, neutral: count },
         topology: { total_nodes: count, total_edges: 0, average_connections: 0, largest_cluster_size: count },
@@ -467,10 +413,6 @@ export class MemoryService {
       // Fallback insights also failed
       return {
         total_memories: 0,
-        total_transactions: 0,
-        confirmed_transactions: 0,
-        pending_transactions: 0,
-        failed_transactions: 0,
         categories: {},
         sentiment_distribution: { positive: 0, negative: 0, neutral: 0 },
         topology: { total_nodes: 0, total_edges: 0, average_connections: 0, largest_cluster_size: 0 },
@@ -511,8 +453,6 @@ export class MemoryService {
           source: mem.source || 'extension',
           user_id: '',
           url: mem.url,
-          tx_status: mem.tx_status || 'confirmed',
-          blockchain_network: mem.blockchain_network || 'sepolia',
           page_metadata: mem.page_metadata,
           access_count: mem.access_count || 0,
           last_accessed: mem.last_accessed || new Date().toISOString()
@@ -591,27 +531,6 @@ export class MemoryService {
     return response.data?.data || { snapshots: [], total: 0, page, limit }
   }
 
-  static async getMemoryTransactionStatus(memoryId: string): Promise<{
-    tx_hash?: string
-    block_number?: number
-    gas_used?: string
-    tx_status: 'pending' | 'confirmed' | 'failed'
-    blockchain_network?: string
-    confirmed_at?: string
-  }> {
-    const response = await getRequest(`${this.baseUrl}/transaction/${memoryId}`)
-    return response.data?.data || { tx_status: 'pending' }
-  }
-
-  static async retryFailedTransactions(): Promise<{
-    retried_count: number
-    success_count: number
-    failed_count: number
-  }> {
-    requireAuthToken()
-    const response = await postRequest(`${this.baseUrl}/retry-failed`, {})
-    return response.data?.data || { retried_count: 0, success_count: 0, failed_count: 0 }
-  }
 
   static async healthCheck(): Promise<{ status: string; timestamp: string }> {
     const response = await getRequest(`${this.baseUrl}/health`)

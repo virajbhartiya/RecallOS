@@ -59,10 +59,6 @@ export const Memories: React.FC = () => {
   // Track viewport for responsive behavior (no sidebars now)
   useEffect(() => {}, [])
 
-  const fetchHyperIndexData = useCallback(async (_memoriesData: Memory[]) => {
-    return
-  }, [])
-
   const fetchMemories = useCallback(async () => {
     try {
       // Require authentication
@@ -75,19 +71,12 @@ export const Memories: React.FC = () => {
       
       setMemories(memoriesData || [])
       setTotalMemoryCount(totalCount || 0)
-      
-      // Fetch HyperIndex data in parallel
-      if (memoriesData && memoriesData.length > 0) {
-        fetchHyperIndexData(memoriesData)
-      }
-      
-      
     } catch (err) {
       console.error('Error fetching memories:', err)
     } finally {
       
     }
-  }, [fetchHyperIndexData])
+  }, [])
 
   const handleNodeClick = (memoryId: string) => {
     // Find the memory information
