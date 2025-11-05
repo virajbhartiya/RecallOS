@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { aiProvider } from './aiProvider';
 import { UMAP } from 'umap-js';
-import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant';
+import { qdrantClient, COLLECTION_NAME, ensureCollection, EMBEDDING_DIMENSION } from '../lib/qdrant';
 import { randomUUID } from 'crypto';
 
 export class MemoryMeshService {
@@ -39,19 +39,19 @@ export class MemoryMeshService {
 
       if (memory.content) {
         embeddingPromises.push(
-          this.createEmbedding(memoryId, memory.content, 'content')
+          this.createEmbedding(memoryId, memory.user_id, memory.content, 'content')
         );
       }
 
       if (memory.summary) {
         embeddingPromises.push(
-          this.createEmbedding(memoryId, memory.summary, 'summary')
+          this.createEmbedding(memoryId, memory.user_id, memory.summary, 'summary')
         );
       }
 
       if (memory.title) {
         embeddingPromises.push(
-          this.createEmbedding(memoryId, memory.title, 'title')
+          this.createEmbedding(memoryId, memory.user_id, memory.title, 'title')
         );
       }
 
@@ -67,6 +67,7 @@ export class MemoryMeshService {
 
   private async createEmbedding(
     memoryId: string,
+    userId: string,
     text: string,
     type: string
   ): Promise<void> {
@@ -83,6 +84,7 @@ export class MemoryMeshService {
             vector: embedding,
             payload: {
               memory_id: memoryId,
+              user_id: userId,
               embedding_type: type,
               model_name: 'text-embedding-004',
               created_at: new Date().toISOString(),
@@ -115,7 +117,8 @@ export class MemoryMeshService {
         return [];
       }
 
-      const contentEmbeddingResult = await qdrantClient.scroll(COLLECTION_NAME, {
+      const contentEmbeddingResult = await qdrantClient.search(COLLECTION_NAME, {
+        vector: new Array(EMBEDDING_DIMENSION).fill(0),
         filter: {
           must: [
             { key: 'memory_id', match: { value: memoryId } },
@@ -123,13 +126,16 @@ export class MemoryMeshService {
           ],
         },
         limit: 1,
+        with_payload: true,
+        with_vector: true,
+        score_threshold: 0,
       });
 
-      if (!contentEmbeddingResult.points || contentEmbeddingResult.points.length === 0) {
+      if (!contentEmbeddingResult || contentEmbeddingResult.length === 0) {
         return [];
       }
 
-      const contentEmbeddingPoint = contentEmbeddingResult.points[0];
+      const contentEmbeddingPoint = contentEmbeddingResult[0];
       if (!contentEmbeddingPoint.vector || !Array.isArray(contentEmbeddingPoint.vector)) {
         return [];
       }
@@ -161,44 +167,28 @@ export class MemoryMeshService {
     try {
       await ensureCollection();
 
-      let userMemoryIds: Set<string>;
-      
+      const filter: any = {
+        must: [
+          { key: 'embedding_type', match: { value: 'content' } },
+          { key: 'user_id', match: { value: userId } },
+        ],
+        must_not: [
+          { key: 'memory_id', match: { value: excludeMemoryId } },
+        ],
+      };
+
       if (preFilteredMemoryIds && preFilteredMemoryIds.length > 0) {
         const filteredIds = preFilteredMemoryIds.filter(id => id !== excludeMemoryId);
-        const userMemories = await prisma.memory.findMany({
-          where: {
-            user_id: userId,
-            id: { in: filteredIds },
-          },
-          select: { id: true },
-        });
-        userMemoryIds = new Set(userMemories.map(m => m.id));
-      } else {
-        const userMemories = await prisma.memory.findMany({
-          where: {
-            user_id: userId,
-            id: { not: excludeMemoryId },
-          },
-          select: { id: true },
-        });
-        userMemoryIds = new Set(userMemories.map(m => m.id));
-      }
-
-      if (userMemoryIds.size === 0) {
-        return [];
+        if (filteredIds.length > 0) {
+          filter.must.push({ key: 'memory_id', match: { any: filteredIds } });
+        } else {
+          return [];
+        }
       }
 
       const searchResult = await qdrantClient.search(COLLECTION_NAME, {
         vector: queryVector,
-        filter: {
-          must: [
-            { key: 'embedding_type', match: { value: 'content' } },
-            { key: 'memory_id', match: { any: Array.from(userMemoryIds) } },
-          ],
-          must_not: [
-            { key: 'memory_id', match: { value: excludeMemoryId } },
-          ],
-        },
+        filter,
         limit: limit * 3,
         with_payload: true,
       });
@@ -326,16 +316,20 @@ export class MemoryMeshService {
 
       await ensureCollection();
       
-      const embeddingResult = await qdrantClient.scroll(COLLECTION_NAME, {
+      const embeddingResult = await qdrantClient.search(COLLECTION_NAME, {
+        vector: new Array(EMBEDDING_DIMENSION).fill(0),
         filter: {
           must: [
             { key: 'memory_id', match: { value: memoryId } },
           ],
         },
         limit: 1,
+        with_payload: true,
+        with_vector: true,
+        score_threshold: 0,
       });
 
-      const hasEmbeddings = embeddingResult.points && embeddingResult.points.length > 0;
+      const hasEmbeddings = embeddingResult.length > 0 && embeddingResult[0]?.payload;
       const hasMetadata = !!memory.page_metadata;
       const hasContent = !!memory.content;
       if (!hasEmbeddings && !hasMetadata && !hasContent) {
@@ -1151,15 +1145,22 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       }
 
       const memoryIds = memories.map(m => m.id);
+      const userId = memories.length > 0 ? memories[0].user_id : undefined;
+      
+      const filter: any = {
+        must: [
+          { key: 'memory_id', match: { any: memoryIds } },
+          { key: 'embedding_type', match: { value: 'content' } },
+        ],
+      };
+
+      if (userId) {
+        filter.must.push({ key: 'user_id', match: { value: userId } });
+      }
       
       const embeddingResult = await qdrantClient.scroll(COLLECTION_NAME, {
-        filter: {
-          must: [
-            { key: 'memory_id', match: { any: memoryIds } },
-            { key: 'embedding_type', match: { value: 'content' } },
-          ],
-        },
-        limit: memoryIds.length,
+        filter,
+        limit: memoryIds.length * 3,
         with_payload: true,
         with_vector: true,
       });
@@ -1559,7 +1560,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
       const nodesWithEmbeddings = layoutNodes.filter(n => n.hasEmbedding).length;
       const detectedClusters = Object.keys(clusters).length;
-      
 
       return {
         nodes: layoutNodes,
@@ -1599,28 +1599,9 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       if (queryEmbedding) {
         await ensureCollection();
 
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-        });
-
-        if (!user) {
-          return [];
-        }
-
-        const userMemories = await prisma.memory.findMany({
-          where: { user_id: userId },
-          select: { id: true },
-        });
-
-        const userMemoryIds = userMemories.map(m => m.id);
-
-        if (userMemoryIds.length === 0) {
-          return [];
-        }
-
         const filter: any = {
           must: [
-            { key: 'memory_id', match: { any: userMemoryIds } },
+            { key: 'user_id', match: { value: userId } },
           ],
         };
 
@@ -1754,16 +1735,20 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     try {
       await ensureCollection();
       
-      const embeddingResult = await qdrantClient.scroll(COLLECTION_NAME, {
+      const embeddingResult = await qdrantClient.search(COLLECTION_NAME, {
+        vector: new Array(EMBEDDING_DIMENSION).fill(0),
         filter: {
           must: [
             { key: 'memory_id', match: { value: memoryId } },
           ],
         },
         limit: 1,
+        with_payload: true,
+        with_vector: true,
+        score_threshold: 0,
       });
 
-      const hasEmbeddings = embeddingResult.points && embeddingResult.points.length > 0;
+      const hasEmbeddings = embeddingResult.length > 0 && embeddingResult[0]?.payload;
 
       const memory = await prisma.memory.findUnique({
         where: { id: memoryId },
