@@ -175,8 +175,8 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
           >
             <option value="">All Sources</option>
             <option value="browser">Browser</option>
+            <option value="extension">Extension</option>
             <option value="manual">Manual</option>
-            <option value="on_chain">On-Chain</option>
             <option value="reasoning">Reasoning</option>
           </select>
         </div>
