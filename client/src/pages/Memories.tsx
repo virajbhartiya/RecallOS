@@ -4,6 +4,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { MemoryService } from '@/services/memoryService'
 import { MemoryMesh3D } from '@/components/MemoryMesh3D'
 import { SearchService } from '@/services/search'
+import { PendingJobsPanel } from '@/components/PendingJobsPanel'
  
 // removed unused Database import
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
@@ -33,6 +34,7 @@ export const Memories: React.FC = () => {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [expandedContent, setExpandedContent] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isPendingJobsOpen, setIsPendingJobsOpen] = useState(false)
   const [listSearchQuery, setListSearchQuery] = useState('')
   const [dialogSearchResults, setDialogSearchResults] = useState<MemorySearchResponse | null>(null)
   const [dialogSearchAnswer, setDialogSearchAnswer] = useState<string | null>(null)
@@ -404,7 +406,14 @@ export const Memories: React.FC = () => {
                 <div className="text-sm font-medium text-gray-900">Memory Mesh</div>
               </div>
             </div>
-            <div className="flex items-center space-x-4"></div>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={() => setIsPendingJobsOpen(true)}
+                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
+              >
+                Pending Jobs
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -749,6 +758,12 @@ export const Memories: React.FC = () => {
             </div>
           </div>
         )}
+
+        <PendingJobsPanel 
+          userId={userId}
+          isOpen={isPendingJobsOpen}
+          onClose={() => setIsPendingJobsOpen(false)}
+        />
       </div>
 
       {/* Memory Stats Overlay */}
