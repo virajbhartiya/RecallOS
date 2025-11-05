@@ -10,3 +10,14 @@ interface ImportMeta {
     VITE_DEV_PORT: number
   }
 }
+
+declare global {
+  interface Window {
+    chrome?: {
+      runtime?: {
+        id?: string;
+        sendMessage?: (extensionId: string, message: any) => Promise<void>;
+      };
+    };
+  }
+}

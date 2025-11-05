@@ -1,5 +1,5 @@
 import { getRequest, postRequest } from '../utility/generalServices'
-import { getOrCreateAuthToken } from '../utils/userId'
+import { requireAuthToken } from '../utils/userId'
 import type {
   Memory,
   MemoryInsights,
@@ -47,20 +47,28 @@ export class MemoryService {
     if (limit) params.append('limit', limit.toString())
     
     try {
-      // Ensure we have an auth token
-      await getOrCreateAuthToken()
+      // Require authentication
+      requireAuthToken()
       
       const response = await getRequest(`${this.baseUrl}/transactions?${params.toString()}`)
-      const data = response.data?.data
       
       // Check if the API returned an error
       if (response.data?.success === false) {
+        console.error('API error:', response.data?.error)
         throw new Error(response.data?.error || 'API returned error')
       }
       
-      if (Array.isArray(data?.memories) && data.memories.length > 0) {
+      // API returns: { success: true, data: { memories: [...], transactionStats: {...}, totalMemories: number } }
+      const data = response.data?.data
+      const memories = data?.memories || []
+      
+      if (Array.isArray(memories)) {
+        if (memories.length === 0) {
+          console.log('No memories found for user:', userId)
+          return []
+        }
         // Map API response to Memory interface
-        return data.memories.map((mem: ApiMemoryResponse) => ({
+        return memories.map((mem: ApiMemoryResponse) => ({
           id: mem.id || mem.hash,
           user_id: userId,
           hash: mem.hash,
@@ -69,7 +77,7 @@ export class MemoryService {
           title: mem.title || 'Memory',
           summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
           content: mem.content || '',
-          source: mem.source || 'on_chain',
+          source: mem.source || 'extension',
           url: mem.url,
           tx_status: mem.tx_status || 'confirmed',
           blockchain_network: mem.blockchain_network || 'sepolia',
@@ -82,11 +90,12 @@ export class MemoryService {
           confirmed_at: mem.confirmed_at
         } as Memory))
       }
+      
+      console.log('No memories found in response:', response.data)
     } catch (error) {
-      // Error fetching memories from database
+      console.error('Error fetching memories:', error)
+      throw error
     }
-    
-    // No fallback - return empty array if no transaction data found
     
     return []
   }
@@ -108,8 +117,8 @@ export class MemoryService {
     try {
       const normalizedAddress = userId
       
-      // Ensure we have an auth token
-      await getOrCreateAuthToken()
+      // Require authentication
+      requireAuthToken()
       
       // Use the working /search endpoint (POST)
       const response = await postRequest('/search', {
@@ -463,7 +472,7 @@ export class MemoryService {
         confirmed_transactions: count,
         pending_transactions: 0,
         failed_transactions: 0,
-        categories: { 'on_chain': count },
+        categories: { 'extension': count },
         sentiment_distribution: { positive: 0, negative: 0, neutral: count },
         topology: { total_nodes: count, total_edges: 0, average_connections: 0, largest_cluster_size: count },
         recent_activity: { last_7_days: count, last_30_days: count }
@@ -513,7 +522,7 @@ export class MemoryService {
           title: mem.title || 'Memory',
           summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
           content: mem.content || '',
-          source: mem.source || 'on_chain',
+          source: mem.source || 'extension',
           user_id: userId,
           url: mem.url,
           tx_status: mem.tx_status || 'confirmed',
