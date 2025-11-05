@@ -51,6 +51,15 @@ export const submitContent = async (
     };
 
     const job = await addContentJob(jobData);
+    
+    console.log(`[Content API] Content submitted and queued for processing`, {
+      jobId: job.id,
+      userId: user_id,
+      contentLength: raw_text.length,
+      source: metadata?.source || 'unknown',
+      url: metadata?.url || 'unknown',
+      timestamp: new Date().toISOString(),
+    });
 
     res.status(202).json({
       status: 'success',

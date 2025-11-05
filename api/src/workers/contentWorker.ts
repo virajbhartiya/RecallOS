@@ -12,6 +12,15 @@ export const startContentWorker = () => {
     'process-content',
     async (job) => {
       const { user_id, raw_text, metadata } = job.data as ContentJobData;
+      
+      console.log(`[Redis Worker] Processing job started`, {
+        jobId: job.id,
+        userId: user_id,
+        contentLength: raw_text?.length || 0,
+        source: metadata?.source || 'unknown',
+        attemptsMade: job.attemptsMade,
+        timestamp: new Date().toISOString(),
+      });
 
       const isRetryableError = (err: any): boolean => {
         const msg = String(err?.message || '').toLowerCase();
@@ -40,21 +49,66 @@ export const startContentWorker = () => {
       let summary: string | null = null;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
+          if (attempt > 1) {
+            console.log(`[Redis Worker] Retrying job (attempt ${attempt}/${maxAttempts})`, {
+              jobId: job.id,
+              userId: user_id,
+              attempt,
+              timestamp: new Date().toISOString(),
+            });
+          }
           summary = await aiProvider.summarizeContent(raw_text, metadata);
+          if (attempt > 1) {
+            console.log(`[Redis Worker] Job retry successful`, {
+              jobId: job.id,
+              userId: user_id,
+              attempt,
+              timestamp: new Date().toISOString(),
+            });
+          }
           break; // success
         } catch (err: any) {
           if (!isRetryableError(err) || attempt === maxAttempts) {
+            console.error(`[Redis Worker] Job failed permanently`, {
+              jobId: job.id,
+              userId: user_id,
+              attempt,
+              error: err?.message || String(err),
+              isRetryable: isRetryableError(err),
+              timestamp: new Date().toISOString(),
+            });
             throw err; // non-retryable or exhausted
           }
           const backoff = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
           const jitter = Math.floor(Math.random() * 500);
+          console.warn(`[Redis Worker] Job retryable error, backing off`, {
+            jobId: job.id,
+            userId: user_id,
+            attempt,
+            backoffMs: backoff + jitter,
+            error: err?.message || String(err),
+            timestamp: new Date().toISOString(),
+          });
           await sleep(backoff + jitter);
         }
       }
 
       if (!summary) {
+        console.error(`[Redis Worker] Failed to generate summary after all retries`, {
+          jobId: job.id,
+          userId: user_id,
+          maxAttempts,
+          timestamp: new Date().toISOString(),
+        });
         throw new Error('Failed to generate summary after retries');
       }
+
+      console.log(`[Redis Worker] Summary generated successfully`, {
+        jobId: job.id,
+        userId: user_id,
+        summaryLength: summary.length,
+        timestamp: new Date().toISOString(),
+      });
 
       if (metadata?.memory_id) {
         await prisma.memory.update({
@@ -77,6 +131,13 @@ export const startContentWorker = () => {
             summary_hash: summaryHash,
           },
         });
+        
+        console.log(`[Redis Worker] Memory updated successfully`, {
+          jobId: job.id,
+          userId: user_id,
+          memoryId: metadata.memory_id,
+          timestamp: new Date().toISOString(),
+        });
       } else {
         const user = await prisma.user.findUnique({
           where: { id: user_id },
@@ -92,6 +153,12 @@ export const startContentWorker = () => {
           });
 
           if (existingByCanonical) {
+            console.log(`[Redis Worker] Duplicate memory detected, skipping creation`, {
+              jobId: job.id,
+              userId: user_id,
+              existingMemoryId: existingByCanonical.id,
+              timestamp: new Date().toISOString(),
+            });
             return {
               success: true,
               contentId: existingByCanonical.id,
@@ -135,15 +202,32 @@ export const startContentWorker = () => {
               summary_hash: summaryHash,
             },
           });
+          
+          console.log(`[Redis Worker] New memory created successfully`, {
+            jobId: job.id,
+            userId: user_id,
+            memoryId: memory.id,
+            timestamp: new Date().toISOString(),
+          });
         }
       }
 
-      return {
+      const result = {
         success: true,
         contentId: metadata?.memory_id || 'memory_processed',
         memoryId: metadata?.memory_id || null,
         summary: summary.substring(0, 100) + '...',
       };
+      
+      console.log(`[Redis Worker] Job completed successfully`, {
+        jobId: job.id,
+        userId: user_id,
+        result,
+        processingTime: Date.now() - job.timestamp,
+        timestamp: new Date().toISOString(),
+      });
+
+      return result;
     },
     {
       connection: getRedisConnection(),
