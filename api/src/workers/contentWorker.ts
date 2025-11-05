@@ -8,7 +8,7 @@ import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../uti
 import { normalizeText, hashCanonical } from '../utils/text';
 
 export const startContentWorker = () => {
-  const worker = new Worker<ContentJobData>(
+  return new Worker<ContentJobData>(
     'process-content',
     async (job) => {
       const { user_id, raw_text, metadata } = job.data as ContentJobData;
@@ -151,7 +151,4 @@ export const startContentWorker = () => {
       limiter: getQueueLimiter(),
     }
   );
-
-  // Silence per-job failure logs to reduce noise; failures still surface to BullMQ
-  // events if you attach listeners elsewhere.
 };
