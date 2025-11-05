@@ -66,7 +66,7 @@ export interface TransactionDetails {
 
 export interface MemoryMeshNode {
   id: string
-  type: 'manual' | 'on_chain' | 'browser' | 'reasoning'
+  type: 'manual' | 'browser' | 'extension' | 'reasoning'
   label: string
   x: number
   y: number

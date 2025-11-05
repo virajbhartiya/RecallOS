@@ -1047,7 +1047,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       'extension': { x: -300, y: -200 },
       'github': { x: 200, y: -100 },
       'meet': { x: -200, y: 300 },
-      'on_chain': { x: 100, y: 200 },
       'default': { x: 0, y: 0 }
     };
     
@@ -1310,7 +1309,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         
         return {
           id: memory.id,
-          type: memory.source || 'on_chain',
+          type: memory.source || 'extension',
           label: memory.title || memory.summary?.substring(0, 20) || 'Memory',
           memory_id: memory.id,
           title: memory.title,
@@ -1323,7 +1322,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           clusterId: undefined as number | undefined,
           layout: {
             isLatentSpace: latentCoords.has(memory.id),
-            cluster: memory.source || 'on_chain',
+            cluster: memory.source || 'extension',
             centrality: memory.related_memories.length,
           }
         };

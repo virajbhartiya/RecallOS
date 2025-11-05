@@ -20,9 +20,6 @@ interface MemoryMesh3DProps {
 
 const nodeColors = {
   manual: '#22c55e',
-  on_chain: '#22c55e',
-  onchain: '#22c55e',
-  'on-chain': '#22c55e',
   browser: '#3b82f6',
   extension: '#3b82f6',
   reasoning: '#a855f7',
