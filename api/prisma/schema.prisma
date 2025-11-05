@@ -29,6 +29,8 @@ model Memory {
   content                String
   summary                String?
   hash                   String?              @unique
+  canonical_text         String?
+  canonical_hash         String?
   timestamp              BigInt
   created_at             DateTime             @default(now())
   full_content           String?
@@ -50,6 +52,7 @@ model Memory {
   @@index([user_id])
   @@index([created_at])
   @@index([user_id, created_at])
+  @@unique([user_id, canonical_hash])
   @@map("memories")
 }
 

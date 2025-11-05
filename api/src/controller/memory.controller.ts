@@ -19,6 +19,7 @@ import { prisma } from '../lib/prisma';
 import { aiProvider } from '../services/aiProvider';
 
 import { memoryMeshService } from '../services/memoryMesh';
+import { normalizeText, hashCanonical } from '../utils/text';
 import { searchMemories } from '../services/memorySearch';
 
 function hashUrl(url: string): string {
@@ -62,6 +63,46 @@ export class MemoryController {
       console.log('[memory/process] user_resolved', { userId: user.id, externalId: user.external_id });
 
 
+      // Exact duplicate check on canonicalized content per user before expensive AI calls
+      const canonicalText = normalizeText(content);
+      const canonicalHash = hashCanonical(canonicalText);
+
+      const existingByCanonical = await prisma.memory.findFirst({
+        where: { user_id: user.id, canonical_hash: canonicalHash } as any,
+        select: {
+          id: true,
+          title: true,
+          url: true,
+          hash: true,
+          timestamp: true,
+          created_at: true,
+          summary: true,
+          content: true,
+          source: true,
+          page_metadata: true,
+          canonical_text: true,
+          canonical_hash: true,
+        } as any,
+      });
+
+      if (existingByCanonical) {
+        const serializedExisting = {
+          ...existingByCanonical,
+          timestamp: (existingByCanonical as any).timestamp
+            ? (existingByCanonical as any).timestamp.toString()
+            : null,
+        };
+        return res.status(200).json({
+          success: true,
+          message: 'Duplicate memory detected, returning existing record',
+          data: {
+            userId,
+            memory: serializedExisting,
+            isDuplicate: true,
+          },
+        });
+      }
+
       const aiStart = Date.now();
       console.log('[memory/process] ai_start', { ts: new Date().toISOString(), tasks: ['summarizeContent', 'extractContentMetadata'] });
       const [summary, extractedMetadata] = await Promise.all([
@@ -78,40 +119,7 @@ export class MemoryController {
 
       const timestamp = Math.floor(Date.now() / 1000);
 
-      // Check for duplicate memories
-      const existingMemory = await prisma.memory.findFirst({
-        where: {
-          user_id: user.id,
-          OR: [
-            { hash: memoryHash },
-            { 
-              AND: [
-                { url: url || 'unknown' },
-                { 
-                  created_at: {
-                    gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Within last 24 hours
-                  }
-                }
-              ]
-            }
-          ]
-        }
-      });
-
-      if (existingMemory) {
-
-        return res.status(200).json({
-          success: true,
-          message: 'Duplicate memory detected, skipping creation',
-          data: {
-            userId,
-            existingMemoryId: existingMemory.id,
-            memoryHash,
-            urlHash,
-            isDuplicate: true
-          },
-        });
-      }
+      // Retain legacy checks but canonical already ensures exact duplicate prevention
 
       const dbCreateStart = Date.now();
       const memory = await prisma.memory.create({
@@ -123,6 +131,8 @@ export class MemoryController {
           content: content,
           summary: summary,
           hash: memoryHash,
+          canonical_text: canonicalText,
+          canonical_hash: canonicalHash,
           timestamp: BigInt(timestamp),
           full_content: content,
           page_metadata: {
@@ -135,7 +145,7 @@ export class MemoryController {
             importance: extractedMetadata.importance,
             searchable_terms: extractedMetadata.searchableTerms,
           },
-        },
+        } as any,
       });
       console.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id, userId: user.id });
 

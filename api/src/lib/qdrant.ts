@@ -9,10 +9,12 @@ const QDRANT_API_KEY = process.env.QDRANT_API_KEY;
 const EMBEDDING_DIMENSION = Number(process.env.EMBEDDING_DIMENSION || 768);
 const COLLECTION_NAME = 'memory_embeddings';
 
-export const qdrantClient = globalForQdrant.qdrant ?? new QdrantClient({
-  url: QDRANT_URL,
-  apiKey: QDRANT_API_KEY,
-});
+const qdrantOptions: any = { url: QDRANT_URL };
+if (QDRANT_URL.startsWith('https://') && QDRANT_API_KEY) {
+  qdrantOptions.apiKey = QDRANT_API_KEY;
+}
+
+export const qdrantClient = globalForQdrant.qdrant ?? new QdrantClient(qdrantOptions);
 
 if (process.env.NODE_ENV !== 'production') {
   globalForQdrant.qdrant = qdrantClient;
