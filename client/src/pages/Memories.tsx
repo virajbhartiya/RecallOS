@@ -65,7 +65,7 @@ export const Memories: React.FC = () => {
       requireAuthToken()
       
       const [memoriesData, totalCount] = await Promise.all([
-        MemoryService.getMemoriesWithTransactionDetails(undefined, 10000),
+        MemoryService.getMemoriesWithTransactionDetails(10000),
         MemoryService.getUserMemoryCount()
       ])
       

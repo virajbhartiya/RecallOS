@@ -166,9 +166,6 @@ export const startContentWorker = () => {
               summary: summary.substring(0, 100) + '...',
             };
           }
-          const memoryHash =
-            '0x' + createHash('sha256').update(summary).digest('hex');
-
           const timestamp = Math.floor(Date.now() / 1000);
 
           const memory = await prisma.memory.create({
@@ -179,7 +176,6 @@ export const startContentWorker = () => {
               title: metadata?.title || 'Untitled',
               content: raw_text,
               summary: summary,
-              hash: memoryHash,
               canonical_text: canonicalText,
               canonical_hash: canonicalHash,
               timestamp: BigInt(timestamp),

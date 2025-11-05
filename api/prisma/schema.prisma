@@ -28,7 +28,6 @@ model Memory {
   title                  String?
   content                String
   summary                String?
-  hash                   String?              @unique
   canonical_text         String?
   canonical_hash         String?
   timestamp              BigInt

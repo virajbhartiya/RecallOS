@@ -27,8 +27,6 @@ router.get('/cluster/:memoryId', authenticateToken, MemoryController.getMemoryCl
 router.get('/search-embeddings', authenticateToken, MemoryController.searchMemoriesWithEmbeddings);
 router.get('/search-hybrid', authenticateToken, MemoryController.searchMemoriesHybrid);
 router.post('/process-mesh/:memoryId', authenticateToken, MemoryController.processMemoryForMesh);
-router.get('/hash/:hash', authenticateToken, MemoryController.getMemoryByHash);
-router.get('/exists/:hash', authenticateToken, MemoryController.isMemoryStored);
 router.get('/snapshots', authenticateToken, MemoryController.getMemorySnapshots);
 router.get('/snapshot/:snapshotId', authenticateToken, MemoryController.getMemorySnapshot);
 router.post('/backfill-snapshots', authenticateToken, MemoryController.backfillMemorySnapshots);
