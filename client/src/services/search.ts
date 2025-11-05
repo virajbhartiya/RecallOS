@@ -87,7 +87,6 @@ export class SearchService {
               title: r.title || 'Untitled Memory',
               content: '',
               summary: r.summary || undefined,
-              hash: undefined,
               timestamp: r.timestamp,
               created_at: createdAtIso,
               page_metadata: undefined,
