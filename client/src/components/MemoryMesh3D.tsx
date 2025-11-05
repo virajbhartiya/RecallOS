@@ -72,8 +72,8 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
   const [hovered, setHovered] = useState(false)
   
   // Supermemory-like tiny nodes
-  const baseSize = 0.012 + (importance * 0.006)
-  const size = isSelected ? baseSize + 0.02 : isHighlighted ? baseSize + 0.008 : baseSize
+  const baseSize = 0.006 + (importance * 0.003)
+  const size = isSelected ? baseSize + 0.01 : isHighlighted ? baseSize + 0.004 : baseSize
   const opacity = inLatentSpace ? 0.95 : 0.75
   
   useFrame(() => {
@@ -125,7 +125,7 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
 
   const color = getLineColor(similarity)
   const opacity = similarity > 0.75 ? 0.6 : (similarity > 0.5 ? 0.4 : 0.3)
-  const lineWidth = similarity > 0.85 ? 3 : (similarity > 0.75 ? 2 : 1)
+  const lineWidth = similarity > 0.85 ? 1 : (similarity > 0.75 ? 0.75 : 0.5)
 
   return (
     <Line
