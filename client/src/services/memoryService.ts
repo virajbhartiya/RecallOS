@@ -630,4 +630,33 @@ export class MemoryService {
     const response = await getRequest(`${this.baseUrl}/health`)
     return response.data?.data || { status: 'unknown', timestamp: new Date().toISOString() }
   }
+
+  static async getPendingJobs(userId?: string): Promise<{
+    jobs: Array<{
+      id: string
+      user_id: string
+      raw_text: string
+      full_text_length: number
+      metadata: Record<string, unknown>
+      status: 'waiting' | 'active' | 'delayed'
+      created_at: string
+      processed_on: string | null
+      finished_on: string | null
+      failed_reason: string | null
+      attempts: number
+    }>
+    counts: {
+      total: number
+      waiting: number
+      active: number
+      delayed: number
+    }
+  }> {
+    const params = new URLSearchParams()
+    if (userId) {
+      params.append('user_id', userId)
+    }
+    const response = await getRequest(`/content/pending?${params.toString()}`)
+    return response.data?.data || { jobs: [], counts: { total: 0, waiting: 0, active: 0, delayed: 0 } }
+  }
 }

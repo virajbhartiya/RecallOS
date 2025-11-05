@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 
-import { addContentJob, ContentJobData } from '../lib/queue';
+import { addContentJob, ContentJobData, contentQueue } from '../lib/queue';
 
 import { prisma } from '../lib/prisma';
 
@@ -130,6 +130,64 @@ export const getSummarizedContent = async (
     });
   } catch (error) {
     console.error('Error fetching summarized content:', error);
+    next(error);
+  }
+};
+
+export const getPendingJobs = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { user_id } = req.query;
+
+    const [waiting, active, delayed] = await Promise.all([
+      contentQueue.getWaiting(),
+      contentQueue.getActive(),
+      contentQueue.getDelayed(),
+    ]);
+
+    const waitingJobs = waiting.map((job) => ({ job, status: 'waiting' as const }));
+    const activeJobs = active.map((job) => ({ job, status: 'active' as const }));
+    const delayedJobs = delayed.map((job) => ({ job, status: 'delayed' as const }));
+
+    let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs];
+
+    if (user_id) {
+      allJobs = allJobs.filter((item) => item.job.data.user_id === user_id);
+    }
+
+    const jobs = allJobs
+      .map((item) => ({
+        id: item.job.id,
+        user_id: item.job.data.user_id,
+        raw_text: item.job.data.raw_text?.substring(0, 200) + (item.job.data.raw_text && item.job.data.raw_text.length > 200 ? '...' : ''),
+        full_text_length: item.job.data.raw_text?.length || 0,
+        metadata: item.job.data.metadata || {},
+        status: item.status,
+        created_at: new Date(item.job.timestamp).toISOString(),
+        processed_on: item.job.processedOn ? new Date(item.job.processedOn).toISOString() : null,
+        finished_on: item.job.finishedOn ? new Date(item.job.finishedOn).toISOString() : null,
+        failed_reason: item.job.failedReason || null,
+        attempts: item.job.attemptsMade,
+      }))
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        jobs,
+        counts: {
+          total: jobs.length,
+          waiting: waiting.length,
+          active: active.length,
+          delayed: delayed.length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching pending jobs:', error);
     next(error);
   }
 };
