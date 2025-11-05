@@ -29,7 +29,6 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOp
   const [counts, setCounts] = useState({ total: 0, waiting: 0, active: 0, delayed: 0 })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [filterByUser, setFilterByUser] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false)
 
   const fetchPendingJobs = useCallback(async () => {
@@ -38,7 +37,13 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOp
       setIsLoading(true)
       setError(null)
 
-      const result = await MemoryService.getPendingJobs(filterByUser ? userId || undefined : undefined)
+      if (!userId) {
+        setError('User ID is required')
+        setIsLoading(false)
+        return
+      }
+
+      const result = await MemoryService.getPendingJobs(userId)
       setJobs(result.jobs)
       setCounts(result.counts)
     } catch (err: any) {
@@ -47,7 +52,7 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOp
     } finally {
       setIsLoading(false)
     }
-  }, [userId, filterByUser])
+  }, [userId])
 
   useEffect(() => {
     if (!isOpen) return
@@ -127,16 +132,6 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOp
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
               <div className="flex items-center space-x-4 flex-wrap">
-                <button
-                  onClick={() => setFilterByUser(!filterByUser)}
-                  className={`px-4 py-2 text-sm font-mono border ${
-                    filterByUser
-                      ? 'bg-blue-50 text-blue-800 border-blue-200'
-                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
-                  }`}
-                >
-                  {filterByUser ? 'Show All' : 'My Jobs Only'}
-                </button>
                 <button
                   onClick={() => setAutoRefresh(!autoRefresh)}
                   className={`px-4 py-2 text-sm font-mono border flex items-center space-x-2 ${
