@@ -6,6 +6,7 @@ import { addContentJob, ContentJobData, contentQueue } from '../lib/queue';
 import { prisma } from '../lib/prisma';
 
 import AppError from '../utils/appError';
+import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text';
 
 export const submitContent = async (
   req: AuthenticatedRequest,
@@ -47,6 +48,101 @@ export const submitContent = async (
           400
         )
       );
+    }
+
+    // Duplicate check before queueing to avoid unnecessary processing
+    const canonicalText = normalizeText(raw_text);
+    const canonicalHash = hashCanonical(canonicalText);
+
+    const existingByCanonical = await prisma.memory.findFirst({
+      where: { user_id, canonical_hash: canonicalHash } as any,
+      select: {
+        id: true,
+        title: true,
+        url: true,
+        timestamp: true,
+        created_at: true,
+        summary: true,
+        content: true,
+        source: true,
+        page_metadata: true,
+        canonical_text: true,
+        canonical_hash: true,
+      } as any,
+    });
+
+    if (existingByCanonical) {
+      const serializedExisting = {
+        ...existingByCanonical,
+        timestamp: (existingByCanonical as any).timestamp
+          ? (existingByCanonical as any).timestamp.toString()
+          : null,
+      };
+      return res.status(200).json({
+        status: 'success',
+        message: 'Duplicate memory detected, returning existing record',
+        data: {
+          userId: user_id,
+          memory: serializedExisting,
+          isDuplicate: true,
+        },
+      });
+    }
+
+    // Fallback: Check for URL-based duplicates within the last hour (for dynamic content)
+    const url = typeof metadata?.url === 'string' ? metadata.url : undefined;
+    if (url && url !== 'unknown') {
+      const normalizedUrl = normalizeUrl(url);
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      
+      const recentMemories = await prisma.memory.findMany({
+        where: {
+          user_id,
+          created_at: { gte: oneHourAgo } as any,
+        } as any,
+        select: {
+          id: true,
+          title: true,
+          url: true,
+          timestamp: true,
+          created_at: true,
+          summary: true,
+          content: true,
+          source: true,
+          page_metadata: true,
+          canonical_text: true,
+          canonical_hash: true,
+        } as any,
+        orderBy: { created_at: 'desc' } as any,
+        take: 50,
+      });
+
+      for (const existingMemory of recentMemories) {
+        const existingUrl = (existingMemory as any).url;
+        if (existingUrl && typeof existingUrl === 'string' && normalizeUrl(existingUrl) === normalizedUrl) {
+          const existingCanonical = normalizeText((existingMemory as any).content || '');
+          const similarity = calculateSimilarity(canonicalText, existingCanonical);
+          
+          if (similarity > 0.9) {
+            const serializedExisting = {
+              ...existingMemory,
+              timestamp: (existingMemory as any).timestamp
+                ? (existingMemory as any).timestamp.toString()
+                : null,
+            };
+            console.log('[Content API] URL duplicate detected, skipping queue', { existingMemoryId: existingMemory.id, similarity, userId: user_id });
+            return res.status(200).json({
+              status: 'success',
+              message: 'Duplicate memory detected by URL similarity, returning existing record',
+              data: {
+                userId: user_id,
+                memory: serializedExisting,
+                isDuplicate: true,
+              },
+            });
+          }
+        }
+      }
     }
 
     const jobData: ContentJobData = {

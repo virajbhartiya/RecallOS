@@ -4,7 +4,7 @@ import { createHash } from 'crypto';
 import { prisma } from '../lib/prisma';
 import { aiProvider } from '../services/aiProvider';
 import { memoryMeshService } from '../services/memoryMesh';
-import { normalizeText, hashCanonical } from '../utils/text';
+import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text';
 
 function hashUrl(url: string): string {
   return createHash('sha256').update(url).digest('hex');
@@ -88,6 +88,61 @@ export class MemoryController {
         });
       }
 
+      // Fallback: Check for URL-based duplicates within the last hour (for dynamic content)
+      if (url && url !== 'unknown') {
+        const normalizedUrl = normalizeUrl(url);
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+        
+        const recentMemories = await prisma.memory.findMany({
+          where: {
+            user_id: user.id,
+            created_at: { gte: oneHourAgo } as any,
+          } as any,
+          select: {
+            id: true,
+            title: true,
+            url: true,
+            timestamp: true,
+            created_at: true,
+            summary: true,
+            content: true,
+            source: true,
+            page_metadata: true,
+            canonical_text: true,
+            canonical_hash: true,
+          } as any,
+          orderBy: { created_at: 'desc' } as any,
+          take: 50,
+        });
+
+        for (const existingMemory of recentMemories) {
+          const existingUrl = (existingMemory as any).url;
+          if (existingUrl && typeof existingUrl === 'string' && normalizeUrl(existingUrl) === normalizedUrl) {
+            const existingCanonical = normalizeText((existingMemory as any).content || '');
+            const similarity = calculateSimilarity(canonicalText, existingCanonical);
+            
+            if (similarity > 0.9) {
+              const serializedExisting = {
+                ...existingMemory,
+                timestamp: (existingMemory as any).timestamp
+                  ? (existingMemory as any).timestamp.toString()
+                  : null,
+              };
+              console.log('[memory/process] url_duplicate_detected', { existingMemoryId: existingMemory.id, similarity, userId: user.id });
+              return res.status(200).json({
+                success: true,
+                message: 'Duplicate memory detected by URL similarity, returning existing record',
+                data: {
+                  userId: user.id,
+                  memory: serializedExisting,
+                  isDuplicate: true,
+                },
+              });
+            }
+          }
+        }
+      }
+
       const aiStart = Date.now();
       console.log('[memory/process] ai_start', { ts: new Date().toISOString(), tasks: ['summarizeContent', 'extractContentMetadata'] });
       const [summary, extractedMetadata] = await Promise.all([
@@ -104,31 +159,73 @@ export class MemoryController {
       // Retain legacy checks but canonical already ensures exact duplicate prevention
 
       const dbCreateStart = Date.now();
-      const memory = await prisma.memory.create({
-        data: {
-          user_id: user.id,
-          source: metadata?.source || 'extension',
-          url: url || 'unknown',
-          title: title || 'Untitled',
-          content: content,
-          summary: summary,
-          canonical_text: canonicalText,
-          canonical_hash: canonicalHash,
-          timestamp: BigInt(timestamp),
-          full_content: content,
-          page_metadata: {
-            ...metadata,
-            extracted_metadata: extractedMetadata,
-            topics: extractedMetadata.topics,
-            categories: extractedMetadata.categories,
-            key_points: extractedMetadata.keyPoints,
-            sentiment: extractedMetadata.sentiment,
-            importance: extractedMetadata.importance,
-            searchable_terms: extractedMetadata.searchableTerms,
-          },
-        } as any,
-      });
-      console.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id, userId: user.id });
+      let memory;
+      try {
+        memory = await prisma.memory.create({
+          data: {
+            user_id: user.id,
+            source: metadata?.source || 'extension',
+            url: url || 'unknown',
+            title: title || 'Untitled',
+            content: content,
+            summary: summary,
+            canonical_text: canonicalText,
+            canonical_hash: canonicalHash,
+            timestamp: BigInt(timestamp),
+            full_content: content,
+            page_metadata: {
+              ...metadata,
+              extracted_metadata: extractedMetadata,
+              topics: extractedMetadata.topics,
+              categories: extractedMetadata.categories,
+              key_points: extractedMetadata.keyPoints,
+              sentiment: extractedMetadata.sentiment,
+              importance: extractedMetadata.importance,
+              searchable_terms: extractedMetadata.searchableTerms,
+            },
+          } as any,
+        });
+        console.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id, userId: user.id });
+      } catch (createError: any) {
+        if (createError.code === 'P2002') {
+          const existingMemory = await prisma.memory.findFirst({
+            where: { user_id: user.id, canonical_hash: canonicalHash } as any,
+            select: {
+              id: true,
+              title: true,
+              url: true,
+              timestamp: true,
+              created_at: true,
+              summary: true,
+              content: true,
+              source: true,
+              page_metadata: true,
+              canonical_text: true,
+              canonical_hash: true,
+            } as any,
+          });
+
+          if (existingMemory) {
+            const serializedExisting = {
+              ...existingMemory,
+              timestamp: (existingMemory as any).timestamp
+                ? (existingMemory as any).timestamp.toString()
+                : null,
+            };
+            console.log('[memory/process] duplicate_detected_on_create', { existingMemoryId: existingMemory.id, userId: user.id });
+            return res.status(200).json({
+              success: true,
+              message: 'Duplicate memory detected, returning existing record',
+              data: {
+                userId: user.id,
+                memory: serializedExisting,
+                isDuplicate: true,
+              },
+            });
+          }
+        }
+        throw createError;
+      }
 
       setImmediate(async () => {
         // Always create snapshot even if mesh processing fails
