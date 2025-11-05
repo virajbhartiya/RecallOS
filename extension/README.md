@@ -1,13 +1,13 @@
 # RecallOS Browser Extension
 
-A browser extension that automatically captures and processes your web browsing activity to create a searchable, verifiable memory network powered by AI and blockchain technology.
+A browser extension that automatically captures and processes your web browsing activity to create a searchable, AI-powered memory network.
 
 ## Features
 
 - **Automatic Content Capture**: Monitors web pages and extracts meaningful content
 - **AI Processing**: Generates summaries and embeddings using Gemini or Ollama
 - **Memory Mesh**: Creates connections between related content and ideas
-- **Blockchain Verification**: Stores content hashes on Sepolia testnet for permanent verification
+ 
 - **AI Integration**: Works with ChatGPT and other AI tools for context-aware responses
 - **Privacy-First**: Never captures private or local content
 
@@ -20,7 +20,7 @@ Since the extension is not yet published to the Chrome Web Store, you'll need to
 1. **Download**: Get the latest release from [GitHub Releases](https://github.com/virajbhartiya/RecallOS/releases/latest)
 2. **Extract**: Unzip the downloaded file to a folder on your computer
 3. **Install**: Load the extension in Chrome/Edge developer mode
-4. **Connect**: Link your wallet to start using RecallOS
+4. **Configure**: Set your API endpoint and preferences
 
 📖 **For detailed installation instructions, see [INSTALLATION.md](./INSTALLATION.md)**
 
@@ -75,7 +75,6 @@ Create a `.env` file in the extension directory:
 
 ```env
 VITE_API_URL=http://localhost:3001
-VITE_BLOCKCHAIN_NETWORK=sepolia
 VITE_AI_PROVIDER=gemini
 ```
 
@@ -93,7 +92,7 @@ The extension requires the following permissions:
 - **Local Processing**: Content is processed locally when possible
 - **No Private Data**: Never captures localhost, private networks, or sensitive information
 - **User Control**: You control what gets captured and stored
-- **Blockchain Transparency**: All operations are verifiable on-chain
+ 
 
 ## Troubleshooting
 
@@ -125,4 +124,4 @@ This project is licensed under the MIT License - see the main repository for det
 
 ---
 
-**Note**: This is a testnet version of RecallOS. The extension is still in development and may have bugs or incomplete features.
+**Note**: This is a development version of RecallOS. The extension is still in development and may have bugs or incomplete features.

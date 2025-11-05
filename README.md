@@ -259,10 +259,7 @@ npm run build
 - `GET /api/memory/user/:userId/recent` - Get recent memories (authenticated)
 - `GET /api/memory/user/:userId/count` - Get memory count (authenticated)
 - `GET /api/memory/user/:userId/memory/:index` - Get memory by index (authenticated)
-- `GET /api/memory/hash/:hash` - Get memory by hash (authenticated)
 - `GET /api/memory/insights` - Analytics and insights (authenticated)
-- `GET /api/memory/transactions` - Memories with transaction details (authenticated)
-- `POST /api/memory/retry-failed` - Retry failed transactions (authenticated)
 
 ### Memory Mesh
 - `GET /api/memory/mesh/:userId` - Get full graph (authenticated)

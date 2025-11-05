@@ -3,7 +3,7 @@
 Dual-mode MCP server exposing RecallOS features via MCP tools.
 
 ### Prereqs
-- Populate `api/.env` with `DATABASE_URL` (and optional `REDIS_*`, `GEMINI_API_KEY`, blockchain vars).
+- Populate `api/.env` with `DATABASE_URL` (and optional `REDIS_*`, `GEMINI_API_KEY`).
 
 ### Run (stdio)
 ```bash
@@ -22,7 +22,7 @@ Health: GET http://localhost:7820/healthz
 - memory.getRecent, memory.byHash, memory.storeContent
 - search.post, search.jobStatus
 - mesh.get, mesh.processMemory
-- blockscout.prefetch, blockscout.get, blockscout.cleanup
+ 
 - content.submit, content.listSummarized
 
 

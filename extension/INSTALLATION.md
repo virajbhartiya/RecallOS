@@ -13,7 +13,7 @@
 
 ## Overview
 
-RecallOS is a browser extension that automatically captures and processes your web browsing activity to create a searchable, verifiable memory network. Since the extension is not yet published to the Chrome Web Store, you'll need to install it manually using Chrome's developer mode.
+RecallOS is a browser extension that automatically captures and processes your web browsing activity to create a searchable, AI-powered memory network. Since the extension is not yet published to the Chrome Web Store, you'll need to install it manually using Chrome's developer mode.
 
 ## Prerequisites
 
@@ -66,14 +66,6 @@ RecallOS is a browser extension that automatically captures and processes your w
 
 ## Post-Installation Setup
 
-### Connect Your Wallet
-
-1. Click on the RecallOS extension icon in your browser toolbar
-2. Click **"Connect Wallet"** in the extension popup
-3. Select your preferred wallet (MetaMask, WalletConnect, etc.)
-4. Approve the connection in your wallet
-5. The extension should now show your connected wallet address
-
 ### Configure Settings (Optional)
 
 1. Click the RecallOS extension icon
@@ -82,7 +74,7 @@ RecallOS is a browser extension that automatically captures and processes your w
    - **Monitoring frequency**: How often to capture page content
    - **Privacy settings**: Which sites to skip monitoring
    - **AI provider**: Choose between Gemini and Ollama
-   - **Blockchain network**: Ensure you're on Sepolia testnet
+   - **Capture rules**: Define sites to include/exclude
 
 ## Troubleshooting
 
@@ -105,15 +97,14 @@ RecallOS is a browser extension that automatically captures and processes your w
 - Look for RecallOS in the list and click the pin icon to pin it to the toolbar
 - Check if the extension is enabled in the extensions page
 
-### Wallet Connection Issues
+### API Connection Issues
 
-**Problem**: Can't connect your wallet to the extension
+**Problem**: Can't connect the extension to the API
 
 **Solutions**:
-- Make sure you have a wallet installed (MetaMask, etc.)
-- Ensure your wallet is unlocked
-- Try refreshing the extension popup
-- Check that you're on the correct network (Sepolia testnet)
+- Ensure the API server is running and reachable
+- Verify the API URL in the extension settings
+- Check browser DevTools console for errors
 
 ### Permission Errors
 
@@ -155,12 +146,12 @@ If you encounter issues not covered in this guide:
 - **Browser**: Chrome 88+ or Edge 88+
 - **RAM**: Minimum 4GB (8GB recommended)
 - **Storage**: 100MB free space for extension files
-- **Internet**: Stable connection for AI processing and blockchain operations
+- **Internet**: Stable connection for AI processing
 
 ## Privacy and Data
 
 - **Local Processing**: Content is processed locally when possible
-- **Blockchain Storage**: Only content hashes are stored on-chain, not the actual content
+- **Cloud/Local AI**: Content is optionally processed locally via Ollama
 - **No Tracking**: The extension doesn't track your browsing habits for advertising
 - **User Control**: You control what gets captured and stored
 
@@ -171,7 +162,7 @@ If you encounter issues not covered in this guide:
 - [ ] Extracted zip file to a folder
 - [ ] Enabled Developer mode in Chrome/Edge
 - [ ] Loaded unpacked extension
-- [ ] Connected wallet in extension popup
+- [ ] Set API endpoint in extension popup
 - [ ] Started browsing to test capture
 
 ### Common Commands
@@ -187,4 +178,4 @@ If you encounter issues not covered in this guide:
 
 ---
 
-**Note**: This is a testnet version of RecallOS. The extension is still in development and may have bugs or incomplete features. Use at your own discretion and report any issues you encounter.
+**Note**: This is a development version of RecallOS. The extension is still in development and may have bugs or incomplete features. Use at your own discretion and report any issues you encounter.
