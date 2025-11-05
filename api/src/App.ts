@@ -21,6 +21,8 @@ import { routes } from './routes/index.route';
 import { prisma } from './lib/prisma';
 
 import { startContentWorker } from './workers/contentWorker';
+import { ensureCollection } from './lib/qdrant';
+import { aiProvider } from './services/aiProvider';
 
 dotenv.config();
 
@@ -93,8 +95,20 @@ async function testDatabaseConnection() {
 }
 
 server.listen(port, async () => {
+  const protocol = (process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true') ? 'https' : 'http';
   await testDatabaseConnection();
+  console.log('[startup] database_connected');
+  try {
+    await ensureCollection();
+    console.log('[startup] qdrant_ready');
+  } catch (e) {
+    console.warn('[startup] qdrant_unavailable', String((e as Error)?.message || e));
+  }
+  const aiReady = aiProvider.isInitialized;
+  console.log('[startup] ai_provider', { initialized: aiReady });
   startContentWorker();
+  console.log('[startup] content_worker_started');
+  console.log('[startup] server_listening', { protocol, port });
 });
 process.on('unhandledRejection', (err: Error) => {
   console.error('Unhandled Rejection! 💥 Shutting down...');
