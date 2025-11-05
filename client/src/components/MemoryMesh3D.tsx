@@ -2,13 +2,13 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Line } from '@react-three/drei'
 import { MemoryService } from '../services/memoryService'
+import { requireAuthToken } from '../utils/userId'
 import { LoadingSpinner, ErrorMessage } from './ui/loading-spinner'
 import type { MemoryMesh, MemoryMeshEdge } from '../types/memory'
 import * as THREE from 'three'
 
 interface MemoryMesh3DProps {
   className?: string
-  userAddress?: string
   onNodeClick?: (memoryId: string) => void
   similarityThreshold?: number
   selectedMemoryId?: string
@@ -327,7 +327,6 @@ const Scene: React.FC<SceneProps> = ({
 
 const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({ 
   className = '', 
-  userAddress, 
   onNodeClick, 
   similarityThreshold = 0.4,
   selectedMemoryId,
@@ -389,13 +388,13 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
 
   useEffect(() => {
     const fetchMeshData = async () => {
-      if (!userAddress) return
-      setIsLoading(true)
-      setError(null)
       try {
-        const totalCount = await MemoryService.getUserMemoryCount(userAddress)
+        requireAuthToken()
+        setIsLoading(true)
+        setError(null)
+        const totalCount = await MemoryService.getUserMemoryCount()
         const limit = totalCount > 0 ? totalCount : 10000
-        const data = await MemoryService.getMemoryMesh(userAddress, limit, similarityThreshold)
+        const data = await MemoryService.getMemoryMesh(limit, similarityThreshold)
         setMeshData(data)
         if (typeof onMeshLoad === 'function') {
           onMeshLoad(data)
@@ -408,7 +407,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
       }
     }
     fetchMeshData()
-  }, [userAddress, similarityThreshold, onMeshLoad])
+  }, [similarityThreshold, onMeshLoad])
 
 
   const handleNodeClick = useCallback((memoryId: string) => {
@@ -449,15 +448,6 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
     )
   }
 
-  if (!userAddress) {
-    return (
-      <div className={`w-full h-full ${className}`}>
-        <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200">
-          <div className="text-sm font-mono text-gray-600">[CONNECT WALLET TO VIEW MESH]</div>
-        </div>
-      </div>
-    )
-  }
 
   if (!meshData) {
     return (

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { AuthenticatedRequest } from '../middleware/auth';
 
 import { addContentJob, ContentJobData, contentQueue } from '../lib/queue';
 
@@ -7,12 +8,16 @@ import { prisma } from '../lib/prisma';
 import AppError from '../utils/appError';
 
 export const submitContent = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const user_id = (req.body.user_id || (req as any).user?.id || req.body.userId) as string | undefined;
+    if (!req.user?.id) {
+      return next(new AppError('Authentication required', 401));
+    }
+
+    const user_id = req.user.id;
     const raw_text = (req.body.raw_text || req.body.content || req.body.full_content || req.body.meaningful_content) as string | undefined;
     const metadata = {
       ...(req.body.metadata || {}),
@@ -78,19 +83,21 @@ export const submitContent = async (
 };
 
 export const getSummarizedContent = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { user_id } = req.params;
+    if (!req.user?.id) {
+      return next(new AppError('Authentication required', 401));
+    }
 
     const { page = 1, limit = 10 } = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
 
     const user = await prisma.user.findUnique({
-      where: { id: user_id },
+      where: { id: req.user.id },
     });
 
     if (!user) {
@@ -99,7 +106,7 @@ export const getSummarizedContent = async (
 
     const [memories, total] = await Promise.all([
       prisma.memory.findMany({
-        where: { user_id },
+        where: { user_id: user.id },
         orderBy: { created_at: 'desc' },
         skip,
         take: Number(limit),
@@ -113,7 +120,7 @@ export const getSummarizedContent = async (
         },
       }),
       prisma.memory.count({
-        where: { user_id },
+        where: { user_id: user.id },
       }),
     ]);
 
@@ -144,12 +151,14 @@ export const getSummarizedContent = async (
 };
 
 export const getPendingJobs = async (
-  req: Request,
+  req: AuthenticatedRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const { user_id } = req.query;
+    if (!req.user?.id) {
+      return next(new AppError('Authentication required', 401));
+    }
 
     const [waiting, active, delayed] = await Promise.all([
       contentQueue.getWaiting(),
@@ -163,9 +172,7 @@ export const getPendingJobs = async (
 
     let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs];
 
-    if (user_id) {
-      allJobs = allJobs.filter((item) => item.job.data.user_id === user_id);
-    }
+    allJobs = allJobs.filter((item) => item.job.data.user_id === req.user.id);
 
     const jobs = allJobs
       .map((item) => ({

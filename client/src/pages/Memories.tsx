@@ -8,7 +8,7 @@ import { PendingJobsPanel } from '@/components/PendingJobsPanel'
  
 // removed unused Database import
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
-import { getUserId, requireAuthToken } from '@/utils/userId'
+import { requireAuthToken } from '@/utils/userId'
 import { useNavigate } from 'react-router-dom'
 
 export const Memories: React.FC = () => {
@@ -16,12 +16,10 @@ export const Memories: React.FC = () => {
   const [memories, setMemories] = useState<Memory[]>([])
   const [totalMemoryCount, setTotalMemoryCount] = useState<number>(0)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [userId, setUserId] = useState<string | null>(null)
   
   useEffect(() => {
     try {
-      const id = getUserId()
-      setUserId(id)
+      requireAuthToken()
       setIsAuthenticated(true)
     } catch (error) {
       navigate('/login')
@@ -66,15 +64,13 @@ export const Memories: React.FC = () => {
   }, [])
 
   const fetchMemories = useCallback(async () => {
-    if (!userId) return
-    
     try {
       // Require authentication
       requireAuthToken()
       
       const [memoriesData, totalCount] = await Promise.all([
-        MemoryService.getMemoriesWithTransactionDetails(userId, undefined, 10000),
-        MemoryService.getUserMemoryCount(userId)
+        MemoryService.getMemoriesWithTransactionDetails(undefined, 10000),
+        MemoryService.getUserMemoryCount()
       ])
       
       setMemories(memoriesData || [])
@@ -91,7 +87,7 @@ export const Memories: React.FC = () => {
     } finally {
       
     }
-  }, [userId, fetchHyperIndexData])
+  }, [fetchHyperIndexData])
 
   const handleNodeClick = (memoryId: string) => {
     // Find the memory information
@@ -128,7 +124,7 @@ export const Memories: React.FC = () => {
     query: string,
     filters: SearchFilters
   ) => {
-    if (!userId || !query.trim()) return
+    if (!query.trim()) return
 
     // Cancel any existing search
     if (abortControllerRef.current) {
@@ -149,7 +145,7 @@ export const Memories: React.FC = () => {
       requireAuthToken()
 
       // Use the working /api/search endpoint for all searches
-      const response = await MemoryService.searchMemories(userId, query, filters, 1, 50, signal)
+      const response = await MemoryService.searchMemories(query, filters, 1, 50, signal)
       
       // Check if the search was aborted before setting results
       if (signal?.aborted) return
@@ -179,7 +175,7 @@ export const Memories: React.FC = () => {
         
       }
     }
-  }, [userId])
+  }, [])
 
   const handleClearSearch = useCallback(() => {
     setSearchResults(null)
@@ -237,7 +233,7 @@ export const Memories: React.FC = () => {
 
   // Dialog search handler
   const handleDialogSearch = useCallback(async (query: string) => {
-    if (!userId || !query.trim()) {
+    if (!query.trim()) {
       setDialogSearchResults(null)
       setDialogSearchAnswer(null)
       setDialogSearchMeta(null)
@@ -258,7 +254,7 @@ export const Memories: React.FC = () => {
       const signal = dialogAbortControllerRef.current?.signal
       requireAuthToken()
 
-      const response = await MemoryService.searchMemories(userId, query, {}, 1, 50, signal)
+      const response = await MemoryService.searchMemories(query, {}, 1, 50, signal)
       
       if (signal?.aborted) return
       
@@ -282,7 +278,7 @@ export const Memories: React.FC = () => {
         setDialogIsSearching(false)
       }
     }
-  }, [userId])
+  }, [])
 
   // Debounced dialog search effect
   useEffect(() => {
@@ -377,7 +373,7 @@ export const Memories: React.FC = () => {
     }
   }, [])
 
-  if (!isAuthenticated || !userId) {
+  if (!isAuthenticated) {
     return null
   }
 
@@ -435,7 +431,6 @@ export const Memories: React.FC = () => {
 
           {/* 3D Memory Mesh Canvas */}
         <MemoryMesh3D
-          userAddress={userId || undefined}
           className="w-full h-full"
           onNodeClick={handleNodeClick}
           similarityThreshold={similarityThreshold}
@@ -760,7 +755,6 @@ export const Memories: React.FC = () => {
         )}
 
         <PendingJobsPanel 
-          userId={userId}
           isOpen={isPendingJobsOpen}
           onClose={() => setIsPendingJobsOpen(false)}
         />

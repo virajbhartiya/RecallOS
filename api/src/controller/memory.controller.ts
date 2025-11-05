@@ -3,17 +3,6 @@ import { AuthenticatedRequest } from '../middleware/auth';
 
 import { createHash } from 'crypto';
 
-function getRequestUserId(req: Request): string | undefined {
-  return (
-    (req.body?.userId as string | undefined) ||
-    (req.query?.userId as string | undefined) ||
-    (req.params?.userId as string | undefined) ||
-    (req.body?.userAddress as string | undefined) ||
-    (req.query?.userAddress as string | undefined) ||
-    (req.params?.userAddress as string | undefined)
-  );
-}
-
 import { prisma } from '../lib/prisma';
 
 import { aiProvider } from '../services/aiProvider';
@@ -30,37 +19,39 @@ export class MemoryController {
   static async processRawContent(req: AuthenticatedRequest, res: Response) {
     try {
       const { content, url, title, metadata } = req.body;
-      // Use authenticated user ID if available, otherwise fall back to request body
-      const userId = req.user?.externalId || getRequestUserId(req);
+
+      if (!req.user?.id) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+        });
+      }
+
+      if (!content) {
+        return res.status(400).json({
+          success: false,
+          error: 'Content is required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+        });
+      }
 
       console.log('[memory/process] inbound', {
         ts: new Date().toISOString(),
-        auth: !!req.user,
-        authUserId: req.user?.externalId,
-        fallbackUserId: !req.user ? userId : undefined,
+        userId: user.id,
         url: typeof url === 'string' ? url.slice(0, 200) : undefined,
         title: typeof title === 'string' ? title.slice(0, 200) : undefined,
         contentLen: typeof content === 'string' ? content.length : undefined,
       });
-
-
-
-      if (!content || !userId) {
-        console.log('[memory/process] rejected', { reason: 'missing_content_or_user', hasContent: !!content, hasUserId: !!userId });
-        return res.status(400).json({
-          success: false,
-          error: 'Content and userId are required',
-        });
-      }
-
-      let user = await prisma.user.findFirst({ where: { external_id: { equals: userId } } as any });
-
-      if (!user) {
-        user = await prisma.user.create({ data: { external_id: userId } as any });
-        console.log('[memory/process] user_created', { userId: user.id, externalId: user.external_id });
-      }
-
-      console.log('[memory/process] user_resolved', { userId: user.id, externalId: user.external_id });
 
 
       // Exact duplicate check on canonicalized content per user before expensive AI calls
@@ -96,7 +87,7 @@ export class MemoryController {
           success: true,
           message: 'Duplicate memory detected, returning existing record',
           data: {
-            userId,
+            userId: user.id,
             memory: serializedExisting,
             isDuplicate: true,
           },
@@ -151,19 +142,7 @@ export class MemoryController {
 
 
 
-      const dbUpdateStart = Date.now();
-      await prisma.memory.update({
-        where: { id: memory.id },
-        data: {
-          tx_status: 'confirmed' as any,
-          blockchain_network: null as any,
-          tx_hash: null,
-          block_number: null,
-          gas_used: null,
-          confirmed_at: new Date(),
-        } as any,
-      });
-      console.log('[memory/process] db_memory_updated', { ms: Date.now() - dbUpdateStart, memoryId: memory.id, status: 'confirmed' });
+      console.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id });
 
       setImmediate(async () => {
         // Always create snapshot even if mesh processing fails
@@ -199,7 +178,7 @@ export class MemoryController {
         success: true,
         message: 'Content processed and stored successfully',
         data: {
-          userId,
+          userId: user.id,
           memoryId: memory.id,
           memoryHash,
           urlHash,
@@ -215,7 +194,7 @@ export class MemoryController {
     }
   }
 
-  static async storeMemory(req: Request, res: Response) {
+  static async storeMemory(req: AuthenticatedRequest, res: Response) {
     try {
       const { hash, url, timestamp } = req.body;
 
@@ -226,12 +205,10 @@ export class MemoryController {
         });
       }
 
-      const userId = getRequestUserId(req);
-      
-      if (!userId) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'userId is required',
+          error: 'Authentication required',
         });
       }
 
@@ -248,7 +225,7 @@ export class MemoryController {
     }
   }
 
-  static async storeMemoryBatch(req: Request, res: Response) {
+  static async storeMemoryBatch(req: AuthenticatedRequest, res: Response) {
     try {
       const { memories } = req.body;
 
@@ -268,12 +245,10 @@ export class MemoryController {
         }
       }
 
-      const userId = getRequestUserId(req);
-      
-      if (!userId) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'userId is required',
+          error: 'Authentication required',
         });
       }
 
@@ -290,14 +265,21 @@ export class MemoryController {
     }
   }
 
-  static async getMemory(req: Request, res: Response) {
+  static async getMemory(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userAddress, index } = req.params;
+      const { index } = req.params;
 
-      if (!userAddress || index === undefined) {
+      if (index === undefined) {
         return res.status(400).json({
           success: false,
-          error: 'User address and index are required',
+          error: 'Index is required',
+        });
+      }
+
+      if (!req.user?.id) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
         });
       }
 
@@ -311,14 +293,12 @@ export class MemoryController {
     }
   }
 
-  static async getUserMemories(req: Request, res: Response) {
+  static async getUserMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      const userId = getRequestUserId(req);
-
-      if (!userId) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'userId is required',
+          error: 'Authentication required',
         });
       }
 
@@ -353,16 +333,21 @@ export class MemoryController {
     }
   }
 
-  static async getMemoriesByUrlHash(req: Request, res: Response) {
+  static async getMemoriesByUrlHash(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userAddress } = req.params;
-
       const { url } = req.query;
 
-      if (!userAddress || !url) {
+      if (!url) {
         return res.status(400).json({
           success: false,
-          error: 'User address and URL are required',
+          error: 'URL is required',
+        });
+      }
+
+      if (!req.user?.id) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
         });
       }
 
@@ -378,16 +363,21 @@ export class MemoryController {
     }
   }
 
-  static async getMemoriesByTimestampRange(req: Request, res: Response) {
+  static async getMemoriesByTimestampRange(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userAddress } = req.params;
-
       const { startTime, endTime } = req.query;
 
-      if (!userAddress || !startTime || !endTime) {
+      if (!startTime || !endTime) {
         return res.status(400).json({
           success: false,
-          error: 'User address, start time, and end time are required',
+          error: 'Start time and end time are required',
+        });
+      }
+
+      if (!req.user?.id) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
         });
       }
 
@@ -403,20 +393,19 @@ export class MemoryController {
 
   static async getRecentMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userAddress } = req.params;
-      const { count } = req.query;
-      const userId = req.user?.externalId || userAddress;
-
-      if (!userId) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'User ID is required',
+          error: 'Authentication required',
         });
       }
 
+      const { count } = req.query;
       const limit = count ? parseInt(count as string) : 10;
 
-      const user = await prisma.user.findFirst({ where: { external_id: { equals: userId } } as any });
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+      });
 
       if (user) {
         const memories = await prisma.memory.findMany({
@@ -428,12 +417,6 @@ export class MemoryController {
             hash: true,
             timestamp: true,
             created_at: true,
-            tx_hash: true,
-            block_number: true,
-            gas_used: true,
-            tx_status: true,
-            blockchain_network: true,
-            confirmed_at: true,
             summary: true,
             content: true,
             source: true,
@@ -447,13 +430,12 @@ export class MemoryController {
         const serializedMemories = memories.map((memory: any) => ({
           ...memory,
           timestamp: memory.timestamp ? memory.timestamp.toString() : null,
-          block_number: memory.block_number ? memory.block_number.toString() : null,
         }));
 
         return res.status(200).json({
           success: true,
           data: {
-            userId,
+            userId: user.id,
             count: limit,
             memories: serializedMemories,
             actualCount: memories.length,
@@ -461,13 +443,13 @@ export class MemoryController {
         });
       }
 
-      // No fallback to blockchain data - return empty array if no database records
+      // Return empty array if no database records
       const memories: any[] = [];
 
       res.status(200).json({
         success: true,
         data: {
-          userId,
+          userId: req.user.id,
           count: limit,
           memories,
           actualCount: memories.length,
@@ -503,12 +485,6 @@ export class MemoryController {
           hash: true,
           timestamp: true,
           created_at: true,
-          tx_hash: true,
-          block_number: true,
-          gas_used: true,
-          tx_status: true,
-          blockchain_network: true,
-          confirmed_at: true,
           summary: true,
           content: true,
           source: true,
@@ -521,7 +497,6 @@ export class MemoryController {
         const serializedMemory = {
           ...memory,
           timestamp: memory.timestamp ? memory.timestamp.toString() : null,
-          block_number: memory.block_number ? memory.block_number.toString() : null,
         };
 
         return res.status(200).json({
@@ -540,24 +515,17 @@ export class MemoryController {
     }
   }
 
-  static async getUserMemoryCount(req: Request, res: Response) {
+  static async getUserMemoryCount(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userAddress } = req.params;
-
-      if (!userAddress) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'User address is required',
+          error: 'Authentication required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
-          ],
-        } as any,
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (user) {
@@ -568,13 +536,13 @@ export class MemoryController {
         return res.status(200).json({
           success: true,
           data: {
-            userAddress,
+            userId: user.id,
             memoryCount: count,
           },
         });
       }
 
-      return res.status(200).json({ success: true, data: { userAddress, memoryCount: 0 } });
+      return res.status(200).json({ success: true, data: { userId: req.user.id, memoryCount: 0 } });
     } catch (error) {
       console.error('Error getting user memory count:', error);
       res.status(500).json({
@@ -584,10 +552,16 @@ export class MemoryController {
     }
   }
 
-  static async searchMemories(req: Request, res: Response) {
+  static async searchMemories(req: AuthenticatedRequest, res: Response) {
     try {
+      if (!req.user?.id) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+        });
+      }
+
       const {
-        userAddress,
         query,
         category,
         topic,
@@ -596,17 +570,27 @@ export class MemoryController {
         limit = 20,
       } = req.query;
 
-      if (!userAddress || !query) {
+      if (!query) {
         return res.status(400).json({
           success: false,
-          error: 'userAddress and query are required',
+          error: 'query is required',
         });
       }
 
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          error: 'User not found',
+        });
+      }
 
       // Use the semantic search functionality
       const searchResults = await searchMemories({
-        userId: userAddress as string,
+        userId: user.external_id || user.id,
         query: query as string,
         limit: parseInt(limit as string),
         enableReasoning: true,
@@ -623,7 +607,7 @@ export class MemoryController {
         hash: null as string | null,
         content: result.summary, // Use summary as content for display
         source: 'browser',
-        user_id: userAddress,
+        user_id: user.id,
         created_at: new Date(result.timestamp * 1000).toISOString(),
         page_metadata: {
           topics: [] as string[],
@@ -632,7 +616,6 @@ export class MemoryController {
           importance: 5
         }
       }));
-
 
       res.status(200).json({
         success: true,
@@ -662,23 +645,15 @@ export class MemoryController {
 
   static async getMemoryInsights(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userAddress } = req.query;
-      const userId = req.user?.externalId || userAddress;
-
-      if (!userId) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'User ID is required',
+          error: 'Authentication required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userId as any },
-            { external_id: (userId as string).toLowerCase() as any },
-          ],
-        } as any,
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -698,7 +673,6 @@ export class MemoryController {
           page_metadata: true,
           timestamp: true,
           source: true,
-          tx_status: true,
         },
       });
 
@@ -710,11 +684,6 @@ export class MemoryController {
 
       const sourceCounts: { [key: string]: number } = {};
 
-      const transactionStatusCounts: { [key: string]: number } = {
-        confirmed: 0,
-        pending: 0,
-        failed: 0
-      };
 
       let totalImportance = 0;
 
@@ -741,14 +710,6 @@ export class MemoryController {
         }
 
         sourceCounts[memory.source] = (sourceCounts[memory.source] || 0) + 1;
-
-        // Count transaction statuses
-        const txStatus = memory.tx_status || 'confirmed'; // Default to confirmed if no status
-        if (transactionStatusCounts.hasOwnProperty(txStatus)) {
-          transactionStatusCounts[txStatus]++;
-        } else {
-          transactionStatusCounts.confirmed++; // Default to confirmed for unknown statuses
-        }
 
         if (metadata?.importance) {
           totalImportance += metadata.importance;
@@ -777,7 +738,6 @@ export class MemoryController {
           topCategories,
           sentimentDistribution: sentimentCounts,
           sourceDistribution: sourceCounts,
-          transactionStatusDistribution: transactionStatusCounts,
           averageImportance: Math.round(averageImportance * 10) / 10,
           insights: {
             mostActiveCategory: topCategories[0]?.category || 'N/A',
@@ -798,290 +758,24 @@ export class MemoryController {
     }
   }
 
-  static async getMemoriesWithTransactionDetails(req: AuthenticatedRequest, res: Response) {
-    try {
-      const { status, limit = 50 } = req.query as any;
-      
-      // Use authenticated user's internal ID if available, otherwise try to resolve from query param
-      let internalUserId: string | undefined;
-      
-      if (req.user?.id) {
-        // User is authenticated, use their internal ID directly
-        internalUserId = req.user.id;
-      } else {
-        // Try to resolve from query param (could be external_id or internal id)
-        const userId = req.user?.externalId || getRequestUserId(req);
-        
-        if (!userId) {
-          return res.status(400).json({
-            success: false,
-            error: 'User ID is required',
-          });
-        }
-
-        // Try to find user by external_id first, then by internal id
-        const user = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { external_id: userId as any },
-              { external_id: (userId as string).toLowerCase() as any },
-              { id: userId as any },
-            ],
-          } as any,
-        });
-        
-        if (!user) {
-          return res.status(404).json({
-            success: false,
-            error: 'User not found',
-          });
-        }
-        
-        internalUserId = user.id;
-      }
-      const whereConditions: any = { user_id: internalUserId };
-
-      if (status) {
-        whereConditions.tx_status = status;
-      }
-
-      const memories = await prisma.memory.findMany({
-        where: whereConditions,
-        select: {
-          id: true,
-          title: true,
-          url: true,
-          hash: true,
-          timestamp: true,
-          created_at: true,
-          tx_hash: true,
-          block_number: true,
-          gas_used: true,
-          tx_status: true,
-          blockchain_network: true,
-          confirmed_at: true,
-          summary: true,
-          content: true,
-          source: true,
-          page_metadata: true,
-        } as any,
-        orderBy: { created_at: 'desc' },
-        take: parseInt(limit as string),
-      });
-
-      const allMemories = await prisma.memory.findMany({
-        where: internalUserId ? { user_id: internalUserId } : {},
-        select: { tx_status: true } as any,
-      });
-
-      const transactionStats: Record<string, number> = {};
-
-      allMemories.forEach(memory => {
-        const status = (memory as any).tx_status || 'unknown';
-
-        transactionStats[status] = (transactionStats[status] || 0) + 1;
-      });
-
-      const serializedMemories = memories.map((memory: any) => ({
-        ...memory,
-        timestamp: memory.timestamp ? memory.timestamp.toString() : null,
-        block_number: memory.block_number ? memory.block_number.toString() : null,
-      }));
-
-      res.status(200).json({
-        success: true,
-        data: {
-          memories: serializedMemories,
-          transactionStats,
-          totalMemories: memories.length,
-        },
-      });
-    } catch (error) {
-      console.error('Error getting memories with transaction details:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-      });
-    }
-  }
-
-  static async getMemoryTransactionStatus(req: Request, res: Response) {
-    try {
-      const { memoryId } = req.params;
-
-      if (!memoryId) {
-        return res.status(400).json({
-          success: false,
-          error: 'memoryId is required',
-        });
-      }
-
-      const memory = await prisma.memory.findUnique({
-        where: { id: memoryId },
-        select: {
-          id: true,
-          title: true,
-          hash: true,
-          tx_hash: true,
-          block_number: true,
-          gas_used: true,
-          tx_status: true,
-          blockchain_network: true,
-          confirmed_at: true,
-          created_at: true,
-        } as any,
-      });
-
-      if (!memory) {
-        return res.status(404).json({
-          success: false,
-          error: 'Memory not found',
-        });
-      }
-
-      res.status(200).json({
-        success: true,
-        data: {
-          memoryId: memory.id,
-          title: memory.title,
-          hash: memory.hash,
-          transaction: {
-            txHash: (memory as any).tx_hash,
-            blockNumber: (memory as any).block_number?.toString(),
-            gasUsed: (memory as any).gas_used,
-            status: (memory as any).tx_status,
-            network: (memory as any).blockchain_network,
-            confirmedAt: (memory as any).confirmed_at,
-            createdAt: memory.created_at,
-          },
-        },
-      });
-    } catch (error) {
-      console.error('Error getting memory transaction status:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-      });
-    }
-  }
-
-  static async retryFailedTransactions(req: Request, res: Response) {
-    try {
-      const { userAddress, limit = 10 } = req.query;
-
-      if (!userAddress) {
-        return res.status(400).json({
-          success: false,
-          error: 'userAddress is required',
-        });
-      }
-
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
-          ],
-        } as any,
-      });
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: 'User not found',
-        });
-      }
-
-      const failedMemories = await prisma.memory.findMany({
-        where: {
-          user_id: user.id,
-          tx_status: 'failed' as any,
-        } as any,
-        take: parseInt(limit as string),
-        orderBy: { created_at: 'asc' },
-      });
-
-      if (failedMemories.length === 0) {
-        return res.status(200).json({
-          success: true,
-          message: 'No failed transactions found',
-          data: { retriedCount: 0 },
-        });
-      }
-
-      let retriedCount = 0;
-
-      const results = [];
-
-      for (const memory of failedMemories) {
-        try {
-          await prisma.memory.update({
-            where: { id: memory.id },
-            data: {
-              tx_status: 'confirmed' as any,
-              blockchain_network: null as any,
-              tx_hash: null,
-              block_number: null,
-              gas_used: null,
-              confirmed_at: new Date(),
-            } as any,
-          });
-          retriedCount++;
-          results.push({
-            memoryId: memory.id,
-            status: 'success'
-          });
-        } catch (error) {
-          console.error(`❌ Error retrying memory ${memory.id}:`, error);
-          results.push({
-            memoryId: memory.id,
-            status: 'error',
-            error: error.message,
-          });
-        }
-      }
-
-      res.status(200).json({
-        success: true,
-        message: `Retried ${retriedCount} out of ${failedMemories.length} failed transactions`,
-        data: {
-          retriedCount,
-          totalFailed: failedMemories.length,
-          results,
-        },
-      });
-    } catch (error) {
-      console.error('Error retrying failed transactions:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-      });
-    }
-  }
 
   static async getMemoryMesh(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userId: paramUserId } = req.params as any;
+      if (!req.user?.id) {
+        return res.status(401).json({ success: false, error: 'Authentication required' });
+      }
+
       const { limit = 50, threshold = 0.3 } = req.query;
 
-      // Enforce authenticated user scoping
-      const effectiveExternalId = req.user?.externalId || paramUserId;
-      if (!effectiveExternalId) {
-        return res.status(400).json({ success: false, error: 'User ID is required' });
-      }
-      if (req.user?.externalId && paramUserId && paramUserId !== req.user.externalId) {
-        return res.status(403).json({ success: false, error: 'Forbidden: mismatched user' });
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
+      });
+
+      if (!user) {
+        return res.status(404).json({ success: false, error: 'User not found' });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: effectiveExternalId as any },
-            { external_id: (effectiveExternalId as string).toLowerCase() as any },
-          ],
-        } as any,
-      });
-      const internalUserId: string | undefined = user?.id;
+      const internalUserId: string | undefined = user.id;
 
       const mesh = await memoryMeshService.getMemoryMesh(
         internalUserId,
@@ -1102,26 +796,26 @@ export class MemoryController {
     }
   }
 
-  static async getMemoryWithRelations(req: Request, res: Response) {
+  static async getMemoryWithRelations(req: AuthenticatedRequest, res: Response) {
     try {
-      const { memoryId } = req.params;
-
-      const { userAddress } = req.query;
-
-      if (!memoryId || !userAddress) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'memoryId and userAddress are required',
+          error: 'Authentication required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
-          ],
-        } as any,
+      const { memoryId } = req.params;
+
+      if (!memoryId) {
+        return res.status(400).json({
+          success: false,
+          error: 'memoryId is required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -1147,26 +841,27 @@ export class MemoryController {
     }
   }
 
-  static async getMemoryCluster(req: Request, res: Response) {
+  static async getMemoryCluster(req: AuthenticatedRequest, res: Response) {
     try {
-      const { memoryId } = req.params;
-
-      const { userAddress, depth = 2 } = req.query;
-
-      if (!memoryId || !userAddress) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'memoryId and userAddress are required',
+          error: 'Authentication required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
-          ],
-        } as any,
+      const { memoryId } = req.params;
+      const { depth = 2 } = req.query;
+
+      if (!memoryId) {
+        return res.status(400).json({
+          success: false,
+          error: 'memoryId is required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -1195,35 +890,35 @@ export class MemoryController {
     }
   }
 
-  static async searchMemoriesWithEmbeddings(req: Request, res: Response) {
+  static async searchMemoriesWithEmbeddings(req: AuthenticatedRequest, res: Response) {
     try {
+      if (!req.user?.id) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+        });
+      }
+
       const { 
-        userAddress, 
         query, 
         category,
         topic,
         sentiment,
-        tx_status,
         source,
         dateRange,
         page = 1,
         limit = 10 
       } = req.query;
 
-      if (!userAddress || !query) {
+      if (!query) {
         return res.status(400).json({
           success: false,
-          error: 'userAddress and query are required',
+          error: 'query is required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
-          ],
-        } as any,
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -1237,11 +932,6 @@ export class MemoryController {
       const whereConditions: any = {
         user_id: user.id,
       };
-
-      // Apply filters to narrow down the memory pool before semantic search
-      if (tx_status) {
-        whereConditions.tx_status = tx_status;
-      }
 
       if (source) {
         whereConditions.source = source;
@@ -1316,7 +1006,6 @@ export class MemoryController {
         memory: {
           ...result.memory,
           timestamp: result.memory.timestamp.toString(),
-          block_number: result.memory.block_number?.toString() || null,
         }
       }));
 
@@ -1333,7 +1022,6 @@ export class MemoryController {
             category,
             topic,
             sentiment,
-            tx_status,
             source,
             dateRange
           }
@@ -1348,30 +1036,35 @@ export class MemoryController {
     }
   }
 
-  static async searchMemoriesHybrid(req: Request, res: Response) {
+  static async searchMemoriesHybrid(req: AuthenticatedRequest, res: Response) {
     try {
+      if (!req.user?.id) {
+        return res.status(401).json({
+          success: false,
+          error: 'Authentication required',
+        });
+      }
+
       const { 
-        userAddress, 
         query, 
         category,
         topic,
         sentiment,
-        tx_status,
         source,
         dateRange,
         page = 1,
         limit = 10 
       } = req.query;
 
-      if (!userAddress || !query) {
+      if (!query) {
         return res.status(400).json({
           success: false,
-          error: 'userAddress and query are required',
+          error: 'query is required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: { external_id: (userAddress as string) } as any,
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -1385,11 +1078,6 @@ export class MemoryController {
       const whereConditions: any = {
         user_id: user.id,
       };
-
-      // Apply filters to narrow down the memory pool
-      if (tx_status) {
-        whereConditions.tx_status = tx_status;
-      }
 
       if (source) {
         whereConditions.source = source;
@@ -1542,7 +1230,6 @@ export class MemoryController {
         memory: {
           ...result.memory,
           timestamp: result.memory.timestamp.toString(),
-          block_number: result.memory.block_number?.toString() || null,
         }
       }));
 
@@ -1564,7 +1251,6 @@ export class MemoryController {
             category,
             topic,
             sentiment,
-            tx_status,
             source,
             dateRange
           }
@@ -1645,21 +1331,26 @@ export class MemoryController {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
-  static async processMemoryForMesh(req: Request, res: Response) {
+  static async processMemoryForMesh(req: AuthenticatedRequest, res: Response) {
     try {
-      const { memoryId } = req.params;
-
-      const { userAddress } = req.query;
-
-      if (!memoryId || !userAddress) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'memoryId and userAddress are required',
+          error: 'Authentication required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: { external_id: (userAddress as string) } as any,
+      const { memoryId } = req.params;
+
+      if (!memoryId) {
+        return res.status(400).json({
+          success: false,
+          error: 'memoryId is required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -1701,26 +1392,19 @@ export class MemoryController {
     }
   }
 
-  static async getMemorySnapshots(req: Request, res: Response) {
+  static async getMemorySnapshots(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userAddress } = req.params;
-
-      const { limit = 20, page = 1 } = req.query;
-
-      if (!userAddress) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'userAddress is required',
+          error: 'Authentication required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
-          ],
-        } as any,
+      const { limit = 20, page = 1 } = req.query;
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -1775,26 +1459,26 @@ export class MemoryController {
     }
   }
 
-  static async getMemorySnapshot(req: Request, res: Response) {
+  static async getMemorySnapshot(req: AuthenticatedRequest, res: Response) {
     try {
-      const { snapshotId } = req.params;
-
-      const { userAddress } = req.query;
-
-      if (!snapshotId || !userAddress) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'snapshotId and userAddress are required',
+          error: 'Authentication required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
-          ],
-        } as any,
+      const { snapshotId } = req.params;
+
+      if (!snapshotId) {
+        return res.status(400).json({
+          success: false,
+          error: 'snapshotId is required',
+        });
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -1841,24 +1525,17 @@ export class MemoryController {
     }
   }
 
-  static async backfillMemorySnapshots(req: Request, res: Response) {
+  static async backfillMemorySnapshots(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userAddress } = req.query;
-
-      if (!userAddress) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'userAddress is required',
+          error: 'Authentication required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
-          ],
-        } as any,
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -1953,30 +1630,23 @@ export class MemoryController {
     } catch (error) {
       res.status(503).json({
         success: false,
-        error: 'Blockchain connection is not available',
+        error: 'Service unavailable',
         details: error.message,
       });
     }
   }
 
-  static async debugMemories(req: Request, res: Response) {
+  static async debugMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      const { userAddress } = req.query;
-
-      if (!userAddress) {
-        return res.status(400).json({
+      if (!req.user?.id) {
+        return res.status(401).json({
           success: false,
-          error: 'userAddress is required',
+          error: 'Authentication required',
         });
       }
 
-      const user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { external_id: userAddress as any },
-            { external_id: (userAddress as string).toLowerCase() as any },
-          ],
-        } as any,
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.id },
       });
 
       if (!user) {
@@ -1993,7 +1663,6 @@ export class MemoryController {
           title: true,
           url: true,
           source: true,
-          tx_status: true,
           created_at: true,
         },
         orderBy: { created_at: 'desc' },
