@@ -27,9 +27,9 @@ const steps = [
   {
     number: 4,
     color: 'orange',
-    title: 'Proves It Happened',
-    description: 'Every memory is permanently recorded on the blockchain, so you can always verify what you learned.',
-    features: ['Permanent record', 'Verifiable proof', 'Never lose information']
+    title: 'Organizes Knowledge',
+    description: 'Memories are structured with summaries, metadata, and connections to related content.',
+    features: ['Clean summaries', 'Rich metadata', 'Connected ideas']
   },
   {
     number: 5,

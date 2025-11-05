@@ -99,7 +99,7 @@ export const Docs = () => {
     
     {
       question: 'Can I delete memories?',
-      answer: 'You can delete memories from the database, but the cryptographic hash will remain on the blockchain permanently. This is by design to ensure the integrity of the verification system.',
+      answer: 'Yes. You can delete memories from the database at any time.',
     },
     {
       question: 'What AI models do you use?',
@@ -222,22 +222,14 @@ export const Docs = () => {
                     Automatically discovers connections between memories using vector embeddings and similarity analysis.
                   </p>
                 </div>
-                <div className="bg-white border border-gray-200 p-4">
-                  <h3 className="font-medium mb-2">Blockchain Verification</h3>
-                  
-                </div>
+                
                 <div className="bg-white border border-gray-200 p-4">
                   <h3 className="font-medium mb-2">ChatGPT Integration</h3>
                   <p className="text-sm text-gray-600">
                     Automatically injects relevant memories into ChatGPT conversations as you type.
                   </p>
                 </div>
-                <div className="bg-white border border-gray-200 p-4">
-                  <h3 className="font-medium mb-2">Transaction Management</h3>
-                  <p className="text-sm text-gray-600">
-                    Track blockchain transactions, retry failed operations, and monitor gas deposits.
-                  </p>
-                </div>
+                
               </div>
             </section>
 
@@ -500,10 +492,7 @@ ChatGPT Integration: Automatic (1.5s delay)`} />
                 <CodeBlock code={`{
   "success": true,
   "data": {
-    "memoryId": "uuid",
-    "hash": "0x...",
-    "txHash": "0x...",
-    "status": "confirmed"
+    "memoryId": "uuid"
   },
   "message": "Memory processed successfully"
 }`} />
