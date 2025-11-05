@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { prisma } from '../lib/prisma';
 import { aiProvider } from './aiProvider';
 import { setSearchJobResult } from './searchJob';
+import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant';
 
 type SearchResult = {
   memory_id: string;
@@ -42,10 +43,6 @@ function sha256Hex(input: string): string {
   return crypto.createHash('sha256').update(input).digest('hex');
 }
 
-function vectorToSqlArray(values: number[]): string {
-  const clamped = values.map(v => Number.isFinite(v) ? v : 0);
-  return `ARRAY[${clamped.join(',')}]::vector`;
-}
 
 async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -94,36 +91,79 @@ export async function searchMemories(params: {
       return { query: normalized, results: [], meta_summary: undefined, answer: undefined };
     }
   }
-  const queryVecSql = vectorToSqlArray(embedding);
-
   const salt = process.env.SEARCH_EMBED_SALT || 'recallos';
   const embeddingHash = sha256Hex(JSON.stringify({ model: 'text-embedding-004', values: embedding.slice(0, 64), salt }));
 
-  // Extract query tokens for keyword boosting
+  await ensureCollection();
+
+  const userMemories = await prisma.memory.findMany({
+    where: { user_id: user.id },
+    select: { id: true },
+  });
+
+  const userMemoryIds = userMemories.map(m => m.id);
+
+  if (userMemoryIds.length === 0) {
+    return { query: normalized, results: [], meta_summary: undefined, answer: undefined, context: undefined };
+  }
+
+  const searchResult = await qdrantClient.search(COLLECTION_NAME, {
+    vector: embedding,
+    filter: {
+      must: [
+        { key: 'memory_id', match: { any: userMemoryIds } },
+      ],
+    },
+    limit: Number(limit) * 3,
+    with_payload: true,
+  });
+
+  if (!searchResult || searchResult.length === 0) {
+    return { query: normalized, results: [], meta_summary: undefined, answer: undefined, context: undefined };
+  }
+
+  const searchMemoryIds = searchResult
+    .map(result => result.payload?.memory_id as string)
+    .filter((id): id is string => !!id);
+
+  if (searchMemoryIds.length === 0) {
+    return { query: normalized, results: [], meta_summary: undefined, answer: undefined, context: undefined };
+  }
+
+  const memories = await prisma.memory.findMany({
+    where: { id: { in: searchMemoryIds } },
+  });
+
+  const memoryMap = new Map(memories.map(m => [m.id, m]));
+  const scoreMap = new Map<string, number>();
+
+  searchResult.forEach((result) => {
+    const memoryId = result.payload?.memory_id as string;
+    if (memoryId) {
+      const existingScore = scoreMap.get(memoryId);
+      const newScore = result.score || 0;
+      if (!existingScore || newScore > existingScore) {
+        scoreMap.set(memoryId, newScore);
+      }
+    }
+  });
+
   const queryTokens = tokenizeQuery(normalized);
   
-  const rows = await prisma.$queryRawUnsafe<Array<{ id: string; title: string | null; summary: string | null; url: string | null; timestamp: bigint; hash: string | null; content: string | null; score: number }>>(`
-    WITH ranked AS (
-      SELECT 
-        m.id,
-        m.title,
-        m.summary,
-        m.url,
-        m.timestamp,
-        m.hash,
-        m.content,
-        GREATEST(0, LEAST(1, 1 - (me.embedding <=> ${queryVecSql}))) AS semantic_score,
-        ROW_NUMBER() OVER (PARTITION BY m.id ORDER BY me.embedding <=> ${queryVecSql}) AS rn
-      FROM memory_embeddings me
-      JOIN memories m ON m.id = me.memory_id
-      WHERE m.user_id = '${user.id}'::uuid
-    )
-    SELECT id, title, summary, url, timestamp, hash, content, semantic_score as score
-    FROM ranked
-    WHERE rn = 1 AND semantic_score > 0.0
-    ORDER BY semantic_score DESC
-    LIMIT ${Number(limit) * 3}
-  `);
+  const rows = Array.from(scoreMap.entries()).map(([memoryId, semanticScore]) => {
+    const memory = memoryMap.get(memoryId);
+    if (!memory) return null;
+    return {
+      id: memory.id,
+      title: memory.title,
+      summary: memory.summary,
+      url: memory.url,
+      timestamp: memory.timestamp,
+      hash: memory.hash,
+      content: memory.content,
+      score: semanticScore,
+    };
+  }).filter((row): row is NonNullable<typeof row> => row !== null);
 
   
   // Calculate hybrid scores combining semantic and keyword matching

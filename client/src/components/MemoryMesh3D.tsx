@@ -20,9 +20,6 @@ interface MemoryMesh3DProps {
 
 const nodeColors = {
   manual: '#22c55e',
-  on_chain: '#22c55e',
-  onchain: '#22c55e',
-  'on-chain': '#22c55e',
   browser: '#3b82f6',
   extension: '#3b82f6',
   reasoning: '#a855f7',
@@ -32,6 +29,13 @@ const nodeColors = {
 const resolveNodeColor = (rawType?: string, url?: string): string => {
   const key = (rawType || '').toLowerCase()
   const href = (url || '').toLowerCase()
+  
+  // First check if source has a specific color (source takes precedence)
+  if (key && nodeColors[key]) {
+    return nodeColors[key]
+  }
+  
+  // Then check URL patterns for sources without specific colors
   if (href) {
     if (/github\.com|gitlab\.com|bitbucket\.org/.test(href)) return '#3b82f6'
     if (/npmjs\.com|pypi\.org|crates\.io|rubygems\.org/.test(href)) return '#22c55e'
@@ -39,6 +43,7 @@ const resolveNodeColor = (rawType?: string, url?: string): string => {
     if (/youtube\.com|youtu\.be|vimeo\.com/.test(href)) return '#3b82f6'
     if (/mail\.google\.com|gmail\.com|outlook\.live\.com/.test(href)) return '#22c55e'
   }
+  
   return nodeColors[key] || '#6b7280'
 }
 
@@ -112,16 +117,15 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
     new THREE.Vector3(...end)
   ], [start, end])
 
-  // Ultra-thin lines with stronger blue for high similarity
   const getLineColor = (similarity: number) => {
     if (similarity > 0.85) return '#3b82f6'
-    if (similarity > 0.75) return '#60a5fa'
-    return '#cbd5e1'
+    if (similarity > 0.75) return '#38bdf8'
+    return '#9ca3af'
   }
 
   const color = getLineColor(similarity)
-  const opacity = similarity > 0.75 ? 0.25 + (similarity * 0.1) : 0.12
-  const lineWidth = similarity > 0.75 ? 0.6 : 0.25
+  const opacity = similarity > 0.75 ? 0.6 : (similarity > 0.5 ? 0.4 : 0.3)
+  const lineWidth = similarity > 0.85 ? 3 : (similarity > 0.75 ? 2 : 1)
 
   return (
     <Line
@@ -132,6 +136,8 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
       opacity={opacity}
       dashed={false}
       toneMapped={false}
+      depthTest={true}
+      depthWrite={false}
     />
   )
 }
@@ -169,18 +175,23 @@ const Scene: React.FC<SceneProps> = ({
   const nodes = useMemo(() => {
     if (!meshData?.nodes?.length) return []
 
-    // Normalize backend XY coordinates into a compact cube around the origin
+    // Normalize backend XYZ coordinates into a compact cube around the origin
     const finiteNodes = meshData.nodes.filter((nn) => Number.isFinite(nn.x) && Number.isFinite(nn.y))
     const minX = finiteNodes.length ? Math.min(...finiteNodes.map((nn) => nn.x)) : 0
     const maxX = finiteNodes.length ? Math.max(...finiteNodes.map((nn) => nn.x)) : 1
     const minY = finiteNodes.length ? Math.min(...finiteNodes.map((nn) => nn.y)) : 0
     const maxY = finiteNodes.length ? Math.max(...finiteNodes.map((nn) => nn.y)) : 1
+    const finiteZ = meshData.nodes.filter((nn: any) => Number.isFinite((nn as any).z)) as Array<any>
+    const minZ = finiteZ.length ? Math.min(...finiteZ.map((nn: any) => (nn as any).z)) : 0
+    const maxZ = finiteZ.length ? Math.max(...finiteZ.map((nn: any) => (nn as any).z)) : 1
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
+    const cz = (minZ + maxZ) / 2
     const spanX = Math.max(1e-6, maxX - minX)
     const spanY = Math.max(1e-6, maxY - minY)
+    const spanZ = Math.max(1e-6, maxZ - minZ)
     const radius = isCompactView ? 1.2 : 2.5 // significantly reduce spacing
-    const zRadius = radius * 0.4
+    const zRadius = radius * 0.8
 
     return meshData.nodes.map((n, i) => {
       const sourceType = memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
@@ -196,8 +207,13 @@ const Scene: React.FC<SceneProps> = ({
         // Normalize XY into [-radius, radius]
         const nx = ((n.x - cx) / spanX) * radius * 2
         const ny = ((n.y - cy) / spanY) * radius * 2
-        // Z from importance (centered around 0)
-        const iz = ((n.importance_score ?? 0.5) - 0.5) * 2 * zRadius
+        // Prefer backend Z if present; fallback to importance
+        let iz: number
+        if (Number.isFinite((n as any).z)) {
+          iz = (((n as any).z - cz) / spanZ) * zRadius * 2
+        } else {
+          iz = ((n.importance_score ?? 0.5) - 0.5) * 2 * zRadius
+        }
         position = [nx, ny, iz]
       } else {
         // Generate 3D position using spherical coordinates with tighter clustering
@@ -290,7 +306,7 @@ const Scene: React.FC<SceneProps> = ({
       
       {edges.map((edge, index) => (
         <MemoryEdge
-          key={index}
+          key={`edge-${index}-${edge.start.join(',')}-${edge.end.join(',')}`}
           start={edge.start}
           end={edge.end}
           similarity={edge.similarity}
@@ -360,7 +376,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   if (isLoading) {
     return (
       <div className={`w-full h-full ${className}`}>
-        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+        <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200">
           <LoadingSpinner size="lg" />
         </div>
       </div>
@@ -370,7 +386,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   if (error) {
     return (
       <div className={`w-full h-full ${className}`}>
-        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+        <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200">
           <ErrorMessage message={error} />
         </div>
       </div>
@@ -380,7 +396,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   if (!userAddress) {
     return (
       <div className={`w-full h-full ${className}`}>
-        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+        <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200">
           <div className="text-sm font-mono text-gray-600">[CONNECT WALLET TO VIEW MESH]</div>
         </div>
       </div>
@@ -390,7 +406,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   if (!meshData) {
     return (
       <div className={`w-full h-full ${className}`}>
-        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+        <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200">
           <div className="text-sm font-mono text-gray-600">[NO MESH DATA]</div>
         </div>
       </div>

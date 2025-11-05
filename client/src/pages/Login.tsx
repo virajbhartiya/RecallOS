@@ -37,7 +37,13 @@ export const Login = () => {
       setUser(response.data.user)
       // Persist JWT for Authorization header usage
       if (response.data?.token) {
-        try { localStorage.setItem('auth_token', response.data.token) } catch {}
+        try { 
+          localStorage.setItem('auth_token', response.data.token)
+          // Also store user ID from token for quick access
+          if (response.data.user?.id) {
+            localStorage.setItem('user_id', response.data.user.id)
+          }
+        } catch {}
       }
       
       // Redirect to memories page after successful login
@@ -56,22 +62,45 @@ export const Login = () => {
     try {
       await axiosInstance.post('/auth/logout')
       setUser(null)
-      try { localStorage.removeItem('auth_token') } catch {}
+      try { 
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_id')
+      } catch {}
       setEmail('')
       setPassword('')
       setError('')
+      navigate('/login')
     } catch (err) {
       console.error('Logout error:', err)
+      // Clear local state even if logout request fails
+      setUser(null)
+      try { 
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_id')
+      } catch {}
+      navigate('/login')
     }
   }
 
   const checkCurrentUser = async () => {
     try {
       const response = await axiosInstance.get('/auth/me')
-      setUser(response.data.user)
+      if (response.data?.user) {
+        setUser(response.data.user)
+        // Update user ID in localStorage if we have it
+        if (response.data.user.id) {
+          try {
+            localStorage.setItem('user_id', response.data.user.id)
+          } catch {}
+        }
+      }
     } catch (err) {
       // User not logged in
       setUser(null)
+      try {
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('user_id')
+      } catch {}
     }
   }
 

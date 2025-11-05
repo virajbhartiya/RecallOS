@@ -30,9 +30,6 @@ interface MemoryMeshProps {
 
 const nodeColors = {
   manual: '#4A90E2',
-  on_chain: '#22c55e',
-  onchain: '#22c55e',
-  'on-chain': '#22c55e',
   browser: '#0ea5e9',
   extension: '#0ea5e9',
   reasoning: '#f59e0b',
