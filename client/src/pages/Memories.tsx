@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom'
 export const Memories: React.FC = () => {
   const navigate = useNavigate()
   const [memories, setMemories] = useState<Memory[]>([])
+  const [totalMemoryCount, setTotalMemoryCount] = useState<number>(0)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
   
@@ -69,9 +70,13 @@ export const Memories: React.FC = () => {
       // Require authentication
       requireAuthToken()
       
-      const memoriesData = await MemoryService.getMemoriesWithTransactionDetails(userId)
+      const [memoriesData, totalCount] = await Promise.all([
+        MemoryService.getMemoriesWithTransactionDetails(userId, undefined, 10000),
+        MemoryService.getUserMemoryCount(userId)
+      ])
       
       setMemories(memoriesData || [])
+      setTotalMemoryCount(totalCount || 0)
       
       // Fetch HyperIndex data in parallel
       if (memoriesData && memoriesData.length > 0) {
@@ -472,7 +477,7 @@ export const Memories: React.FC = () => {
                   <div className="text-xs font-semibold uppercase tracking-wider text-gray-600">Statistics</div>
                   <div className="flex items-center justify-between text-xs text-gray-900">
                     <span>Nodes</span>
-                    <span className="font-mono font-semibold">{memories.length}</span>
+                    <span className="font-mono font-semibold">{totalMemoryCount || memories.length}</span>
                   </div>
                   {searchResults && searchResults.results && (
                     <div className="flex items-center justify-between text-xs text-gray-900">

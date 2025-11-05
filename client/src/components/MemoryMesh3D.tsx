@@ -339,7 +339,9 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
       setIsLoading(true)
       setError(null)
       try {
-        const data = await MemoryService.getMemoryMesh(userAddress, 50, similarityThreshold)
+        const totalCount = await MemoryService.getUserMemoryCount(userAddress)
+        const limit = totalCount > 0 ? totalCount : 10000
+        const data = await MemoryService.getMemoryMesh(userAddress, limit, similarityThreshold)
         setMeshData(data)
         if (typeof onMeshLoad === 'function') {
           onMeshLoad(data)
