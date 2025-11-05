@@ -19,12 +19,11 @@ interface PendingJob {
 }
 
 interface PendingJobsPanelProps {
-  userId: string | null
   isOpen: boolean
   onClose: () => void
 }
 
-export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOpen, onClose }) => {
+export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onClose }) => {
   const [jobs, setJobs] = useState<PendingJob[]>([])
   const [counts, setCounts] = useState({ total: 0, waiting: 0, active: 0, delayed: 0 })
   const [isLoading, setIsLoading] = useState(true)
@@ -37,13 +36,7 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOp
       setIsLoading(true)
       setError(null)
 
-      if (!userId) {
-        setError('User ID is required')
-        setIsLoading(false)
-        return
-      }
-
-      const result = await MemoryService.getPendingJobs(userId)
+      const result = await MemoryService.getPendingJobs()
       setJobs(result.jobs)
       setCounts(result.counts)
     } catch (err: any) {
@@ -52,7 +45,7 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOp
     } finally {
       setIsLoading(false)
     }
-  }, [userId])
+  }, [])
 
   useEffect(() => {
     if (!isOpen) return

@@ -5,11 +5,12 @@ import {
   getSummarizedContent,
   getPendingJobs,
 } from '../controller/content.controller';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
-router.post('/', submitContent);
-router.get('/user/:user_id', getSummarizedContent);
-router.get('/pending', getPendingJobs);
+router.post('/', authenticateToken, submitContent);
+router.get('/user', authenticateToken, getSummarizedContent);
+router.get('/pending', authenticateToken, getPendingJobs);
 
 export default router;

@@ -5,7 +5,7 @@ import { MemoryService } from '../services/memoryService'
 import { LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
 import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse, SearchResult } from '../types/memory'
-import { getUserId, requireAuthToken } from '@/utils/userId'
+import { requireAuthToken } from '@/utils/userId'
 import { useNavigate } from 'react-router-dom'
 
 const SearchResultCard: React.FC<{ 
@@ -165,7 +165,6 @@ export const Search: React.FC = () => {
   const navigate = useNavigate()
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [address, setAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
@@ -175,8 +174,7 @@ export const Search: React.FC = () => {
 
   useEffect(() => {
     try {
-      const id = getUserId()
-      setAddress(id)
+      requireAuthToken()
       setIsAuthenticated(true)
     } catch (error) {
       navigate('/login')
@@ -192,8 +190,6 @@ export const Search: React.FC = () => {
     filters: SearchFilters, 
     useSemantic: boolean
   ) => {
-    if (!address) return
-
     setIsLoading(true)
     setError(null)
     setSearchResults(null)
@@ -206,7 +202,6 @@ export const Search: React.FC = () => {
 
       if (useSemantic) {
         response = await MemoryService.searchMemoriesWithEmbeddings(
-          address,
           query,
           filters,
           1,
@@ -214,7 +209,6 @@ export const Search: React.FC = () => {
         )
       } else {
         response = await MemoryService.searchMemories(
-          address,
           query,
           filters,
           1,
@@ -235,7 +229,7 @@ export const Search: React.FC = () => {
     } finally {
       setIsLoading(false)
     }
-  }, [address, fetchHyperIndexData])
+  }, [fetchHyperIndexData])
 
   const handleClearFilters = useCallback(() => {
     setSearchResults(null)
@@ -269,7 +263,7 @@ export const Search: React.FC = () => {
     )
   }
 
-  if (!isAuthenticated || !address) {
+  if (!isAuthenticated) {
     return null
   }
 
