@@ -112,16 +112,15 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
     new THREE.Vector3(...end)
   ], [start, end])
 
-  // Ultra-thin lines with stronger blue for high similarity
   const getLineColor = (similarity: number) => {
     if (similarity > 0.85) return '#3b82f6'
-    if (similarity > 0.75) return '#60a5fa'
-    return '#cbd5e1'
+    if (similarity > 0.75) return '#38bdf8'
+    return '#d1d5db'
   }
 
   const color = getLineColor(similarity)
-  const opacity = similarity > 0.75 ? 0.25 + (similarity * 0.1) : 0.12
-  const lineWidth = similarity > 0.75 ? 0.6 : 0.25
+  const opacity = similarity > 0.75 ? 0.3 : (similarity > 0.5 ? 0.2 : 0.15)
+  const lineWidth = similarity > 0.85 ? 1.5 : (similarity > 0.75 ? 1.0 : 0.5)
 
   return (
     <Line
@@ -370,7 +369,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   if (isLoading) {
     return (
       <div className={`w-full h-full ${className}`}>
-        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+        <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200">
           <LoadingSpinner size="lg" />
         </div>
       </div>
@@ -380,7 +379,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   if (error) {
     return (
       <div className={`w-full h-full ${className}`}>
-        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+        <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200">
           <ErrorMessage message={error} />
         </div>
       </div>
@@ -390,7 +389,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   if (!userAddress) {
     return (
       <div className={`w-full h-full ${className}`}>
-        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+        <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200">
           <div className="text-sm font-mono text-gray-600">[CONNECT WALLET TO VIEW MESH]</div>
         </div>
       </div>
@@ -400,7 +399,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   if (!meshData) {
     return (
       <div className={`w-full h-full ${className}`}>
-        <div className="w-full h-full flex items-center justify-center bg-gray-50 border border-gray-200">
+        <div className="w-full h-full flex items-center justify-center bg-white border border-gray-200">
           <div className="text-sm font-mono text-gray-600">[NO MESH DATA]</div>
         </div>
       </div>

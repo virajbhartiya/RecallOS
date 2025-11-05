@@ -1343,7 +1343,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       const nodeCount = nodes.length;
       const k = Math.min(8, Math.max(3, Math.floor(Math.sqrt(Math.max(1, nodeCount)))));
       const minDegree = Math.min(3, Math.max(1, Math.floor(k / 2)));
-      const maxDistance = 1200;
 
       const nodeIdToDomain = new Map<string, string | null>(
         nodes.map(n => [n.id, getDomain((n as any).url)])
@@ -1354,6 +1353,10 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       const nodeIdToTimestamp = new Map<string, number | null>(
         nodes.map(n => [n.id, (n as any).timestamp ? Number((n as any).timestamp) : null])
       );
+
+      // First pass: collect all distances to calculate proper maxDistance
+      const allDistances: number[] = [];
+      const nodeDistancesMap = new Map<string, Array<{ targetId: string; distance: number }>>();
 
       nodes.forEach((node, i) => {
         if (!latentCoords.has(node.id)) return;
@@ -1371,32 +1374,50 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           const dz = ((nodeCoord as any).z ?? 0) - ((otherCoord as any).z ?? 0);
           const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
           distances.push({ targetId: otherNode.id, distance });
+          allDistances.push(distance);
         });
 
         distances.sort((a, b) => a.distance - b.distance);
-        const nearest = distances.slice(0, k);
+        nodeDistancesMap.set(node.id, distances);
+      });
 
+      // Calculate maxDistance from actual distances (use 95th percentile to avoid outliers)
+      allDistances.sort((a, b) => a - b);
+      const percentile95 = Math.floor(allDistances.length * 0.95);
+      const maxDistance = allDistances[percentile95] || Math.max(...allDistances, 1);
+
+      // Second pass: calculate similarity scores
+      nodes.forEach((node, i) => {
+        if (!latentCoords.has(node.id)) return;
+
+        const distances = nodeDistancesMap.get(node.id)!;
+        if (!distances) return;
+
+        const nearest = distances.slice(0, k);
         const chosen = nearest.length >= minDegree ? nearest : distances.slice(0, minDegree);
 
         chosen.forEach(({ targetId, distance }) => {
-          const baseSim = Math.max(0, 1 - distance / maxDistance);
+          // Use inverse distance with proper scaling - closer nodes get higher similarity
+          // Normalize to 0-1 range, then apply non-linear scaling for better distribution
+          const normalizedDist = Math.min(1, distance / maxDistance);
+          const baseSim = Math.pow(1 - normalizedDist, 1.5);
 
           let boost = 0;
           const srcA = nodeIdToSource.get(node.id);
           const srcB = nodeIdToSource.get(targetId);
-          if (srcA && srcB && srcA === srcB) boost += 0.05;
+          if (srcA && srcB && srcA === srcB) boost += 0.02;
 
           const domA = nodeIdToDomain.get(node.id);
           const domB = nodeIdToDomain.get(targetId);
-          if (domA && domB && domA === domB) boost += 0.07;
+          if (domA && domB && domA === domB) boost += 0.03;
 
           const tsA = nodeIdToTimestamp.get(node.id);
           const tsB = nodeIdToTimestamp.get(targetId);
           if (tsA && tsB) {
             const dt = Math.abs(tsA - tsB);
-            if (dt <= 60 * 60) boost += 0.06;
-            else if (dt <= 24 * 60 * 60) boost += 0.04;
-            else if (dt <= 7 * 24 * 60 * 60) boost += 0.02;
+            if (dt <= 60 * 60) boost += 0.02;
+            else if (dt <= 24 * 60 * 60) boost += 0.015;
+            else if (dt <= 7 * 24 * 60 * 60) boost += 0.01;
           }
 
           const similarityScore = Math.max(0, Math.min(1, baseSim + boost));
@@ -1421,25 +1442,37 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         }
       });
       
-      // Normalize scores and enforce degree caps
-      let edges = Array.from(edgeMap.values()).filter(e => e.similarity_score > 0.1);
-
-      // Per-node degree control
+      let edges = Array.from(edgeMap.values()).filter(e => e.similarity_score >= 0.05);
+      
+      // Sort by similarity to prioritize strong connections
+      edges.sort((a, b) => b.similarity_score - a.similarity_score);
+      
+      // Per-node degree control - simple top-k selection
       const degreeMap = new Map<string, number>();
       const incrementDegree = (id: string) => degreeMap.set(id, (degreeMap.get(id) || 0) + 1);
 
-      // Prefer higher similarity edges when enforcing maxDegree
       const maxDegree = Math.min(12, Math.max(5, Math.floor(k * 2)));
-      edges = edges
-        .sort((a, b) => b.similarity_score - a.similarity_score)
-        .filter(edge => {
-          const dA = degreeMap.get(edge.source) || 0;
-          const dB = degreeMap.get(edge.target) || 0;
-          if (dA >= maxDegree || dB >= maxDegree) return false;
+      
+      const finalEdges: any[] = [];
+      const addedEdges = new Set<string>();
+      
+      // Simple filtering: take top edges respecting maxDegree per node
+      for (const edge of edges) {
+        const edgeKey = [edge.source, edge.target].sort().join('_');
+        if (addedEdges.has(edgeKey)) continue;
+        
+        const dA = degreeMap.get(edge.source) || 0;
+        const dB = degreeMap.get(edge.target) || 0;
+        
+        if (dA < maxDegree && dB < maxDegree) {
+          finalEdges.push(edge);
+          addedEdges.add(edgeKey);
           incrementDegree(edge.source);
           incrementDegree(edge.target);
-          return true;
-        });
+        }
+      }
+      
+      edges = finalEdges;
 
       // Ensure minimum degree by adding closest edges if needed
       const idToNeighbors = new Map<string, any[]>(nodes.map(n => [n.id, [] as any[]]));

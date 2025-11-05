@@ -51,16 +51,24 @@ export class MemoryService {
       requireAuthToken()
       
       const response = await getRequest(`${this.baseUrl}/transactions?${params.toString()}`)
-      const data = response.data?.data
       
       // Check if the API returned an error
       if (response.data?.success === false) {
+        console.error('API error:', response.data?.error)
         throw new Error(response.data?.error || 'API returned error')
       }
       
-      if (Array.isArray(data?.memories) && data.memories.length > 0) {
+      // API returns: { success: true, data: { memories: [...], transactionStats: {...}, totalMemories: number } }
+      const data = response.data?.data
+      const memories = data?.memories || []
+      
+      if (Array.isArray(memories)) {
+        if (memories.length === 0) {
+          console.log('No memories found for user:', userId)
+          return []
+        }
         // Map API response to Memory interface
-        return data.memories.map((mem: ApiMemoryResponse) => ({
+        return memories.map((mem: ApiMemoryResponse) => ({
           id: mem.id || mem.hash,
           user_id: userId,
           hash: mem.hash,
@@ -82,11 +90,12 @@ export class MemoryService {
           confirmed_at: mem.confirmed_at
         } as Memory))
       }
+      
+      console.log('No memories found in response:', response.data)
     } catch (error) {
-      // Error fetching memories from database
+      console.error('Error fetching memories:', error)
+      throw error
     }
-    
-    // No fallback - return empty array if no transaction data found
     
     return []
   }
