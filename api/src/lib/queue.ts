@@ -32,12 +32,82 @@ const queueOptions: QueueOptions = {
 export const contentQueue = new Queue<ContentJobData>(queueName, queueOptions);
 export const contentQueueEvents = new QueueEvents(queueName, { connection: getRedisConnection() });
 
+contentQueueEvents.on('waiting', ({ jobId }) => {
+  console.log(`[Redis Queue] Job waiting in queue`, {
+    jobId,
+    state: 'waiting',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+contentQueueEvents.on('active', ({ jobId }) => {
+  console.log(`[Redis Queue] Job started processing`, {
+    jobId,
+    state: 'active',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+contentQueueEvents.on('completed', ({ jobId, returnvalue }) => {
+  console.log(`[Redis Queue] Job completed successfully`, {
+    jobId,
+    state: 'completed',
+    returnvalue: returnvalue ? JSON.stringify(returnvalue).substring(0, 200) : null,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+contentQueueEvents.on('failed', ({ jobId, failedReason }) => {
+  console.error(`[Redis Queue] Job failed`, {
+    jobId,
+    state: 'failed',
+    failedReason: failedReason || 'Unknown error',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+contentQueueEvents.on('progress', ({ jobId, data }) => {
+  console.log(`[Redis Queue] Job progress update`, {
+    jobId,
+    state: 'progress',
+    progress: data,
+    timestamp: new Date().toISOString(),
+  });
+});
+
+contentQueueEvents.on('stalled', ({ jobId }) => {
+  console.warn(`[Redis Queue] Job stalled`, {
+    jobId,
+    state: 'stalled',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+contentQueueEvents.on('delayed', ({ jobId, delay }) => {
+  console.log(`[Redis Queue] Job delayed`, {
+    jobId,
+    state: 'delayed',
+    delayMs: delay,
+    timestamp: new Date().toISOString(),
+  });
+});
+
 export const addContentJob = async (data: ContentJobData) => {
   const jobId = crypto.randomUUID();
   const jobOptions: JobsOptions = {
     jobId,
   };
   const job = await contentQueue.add(queueName, data, jobOptions);
+  
+  console.log(`[Redis Queue] Job queued for processing`, {
+    jobId: job.id,
+    userId: data.user_id,
+    contentLength: data.raw_text?.length || 0,
+    source: data.metadata?.source || 'unknown',
+    url: data.metadata?.url || 'unknown',
+    timestamp: new Date().toISOString(),
+  });
+  
   return { id: job.id };
 };
 
