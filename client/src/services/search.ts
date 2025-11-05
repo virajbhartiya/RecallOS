@@ -1,5 +1,6 @@
 import { postRequest } from '../utility/generalServices'
 import axiosInstance from '../utility/axiosInterceptor'
+import { requireAuthToken } from '../utils/userId'
 import type { Memory, MemorySearchResponse, SearchFilters, SearchResult } from '../types/memory'
 
 type ApiSearchResult = {
@@ -8,20 +9,19 @@ type ApiSearchResult = {
   summary: string | null
   url: string | null
   timestamp: number
-  avail_hash: string | null
   related_memories: string[]
   score?: number
 }
 
 export class SearchService {
   static async semanticSearch(
-    userId: string,
     query: string,
     limit: number = 10,
     contextOnly: boolean = false,
     signal?: AbortSignal
   ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string; job_id?: string }> {
-    const res = await postRequest('/search', { userId, query, limit, contextOnly }, undefined, signal)
+    requireAuthToken()
+    const res = await postRequest('/search', { query, limit, contextOnly }, undefined, signal)
     if (!res || res.status >= 400) throw new Error('Search request failed')
     return res.data
   }
@@ -54,12 +54,12 @@ export class SearchService {
    * ```
    */
   static async getContextForAI(
-    userId: string,
     query: string,
     limit: number = 10,
     signal?: AbortSignal
   ): Promise<{ query: string; context: string; results: ApiSearchResult[] }> {
-    const res = await postRequest('/search', { userId, query, limit, contextOnly: true }, undefined, signal)
+    requireAuthToken()
+    const res = await postRequest('/search', { query, limit, contextOnly: true }, undefined, signal)
     if (!res || res.status >= 400) throw new Error('Context search request failed')
     return {
       query: res.data.query,
@@ -69,34 +69,30 @@ export class SearchService {
   }
 
   static async semanticSearchMapped(
-    userId: string,
     query: string,
     filters: SearchFilters = {},
     page: number = 1,
     limit: number = 10,
     signal?: AbortSignal
   ): Promise<MemorySearchResponse> {
-    const data = await this.semanticSearch(userId, query, limit, false, signal)
+    const data = await this.semanticSearch(query, limit, false, signal)
     const results: SearchResult[] = (data.results || [])
       .map((r) => {
         const createdAtIso = new Date(r.timestamp * 1000).toISOString()
             const memory: Memory = {
               id: r.memory_id,
-              user_id: userId,
+              user_id: '',
               source: 'browser',
               url: r.url || undefined,
               title: r.title || 'Untitled Memory',
               content: '',
               summary: r.summary || undefined,
-              hash: r.avail_hash || undefined,
               timestamp: r.timestamp,
               created_at: createdAtIso,
               page_metadata: undefined,
               importance_score: undefined,
               access_count: 0,
               last_accessed: createdAtIso,
-              tx_status: undefined,
-              blockchain_network: undefined,
             }
         return {
           memory,

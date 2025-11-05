@@ -21,20 +21,10 @@ export interface Memory {
   importance_score?: number
   access_count: number
   last_accessed: string
-  tx_hash?: string
-  block_number?: number
-  gas_used?: string
-  tx_status?: 'pending' | 'confirmed' | 'failed'
-  blockchain_network?: string
-  confirmed_at?: string
 }
 
 export interface MemoryInsights {
   total_memories: number
-  total_transactions: number
-  confirmed_transactions: number
-  pending_transactions: number
-  failed_transactions: number
   categories: {
     [category: string]: number
   }
@@ -55,15 +45,6 @@ export interface MemoryInsights {
   }
 }
 
-export interface TransactionDetails {
-  tx_hash: string
-  block_number: number
-  gas_used: string
-  tx_status: 'pending' | 'confirmed' | 'failed'
-  blockchain_network: string
-  confirmed_at?: string
-}
-
 export interface MemoryMeshNode {
   id: string
   type: 'manual' | 'browser' | 'extension' | 'reasoning'
@@ -76,10 +57,6 @@ export interface MemoryMeshNode {
   content?: string
   full_content?: string
   importance_score?: number
-  tx_hash?: string
-  block_number?: number
-  blockchain_network?: string
-  tx_status?: 'pending' | 'confirmed' | 'failed'
   hasEmbedding?: boolean
   clusterId?: number
   layout?: {
@@ -126,7 +103,6 @@ export interface SearchFilters {
     start: string
     end: string
   }
-  tx_status?: 'pending' | 'confirmed' | 'failed'
   source?: string
 }
 

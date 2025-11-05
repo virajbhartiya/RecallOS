@@ -31,7 +31,7 @@ export type Insights = { totalMemories: number; topTopics: Array<{ topic: string
 
 export type TransactionStats = Record<string, number>
 
-export type SearchPostResponse = { query: string; results: Array<{ memory_id: string; title: string | null; summary: string | null; url: string | null; timestamp: number; avail_hash: string | null; related_memories: string[]; score: number }>; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; job_id: string }
+export type SearchPostResponse = { query: string; results: Array<{ memory_id: string; title: string | null; summary: string | null; url: string | null; timestamp: number; related_memories: string[]; score: number }>; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; job_id: string }
 
 export type SearchJob = { id: string; status: 'pending' | 'completed' | 'failed'; answer?: string; meta_summary?: string; created_at: number }
 

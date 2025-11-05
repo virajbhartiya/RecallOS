@@ -47,9 +47,6 @@ export const Login = () => {
       if (response.data?.token) {
         try { 
           localStorage.setItem('auth_token', response.data.token)
-          if (response.data.user?.id) {
-            localStorage.setItem('user_id', response.data.user.id)
-          }
         } catch {}
       }
       
@@ -70,7 +67,6 @@ export const Login = () => {
       setUser(null)
       try { 
         localStorage.removeItem('auth_token')
-        localStorage.removeItem('user_id')
       } catch {}
       setEmail('')
       setPassword('')
@@ -81,7 +77,6 @@ export const Login = () => {
       setUser(null)
       try { 
         localStorage.removeItem('auth_token')
-        localStorage.removeItem('user_id')
       } catch {}
       navigate('/login')
     }
@@ -92,11 +87,6 @@ export const Login = () => {
       const response = await axiosInstance.get('/auth/me')
       if (response.data?.user) {
         setUser(response.data.user)
-        if (response.data.user.id) {
-          try {
-            localStorage.setItem('user_id', response.data.user.id)
-          } catch {}
-        }
       }
     } catch (err) {
       setUser(null)

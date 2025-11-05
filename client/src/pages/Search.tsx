@@ -3,21 +3,14 @@ import { MemorySearch } from '../components/MemorySearch'
 import { MemoryService } from '../services/memoryService'
  
 import { LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
-import { Database } from 'lucide-react'
 import type { Memory, SearchFilters, MemorySearchResponse, SearchResult } from '../types/memory'
-import { getUserId, requireAuthToken } from '@/utils/userId'
+import { requireAuthToken } from '@/utils/userId'
 import { useNavigate } from 'react-router-dom'
 
 const SearchResultCard: React.FC<{ 
   result: SearchResult
   onClick: (memory: Memory) => void
-  hyperIndexData?: {
-    blockNumber?: string
-    gasUsed?: string
-    gasPrice?: string
-    timestamp?: string
-  }
-}> = ({ result, onClick, hyperIndexData }) => {
+}> = ({ result, onClick }) => {
   const memory = result.memory
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -63,27 +56,6 @@ const SearchResultCard: React.FC<{
             <span>{formatDate(memory.created_at)}</span>
             <span>•</span>
             <span className="uppercase">{memory.source}</span>
-            {memory.tx_status && (
-              <>
-                <span>•</span>
-                <span className={`uppercase ${
-                  memory.tx_status === 'confirmed' ? 'text-green-600' :
-                  memory.tx_status === 'pending' ? 'text-yellow-600' :
-                  'text-red-600'
-                }`}>
-                  {memory.tx_status}
-                </span>
-              </>
-            )}
-            {hyperIndexData?.blockNumber && (
-              <>
-                <span>•</span>
-                <span className="text-blue-600 flex items-center gap-1">
-                  <Database className="w-3 h-3" />
-                  Block {hyperIndexData.blockNumber}
-                </span>
-              </>
-            )}
           </div>
         </div>
         <div className="flex items-center space-x-2">
@@ -100,37 +72,6 @@ const SearchResultCard: React.FC<{
         <p className="text-sm text-gray-700 mb-3 line-clamp-2">
           {memory.summary}
         </p>
-      )}
-
-      {hyperIndexData && (
-        <div className="mt-3 p-2 bg-blue-50 border border-blue-200 rounded text-xs font-mono">
-          <div className="flex items-center gap-2 mb-1">
-            <Database className="w-3 h-3 text-blue-600" />
-            <span className="text-blue-800 font-semibold">BLOCKCHAIN DATA</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2 text-gray-700">
-            {hyperIndexData.blockNumber && (
-              <div>
-                <span className="text-gray-500">Block:</span> {hyperIndexData.blockNumber}
-              </div>
-            )}
-            {hyperIndexData.gasUsed && (
-              <div>
-                <span className="text-gray-500">Gas:</span> {hyperIndexData.gasUsed}
-              </div>
-            )}
-            {hyperIndexData.gasPrice && (
-              <div>
-                <span className="text-gray-500">Price:</span> {hyperIndexData.gasPrice}
-              </div>
-            )}
-            {hyperIndexData.timestamp && (
-              <div>
-                <span className="text-gray-500">Time:</span> {new Date(parseInt(hyperIndexData.timestamp) * 1000).toLocaleString()}
-              </div>
-            )}
-          </div>
-        </div>
       )}
 
       {memory.url && memory.url !== 'unknown' && (
@@ -165,35 +106,26 @@ export const Search: React.FC = () => {
   const navigate = useNavigate()
   const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [address, setAddress] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [showOnlyCited, setShowOnlyCited] = useState(true)
-  const [hyperIndexData, _setHyperIndexData] = useState<Record<string, any>>({})
 
   useEffect(() => {
     try {
-      const id = getUserId()
-      setAddress(id)
+      requireAuthToken()
       setIsAuthenticated(true)
     } catch (error) {
       navigate('/login')
     }
   }, [navigate])
 
-  const fetchHyperIndexData = useCallback(async (_memories: Memory[]) => {
-    return
-  }, [])
-
   const handleSearch = useCallback(async (
     query: string, 
     filters: SearchFilters, 
     useSemantic: boolean
   ) => {
-    if (!address) return
-
     setIsLoading(true)
     setError(null)
     setSearchResults(null)
@@ -206,7 +138,6 @@ export const Search: React.FC = () => {
 
       if (useSemantic) {
         response = await MemoryService.searchMemoriesWithEmbeddings(
-          address,
           query,
           filters,
           1,
@@ -214,7 +145,6 @@ export const Search: React.FC = () => {
         )
       } else {
         response = await MemoryService.searchMemories(
-          address,
           query,
           filters,
           1,
@@ -223,19 +153,13 @@ export const Search: React.FC = () => {
       }
 
       setSearchResults(response)
-      
-      // Fetch HyperIndex data for search results
-      if (response.results && response.results.length > 0) {
-        const memories = response.results.map(r => r.memory)
-        fetchHyperIndexData(memories)
-      }
     } catch (err) {
       setError('Failed to search memories')
       console.error('Error searching memories:', err)
     } finally {
       setIsLoading(false)
     }
-  }, [address, fetchHyperIndexData])
+  }, [])
 
   const handleClearFilters = useCallback(() => {
     setSearchResults(null)
@@ -269,7 +193,7 @@ export const Search: React.FC = () => {
     )
   }
 
-  if (!isAuthenticated || !address) {
+  if (!isAuthenticated) {
     return null
   }
 
@@ -408,17 +332,13 @@ export const Search: React.FC = () => {
 
               {/* Results Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {getFilteredResults().map((result) => {
-                  const memoryHyperIndexData = hyperIndexData[result.memory.tx_hash || result.memory.id]
-                  return (
-                    <SearchResultCard
-                      key={result.memory.id}
-                      result={result}
-                      onClick={handleSelectMemory}
-                      hyperIndexData={memoryHyperIndexData}
-                    />
-                  )
-                })}
+                {getFilteredResults().map((result) => (
+                  <SearchResultCard
+                    key={result.memory.id}
+                    result={result}
+                    onClick={handleSelectMemory}
+                  />
+                ))}
               </div>
             </>
           )}
@@ -496,18 +416,6 @@ export const Search: React.FC = () => {
                           {new Date(selectedMemory.created_at).toLocaleString()}
                         </span>
                       </div>
-                      {selectedMemory.tx_status && (
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Status:</span>
-                          <span className={`uppercase ${
-                            selectedMemory.tx_status === 'confirmed' ? 'text-green-600' :
-                            selectedMemory.tx_status === 'pending' ? 'text-yellow-600' :
-                            'text-red-600'
-                          }`}>
-                            {selectedMemory.tx_status}
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </div>
 
