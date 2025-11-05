@@ -69,19 +69,27 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
   onClick
 }) => {
   const meshRef = useRef<THREE.Mesh>(null)
+  const { camera } = useThree()
   const [hovered, setHovered] = useState(false)
   
   // Supermemory-like tiny nodes
-  const baseSize = 0.006 + (importance * 0.003)
-  const size = isSelected ? baseSize + 0.01 : isHighlighted ? baseSize + 0.004 : baseSize
+  const baseSize = 0.0035 + (importance * 0.0015)
+  const size = baseSize
   const opacity = inLatentSpace ? 0.95 : 0.75
   
   useFrame(() => {
-    if (meshRef.current) {
-      // Enhanced hover effect for selected nodes
-      const hoverScale = isSelected ? 1.5 : isHighlighted ? 1.3 : 1.2
-      meshRef.current.scale.setScalar(hovered ? hoverScale : 1)
-    }
+    if (!meshRef.current) return
+    // Distance-based scaling to keep apparent size consistent while zooming
+    const nodePosition = meshRef.current.position
+    const distance = camera.position.distanceTo(nodePosition)
+    // Convert camera fov to radians for approximate world-space pixel scaling
+    const fovRad = (camera as any).fov ? ((camera as any).fov * Math.PI) / 180 : (60 * Math.PI) / 180
+    const worldPerceivedScale = Math.tan(fovRad / 2) * 2
+    // Tune multiplier to get roughly dot-like size; clamp to avoid extremes
+    const dynamicScale = Math.min(6, Math.max(0.25, distance * worldPerceivedScale * 0.06))
+    const emphasis = isSelected ? 1.8 : isHighlighted ? 1.3 : 1.0
+    const hoverBoost = hovered ? 1.15 : 1.0
+    meshRef.current.scale.setScalar(dynamicScale * emphasis * hoverBoost)
   })
 
   return (
@@ -92,7 +100,7 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
       onPointerOver={() => setHovered(true)}
       onPointerOut={() => setHovered(false)}
     >
-      <sphereGeometry args={[size, 12, 12]} />
+      <sphereGeometry args={[size, 8, 8]} />
       <meshBasicMaterial
         color={color}
         transparent
@@ -125,7 +133,7 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
 
   const color = getLineColor(similarity)
   const opacity = similarity > 0.75 ? 0.6 : (similarity > 0.5 ? 0.4 : 0.3)
-  const lineWidth = similarity > 0.85 ? 1 : (similarity > 0.75 ? 0.75 : 0.5)
+  const lineWidth = similarity > 0.85 ? 0.4 : (similarity > 0.75 ? 0.3 : 0.2)
 
   return (
     <Line
@@ -165,9 +173,9 @@ const Scene: React.FC<SceneProps> = ({
   
   useEffect(() => {
     if (isCompactView) {
-      camera.position.set(2, 2, 2) // Closer to the tighter cluster
+      camera.position.set(1.0, 1.0, 1.0)
     } else {
-      camera.position.set(3.5, 3.5, 3.5) // Closer to the tighter cluster
+      camera.position.set(1.4, 1.4, 1.4)
     }
     camera.lookAt(0, 0, 0)
   }, [camera, isCompactView])
@@ -190,7 +198,7 @@ const Scene: React.FC<SceneProps> = ({
     const spanX = Math.max(1e-6, maxX - minX)
     const spanY = Math.max(1e-6, maxY - minY)
     const spanZ = Math.max(1e-6, maxZ - minZ)
-    const radius = isCompactView ? 1.2 : 2.5 // significantly reduce spacing
+    const radius = isCompactView ? 1.0 : 1.6 // draw nodes closer together
     const zRadius = radius * 0.8
 
     return meshData.nodes.map((n, i) => {
@@ -217,7 +225,7 @@ const Scene: React.FC<SceneProps> = ({
         position = [nx, ny, iz]
       } else {
         // Generate 3D position using spherical coordinates with tighter clustering
-        const rr = (isCompactView ? radius * 0.4 : radius * 0.6) + (i * 0.01) // Much tighter clustering
+        const rr = (isCompactView ? radius * 0.4 : radius * 0.55) + (i * 0.008)
         const theta = (i / Math.max(1, meshData.nodes.length)) * Math.PI * 2
         const phi = Math.acos(2 * Math.random() - 1)
         position = [
@@ -420,7 +428,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
       <div className="w-full h-full overflow-hidden relative bg-transparent">
         <Canvas
           camera={{ 
-            position: isCompactView ? [2, 2, 2] : [3.5, 3.5, 3.5], 
+            position: isCompactView ? [1.0, 1.0, 1.0] : [1.4, 1.4, 1.4], 
             fov: isCompactView ? 75 : 60 
           }}
           style={{ background: 'transparent' }}
@@ -439,8 +447,8 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
             enablePan={true}
             enableZoom={true}
             enableRotate={true}
-            minDistance={isCompactView ? 0.5 : 1}
-            maxDistance={isCompactView ? 25 : 50}
+            minDistance={isCompactView ? 0.3 : 0.6}
+            maxDistance={isCompactView ? 20 : 40}
             zoomSpeed={1.2}
             panSpeed={0.8}
             rotateSpeed={0.5}
