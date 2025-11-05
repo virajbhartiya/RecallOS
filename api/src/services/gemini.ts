@@ -256,14 +256,14 @@ Return clean, readable plain text only.`;
     const keyTopics = metadata?.key_topics || [];
 
     const baseContext = `
-RecallOS Web3 Memory Context:
-- This system captures, anchors, and reasons over user knowledge using Avail for verifiable cognition.
-- Each summary must preserve conceptual and factual signals that aid downstream embedding and memory linkage.
-- Focus on what this content teaches, why it matters, and how it connects to user knowledge evolution.
-`;
+    RecallOS Memory Context:
+    - This system captures, anchors, and reasons over user knowledge.
+    - Each summary must preserve conceptual and factual signals that aid downstream embedding and memory linkage.
+    - Focus on what this content teaches, why it matters, and how it connects to user knowledge evolution.
+    `;
 
     const prompts: Record<string, string> = {
-      blog_post: `Summarize this blog post for RecallOS memory storage. Extract conceptual essence, useful principles, and any links to blockchain, AI reasoning, or systems thinking. Limit to 200 words.`,
+      blog_post: `Summarize this blog post for RecallOS memory storage. Extract conceptual essence, useful principles, and any links to AI reasoning or systems thinking. Limit to 200 words.`,
       article: `Summarize this article emphasizing the knowledge kernel — ideas worth recalling in context of verifiable cognition. Capture main argument, supporting evidence, and conceptual contribution. 200 words max.`,
       documentation: `Summarize this documentation for knowledge anchoring. Include system purpose, key methods, conceptual model, and when it's relevant. Preserve implementation-level cues for recall. 200 words.`,
       tutorial: `Summarize this tutorial as a learning trace. Identify goal, key procedures, conceptual lessons, and result. Summaries must support future reasoning and contextual recall. 200 words.`,

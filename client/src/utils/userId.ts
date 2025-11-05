@@ -1,33 +1,3 @@
-export function getAuthenticatedUserId(): string | null {
-  try {
-    const token = getAuthToken();
-    if (!token) return null;
-    
-    // Parse JWT token to get user ID
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      if (payload.userId) {
-        return payload.userId;
-      }
-      if (payload.externalId) {
-        return payload.externalId;
-      }
-    } catch (e) {
-      // Invalid token format
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-export function getUserId(): string {
-  const authUserId = getAuthenticatedUserId();
-  if (!authUserId) {
-    throw new Error('User not authenticated. Please log in.');
-  }
-  return authUserId;
-}
 
 export function getAuthToken(): string | null {
   try {

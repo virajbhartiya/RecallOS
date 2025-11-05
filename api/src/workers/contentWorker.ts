@@ -5,7 +5,7 @@ import { memoryMeshService } from '../services/memoryMesh';
 import { prisma } from '../lib/prisma';
 import { createHash } from 'crypto';
 import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../utils/env';
-import { normalizeText, hashCanonical } from '../utils/text';
+import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text';
 
 export const startContentWorker = () => {
   return new Worker<ContentJobData>(
@@ -166,27 +166,87 @@ export const startContentWorker = () => {
               summary: summary.substring(0, 100) + '...',
             };
           }
-          const memoryHash =
-            '0x' + createHash('sha256').update(summary).digest('hex');
 
+          // Fallback: Check for URL-based duplicates within the last hour (for dynamic content)
+          if (metadata?.url && metadata.url !== 'unknown') {
+            const normalizedUrl = normalizeUrl(metadata.url);
+            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+            
+            const recentMemories = await prisma.memory.findMany({
+              where: {
+                user_id,
+                created_at: { gte: oneHourAgo } as any,
+              } as any,
+              orderBy: { created_at: 'desc' } as any,
+              take: 50,
+            });
+
+            for (const existingMemory of recentMemories) {
+              const existingUrl = (existingMemory as any).url;
+              if (existingUrl && typeof existingUrl === 'string' && normalizeUrl(existingUrl) === normalizedUrl) {
+                const existingCanonical = normalizeText((existingMemory as any).content || '');
+                const similarity = calculateSimilarity(canonicalText, existingCanonical);
+                
+                if (similarity > 0.9) {
+                  console.log(`[Redis Worker] URL duplicate detected, skipping creation`, {
+                    jobId: job.id,
+                    userId: user_id,
+                    existingMemoryId: existingMemory.id,
+                    similarity,
+                    timestamp: new Date().toISOString(),
+                  });
+                  return {
+                    success: true,
+                    contentId: existingMemory.id,
+                    memoryId: existingMemory.id,
+                    summary: summary.substring(0, 100) + '...',
+                  };
+                }
+              }
+            }
+          }
           const timestamp = Math.floor(Date.now() / 1000);
 
-          const memory = await prisma.memory.create({
-            data: {
-              user_id,
-              source: metadata?.source || 'queue',
-              url: metadata?.url || 'unknown',
-              title: metadata?.title || 'Untitled',
-              content: raw_text,
-              summary: summary,
-              hash: memoryHash,
-              canonical_text: canonicalText,
-              canonical_hash: canonicalHash,
-              timestamp: BigInt(timestamp),
-              full_content: raw_text,
-              page_metadata: metadata || {},
-            } as any,
-          });
+          let memory;
+          try {
+            memory = await prisma.memory.create({
+              data: {
+                user_id,
+                source: metadata?.source || 'queue',
+                url: metadata?.url || 'unknown',
+                title: metadata?.title || 'Untitled',
+                content: raw_text,
+                summary: summary,
+                canonical_text: canonicalText,
+                canonical_hash: canonicalHash,
+                timestamp: BigInt(timestamp),
+                full_content: raw_text,
+                page_metadata: metadata || {},
+              } as any,
+            });
+          } catch (createError: any) {
+            if (createError.code === 'P2002') {
+              const existingByCanonical = await prisma.memory.findFirst({
+                where: { user_id, canonical_hash: canonicalHash } as any,
+              });
+
+              if (existingByCanonical) {
+                console.log(`[Redis Worker] Duplicate memory detected on create, skipping`, {
+                  jobId: job.id,
+                  userId: user_id,
+                  existingMemoryId: existingByCanonical.id,
+                  timestamp: new Date().toISOString(),
+                });
+                return {
+                  success: true,
+                  contentId: existingByCanonical.id,
+                  memoryId: existingByCanonical.id,
+                  summary: summary.substring(0, 100) + '...',
+                };
+              }
+            }
+            throw createError;
+          }
 
           await memoryMeshService.generateEmbeddingsForMemory(memory.id);
           await memoryMeshService.createMemoryRelations(memory.id, user_id);

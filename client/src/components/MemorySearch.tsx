@@ -147,21 +147,6 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
         </div>
 
         {/* Transaction Status Filter */}
-        <div>
-          <label className="block text-xs font-mono text-gray-600 uppercase tracking-wide mb-1">
-            TX STATUS
-          </label>
-          <select
-            value={filters.tx_status || ''}
-            onChange={(e) => handleFilterChange('tx_status', e.target.value || undefined)}
-            className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
-          >
-            <option value="">All Status</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed</option>
-          </select>
-        </div>
 
         {/* Source Filter */}
         <div>

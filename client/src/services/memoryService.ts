@@ -20,15 +20,9 @@ interface ApiMemoryResponse {
   content?: string
   source?: string
   url?: string
-  tx_status?: string
-  blockchain_network?: string
   page_metadata?: Record<string, unknown>
   access_count?: number
   last_accessed?: string
-  tx_hash?: string
-  block_number?: string | number
-  gas_used?: string
-  confirmed_at?: string
 }
 
 export class MemoryService {
@@ -36,58 +30,41 @@ export class MemoryService {
 
 
   static async getMemoriesWithTransactionDetails(
-    userId: string,
-    status?: 'pending' | 'confirmed' | 'failed',
     limit?: number
   ): Promise<Memory[]> {
-    const normalizedAddress = userId
-    const params = new URLSearchParams()
-    params.append('userId', normalizedAddress)
-    if (status) params.append('status', status)
-    if (limit) params.append('limit', limit.toString())
+    requireAuthToken()
     
     try {
-      // Require authentication
-      requireAuthToken()
+      const response = await getRequest(`${this.baseUrl}/user/recent?count=${limit || 10000}`)
       
-      const response = await getRequest(`${this.baseUrl}/transactions?${params.toString()}`)
-      
-      // Check if the API returned an error
       if (response.data?.success === false) {
         console.error('API error:', response.data?.error)
         throw new Error(response.data?.error || 'API returned error')
       }
       
-      // API returns: { success: true, data: { memories: [...], transactionStats: {...}, totalMemories: number } }
       const data = response.data?.data
       const memories = data?.memories || []
       
       if (Array.isArray(memories)) {
         if (memories.length === 0) {
-          console.log('No memories found for user:', userId)
+          console.log('No memories found')
           return []
         }
-        // Map API response to Memory interface
+        
         return memories.map((mem: ApiMemoryResponse) => ({
-          id: mem.id || mem.hash,
-          user_id: userId,
-          hash: mem.hash,
-          timestamp: typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp,
-          created_at: mem.created_at || new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toISOString(),
+          id: mem.id || '',
+          user_id: '',
+          hash: mem.hash || '',
+          timestamp: typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : (typeof mem.timestamp === 'number' ? mem.timestamp : 0),
+          created_at: mem.created_at || new Date().toISOString(),
           title: mem.title || 'Memory',
-          summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
+          summary: mem.summary || '',
           content: mem.content || '',
           source: mem.source || 'extension',
           url: mem.url,
-          tx_status: mem.tx_status || 'confirmed',
-          blockchain_network: mem.blockchain_network || 'sepolia',
           page_metadata: mem.page_metadata,
           access_count: mem.access_count || 0,
           last_accessed: mem.last_accessed || new Date().toISOString(),
-          tx_hash: mem.tx_hash,
-          block_number: mem.block_number ? (typeof mem.block_number === 'string' ? parseInt(mem.block_number) : mem.block_number) : undefined,
-          gas_used: mem.gas_used,
-          confirmed_at: mem.confirmed_at
         } as Memory))
       }
       
@@ -100,14 +77,13 @@ export class MemoryService {
     return []
   }
 
-  static async getMemoryMesh(userId: string, limit: number = 50, threshold: number = 0.3): Promise<MemoryMesh> {
-    const normalizedAddress = userId
-    const response = await getRequest(`${this.baseUrl}/mesh/${normalizedAddress}?limit=${limit}&threshold=${threshold}`)
+  static async getMemoryMesh(limit: number = 50, threshold: number = 0.3): Promise<MemoryMesh> {
+    requireAuthToken()
+    const response = await getRequest(`${this.baseUrl}/mesh?limit=${limit}&threshold=${threshold}`)
     return response.data?.data || { nodes: [], edges: [], clusters: {} }
   }
 
   static async searchMemories(
-    userId: string,
     query: string,
     filters: SearchFilters = {},
     page: number = 1,
@@ -115,14 +91,11 @@ export class MemoryService {
     signal?: AbortSignal
   ): Promise<MemorySearchResponse> {
     try {
-      const normalizedAddress = userId
-      
       // Require authentication
       requireAuthToken()
       
       // Use the working /search endpoint (POST)
       const response = await postRequest('/search', {
-        userId: normalizedAddress,
         query,
         limit,
         contextOnly: false
@@ -148,7 +121,6 @@ export class MemoryService {
           title?: string;
           content?: string;
           summary?: string;
-          avail_hash?: string;
           timestamp: number;
           created_at?: string;
           full_content?: string;
@@ -163,12 +135,6 @@ export class MemoryService {
           importance_score?: number;
           access_count?: number;
           last_accessed?: string;
-          tx_hash?: string;
-          block_number?: number;
-          gas_used?: string;
-          tx_status?: 'pending' | 'confirmed' | 'failed';
-          blockchain_network?: string;
-          confirmed_at?: string;
           score: number;
         }) => ({
           memory: {
@@ -179,7 +145,6 @@ export class MemoryService {
             title: result.title,
             content: result.content || result.summary || '',
             summary: result.summary,
-            hash: result.avail_hash,
             timestamp: result.timestamp,
             created_at: result.created_at || new Date(result.timestamp * 1000).toISOString(),
             full_content: result.full_content,
@@ -187,12 +152,6 @@ export class MemoryService {
             importance_score: result.importance_score,
             access_count: result.access_count || 0,
             last_accessed: result.last_accessed || new Date().toISOString(),
-            tx_hash: result.tx_hash,
-            block_number: result.block_number,
-            gas_used: result.gas_used,
-            tx_status: result.tx_status,
-            blockchain_network: result.blockchain_network,
-            confirmed_at: result.confirmed_at
           },
           similarity_score: result.score,
           relevance_score: result.score,
@@ -221,18 +180,16 @@ export class MemoryService {
   }
 
   static async searchMemoriesWithEmbeddings(
-    userId: string,
     query: string,
     filters: SearchFilters = {},
     page: number = 1,
     limit: number = 10
   ): Promise<MemorySearchResponse> {
     try {
-      const normalizedAddress = userId
+      requireAuthToken()
       
       // Use the working /search endpoint (POST) - same as searchMemories
       const response = await postRequest('/search', {
-        userId: normalizedAddress,
         query,
         limit,
         contextOnly: false
@@ -258,7 +215,6 @@ export class MemoryService {
           title?: string;
           content?: string;
           summary?: string;
-          avail_hash?: string;
           timestamp: number;
           created_at?: string;
           full_content?: string;
@@ -273,12 +229,6 @@ export class MemoryService {
           importance_score?: number;
           access_count?: number;
           last_accessed?: string;
-          tx_hash?: string;
-          block_number?: number;
-          gas_used?: string;
-          tx_status?: 'pending' | 'confirmed' | 'failed';
-          blockchain_network?: string;
-          confirmed_at?: string;
           score: number;
         }) => ({
           memory: {
@@ -289,7 +239,6 @@ export class MemoryService {
             title: result.title,
             content: result.content || result.summary || '',
             summary: result.summary,
-            hash: result.avail_hash,
             timestamp: result.timestamp,
             created_at: result.created_at || new Date(result.timestamp * 1000).toISOString(),
             full_content: result.full_content,
@@ -297,12 +246,6 @@ export class MemoryService {
             importance_score: result.importance_score,
             access_count: result.access_count || 0,
             last_accessed: result.last_accessed || new Date().toISOString(),
-            tx_hash: result.tx_hash,
-            block_number: result.block_number,
-            gas_used: result.gas_used,
-            tx_status: result.tx_status,
-            blockchain_network: result.blockchain_network,
-            confirmed_at: result.confirmed_at
           },
           similarity_score: result.score,
           relevance_score: result.score,
@@ -331,16 +274,14 @@ export class MemoryService {
   }
 
   static async searchMemoriesHybrid(
-    userId: string,
     query: string,
     filters: SearchFilters = {},
     page: number = 1,
     limit: number = 10
   ): Promise<MemorySearchResponse> {
     try {
-      const normalizedAddress = userId
+      requireAuthToken()
       const params = new URLSearchParams({
-        userId: normalizedAddress,
         query,
         page: page.toString(),
         limit: limit.toString()
@@ -385,13 +326,11 @@ export class MemoryService {
     }
   }
 
-  static async getMemoryInsights(userId: string): Promise<MemoryInsights> {
-    const normalizedAddress = userId
-    const params = new URLSearchParams()
-    params.append('userId', normalizedAddress)
+  static async getMemoryInsights(): Promise<MemoryInsights> {
+    requireAuthToken()
     
     try {
-      const response = await getRequest(`${this.baseUrl}/insights?${params.toString()}`)
+      const response = await getRequest(`${this.baseUrl}/insights`)
       
       // Check if the API returned an error
       if (response.data?.success === false) {
@@ -403,10 +342,6 @@ export class MemoryService {
       if (data) {
         return {
           total_memories: data.totalMemories || 0,
-          total_transactions: data.totalMemories || 0, // Total transactions = total memories
-          confirmed_transactions: data.transactionStatusDistribution?.confirmed || 0,
-          pending_transactions: data.transactionStatusDistribution?.pending || 0,
-          failed_transactions: data.transactionStatusDistribution?.failed || 0,
           categories: data.topCategories?.reduce((acc: Record<string, number>, cat: { category: string; count: number }) => {
             acc[cat.category] = cat.count
             return acc
@@ -430,20 +365,15 @@ export class MemoryService {
             content: 'User initialization',
             url: 'user-init',
             title: 'User Setup',
-            userId: userId,
             metadata: { source: 'manual' }
           })
           
           // Retry the original request
-          const retryResponse = await getRequest(`${this.baseUrl}/insights?${params.toString()}`)
+          const retryResponse = await getRequest(`${this.baseUrl}/insights`)
           const retryData = retryResponse.data?.data
           if (retryData) {
             return {
               total_memories: retryData.totalMemories || 0,
-              total_transactions: retryData.totalMemories || 0, // Total transactions = total memories
-              confirmed_transactions: retryData.transactionStatusDistribution?.confirmed || 0,
-              pending_transactions: retryData.transactionStatusDistribution?.pending || 0,
-              failed_transactions: retryData.transactionStatusDistribution?.failed || 0,
               categories: retryData.topCategories?.reduce((acc: Record<string, number>, cat: { category: string; count: number }) => {
                 acc[cat.category] = cat.count
                 return acc
@@ -463,15 +393,11 @@ export class MemoryService {
       }
     }
     
-    // Fallback: create basic insights from blockchain data
+    // Fallback: create basic insights
     try {
-      const count = await this.getUserMemoryCount(userId)
+      const count = await this.getUserMemoryCount()
       return {
         total_memories: count,
-        total_transactions: count,
-        confirmed_transactions: count,
-        pending_transactions: 0,
-        failed_transactions: 0,
         categories: { 'extension': count },
         sentiment_distribution: { positive: 0, negative: 0, neutral: count },
         topology: { total_nodes: count, total_edges: 0, average_connections: 0, largest_cluster_size: count },
@@ -481,10 +407,6 @@ export class MemoryService {
       // Fallback insights also failed
       return {
         total_memories: 0,
-        total_transactions: 0,
-        confirmed_transactions: 0,
-        pending_transactions: 0,
-        failed_transactions: 0,
         categories: {},
         sentiment_distribution: { positive: 0, negative: 0, neutral: 0 },
         topology: { total_nodes: 0, total_edges: 0, average_connections: 0, largest_cluster_size: 0 },
@@ -493,23 +415,11 @@ export class MemoryService {
     }
   }
 
-  static async getRecentMemories(userId: string, count: number = 10): Promise<Memory[]> {
-    const normalizedAddress = userId
+  static async getRecentMemories(count: number = 10): Promise<Memory[]> {
+    requireAuthToken()
     
-    // First try the database endpoint for full data
     try {
-      const response = await getRequest(`${this.baseUrl}/transactions?userId=${normalizedAddress}&limit=${count}`)
-      const data = response.data?.data
-      if (Array.isArray(data?.memories) && data.memories.length > 0) {
-        return data.memories
-      }
-    } catch (error) {
-      // Error fetching recent memories from database
-    }
-    
-    // Fallback to recent memories endpoint (now returns full database data)
-    try {
-      const response = await getRequest(`${this.baseUrl}/user/${normalizedAddress}/recent?count=${count}`)
+      const response = await getRequest(`${this.baseUrl}/user/recent?count=${count}`)
       const data = response.data?.data
       
       if (Array.isArray(data?.memories) && data.memories.length > 0) {
@@ -523,10 +433,8 @@ export class MemoryService {
           summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
           content: mem.content || '',
           source: mem.source || 'extension',
-          user_id: userId,
+          user_id: '',
           url: mem.url,
-          tx_status: mem.tx_status || 'confirmed',
-          blockchain_network: mem.blockchain_network || 'sepolia',
           page_metadata: mem.page_metadata,
           access_count: mem.access_count || 0,
           last_accessed: mem.last_accessed || new Date().toISOString()
@@ -540,11 +448,11 @@ export class MemoryService {
   }
 
   static async getUserMemories(
-    userId: string,
     page: number = 1,
     limit: number = 20
   ): Promise<{ memories: Memory[]; total: number; page: number; limit: number }> {
-    const response = await getRequest(`${this.baseUrl}/user/${userId}?page=${page}&limit=${limit}`)
+    requireAuthToken()
+    const response = await getRequest(`${this.baseUrl}/user?page=${page}&limit=${limit}`)
     const data = response.data?.data
     return data || { memories: [], total: 0, page, limit }
   }
@@ -562,23 +470,15 @@ export class MemoryService {
     return response.data?.data
   }
 
-  static async getUserMemoryCount(userId: string): Promise<number> {
-    const normalizedAddress = userId
+  static async getUserMemoryCount(): Promise<number> {
+    requireAuthToken()
     try {
-      const response = await getRequest(`${this.baseUrl}/user/${normalizedAddress}/count`)
+      const response = await getRequest(`${this.baseUrl}/user/count`)
       const count = response.data?.data?.memoryCount
       return typeof count === 'number' ? count : parseInt(count) || 0
     } catch (error) {
-      // Error fetching memory count
-      // Fallback: try to get count from transactions endpoint
-      try {
-        const response = await getRequest(`${this.baseUrl}/transactions?userId=${normalizedAddress}&limit=1000`)
-        const data = response.data?.data
-        return Array.isArray(data?.memories) ? data.memories.length : 0
-      } catch (fallbackError) {
-        // Fallback count also failed
-        return 0
-      }
+      console.error('Error fetching memory count:', error)
+      return 0
     }
   }
 
@@ -597,41 +497,21 @@ export class MemoryService {
   }
 
   static async getMemorySnapshots(
-    userId: string,
     page: number = 1,
     limit: number = 20
   ): Promise<{ snapshots: unknown[]; total: number; page: number; limit: number }> {
-    const response = await getRequest(`${this.baseUrl}/snapshots/${userId}?page=${page}&limit=${limit}`)
+    requireAuthToken()
+    const response = await getRequest(`${this.baseUrl}/snapshots?page=${page}&limit=${limit}`)
     return response.data?.data || { snapshots: [], total: 0, page, limit }
   }
 
-  static async getMemoryTransactionStatus(memoryId: string): Promise<{
-    tx_hash?: string
-    block_number?: number
-    gas_used?: string
-    tx_status: 'pending' | 'confirmed' | 'failed'
-    blockchain_network?: string
-    confirmed_at?: string
-  }> {
-    const response = await getRequest(`${this.baseUrl}/transaction/${memoryId}`)
-    return response.data?.data || { tx_status: 'pending' }
-  }
-
-  static async retryFailedTransactions(userId: string): Promise<{
-    retried_count: number
-    success_count: number
-    failed_count: number
-  }> {
-    const response = await postRequest(`${this.baseUrl}/retry-failed`, { userId })
-    return response.data?.data || { retried_count: 0, success_count: 0, failed_count: 0 }
-  }
 
   static async healthCheck(): Promise<{ status: string; timestamp: string }> {
     const response = await getRequest(`${this.baseUrl}/health`)
     return response.data?.data || { status: 'unknown', timestamp: new Date().toISOString() }
   }
 
-  static async getPendingJobs(userId?: string): Promise<{
+  static async getPendingJobs(): Promise<{
     jobs: Array<{
       id: string
       user_id: string
@@ -652,11 +532,8 @@ export class MemoryService {
       delayed: number
     }
   }> {
-    const params = new URLSearchParams()
-    if (userId) {
-      params.append('user_id', userId)
-    }
-    const response = await getRequest(`/content/pending?${params.toString()}`)
+    requireAuthToken()
+    const response = await getRequest(`/content/pending`)
     return response.data?.data || { jobs: [], counts: { total: 0, waiting: 0, active: 0, delayed: 0 } }
   }
 }

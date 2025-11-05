@@ -55,9 +55,12 @@ process.on('uncaughtException', (err: Error) => {
   process.exit(1);
 });
 app.use(morgan('dev'));
-app.use(express.urlencoded({ extended: false }));
-app.use(express.json());
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+app.use(express.json({ limit: '10mb' }));
 import { getAllowedOrigins } from './utils/env';
+import { validateRequestSize } from './utils/validation';
+
+app.use(validateRequestSize(10 * 1024 * 1024)); // 10MB limit
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -85,9 +88,6 @@ app.use(
 async function testDatabaseConnection() {
   try {
     await prisma.$connect();
-
-    const userCount = await prisma.user.count();
-
   } catch (error) {
     console.error('Database connection failed:', error);
     process.exit(1);
