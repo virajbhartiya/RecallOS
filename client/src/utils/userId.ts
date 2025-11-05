@@ -43,8 +43,9 @@ export function setAuthToken(token: string): void {
     
     // Also sync to chrome.storage for extension access
     try {
-      if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
-        chrome.runtime.sendMessage(chrome.runtime.id, {
+      const chromeApi = typeof window !== 'undefined' ? (window as any).chrome : undefined;
+      if (chromeApi?.runtime?.id && chromeApi.runtime.sendMessage) {
+        chromeApi.runtime.sendMessage(chromeApi.runtime.id, {
           type: 'SYNC_AUTH_TOKEN',
           token: token
         }).catch(() => {
