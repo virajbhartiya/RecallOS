@@ -32,22 +32,16 @@ export class MemoryService {
   static async getMemoriesWithTransactionDetails(
     limit?: number
   ): Promise<Memory[]> {
-    const params = new URLSearchParams()
-    if (limit) params.append('limit', limit.toString())
+    requireAuthToken()
     
     try {
-      // Require authentication
-      requireAuthToken()
+      const response = await getRequest(`${this.baseUrl}/user/recent?count=${limit || 10000}`)
       
-      const response = await getRequest(`${this.baseUrl}/transactions?${params.toString()}`)
-      
-      // Check if the API returned an error
       if (response.data?.success === false) {
         console.error('API error:', response.data?.error)
         throw new Error(response.data?.error || 'API returned error')
       }
       
-      // API returns: { success: true, data: { memories: [...], totalMemories: number } }
       const data = response.data?.data
       const memories = data?.memories || []
       
@@ -56,15 +50,15 @@ export class MemoryService {
           console.log('No memories found')
           return []
         }
-        // Map API response to Memory interface
+        
         return memories.map((mem: ApiMemoryResponse) => ({
-          id: mem.id || mem.hash,
+          id: mem.id || '',
           user_id: '',
-          hash: mem.hash,
-          timestamp: typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp,
-          created_at: mem.created_at || new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toISOString(),
+          hash: mem.hash || '',
+          timestamp: typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : (typeof mem.timestamp === 'number' ? mem.timestamp : 0),
+          created_at: mem.created_at || new Date().toISOString(),
           title: mem.title || 'Memory',
-          summary: mem.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
+          summary: mem.summary || '',
           content: mem.content || '',
           source: mem.source || 'extension',
           url: mem.url,
@@ -424,18 +418,6 @@ export class MemoryService {
   static async getRecentMemories(count: number = 10): Promise<Memory[]> {
     requireAuthToken()
     
-    // First try the database endpoint for full data
-    try {
-      const response = await getRequest(`${this.baseUrl}/transactions?limit=${count}`)
-      const data = response.data?.data
-      if (Array.isArray(data?.memories) && data.memories.length > 0) {
-        return data.memories
-      }
-    } catch (error) {
-      // Error fetching recent memories from database
-    }
-    
-    // Fallback to recent memories endpoint (now returns full database data)
     try {
       const response = await getRequest(`${this.baseUrl}/user/recent?count=${count}`)
       const data = response.data?.data
@@ -495,16 +477,8 @@ export class MemoryService {
       const count = response.data?.data?.memoryCount
       return typeof count === 'number' ? count : parseInt(count) || 0
     } catch (error) {
-      // Error fetching memory count
-      // Fallback: try to get count from transactions endpoint
-      try {
-        const response = await getRequest(`${this.baseUrl}/transactions?limit=1000`)
-        const data = response.data?.data
-        return Array.isArray(data?.memories) ? data.memories.length : 0
-      } catch (fallbackError) {
-        // Fallback count also failed
-        return 0
-      }
+      console.error('Error fetching memory count:', error)
+      return 0
     }
   }
 
