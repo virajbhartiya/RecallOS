@@ -7,7 +7,6 @@ interface ContextData {
   title: string;
   content_snippet: string;
   timestamp: number;
-  wallet_address?: string;
   full_content?: string;
   meaningful_content?: string;
   content_summary?: string;
@@ -40,7 +39,6 @@ async function setExtensionEnabled(enabled: boolean): Promise<void> {
   }
 }
 
-async function getWalletAddress(): Promise<string | null> { return null; }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   const controller = new AbortController();
@@ -65,7 +63,6 @@ async function sendToBackend(data: ContextData): Promise<void> {
     }
 
     const apiEndpoint = await getApiEndpoint();
-    const walletAddress = null;
 
     const privacyInfo = (data as any).privacy_extension_info;
     const hasPrivacyConflicts = privacyInfo?.detected || false;
@@ -175,13 +172,6 @@ async function setApiEndpoint(endpoint: string): Promise<void> {
   }
 }
 
-async function setWalletAddress(walletAddress: string): Promise<void> {
-  try {
-    await chrome.storage.sync.set({ wallet_address: walletAddress });
-  } catch (error) {
-    // Ignore errors
-  }
-}
 
 chrome.runtime.onMessage.addListener(
   async (
@@ -189,7 +179,6 @@ chrome.runtime.onMessage.addListener(
       type?: string;
       data?: ContextData;
       endpoint?: string;
-      walletAddress?: string;
       enabled?: boolean;
     },
     _sender: chrome.runtime.MessageSender,
