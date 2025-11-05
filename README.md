@@ -7,25 +7,43 @@
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL 14+ with pgvector extension
+- PostgreSQL 14+
+- Qdrant (for vector embeddings storage)
 - Redis (for background jobs)
 - Gemini API key or Ollama (for AI)
 
 ### 1. Database Setup
 
+#### PostgreSQL
+
 ```bash
-# Install PostgreSQL with pgvector
+# Install PostgreSQL
 # macOS
 brew install postgresql@14
-brew install pgvector
 
 # Start PostgreSQL
 brew services start postgresql@14
 
 # Create database
 createdb recallos
-psql recallos -c 'CREATE EXTENSION vector;'
 ```
+
+#### Qdrant Vector Database
+
+Qdrant is used for storing and searching memory embeddings. You can run it using Docker:
+
+```bash
+# Using Docker Compose (recommended)
+cd api
+docker-compose up -d qdrant
+
+# Or using Docker directly
+docker run -p 6333:6333 -p 6334:6334 -v $(pwd)/qdrant_storage:/qdrant/storage qdrant/qdrant
+```
+
+Qdrant will be available at `http://localhost:6333` (web UI) and `http://localhost:6334` (gRPC).
+
+The API will automatically create the `memory_embeddings` collection on startup with the configured embedding dimension and payload indexes.
 
 ### 2. API Setup
 
@@ -39,6 +57,9 @@ npm install
 cp .env.example .env
 # Edit .env with your values:
 # - DATABASE_URL
+# - QDRANT_URL (default: http://localhost:6333)
+# - QDRANT_API_KEY (optional, for production)
+# - EMBEDDING_DIMENSION (default: 768)
 # - REDIS_URL
 # - GEMINI_API_KEY (or OLLAMA_BASE_URL)
 # - JWT_SECRET
@@ -49,7 +70,10 @@ cp .env.example .env
 # Run migrations
 npm run db:migrate
 
-# Start API server
+# Start all services (PostgreSQL, Qdrant, Redis)
+npm run docker:up
+
+# Or start API server only
 npm start
 # Server runs on http://localhost:3000
 ```
@@ -134,9 +158,9 @@ npm run build
                         │
           ┌─────────────┬───────────┐
           │             │           │
-     ┌────▼─────┐  ┌────▼─────┐ ┌────▼────┐
-     │PostgreSQL│  │ pgvector │ │  Redis  │
-     │ Database │  │Embeddings│ │ Queue   │
+     ┌────▼─────┐  ┌────▼─────┐ ┌────▼─────┐
+     │PostgreSQL│  │ Qdrant   │ │  Redis  │
+     │ Database │  │Vectors   │ │ Queue   │
      └──────────┘  └──────────┘ └─────────┘
 ```
 
@@ -163,7 +187,7 @@ npm run build
 - **Force-Directed Visualization**: 3D graph in web client
 
 ### 4. Semantic Search
-- **Vector Similarity**: pgvector-powered fast search
+- **Vector Similarity**: Qdrant-powered fast vector search
 - **AI Answers**: GPT-style responses with inline citations [1], [2]
 - **Meta Summaries**: Contextual overview across results
 - **Hybrid Mode**: Blends keyword (40%) + semantic (60%) search
@@ -201,8 +225,8 @@ npm run build
 - bcryptjs for password hashing
 
 ### Database
-- PostgreSQL 14+
-- pgvector extension for vector similarity
+- PostgreSQL 14+ (relational data only)
+- Qdrant vector database for embeddings storage and search
 - Redis for job queue
 
 ### AI/ML
@@ -418,16 +442,29 @@ npm run db:reset
 npm run db:studio
 ```
 
+### Qdrant Management
+
+```bash
+cd api
+
+# Clean Qdrant collection (WARNING: deletes all embeddings)
+npm run clean:qdrant
+
+# Clean everything (Qdrant + database)
+npm run clean:all
+```
+
 ---
 
 ## Deployment
 
 ### API (Railway/Render)
-1. Create PostgreSQL database with pgvector
-2. Create Redis instance
-3. Set environment variables
-4. Deploy from GitHub
-5. Run migrations: `npm run db:deploy`
+1. Create PostgreSQL database
+2. Deploy Qdrant instance (or use Qdrant Cloud)
+3. Create Redis instance
+4. Set environment variables (including QDRANT_URL, QDRANT_API_KEY if using Qdrant Cloud)
+5. Deploy from GitHub
+6. Run migrations: `npm run db:deploy`
 
 ### Client (Vercel)
 1. Import GitHub repository
@@ -477,9 +514,15 @@ npm run db:studio
 ### Database connection failed
 - Verify PostgreSQL is running
 - Check DATABASE_URL is correct
-- Ensure pgvector extension is installed
 - Test connection with psql
 - Review database logs
+
+### Qdrant connection failed
+- Verify Qdrant is running (check `http://localhost:6333/health`)
+- Check QDRANT_URL is correct (default: http://localhost:6333)
+- If using Qdrant Cloud, verify QDRANT_API_KEY is set
+- Check EMBEDDING_DIMENSION matches your embedding model (default: 768)
+- Review Qdrant logs: `docker-compose logs qdrant`
 
 ---
 
@@ -491,7 +534,7 @@ npm run db:studio
 - **Throughput**: 10-20 memories/minute
 
 ### Search
-- **Vector similarity**: < 100ms
+- **Vector similarity**: < 100ms (Qdrant)
 - **AI answer**: 5-15 seconds
 - **Total**: 5-20 seconds
 
@@ -499,6 +542,7 @@ npm run db:studio
 - **Memory capacity**: 1M+ memories
 - **Relations capacity**: 10M+ edges
 - **Query performance**: < 100ms
+- **Embedding storage**: Qdrant handles all vector embeddings
 
 ---
 
