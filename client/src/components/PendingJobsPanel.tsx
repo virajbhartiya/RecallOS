@@ -105,28 +105,28 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOp
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-hidden" onClick={onClose}>
       <div 
-        className="bg-white border border-gray-200 shadow-xl w-[90vw] max-w-6xl h-[90vh] max-h-[90vh] flex flex-col" 
+        className="bg-white border border-gray-200 shadow-xl w-[90vw] max-w-6xl h-[90vh] max-h-[90vh] flex flex-col overflow-hidden" 
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-white">
-          <div>
-            <h2 className="text-lg font-mono font-semibold text-gray-900">Pending Memory Jobs</h2>
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-white flex-shrink-0">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-mono font-semibold text-gray-900 truncate">Pending Memory Jobs</h2>
             <p className="text-xs text-gray-600 mt-1">View all memories currently in the Redis processing queue</p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-900 transition-colors text-2xl leading-none w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded"
+            className="text-gray-400 hover:text-gray-900 transition-colors text-2xl leading-none w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded flex-shrink-0 ml-4"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 bg-gray-50">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 bg-gray-50">
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-4">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
+              <div className="flex items-center space-x-4 flex-wrap">
                 <button
                   onClick={() => setFilterByUser(!filterByUser)}
                   className={`px-4 py-2 text-sm font-mono border ${
@@ -158,7 +158,7 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOp
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div className="bg-white border border-gray-200 p-4">
                 <div className="text-xs font-mono text-gray-500 uppercase mb-1">Total</div>
                 <div className="text-2xl font-mono font-bold text-gray-900">{counts.total}</div>
@@ -192,67 +192,77 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ userId, isOp
           {isLoading && jobs.length === 0 ? (
             <LoadingCard />
           ) : jobs.length === 0 ? (
-            <EmptyState message="No pending jobs found in the queue" />
+            <EmptyState title="No pending jobs found in the queue" />
           ) : (
             <div className="space-y-4">
               {jobs.map((job) => (
-                <div key={job.id} className="bg-white border border-gray-200 p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        {getStatusIcon(job.status)}
-                        {getStatusBadge(job.status)}
-                        <span className="text-xs font-mono text-gray-500">ID: {job.id}</span>
-                      </div>
-                      <div className="text-sm font-mono text-gray-600 mb-2">
-                        User: {job.user_id}
-                      </div>
-                      {job.metadata?.title && (
-                        <h3 className="text-lg font-mono font-semibold text-gray-900 mb-2">
-                          {String(job.metadata.title)}
-                        </h3>
-                      )}
-                      {job.metadata?.url && (
-                        <a
-                          href={String(job.metadata.url)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm font-mono text-blue-600 hover:underline mb-2 block"
-                        >
-                          {String(job.metadata.url)}
-                        </a>
-                      )}
-                      <div className="text-sm text-gray-700 mb-3 bg-gray-50 p-3 border border-gray-200 font-mono">
-                        {job.raw_text}
-                      </div>
+                <div key={job.id} className="bg-white border border-gray-200 p-6 overflow-hidden">
+                  <div className="mb-4">
+                    <div className="flex items-center space-x-3 mb-2 flex-wrap gap-2">
+                      {getStatusIcon(job.status)}
+                      {getStatusBadge(job.status)}
+                      <span className="text-xs font-mono text-gray-500 break-all">ID: {job.id}</span>
+                    </div>
+                    <div className="text-sm font-mono text-gray-600 mb-2 break-all">
+                      User: {job.user_id}
+                    </div>
+                    {(() => {
+                      const title = job.metadata?.title;
+                      if (title && typeof title === 'string') {
+                        return (
+                          <h3 className="text-lg font-mono font-semibold text-gray-900 mb-2 break-words">
+                            {title}
+                          </h3>
+                        );
+                      }
+                      return null;
+                    })()}
+                    {(() => {
+                      const url = job.metadata?.url;
+                      if (url && typeof url === 'string') {
+                        return (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-mono text-blue-600 hover:underline mb-2 block break-all"
+                          >
+                            {url}
+                          </a>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <div className="text-sm text-gray-700 mb-3 bg-gray-50 p-3 border border-gray-200 font-mono break-words whitespace-pre-wrap">
+                      {job.raw_text}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    <div className="min-w-0">
                       <div className="text-xs font-mono text-gray-500 uppercase mb-1">Created</div>
-                      <div className="text-xs font-mono text-gray-900">{formatDate(job.created_at)}</div>
+                      <div className="text-xs font-mono text-gray-900 break-words">{formatDate(job.created_at)}</div>
                     </div>
                     {job.processed_on && (
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-xs font-mono text-gray-500 uppercase mb-1">Processed</div>
-                        <div className="text-xs font-mono text-gray-900">{formatDate(job.processed_on)}</div>
+                        <div className="text-xs font-mono text-gray-900 break-words">{formatDate(job.processed_on)}</div>
                       </div>
                     )}
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-xs font-mono text-gray-500 uppercase mb-1">Length</div>
                       <div className="text-xs font-mono text-gray-900">{job.full_text_length.toLocaleString()} chars</div>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-xs font-mono text-gray-500 uppercase mb-1">Attempts</div>
                       <div className="text-xs font-mono text-gray-900">{job.attempts}</div>
                     </div>
                   </div>
 
                   {job.failed_reason && (
-                    <div className="mt-4 p-3 bg-red-50 border border-red-200">
+                    <div className="mt-4 p-3 bg-red-50 border border-red-200 overflow-hidden">
                       <div className="text-xs font-mono text-red-800 uppercase mb-1">Failed Reason</div>
-                      <div className="text-sm font-mono text-red-900">{job.failed_reason}</div>
+                      <div className="text-sm font-mono text-red-900 break-words">{job.failed_reason}</div>
                     </div>
                   )}
 
