@@ -6,6 +6,7 @@ import { createSearchJob, getSearchJob } from '../services/searchJob';
 import { prisma } from '../lib/prisma';
 
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+  let job: { id: string } | null = null;
   try {
     if (!req.user?.id) {
       return next(new AppError('Authentication required', 401));
@@ -23,13 +24,11 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
     }
     
     // Only create job for async answer delivery if not in context-only mode
-    let job = null;
     if (!contextOnly) {
       job = createSearchJob();
-      ;(global as any).__currentSearchJobId = job.id;
     }
     
-    const data = await searchMemories({ userId: user.external_id || user.id, query, limit, contextOnly });
+    const data = await searchMemories({ userId: user.external_id || user.id, query, limit, contextOnly, jobId: job?.id });
     
     // Return response with appropriate fields
     const response: any = { 
@@ -50,11 +49,9 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
     console.error('Error in postSearch:', err);
     // Update search job status to failed if there's a job
     try {
-      const jobId = (global as any).__currentSearchJobId as string | undefined;
-      if (jobId) {
+      if (job?.id) {
         const { setSearchJobResult } = await import('../services/searchJob');
-        await setSearchJobResult(jobId, { status: 'failed' });
-        (global as any).__currentSearchJobId = undefined;
+        await setSearchJobResult(job.id, { status: 'failed' });
       }
     } catch (jobError) {
       console.error('Error updating search job status in controller:', jobError);

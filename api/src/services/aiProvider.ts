@@ -32,43 +32,6 @@ export const aiProvider = {
     
     // Since Ollama embedding models are not working properly, use fallback directly
     return this.generateFallbackEmbedding(text)
-    
-    // Keep the original Ollama code commented out for future reference
-    /*
-    try {
-      const res = await fetch(`${OLLAMA_BASE}/api/embeddings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model: OLLAMA_EMBED_MODEL, input: text })
-      })
-      
-      if (!res.ok) {
-        console.error(`Ollama embeddings API error: ${res.status} ${res.statusText}`)
-        throw new Error(`Ollama embeddings failed: ${res.status}`)
-      }
-      
-      const data: any = await res.json()
-        hasEmbedding: !!data?.embedding, 
-        embeddingLength: data?.embedding?.length || 0,
-        hasEmbeddings: !!data?.embeddings,
-        embeddingsLength: data?.embeddings?.length || 0
-      })
-      
-      const vec: number[] = data?.embedding || data?.embeddings || []
-      
-      if (!Array.isArray(vec) || vec.length === 0) {
-        console.error('Ollama returned empty embedding array:', data)
-        // Generate a simple hash-based embedding as fallback
-        return this.generateFallbackEmbedding(text)
-      }
-      
-      return vec.map((v: any) => Number(v) || 0)
-    } catch (error) {
-      console.error('Error generating Ollama embedding:', error)
-      // Generate a simple hash-based embedding as fallback
-      return this.generateFallbackEmbedding(text)
-    }
-    */
   },
 
   async generateHybridEmbedding(text: string): Promise<number[]> {

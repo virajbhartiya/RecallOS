@@ -57,8 +57,9 @@ export async function searchMemories(params: {
   limit?: number;
   enableReasoning?: boolean;
   contextOnly?: boolean;
+  jobId?: string;
 }): Promise<{ query: string; results: SearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string }>{
-  const { userId, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', contextOnly = false } = params;
+  const { userId, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', contextOnly = false, jobId } = params;
 
   if (!aiProvider.isInitialized) {
     console.error('AI Provider not initialized. Check GEMINI_API_KEY or AI_PROVIDER configuration.');
@@ -80,10 +81,8 @@ export async function searchMemories(params: {
       embedding = aiProvider.generateFallbackEmbedding(normalized);
     } catch (fallbackError) {
       try {
-        const jobId = (global as any).__currentSearchJobId as string | undefined;
         if (jobId) {
           await setSearchJobResult(jobId, { status: 'failed' });
-          (global as any).__currentSearchJobId = undefined;
         }
       } catch (jobError) {
         // Error updating search job status
@@ -361,10 +360,8 @@ ${bullets}`;
     } catch (error) {
       // Update search job status to failed if there's a job
       try {
-        const jobId = (global as any).__currentSearchJobId as string | undefined;
         if (jobId) {
           await setSearchJobResult(jobId, { status: 'failed' });
-          (global as any).__currentSearchJobId = undefined;
         }
       } catch (jobError) {
         // Error updating search job status
@@ -414,11 +411,8 @@ ${bullets}`;
 
   
   try {
-    const jobId = (global as any).__currentSearchJobId as string | undefined;
     if (jobId) {
       await setSearchJobResult(jobId, { answer, meta_summary: metaSummary, status: 'completed' });
-      (global as any).__currentSearchJobId = undefined;
-    } else {
     }
   } catch (error) {
     // Error updating search job result
