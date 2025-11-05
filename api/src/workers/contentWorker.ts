@@ -5,6 +5,7 @@ import { memoryMeshService } from '../services/memoryMesh';
 import { prisma } from '../lib/prisma';
 import { createHash } from 'crypto';
 import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../utils/env';
+import { normalizeText, hashCanonical } from '../utils/text';
 
 export const startContentWorker = () => {
   const worker = new Worker<ContentJobData>(
@@ -82,6 +83,22 @@ export const startContentWorker = () => {
         });
 
         if (user) {
+          // Exact duplicate check on canonicalized content per user
+          const canonicalText = normalizeText(raw_text);
+          const canonicalHash = hashCanonical(canonicalText);
+
+          const existingByCanonical = await prisma.memory.findFirst({
+            where: { user_id: user.id, canonical_hash: canonicalHash } as any,
+          });
+
+          if (existingByCanonical) {
+            return {
+              success: true,
+              contentId: existingByCanonical.id,
+              memoryId: existingByCanonical.id,
+              summary: summary.substring(0, 100) + '...',
+            };
+          }
           const memoryHash =
             '0x' + createHash('sha256').update(summary).digest('hex');
 
@@ -96,10 +113,12 @@ export const startContentWorker = () => {
               content: raw_text,
               summary: summary,
               hash: memoryHash,
+              canonical_text: canonicalText,
+              canonical_hash: canonicalHash,
               timestamp: BigInt(timestamp),
               full_content: raw_text,
               page_metadata: metadata || {},
-            },
+            } as any,
           });
 
           await memoryMeshService.generateEmbeddingsForMemory(memory.id);
