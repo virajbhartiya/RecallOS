@@ -1,6 +1,9 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axiosInstance from '../utility/axiosInterceptor'
+import { ConsoleButton } from '@/components/sections/ConsoleButton'
+import { LoadingSpinner } from '@/components/ui/loading-spinner'
+import { cn } from '@/lib/utils'
 
 interface User {
   id: string
@@ -15,12 +18,18 @@ export const Login = () => {
   const [error, setError] = useState('')
   const [isRegister, setIsRegister] = useState(false)
   const [user, setUser] = useState<User | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email.trim() || !password.trim()) {
       setError('Please enter email and password')
+      return
+    }
+
+    if (isRegister && password.length < 8) {
+      setError('Password must be at least 8 characters long')
       return
     }
 
@@ -35,18 +44,15 @@ export const Login = () => {
       })
       
       setUser(response.data.user)
-      // Persist JWT for Authorization header usage
       if (response.data?.token) {
         try { 
           localStorage.setItem('auth_token', response.data.token)
-          // Also store user ID from token for quick access
           if (response.data.user?.id) {
             localStorage.setItem('user_id', response.data.user.id)
           }
         } catch {}
       }
       
-      // Redirect to memories page after successful login
       setTimeout(() => {
         navigate('/memories')
       }, 1000)
@@ -72,7 +78,6 @@ export const Login = () => {
       navigate('/login')
     } catch (err) {
       console.error('Logout error:', err)
-      // Clear local state even if logout request fails
       setUser(null)
       try { 
         localStorage.removeItem('auth_token')
@@ -87,7 +92,6 @@ export const Login = () => {
       const response = await axiosInstance.get('/auth/me')
       if (response.data?.user) {
         setUser(response.data.user)
-        // Update user ID in localStorage if we have it
         if (response.data.user.id) {
           try {
             localStorage.setItem('user_id', response.data.user.id)
@@ -95,7 +99,6 @@ export const Login = () => {
         }
       }
     } catch (err) {
-      // User not logged in
       setUser(null)
       try {
         localStorage.removeItem('auth_token')
@@ -104,35 +107,51 @@ export const Login = () => {
     }
   }
 
-  // Check if user is already logged in
-  React.useEffect(() => {
+  useEffect(() => {
     checkCurrentUser()
   }, [])
 
   if (user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <div className="text-center">
-            <h2 className="text-3xl font-light text-gray-900 mb-4">
-              Welcome back!
-            </h2>
-            <p className="text-gray-600 mb-6">
-              Logged in as <strong>{user.email}</strong>
-            </p>
-            <div className="space-y-3">
-              <button
-                onClick={() => navigate('/memories')}
-                className="w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
-              >
-                Go to Memories
-              </button>
-              <button
-                onClick={handleLogout}
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
-              >
-                Logout
-              </button>
+      <div 
+        className="min-h-screen text-black relative font-primary"
+        style={{
+          backgroundImage: 'linear-gradient(135deg, #f9fafb, #ffffff, #f3f4f6)',
+          color: '#000000'
+        }}
+      >
+        <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
+          <div className="max-w-md w-full">
+            <div className="bg-white/80 backdrop-blur border border-gray-200 p-8 shadow-sm">
+              <div className="text-center space-y-6">
+                <div className="mx-auto w-14 h-14 bg-black text-white flex items-center justify-center font-bold text-xl font-mono shadow-lg">
+                  R
+                </div>
+                <div>
+                  <h1 className="text-2xl font-semibold text-gray-900 mb-2">
+                    Welcome back!
+                  </h1>
+                  <p className="text-sm text-gray-600">
+                    You're signed in as <span className="font-medium text-gray-900">{user.email}</span>
+                  </p>
+                </div>
+                <div className="space-y-3 pt-4">
+                  <ConsoleButton
+                    variant="console_key"
+                    className="w-full group relative overflow-hidden rounded-none px-4 py-2 transition-all duration-200 hover:shadow-md"
+                    onClick={() => navigate('/memories')}
+                  >
+                    <span className="relative z-10 text-sm font-medium">Continue to Dashboard</span>
+                    <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
+                  </ConsoleButton>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full border border-gray-200 text-gray-700 px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors rounded-none"
+                  >
+                    Sign Out
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -141,101 +160,223 @@ export const Login = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-light text-gray-900">
-            {isRegister ? 'Create Account' : 'Sign In'}
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            {isRegister 
-              ? 'Create a new account to start using RecallOS'
-              : 'Sign in to your RecallOS account'
-            }
-          </p>
-        </div>
-        
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="email" className="sr-only">
-              Email address
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-black focus:border-black focus:z-10 sm:text-sm"
-              placeholder="Email address"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
+    <div 
+      className="min-h-screen text-black relative font-primary overflow-hidden"
+      style={{
+        backgroundImage: 'linear-gradient(135deg, #f9fafb, #ffffff, #f3f4f6)',
+        color: '#000000'
+      }}
+    >
+      {/* Animated background grid */}
+      <div className="fixed inset-0 pointer-events-none opacity-20">
+        <div className="w-full h-full" style={{
+          backgroundImage: `
+            linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)
+          `,
+          backgroundSize: '24px 24px',
+        }} />
+      </div>
 
-          <div>
-            <label htmlFor="password" className="sr-only">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete={isRegister ? 'new-password' : 'current-password'}
-              required
-              className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-black focus:border-black focus:z-10 sm:text-sm"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+      {/* Gradient blur overlays */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
+        {[
+          { className: 'absolute -top-28 -left-24 w-[28rem] h-[28rem]', from: '#a5b4fc', via: '#fbcfe8', to: '#fde68a', opacity: 0.35 },
+          { className: 'absolute -bottom-28 right-0 w-[28rem] h-[28rem]', from: '#99f6e4', via: '#6ee7b7', to: '#a7f3d0', opacity: 0.30 }
+        ].map((b, i) => (
+          <div
+            key={i}
+            className={`${b.className} rounded-full blur-3xl`}
+            style={{
+              backgroundImage: `linear-gradient(135deg, ${b.from}, ${b.via}, ${b.to})`,
+              opacity: b.opacity as number,
+              filter: 'blur(64px)'
+            }}
+          />
+        ))}
+      </div>
 
-          {error && (
-            <div className="text-red-600 text-sm text-center">
-              {error}
+      <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 relative z-10">
+        <div className="max-w-md w-full">
+          {/* Logo */}
+          <div className="mb-8 text-center">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-black text-white flex items-center justify-center font-bold text-xl font-mono shadow-lg">
+                R
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-italics font-editorial text-black">RecallOS</span>
+                <span className="text-xs text-gray-600 font-mono -mt-1">Remember what the web showed you</span>
+              </div>
             </div>
-          )}
-
-          <div className="space-y-3">
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading 
-                ? (isRegister ? 'Creating Account...' : 'Signing In...') 
-                : (isRegister ? 'Create Account' : 'Sign In')
-              }
-            </button>
-            
-            <button
-              type="button"
-              onClick={() => setIsRegister(!isRegister)}
-              className="w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
-            >
-              {isRegister ? 'Already have an account? Sign In' : 'Need an account? Register'}
-            </button>
           </div>
 
-          <div className="text-center">
+          <div className="bg-white/80 backdrop-blur border border-gray-200 p-8 shadow-sm">
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-3xl font-light font-editorial text-gray-900 mb-2">
+                  {isRegister ? 'Create your account' : 'Sign in to your account'}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {isRegister 
+                    ? 'Get started with RecallOS today'
+                    : 'Enter your credentials to continue'
+                  }
+                </p>
+              </div>
+
+              <form className="space-y-5" onSubmit={handleSubmit}>
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    Email address
+                  </label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    className={cn(
+                      "block w-full px-4 py-3 border rounded-none transition-all duration-200",
+                      "focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent",
+                      "placeholder:text-gray-400 text-gray-900 text-sm",
+                      error ? "border-red-300 focus:ring-red-500" : "border-gray-300"
+                    )}
+                    placeholder="name@company.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value)
+                      setError('')
+                    }}
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete={isRegister ? 'new-password' : 'current-password'}
+                      required
+                      className={cn(
+                        "block w-full px-4 py-3 pr-11 border rounded-none transition-all duration-200",
+                        "focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent",
+                        "placeholder:text-gray-400 text-gray-900 text-sm",
+                        error ? "border-red-300 focus:ring-red-500" : "border-gray-300"
+                      )}
+                      placeholder="Enter your password"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value)
+                        setError('')
+                      }}
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showPassword ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.29 3.29m0 0A9.97 9.97 0 015.12 5.12m3.29 3.29L12 12m-3.59-3.59L3 3m9.59 9.59L21 21" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                  {isRegister && (
+                    <p className="mt-2 text-xs text-gray-500">
+                      Must be at least 8 characters
+                    </p>
+                  )}
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 p-4 rounded-none">
+                    <div className="flex">
+                      <svg className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-800">{error}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full group relative overflow-hidden rounded-none px-4 py-2 transition-all duration-200 hover:shadow-md bg-gray-100 border border-gray-300 text-black hover:bg-black hover:text-white hover:border-black disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center justify-center">
+                        <LoadingSpinner size="sm" className="mr-2" />
+                        {isRegister ? 'Creating account...' : 'Signing in...'}
+                      </span>
+                    ) : (
+                      <span className="relative z-10 text-sm font-medium">
+                        {isRegister ? 'Create account' : 'Sign in'}
+                      </span>
+                    )}
+                    <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
+                  </button>
+                </div>
+              </form>
+
+              <div className="relative pt-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-4 bg-white/80 text-gray-500">
+                    {isRegister ? 'Already have an account?' : "Don't have an account?"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegister(!isRegister)
+                    setError('')
+                    setEmail('')
+                    setPassword('')
+                  }}
+                  disabled={isLoading}
+                  className="text-sm font-medium text-black hover:text-gray-700 transition-colors duration-200"
+                >
+                  {isRegister ? 'Sign in instead' : 'Create an account'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 text-center">
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="text-sm text-gray-600 hover:text-gray-900"
+              className="text-sm text-gray-500 hover:text-gray-900 transition-colors duration-200 inline-flex items-center"
             >
-              ← Back to Home
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Home
             </button>
           </div>
-        </form>
-
-        <div className="mt-6 p-4 bg-gray-100 rounded-md">
-          <h3 className="text-sm font-medium text-gray-900 mb-2">How it works:</h3>
-          <ul className="text-xs text-gray-600 space-y-1">
-            <li>• {isRegister ? 'Create an account with email/password' : 'Sign in with your email/password'}</li>
-            <li>• Session cookie is set automatically (HttpOnly, Secure)</li>
-            <li>• Session persists across browser tabs</li>
-            <li>• Extension will automatically send this cookie</li>
-          </ul>
         </div>
       </div>
     </div>
