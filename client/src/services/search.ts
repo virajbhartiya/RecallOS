@@ -9,7 +9,6 @@ type ApiSearchResult = {
   summary: string | null
   url: string | null
   timestamp: number
-  avail_hash: string | null
   related_memories: string[]
   score?: number
 }
@@ -88,15 +87,13 @@ export class SearchService {
               title: r.title || 'Untitled Memory',
               content: '',
               summary: r.summary || undefined,
-              hash: r.avail_hash || undefined,
+              hash: undefined,
               timestamp: r.timestamp,
               created_at: createdAtIso,
               page_metadata: undefined,
               importance_score: undefined,
               access_count: 0,
               last_accessed: createdAtIso,
-              tx_status: undefined,
-              blockchain_network: undefined,
             }
         return {
           memory,
