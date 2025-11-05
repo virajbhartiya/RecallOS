@@ -1,77 +1,91 @@
 generator client {
   provider = "prisma-client-js"
 }
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
 model User {
-  id              String   @id @default(uuid()) @db.Uuid
-  external_id     String?  @unique
-  email           String?  @unique
-  password_hash   String?
-  created_at      DateTime @default(now())
-  updated_at      DateTime @default(now()) @updatedAt
-  memories        Memory[]
+  id               String           @id @default(uuid()) @db.Uuid
+  external_id      String?          @unique
+  email            String?          @unique
+  password_hash    String?
+  created_at       DateTime         @default(now())
+  updated_at       DateTime         @default(now()) @updatedAt
+  memories         Memory[]
   memory_snapshots MemorySnapshot[]
+
   @@map("users")
 }
+
 model Memory {
-  id              String   @id @default(uuid()) @db.Uuid
-  user_id         String   @db.Uuid
-  source          String
-  url             String?
-  title           String?
-  content         String
-  summary         String?
-  hash            String?  @unique
-  timestamp       BigInt
-  created_at      DateTime @default(now())
-  full_content    String?
-  page_metadata   Json?
-  importance_score Float?   @default(0.0)
-  access_count     Int      @default(0)
-  last_accessed    DateTime @default(now())
-  tx_hash         String?  @unique
-  block_number    BigInt?
-  gas_used        String?
-  tx_status       String?  @default("pending") 
-  blockchain_network String? @default("sepolia")
-  confirmed_at    DateTime?
-  user            User           @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  related_memories MemoryRelation[] @relation("MemoryRelations")
-  related_to_memories MemoryRelation[] @relation("RelatedMemories")
+  id                     String               @id @default(uuid()) @db.Uuid
+  user_id                String               @db.Uuid
+  source                 String
+  url                    String?
+  title                  String?
+  content                String
+  summary                String?
+  hash                   String?              @unique
+  timestamp              BigInt
+  created_at             DateTime             @default(now())
+  full_content           String?
+  page_metadata          Json?
+  importance_score       Float?               @default(0.0)
+  access_count           Int                  @default(0)
+  last_accessed          DateTime             @default(now())
+  tx_hash                String?              @unique
+  block_number           BigInt?
+  gas_used               String?
+  tx_status              String?              @default("pending")
+  blockchain_network     String?              @default("sepolia")
+  confirmed_at           DateTime?
+  user                   User                 @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  related_memories       MemoryRelation[]     @relation("MemoryRelations")
+  related_to_memories    MemoryRelation[]     @relation("RelatedMemories")
   query_related_memories QueryRelatedMemory[]
+
+  @@index([user_id])
+  @@index([created_at])
+  @@index([user_id, created_at])
   @@map("memories")
 }
+
 model MemoryRelation {
-  id              String   @id @default(uuid()) @db.Uuid
-  memory_id       String   @db.Uuid
-  related_memory_id String @db.Uuid
-  similarity_score Float
-  relation_type   String   
-  created_at      DateTime @default(now())
-  memory          Memory   @relation("MemoryRelations", fields: [memory_id], references: [id], onDelete: Cascade)
-  related_memory  Memory   @relation("RelatedMemories", fields: [related_memory_id], references: [id], onDelete: Cascade)
+  id                String   @id @default(uuid()) @db.Uuid
+  memory_id         String   @db.Uuid
+  related_memory_id String   @db.Uuid
+  similarity_score  Float
+  relation_type     String
+  created_at        DateTime @default(now())
+  memory            Memory   @relation("MemoryRelations", fields: [memory_id], references: [id], onDelete: Cascade)
+  related_memory    Memory   @relation("RelatedMemories", fields: [related_memory_id], references: [id], onDelete: Cascade)
+
   @@unique([memory_id, related_memory_id])
+  @@index([memory_id])
+  @@index([similarity_score])
   @@map("memory_relations")
 }
+
 model MemorySnapshot {
-  id                    String   @id @default(uuid()) @db.Uuid
-  user_id               String   @db.Uuid
-  raw_text              String
-  summary               String
-  summary_hash          String   @unique
-  created_at            DateTime @default(now())
-  user                  User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id           String   @id @default(uuid()) @db.Uuid
+  user_id      String   @db.Uuid
+  raw_text     String
+  summary      String
+  summary_hash String   @unique
+  created_at   DateTime @default(now())
+  user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
   @@map("memory_snapshots")
 }
 
 model BlockscoutTransaction {
-  id                    String   @id @default(uuid()) @db.Uuid
-  tx_hash               String   @unique
+  id                    String    @id @default(uuid()) @db.Uuid
+  tx_hash               String    @unique
   network               String
-  status                String   @default("pending")
+  status                String    @default("pending")
   block_number          BigInt?
   gas_used              String?
   gas_price             String?
@@ -79,53 +93,57 @@ model BlockscoutTransaction {
   to_address            String?
   value                 String?
   timestamp             BigInt?
-  finality_reached      Boolean  @default(false)
+  finality_reached      Boolean   @default(false)
   finality_confirmed_at DateTime?
   raw_data              Json?
-  created_at            DateTime @default(now())
-  updated_at            DateTime @updatedAt
-  last_checked_at       DateTime @default(now())
-  check_count           Int      @default(0)
+  created_at            DateTime  @default(now())
+  updated_at            DateTime  @updatedAt
+  last_checked_at       DateTime  @default(now())
+  check_count           Int       @default(0)
+
   @@map("blockscout_transactions")
 }
 
 /// Each search query event (stores only hashed embedding reference)
 model QueryEvent {
-  id             String   @id @default(uuid()) @db.Uuid
+  id             String               @id @default(uuid()) @db.Uuid
   user_id        String
   query          String
   embedding_hash String
   meta_summary   String?
-  created_at     DateTime @default(now())
+  created_at     DateTime             @default(now())
   related        QueryRelatedMemory[]
+
   @@map("query_events")
 }
 
 /// Links a query event to matching memories
 model QueryRelatedMemory {
-  id            String @id @default(uuid()) @db.Uuid
-  query_event_id String @db.Uuid
-  memory_id      String @db.Uuid
+  id             String     @id @default(uuid()) @db.Uuid
+  query_event_id String     @db.Uuid
+  memory_id      String     @db.Uuid
   rank           Int
   score          Float
-  created_at     DateTime @default(now())
+  created_at     DateTime   @default(now())
   query_event    QueryEvent @relation(fields: [query_event_id], references: [id], onDelete: Cascade)
   memory         Memory     @relation(fields: [memory_id], references: [id], onDelete: Cascade)
+
   @@unique([query_event_id, memory_id])
   @@map("query_related_memories")
 }
 
 model SearchCache {
-  id            String   @id @default(uuid()) @db.Uuid
-  user_id       String
-  query         String
-  query_hash    String   @unique
-  results       Json
-  meta_summary  String?
-  answer        String?
-  citations     Json?
-  job_id        String?
-  created_at    DateTime @default(now())
-  expires_at    DateTime
+  id           String   @id @default(uuid()) @db.Uuid
+  user_id      String
+  query        String
+  query_hash   String   @unique
+  results      Json
+  meta_summary String?
+  answer       String?
+  citations    Json?
+  job_id       String?
+  created_at   DateTime @default(now())
+  expires_at   DateTime
+
   @@map("search_cache")
 }

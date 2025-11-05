@@ -32,6 +32,13 @@ const nodeColors = {
 const resolveNodeColor = (rawType?: string, url?: string): string => {
   const key = (rawType || '').toLowerCase()
   const href = (url || '').toLowerCase()
+  
+  // First check if source has a specific color (source takes precedence)
+  if (key && nodeColors[key]) {
+    return nodeColors[key]
+  }
+  
+  // Then check URL patterns for sources without specific colors
   if (href) {
     if (/github\.com|gitlab\.com|bitbucket\.org/.test(href)) return '#3b82f6'
     if (/npmjs\.com|pypi\.org|crates\.io|rubygems\.org/.test(href)) return '#22c55e'
@@ -39,6 +46,7 @@ const resolveNodeColor = (rawType?: string, url?: string): string => {
     if (/youtube\.com|youtu\.be|vimeo\.com/.test(href)) return '#3b82f6'
     if (/mail\.google\.com|gmail\.com|outlook\.live\.com/.test(href)) return '#22c55e'
   }
+  
   return nodeColors[key] || '#6b7280'
 }
 
@@ -115,12 +123,12 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
   const getLineColor = (similarity: number) => {
     if (similarity > 0.85) return '#3b82f6'
     if (similarity > 0.75) return '#38bdf8'
-    return '#d1d5db'
+    return '#9ca3af'
   }
 
   const color = getLineColor(similarity)
-  const opacity = similarity > 0.75 ? 0.3 : (similarity > 0.5 ? 0.2 : 0.15)
-  const lineWidth = similarity > 0.85 ? 1.5 : (similarity > 0.75 ? 1.0 : 0.5)
+  const opacity = similarity > 0.75 ? 0.6 : (similarity > 0.5 ? 0.4 : 0.3)
+  const lineWidth = similarity > 0.85 ? 3 : (similarity > 0.75 ? 2 : 1)
 
   return (
     <Line
@@ -131,6 +139,8 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
       opacity={opacity}
       dashed={false}
       toneMapped={false}
+      depthTest={true}
+      depthWrite={false}
     />
   )
 }
@@ -299,7 +309,7 @@ const Scene: React.FC<SceneProps> = ({
       
       {edges.map((edge, index) => (
         <MemoryEdge
-          key={index}
+          key={`edge-${index}-${edge.start.join(',')}-${edge.end.join(',')}`}
           start={edge.start}
           end={edge.end}
           similarity={edge.similarity}
