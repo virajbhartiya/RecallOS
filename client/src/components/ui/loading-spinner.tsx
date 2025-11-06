@@ -58,12 +58,13 @@ interface LoadingCardProps {
 
 export const LoadingCard: React.FC<LoadingCardProps> = ({ className = '' }) => {
   return (
-    <div className={cn('bg-white border border-gray-200 p-4', className)}>
-      <div className="animate-pulse">
-        <div className="h-4 bg-gray-200 rounded mb-2 w-3/4"></div>
-        <div className="h-3 bg-gray-200 rounded mb-2 w-1/2"></div>
-        <div className="h-3 bg-gray-200 rounded mb-2 w-full"></div>
-        <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+    <div className={cn('w-full py-16 flex items-center justify-center', className)}>
+      <div className="flex flex-col items-center space-y-4">
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 border-4 border-gray-200 rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-black border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <div className="text-sm font-mono text-gray-500">Loading...</div>
       </div>
     </div>
   )
