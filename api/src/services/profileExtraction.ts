@@ -1,5 +1,6 @@
 import { aiProvider } from './aiProvider';
 import { prisma } from '../lib/prisma';
+import { logger } from '../utils/logger';
 
 export interface StaticProfile {
   interests: string[];
@@ -98,7 +99,7 @@ export class ProfileExtractionService {
       const parsed = this.parseProfileResponse(response);
       return parsed;
     } catch (error) {
-      console.error('Error extracting profile from memories:', error);
+      logger.error('Error extracting profile from memories:', error);
       return this.extractProfileFallback(memories);
     }
   }
@@ -268,9 +269,9 @@ Return ONLY the JSON object:`;
           jsonStr = this.fixJson(jsonStr);
           data = JSON.parse(jsonStr);
         } catch (secondError) {
-          console.error('Error parsing profile response after fixes:', secondError);
-          console.error('JSON string (first 1000 chars):', jsonStr.substring(0, 1000));
-          console.error('JSON string (last 500 chars):', jsonStr.substring(Math.max(0, jsonStr.length - 500)));
+          logger.error('Error parsing profile response after fixes:', secondError);
+          logger.error('JSON string (first 1000 chars):', jsonStr.substring(0, 1000));
+          logger.error('JSON string (last 500 chars):', jsonStr.substring(Math.max(0, jsonStr.length - 500)));
           throw new Error('Failed to parse JSON after fixes');
         }
       }
@@ -282,7 +283,7 @@ Return ONLY the JSON object:`;
         dynamic_profile_text: data.dynamic_profile_text || '',
       };
     } catch (error) {
-      console.error('Error parsing profile response:', error);
+      logger.error('Error parsing profile response:', error);
       return this.getEmptyProfile();
     }
   }

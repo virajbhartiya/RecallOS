@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { aiProvider } from '../services/aiProvider';
 import { memoryMeshService } from '../services/memoryMesh';
 import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text';
+import { logger } from '../utils/logger';
 
 function hashUrl(url: string): string {
   return createHash('sha256').update(url).digest('hex');
@@ -33,7 +34,7 @@ export class MemoryController {
         });
       }
 
-      console.log('[memory/process] inbound', {
+      logger.log('[memory/process] inbound', {
         ts: new Date().toISOString(),
         userId: user.id,
         url: typeof url === 'string' ? url.slice(0, 200) : undefined,
@@ -121,7 +122,7 @@ export class MemoryController {
                   ? (existingMemory as any).timestamp.toString()
                   : null,
               };
-              console.log('[memory/process] url_duplicate_detected', { existingMemoryId: existingMemory.id, similarity, userId: user.id });
+              logger.log('[memory/process] url_duplicate_detected', { existingMemoryId: existingMemory.id, similarity, userId: user.id });
               return res.status(200).json({
                 success: true,
                 message: 'Duplicate memory detected by URL similarity, returning existing record',
@@ -137,14 +138,14 @@ export class MemoryController {
       }
 
       const aiStart = Date.now();
-      console.log('[memory/process] ai_start', { ts: new Date().toISOString(), tasks: ['summarizeContent', 'extractContentMetadata'] });
+      logger.log('[memory/process] ai_start', { ts: new Date().toISOString(), tasks: ['summarizeContent', 'extractContentMetadata'] });
       const [summaryResult, extractedMetadataResult] = await Promise.all([
         aiProvider.summarizeContent(content, metadata, user.id),
         aiProvider.extractContentMetadata(content, metadata, user.id),
       ]);
       const summary = typeof summaryResult === 'string' ? summaryResult : (summaryResult as any).text || summaryResult;
       const extractedMetadata = typeof extractedMetadataResult === 'object' && 'topics' in extractedMetadataResult ? extractedMetadataResult : (extractedMetadataResult as any).metadata || extractedMetadataResult;
-      console.log('[memory/process] ai_done', { ms: Date.now() - aiStart, hasSummary: !!summary, hasExtracted: !!extractedMetadata });
+      logger.log('[memory/process] ai_done', { ms: Date.now() - aiStart, hasSummary: !!summary, hasExtracted: !!extractedMetadata });
 
 
       const urlHash = hashUrl(url || 'unknown');
@@ -180,7 +181,7 @@ export class MemoryController {
             },
           } as any,
         });
-        console.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id, userId: user.id });
+        logger.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id, userId: user.id });
       } catch (createError: any) {
         if (createError.code === 'P2002') {
           const existingMemory = await prisma.memory.findFirst({
@@ -207,7 +208,7 @@ export class MemoryController {
                 ? (existingMemory as any).timestamp.toString()
                 : null,
             };
-            console.log('[memory/process] duplicate_detected_on_create', { existingMemoryId: existingMemory.id, userId: user.id });
+            logger.log('[memory/process] duplicate_detected_on_create', { existingMemoryId: existingMemory.id, userId: user.id });
             return res.status(200).json({
               success: true,
               message: 'Duplicate memory detected, returning existing record',
@@ -237,21 +238,21 @@ export class MemoryController {
               summary_hash: summaryHash,
             },
           });
-          console.log('[memory/process] snapshot_created', { ms: Date.now() - snapStart, memoryId: memory.id });
+          logger.log('[memory/process] snapshot_created', { ms: Date.now() - snapStart, memoryId: memory.id });
         } catch (snapshotError) {
-          console.error(`Error creating snapshot for memory ${memory.id}:`, snapshotError);
+          logger.error(`Error creating snapshot for memory ${memory.id}:`, snapshotError);
         }
 
         try {
           const meshStart = Date.now();
-          console.log('[memory/process] mesh_start', { memoryId: memory.id, userId: user.id });
+          logger.log('[memory/process] mesh_start', { memoryId: memory.id, userId: user.id });
           await memoryMeshService.processMemoryForMesh(memory.id, user.id);
-          console.log('[memory/process] mesh_done', { ms: Date.now() - meshStart, memoryId: memory.id });
+          logger.log('[memory/process] mesh_done', { ms: Date.now() - meshStart, memoryId: memory.id });
         } catch (meshError) {
-          console.error(`Error processing memory ${memory.id} for mesh:`, meshError);
+          logger.error(`Error processing memory ${memory.id} for mesh:`, meshError);
         }
       });
-      console.log('[memory/process] done', { memoryId: memory.id });
+      logger.log('[memory/process] done', { memoryId: memory.id });
       res.status(200).json({
         success: true,
         message: 'Content processed and stored successfully',
@@ -263,7 +264,7 @@ export class MemoryController {
         },
       });
     } catch (error) {
-      console.error('Error processing raw content:', error);
+      logger.error('Error processing raw content:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to process raw content',
@@ -329,7 +330,7 @@ export class MemoryController {
         },
       });
     } catch (error) {
-      console.error('Error getting recent memories:', error);
+      logger.error('Error getting recent memories:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to get recent memories',
@@ -360,7 +361,7 @@ export class MemoryController {
 
       return res.status(200).json({ success: true, data: { userId: req.user!.id, memoryCount: 0 } });
     } catch (error) {
-      console.error('Error getting user memory count:', error);
+      logger.error('Error getting user memory count:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to get user memory count',
@@ -469,7 +470,7 @@ export class MemoryController {
         },
       });
     } catch (error) {
-      console.error('Error getting memory insights:', error);
+      logger.error('Error getting memory insights:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -526,7 +527,7 @@ export class MemoryController {
         },
       });
     } catch (error) {
-      console.error('Debug memories error:', error);
+      logger.error('Debug memories error:', error);
       res.status(500).json({
         success: false,
         error: 'Debug failed',
@@ -575,7 +576,7 @@ export class MemoryController {
         },
       });
     } catch (error) {
-      console.error('Error deleting memory:', error);
+      logger.error('Error deleting memory:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to delete memory',

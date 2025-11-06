@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { createHash } from 'crypto';
 import { prisma } from '../lib/prisma';
+import { logger } from '../utils/logger';
 
 export class MemorySnapshotController {
   static async getMemorySnapshots(req: AuthenticatedRequest, res: Response) {
@@ -56,7 +57,7 @@ export class MemorySnapshotController {
         },
       });
     } catch (error) {
-      console.error('Error getting memory snapshots:', error);
+      logger.error('Error getting memory snapshots:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -115,7 +116,7 @@ export class MemorySnapshotController {
         },
       });
     } catch (error) {
-      console.error('Error getting memory snapshot:', error);
+      logger.error('Error getting memory snapshot:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -185,7 +186,7 @@ export class MemorySnapshotController {
             });
           }
         } catch (error) {
-          console.error(
+          logger.error(
             `Error creating snapshot for memory ${memory.id}:`,
             error
           );
@@ -207,7 +208,7 @@ export class MemorySnapshotController {
         },
       });
     } catch (error) {
-      console.error('Error backfilling memory snapshots:', error);
+      logger.error('Error backfilling memory snapshots:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',

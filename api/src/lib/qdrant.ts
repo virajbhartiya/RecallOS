@@ -1,4 +1,5 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { logger } from '../utils/logger';
 
 const globalForQdrant = globalThis as unknown as {
   qdrant: QdrantClient | undefined;
@@ -74,10 +75,10 @@ export async function ensureCollection(): Promise<void> {
         });
       }
     } catch (indexError) {
-      console.warn('Error creating payload indexes (may already exist):', indexError);
+      logger.warn('Error creating payload indexes (may already exist):', indexError);
     }
   } catch (error) {
-    console.error('Error ensuring Qdrant collection:', error);
+    logger.error('Error ensuring Qdrant collection:', error);
     throw error;
   }
 }

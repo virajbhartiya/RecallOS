@@ -4,6 +4,7 @@ import { aiProvider } from './aiProvider';
 import { setSearchJobResult } from './searchJob';
 import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant';
 import { profileUpdateService } from './profileUpdate';
+import { logger } from '../utils/logger';
 
 type SearchResult = {
   memory_id: string;
@@ -62,7 +63,7 @@ export async function searchMemories(params: {
 }): Promise<{ query: string; results: SearchResult[]; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string }>{
   const { userId, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', contextOnly = false, jobId } = params;
 
-  console.log('[search] processing started', {
+  logger.log('[search] processing started', {
     ts: new Date().toISOString(),
     userId,
     query: query.slice(0, 100),
@@ -73,7 +74,7 @@ export async function searchMemories(params: {
   });
 
   if (!aiProvider.isInitialized) {
-    console.error('AI Provider not initialized. Check GEMINI_API_KEY or AI_PROVIDER configuration.');
+    logger.error('AI Provider not initialized. Check GEMINI_API_KEY or AI_PROVIDER configuration.');
     throw new Error('AI Provider not configured. Set GEMINI_API_KEY or configure AI_PROVIDER.');
   }
 
@@ -86,10 +87,10 @@ export async function searchMemories(params: {
 
   let embedding: number[];
   try {
-    console.log('[search] generating embedding', { ts: new Date().toISOString(), userId, queryLength: normalized.length });
+    logger.log('[search] generating embedding', { ts: new Date().toISOString(), userId, queryLength: normalized.length });
     const embeddingResult = await withTimeout(aiProvider.generateEmbedding(normalized), 30000); // 30 seconds
     embedding = typeof embeddingResult === 'object' && 'embedding' in embeddingResult ? (embeddingResult as any).embedding : (embeddingResult as number[]);
-    console.log('[search] embedding generated', { ts: new Date().toISOString(), userId, embeddingLength: embedding.length });
+    logger.log('[search] embedding generated', { ts: new Date().toISOString(), userId, embeddingLength: embedding.length });
   } catch (error) {
     try {
       embedding = aiProvider.generateFallbackEmbedding(normalized);
@@ -117,11 +118,11 @@ export async function searchMemories(params: {
   const userMemoryIds = userMemories.map(m => m.id);
 
   if (userMemoryIds.length === 0) {
-    console.log('[search] no memories found for user', { ts: new Date().toISOString(), userId });
+    logger.log('[search] no memories found for user', { ts: new Date().toISOString(), userId });
       return { query: normalized, results: [], answer: undefined, context: undefined };
   }
 
-  console.log('[search] searching qdrant', { ts: new Date().toISOString(), userId, memoryCount: userMemoryIds.length, searchLimit: Number(limit) * 3 });
+  logger.log('[search] searching qdrant', { ts: new Date().toISOString(), userId, memoryCount: userMemoryIds.length, searchLimit: Number(limit) * 3 });
   const searchResult = await qdrantClient.search(COLLECTION_NAME, {
     vector: embedding,
     filter: {
@@ -132,7 +133,7 @@ export async function searchMemories(params: {
     limit: Number(limit) * 3,
     with_payload: true,
   });
-  console.log('[search] qdrant search completed', { ts: new Date().toISOString(), userId, resultCount: searchResult.length });
+  logger.log('[search] qdrant search completed', { ts: new Date().toISOString(), userId, resultCount: searchResult.length });
 
   if (!searchResult || searchResult.length === 0) {
       return { query: normalized, results: [], answer: undefined, context: undefined };
@@ -248,7 +249,7 @@ export async function searchMemories(params: {
     .sort((a, b) => b.final_score - a.final_score)
     .slice(0, Number(limit));
   
-  console.log('[search] results filtered and sorted', { ts: new Date().toISOString(), userId, filteredCount: filteredRows.length, totalScored: scoredRows.length });
+  logger.log('[search] results filtered and sorted', { ts: new Date().toISOString(), userId, filteredCount: filteredRows.length, totalScored: scoredRows.length });
   
   const memoryIds = filteredRows.map(r => r.id);
 
@@ -337,10 +338,10 @@ Return clean, readable plain text only.
 User query: "${normalized}"${profileSection}
 Evidence notes (ordered by relevance):
 ${bullets}`;
-      console.log('[search] generating answer', { ts: new Date().toISOString(), userId, memoryCount: filteredRows.length });
+      logger.log('[search] generating answer', { ts: new Date().toISOString(), userId, memoryCount: filteredRows.length });
       const answerResult = await withTimeout(aiProvider.generateContent(ansPrompt, true), 300000); // 5 minutes (accounts for queue delays + Gemini 2 min timeout), true = search request (high priority)
       answer = typeof answerResult === 'string' ? answerResult : (answerResult as any).text || answerResult;
-      console.log('[search] answer generated', { ts: new Date().toISOString(), userId, answerLength: answer?.length });
+      logger.log('[search] answer generated', { ts: new Date().toISOString(), userId, answerLength: answer?.length });
       // Build citations map aligned with [n]
       const allCitations = filteredRows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
       // Keep only citations actually referenced in the answer/meta text, preserve first-seen order
@@ -361,7 +362,7 @@ ${bullets}`;
         ? order.map(n => allCitations.find(c => c.label === n)).filter((c): c is { label: number; memory_id: string; title: string | null; url: string | null } => Boolean(c))
         : [];
     } catch (error) {
-      console.error('[search] error generating answer, using fallback', { 
+      logger.error('[search] error generating answer, using fallback', { 
         ts: new Date().toISOString(), 
         userId, 
         error: error instanceof Error ? error.message : String(error),
@@ -426,11 +427,11 @@ ${bullets}`;
         }))
       });
     } catch (error) {
-      console.error('Error updating search job initial status:', error);
+      logger.error('Error updating search job initial status:', error);
     }
   }
   
-  console.log('[search] processing completed', {
+  logger.log('[search] processing completed', {
     ts: new Date().toISOString(),
     userId,
     resultCount: results.length,

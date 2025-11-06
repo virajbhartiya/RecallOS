@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { profileUpdateService } from '../services/profileUpdate';
+import { logger } from '../utils/logger';
 
 export class ProfileController {
   static async getProfile(req: AuthenticatedRequest, res: Response) {
@@ -40,7 +41,7 @@ export class ProfileController {
         },
       });
     } catch (error) {
-      console.error('Error getting profile:', error);
+      logger.error('Error getting profile:', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get profile',
@@ -52,14 +53,14 @@ export class ProfileController {
     try {
       const userId = req.user!.id;
 
-      console.log('[profile/refresh] starting', {
+      logger.log('[profile/refresh] starting', {
         ts: new Date().toISOString(),
         userId,
       });
 
       const profile = await profileUpdateService.updateUserProfile(userId, true);
 
-      console.log('[profile/refresh] completed', {
+      logger.log('[profile/refresh] completed', {
         ts: new Date().toISOString(),
         userId,
         version: profile.version,
@@ -87,7 +88,7 @@ export class ProfileController {
         },
       });
     } catch (error) {
-      console.error('Error refreshing profile:', error);
+      logger.error('Error refreshing profile:', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to refresh profile',
@@ -108,7 +109,7 @@ export class ProfileController {
         },
       });
     } catch (error) {
-      console.error('Error getting profile context:', error);
+      logger.error('Error getting profile context:', error);
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get profile context',

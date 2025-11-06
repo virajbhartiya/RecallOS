@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { memoryMeshService } from '../services/memoryMesh';
 import { searchMemories } from '../services/memorySearch';
+import { logger } from '../utils/logger';
 
 export class MemorySearchController {
   static async searchMemories(req: AuthenticatedRequest, res: Response) {
@@ -76,7 +77,7 @@ export class MemorySearchController {
         },
       });
     } catch (error) {
-      console.error('Error searching memories:', error);
+      logger.error('Error searching memories:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -209,7 +210,7 @@ export class MemorySearchController {
         },
       });
     } catch (error) {
-      console.error('Error searching memories with embeddings:', error);
+      logger.error('Error searching memories with embeddings:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -414,7 +415,7 @@ export class MemorySearchController {
         },
       });
     } catch (error) {
-      console.error('Error in hybrid search:', error);
+      logger.error('Error in hybrid search:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',

@@ -4,6 +4,7 @@ import AppError from '../utils/appError';
 import { searchMemories } from '../services/memorySearch';
 import { createSearchJob, getSearchJob } from '../services/searchJob';
 import { prisma } from '../lib/prisma';
+import { logger } from '../utils/logger';
 
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   let job: { id: string } | null = null;
@@ -11,7 +12,7 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
     const { query, limit, contextOnly } = req.body || {};
     if (!query) return next(new AppError('query is required', 400));
     
-    console.log('[search/controller] request received', {
+    logger.log('[search/controller] request received', {
       ts: new Date().toISOString(),
       userId: req.user!.id,
       query: query.slice(0, 100),
@@ -82,10 +83,10 @@ Evidence notes (ordered by relevance):
 ${bullets}`;
           const { aiProvider } = await import('../services/aiProvider');
           const { withTimeout } = await import('../services/memorySearch');
-          console.log('[search/controller] generating async answer', { ts: new Date().toISOString(), jobId: job.id });
+          logger.log('[search/controller] generating async answer', { ts: new Date().toISOString(), jobId: job.id });
           const answerResult = await withTimeout(aiProvider.generateContent(ansPrompt, true), 180000); // 3 minutes for async, true = search request (high priority)
           const generatedAnswer = typeof answerResult === 'string' ? answerResult : (answerResult as any).text || answerResult;
-          console.log('[search/controller] async answer generated', { ts: new Date().toISOString(), jobId: job.id, answerLength: generatedAnswer?.length });
+          logger.log('[search/controller] async answer generated', { ts: new Date().toISOString(), jobId: job.id, answerLength: generatedAnswer?.length });
           const allCitations = filteredRows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
           const pickOrderFrom = (text: string | undefined) => {
             if (!text) return [] as number[];
@@ -109,12 +110,12 @@ ${bullets}`;
             status: 'completed'
           });
         } catch (error) {
-          console.error('[search] error generating async answer in controller:', error);
+          logger.error('[search] error generating async answer in controller:', error);
           try {
             const { setSearchJobResult } = await import('../services/searchJob');
             await setSearchJobResult(job!.id, { status: 'failed' });
           } catch (jobError) {
-            console.error('Error updating search job status:', jobError);
+            logger.error('Error updating search job status:', jobError);
           }
         }
       });
@@ -136,7 +137,7 @@ ${bullets}`;
     
     res.status(200).json(response);
   } catch (err) {
-    console.error('Error in postSearch:', err);
+    logger.error('Error in postSearch:', err);
     // Update search job status to failed if there's a job
     try {
       if (job?.id) {
@@ -144,7 +145,7 @@ ${bullets}`;
         await setSearchJobResult(job.id, { status: 'failed' });
       }
     } catch (jobError) {
-      console.error('Error updating search job status in controller:', jobError);
+      logger.error('Error updating search job status in controller:', jobError);
     }
     next(err);
   }

@@ -1,6 +1,7 @@
 import fetch from 'node-fetch'
 import { geminiService } from './gemini'
 import { tokenTracking } from './tokenTracking'
+import { logger } from '../utils/logger'
 
 type Provider = 'gemini' | 'ollama' | 'hybrid'
 
@@ -15,7 +16,7 @@ export const aiProvider = {
     if (provider === 'gemini') {
       const isInit = geminiService.isInitialized;
       if (!isInit) {
-        console.warn('Gemini service not initialized. Check GEMINI_API_KEY environment variable.');
+        logger.warn('Gemini service not initialized. Check GEMINI_API_KEY environment variable.');
       }
       return isInit;
     }
@@ -67,7 +68,7 @@ export const aiProvider = {
           return embedding
         }
       } catch (error) {
-        console.error('Embedding method failed:', error)
+        logger.error('Embedding method failed:', error)
         continue
       }
     }
@@ -401,7 +402,7 @@ JSON ONLY:`
           contextRelevance: Array.isArray(obj.contextRelevance) ? obj.contextRelevance : [],
         }
       } catch (error) {
-        console.error('Error extracting metadata with AI, using fallback:', error)
+        logger.error('Error extracting metadata with AI, using fallback:', error)
         result = this.generateFallbackMetadata(rawText, metadata)
       }
     }

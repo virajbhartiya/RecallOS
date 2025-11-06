@@ -3,6 +3,7 @@ import { aiProvider } from './aiProvider';
 import { UMAP } from 'umap-js';
 import { qdrantClient, COLLECTION_NAME, ensureCollection, EMBEDDING_DIMENSION } from '../lib/qdrant';
 import { randomUUID } from 'crypto';
+import { logger } from '../utils/logger';
 
 export class MemoryMeshService {
   private relationshipCache = new Map<string, any>();
@@ -13,7 +14,7 @@ export class MemoryMeshService {
     setInterval(() => this.cleanCache(), 60 * 60 * 1000);
     // Ensure Qdrant collection exists on startup
     ensureCollection().catch((error) => {
-      console.error('Failed to ensure Qdrant collection:', error);
+      logger.error('Failed to ensure Qdrant collection:', error);
     });
   }
 
@@ -57,7 +58,7 @@ export class MemoryMeshService {
 
       await Promise.all(embeddingPromises);
     } catch (error) {
-      console.error(
+      logger.error(
         `Error generating embeddings for memory ${memoryId}:`,
         error
       );
@@ -94,7 +95,7 @@ export class MemoryMeshService {
         ],
       });
     } catch (error) {
-      console.error(
+      logger.error(
         `Error creating ${type} embedding for memory ${memoryId}:`,
         error
       );
@@ -152,7 +153,7 @@ export class MemoryMeshService {
 
       return similarMemories;
     } catch (error) {
-      console.error(`Error finding related memories for ${memoryId}:`, error);
+      logger.error(`Error finding related memories for ${memoryId}:`, error);
       throw error;
     }
   }
@@ -274,7 +275,7 @@ export class MemoryMeshService {
           similarity_score: item.similarity,
         }));
     } catch (error) {
-      console.error('Error finding similar memories:', error);
+      logger.error('Error finding similar memories:', error);
       throw error;
     }
   }
@@ -427,7 +428,7 @@ export class MemoryMeshService {
 
       await Promise.all(relationPromises);
     } catch (error) {
-      console.error(`Error creating memory relations for ${memoryId}:`, error);
+      logger.error(`Error creating memory relations for ${memoryId}:`, error);
       throw error;
     }
   }
@@ -540,7 +541,7 @@ export class MemoryMeshService {
         .sort((a, b) => b.similarity_score - a.similarity_score)
         .slice(0, limit);
     } catch (error) {
-      console.error('Error finding topical relations:', error);
+      logger.error('Error finding topical relations:', error);
 
       return [];
     }
@@ -637,7 +638,7 @@ export class MemoryMeshService {
         .sort((a, b) => b.similarity_score - a.similarity_score)
         .slice(0, limit);
     } catch (error) {
-      console.error('Error finding temporal relations:', error);
+      logger.error('Error finding temporal relations:', error);
 
       return [];
     }
@@ -689,7 +690,7 @@ export class MemoryMeshService {
         }
       });
     } catch (error) {
-      console.error('Error cleaning up low quality relations:', error);
+      logger.error('Error cleaning up low quality relations:', error);
     }
   }
 
@@ -733,7 +734,7 @@ export class MemoryMeshService {
         .sort((a, b) => b.similarity_score - a.similarity_score)
         .slice(0, 8); // Limit final relations per memory
     } catch (error) {
-      console.error('Error filtering relations with AI:', error);
+      logger.error('Error filtering relations with AI:', error);
       // Fallback to high similarity threshold
       return relations
         .filter(r => r.similarity_score >= 0.6)
@@ -827,7 +828,7 @@ export class MemoryMeshService {
         relation_type: evaluations[index].relationshipType !== 'none' ? evaluations[index].relationshipType : candidate.relation_type,
       }));
     } catch (error) {
-      console.error('Error in batch AI evaluation:', error);
+      logger.error('Error in batch AI evaluation:', error);
       return [];
     }
   }
@@ -878,7 +879,7 @@ export class MemoryMeshService {
 
       return results;
     } catch (error) {
-      console.error('Error in batch relationship evaluation:', error);
+      logger.error('Error in batch relationship evaluation:', error);
       return batchData.map(() => ({ isRelevant: false, relevanceScore: 0, relationshipType: 'none', reasoning: 'Evaluation failed' }));
     }
   }
@@ -940,7 +941,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
       return JSON.parse(jsonMatch[0]);
     } catch (error) {
-      console.error('Error in AI batch evaluation:', error);
+      logger.error('Error in AI batch evaluation:', error);
       return batchData.map(() => ({ isRelevant: false, relevanceScore: 0, relationshipType: 'none', reasoning: 'Evaluation failed' }));
     }
   }
@@ -1241,7 +1242,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
       return coordMap;
     } catch (error) {
-      console.error('Error computing latent space projection:', error);
+      logger.error('Error computing latent space projection:', error);
       return new Map();
     }
   }
@@ -1578,7 +1579,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         }
       };
     } catch (error) {
-      console.error(`Error getting memory mesh for user ${userId}:`, error);
+      logger.error(`Error getting memory mesh for user ${userId}:`, error);
       throw error;
     }
   }
@@ -1595,7 +1596,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         const embeddingResult = await aiProvider.generateEmbedding(query);
         queryEmbedding = typeof embeddingResult === 'object' && 'embedding' in embeddingResult ? (embeddingResult as any).embedding : (embeddingResult as number[]);
       } catch (e) {
-        console.warn('Embedding generation unavailable, falling back to metadata-based search');
+        logger.warn('Embedding generation unavailable, falling back to metadata-based search');
       }
 
       if (queryEmbedding) {
@@ -1718,7 +1719,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
       return memories.map(m => ({ ...m, similarity_score: 0.3 }));
     } catch (error) {
-      console.error(`Error searching memories for user ${userId}:`, error);
+      logger.error(`Error searching memories for user ${userId}:`, error);
       throw error;
     }
   }
@@ -1728,7 +1729,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       await this.generateEmbeddingsForMemory(memoryId);
       await this.createMemoryRelations(memoryId, userId);
     } catch (error) {
-      console.error(`Error processing memory ${memoryId} for mesh:`, error);
+      logger.error(`Error processing memory ${memoryId} for mesh:`, error);
       throw error;
     }
   }
@@ -1803,7 +1804,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         },
       };
     } catch (error) {
-      console.error(
+      logger.error(
         `Error getting memory with relations for ${memoryId}:`,
         error
       );
@@ -1873,7 +1874,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         memories: Array.from(cluster.values()),
       };
     } catch (error) {
-      console.error(
+      logger.error(
         `Error getting memory cluster for ${centerMemoryId}:`,
         error
       );

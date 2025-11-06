@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { getCookieDomain, getSessionCookieName, isCookieSecure } from './env';
+import { logger } from './logger';
 
 export function setAuthCookie(res: Response, value: string, maxAgeMs: number = 1000 * 60 * 60 * 24 * 30): void {
   const name = getSessionCookieName();
@@ -21,7 +22,7 @@ export function setAuthCookie(res: Response, value: string, maxAgeMs: number = 1
   }
   
   // Log cookie settings for debugging
-  console.log('[AuthCookie] Setting cookie:', {
+  logger.log('[AuthCookie] Setting cookie:', {
     name,
     domain: cookieOptions.domain || 'localhost (no domain)',
     path: cookieOptions.path,

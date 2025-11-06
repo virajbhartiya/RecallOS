@@ -7,6 +7,7 @@ import { prisma } from '../lib/prisma';
 import { createHash } from 'crypto';
 import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../utils/env';
 import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text';
+import { logger } from '../utils/logger';
 
 export const startContentWorker = () => {
   return new Worker<ContentJobData>(
@@ -14,7 +15,7 @@ export const startContentWorker = () => {
     async (job) => {
       const { user_id, raw_text, metadata } = job.data as ContentJobData;
       
-      console.log(`[Redis Worker] Processing job started`, {
+      logger.log(`[Redis Worker] Processing job started`, {
         jobId: job.id,
         userId: user_id,
         contentLength: raw_text?.length || 0,
@@ -51,7 +52,7 @@ export const startContentWorker = () => {
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
           if (attempt > 1) {
-            console.log(`[Redis Worker] Retrying job (attempt ${attempt}/${maxAttempts})`, {
+            logger.log(`[Redis Worker] Retrying job (attempt ${attempt}/${maxAttempts})`, {
               jobId: job.id,
               userId: user_id,
               attempt,
@@ -61,7 +62,7 @@ export const startContentWorker = () => {
           const summaryResult = await aiProvider.summarizeContent(raw_text, metadata);
           summary = typeof summaryResult === 'string' ? summaryResult : (summaryResult as any).text || summaryResult;
           if (attempt > 1) {
-            console.log(`[Redis Worker] Job retry successful`, {
+            logger.log(`[Redis Worker] Job retry successful`, {
               jobId: job.id,
               userId: user_id,
               attempt,
@@ -71,7 +72,7 @@ export const startContentWorker = () => {
           break; // success
         } catch (err: any) {
           if (!isRetryableError(err) || attempt === maxAttempts) {
-            console.error(`[Redis Worker] Job failed permanently`, {
+            logger.error(`[Redis Worker] Job failed permanently`, {
               jobId: job.id,
               userId: user_id,
               attempt,
@@ -83,7 +84,7 @@ export const startContentWorker = () => {
           }
           const backoff = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
           const jitter = Math.floor(Math.random() * 500);
-          console.warn(`[Redis Worker] Job retryable error, backing off`, {
+          logger.warn(`[Redis Worker] Job retryable error, backing off`, {
             jobId: job.id,
             userId: user_id,
             attempt,
@@ -96,7 +97,7 @@ export const startContentWorker = () => {
       }
 
       if (!summary) {
-        console.error(`[Redis Worker] Failed to generate summary after all retries`, {
+        logger.error(`[Redis Worker] Failed to generate summary after all retries`, {
           jobId: job.id,
           userId: user_id,
           maxAttempts,
@@ -105,7 +106,7 @@ export const startContentWorker = () => {
         throw new Error('Failed to generate summary after retries');
       }
 
-      console.log(`[Redis Worker] Summary generated successfully`, {
+      logger.log(`[Redis Worker] Summary generated successfully`, {
         jobId: job.id,
         userId: user_id,
         summaryLength: summary.length,
@@ -134,7 +135,7 @@ export const startContentWorker = () => {
           },
         });
         
-        console.log(`[Redis Worker] Memory updated successfully`, {
+        logger.log(`[Redis Worker] Memory updated successfully`, {
           jobId: job.id,
           userId: user_id,
           memoryId: metadata.memory_id,
@@ -145,20 +146,20 @@ export const startContentWorker = () => {
           try {
             const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 7);
             if (shouldUpdate) {
-              console.log(`[Redis Worker] Triggering profile update`, {
+              logger.log(`[Redis Worker] Triggering profile update`, {
                 jobId: job.id,
                 userId: user_id,
                 timestamp: new Date().toISOString(),
               });
               await profileUpdateService.updateUserProfile(user_id);
-              console.log(`[Redis Worker] Profile update completed`, {
+              logger.log(`[Redis Worker] Profile update completed`, {
                 jobId: job.id,
                 userId: user_id,
                 timestamp: new Date().toISOString(),
               });
             }
           } catch (profileError) {
-            console.error(`[Redis Worker] Error updating profile:`, profileError);
+            logger.error(`[Redis Worker] Error updating profile:`, profileError);
           }
         });
       } else {
@@ -176,7 +177,7 @@ export const startContentWorker = () => {
           });
 
           if (existingByCanonical) {
-            console.log(`[Redis Worker] Duplicate memory detected, skipping creation`, {
+            logger.log(`[Redis Worker] Duplicate memory detected, skipping creation`, {
               jobId: job.id,
               userId: user_id,
               existingMemoryId: existingByCanonical.id,
@@ -211,7 +212,7 @@ export const startContentWorker = () => {
                 const similarity = calculateSimilarity(canonicalText, existingCanonical);
                 
                 if (similarity > 0.9) {
-                  console.log(`[Redis Worker] URL duplicate detected, skipping creation`, {
+                  logger.log(`[Redis Worker] URL duplicate detected, skipping creation`, {
                     jobId: job.id,
                     userId: user_id,
                     existingMemoryId: existingMemory.id,
@@ -254,7 +255,7 @@ export const startContentWorker = () => {
               });
 
               if (existingByCanonical) {
-                console.log(`[Redis Worker] Duplicate memory detected on create, skipping`, {
+                logger.log(`[Redis Worker] Duplicate memory detected on create, skipping`, {
                   jobId: job.id,
                   userId: user_id,
                   existingMemoryId: existingByCanonical.id,
@@ -286,7 +287,7 @@ export const startContentWorker = () => {
             },
           });
           
-          console.log(`[Redis Worker] New memory created successfully`, {
+          logger.log(`[Redis Worker] New memory created successfully`, {
             jobId: job.id,
             userId: user_id,
             memoryId: memory.id,
@@ -297,20 +298,20 @@ export const startContentWorker = () => {
             try {
               const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 7);
               if (shouldUpdate) {
-                console.log(`[Redis Worker] Triggering profile update`, {
+                logger.log(`[Redis Worker] Triggering profile update`, {
                   jobId: job.id,
                   userId: user_id,
                   timestamp: new Date().toISOString(),
                 });
                 await profileUpdateService.updateUserProfile(user_id);
-                console.log(`[Redis Worker] Profile update completed`, {
+                logger.log(`[Redis Worker] Profile update completed`, {
                   jobId: job.id,
                   userId: user_id,
                   timestamp: new Date().toISOString(),
                 });
               }
             } catch (profileError) {
-              console.error(`[Redis Worker] Error updating profile:`, profileError);
+              logger.error(`[Redis Worker] Error updating profile:`, profileError);
             }
           });
         }
@@ -323,7 +324,7 @@ export const startContentWorker = () => {
         summary: summary.substring(0, 100) + '...',
       };
       
-      console.log(`[Redis Worker] Job completed successfully`, {
+      logger.log(`[Redis Worker] Job completed successfully`, {
         jobId: job.id,
         userId: user_id,
         result,

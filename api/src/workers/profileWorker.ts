@@ -1,7 +1,8 @@
 import { profileUpdateService } from '../services/profileUpdate';
+import { logger } from '../utils/logger';
 
 export const startProfileWorker = async (daysSinceLastUpdate: number = 7) => {
-  console.log('[Profile Worker] Starting batch profile update', {
+  logger.log('[Profile Worker] Starting batch profile update', {
     ts: new Date().toISOString(),
     daysSinceLastUpdate,
   });
@@ -9,13 +10,13 @@ export const startProfileWorker = async (daysSinceLastUpdate: number = 7) => {
   try {
     const userIds = await profileUpdateService.getUsersNeedingUpdate(daysSinceLastUpdate);
     
-    console.log('[Profile Worker] Found users needing update', {
+    logger.log('[Profile Worker] Found users needing update', {
       ts: new Date().toISOString(),
       count: userIds.length,
     });
 
     if (userIds.length === 0) {
-      console.log('[Profile Worker] No users need profile update', {
+      logger.log('[Profile Worker] No users need profile update', {
         ts: new Date().toISOString(),
       });
       return { updated: 0, failed: 0 };
@@ -26,7 +27,7 @@ export const startProfileWorker = async (daysSinceLastUpdate: number = 7) => {
 
     for (const userId of userIds) {
       try {
-        console.log('[Profile Worker] Updating profile', {
+        logger.log('[Profile Worker] Updating profile', {
           ts: new Date().toISOString(),
           userId,
         });
@@ -34,13 +35,13 @@ export const startProfileWorker = async (daysSinceLastUpdate: number = 7) => {
         await profileUpdateService.updateUserProfile(userId);
         updated++;
 
-        console.log('[Profile Worker] Profile updated successfully', {
+        logger.log('[Profile Worker] Profile updated successfully', {
           ts: new Date().toISOString(),
           userId,
         });
       } catch (error) {
         failed++;
-        console.error('[Profile Worker] Error updating profile', {
+        logger.error('[Profile Worker] Error updating profile', {
           ts: new Date().toISOString(),
           userId,
           error: error instanceof Error ? error.message : String(error),
@@ -48,7 +49,7 @@ export const startProfileWorker = async (daysSinceLastUpdate: number = 7) => {
       }
     }
 
-    console.log('[Profile Worker] Batch update completed', {
+    logger.log('[Profile Worker] Batch update completed', {
       ts: new Date().toISOString(),
       updated,
       failed,
@@ -57,7 +58,7 @@ export const startProfileWorker = async (daysSinceLastUpdate: number = 7) => {
 
     return { updated, failed };
   } catch (error) {
-    console.error('[Profile Worker] Batch update failed', {
+    logger.error('[Profile Worker] Batch update failed', {
       ts: new Date().toISOString(),
       error: error instanceof Error ? error.message : String(error),
     });

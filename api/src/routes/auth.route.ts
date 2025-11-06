@@ -4,6 +4,7 @@ import { setAuthCookie, clearAuthCookie } from '../utils/authCookie';
 import { generateToken } from '../utils/jwt';
 import { authenticateToken, AuthenticatedRequest } from '../middleware/auth';
 import { hashPassword, comparePassword } from '../utils/password';
+import { logger } from '../utils/logger';
 
 const router = Router();
 
@@ -44,7 +45,7 @@ router.post('/register', async (req: Request, res: Response) => {
     setAuthCookie(res, token);
     return res.status(201).json({ message: 'Registered', token, user: { id: (user as any).id, email: (user as any).email } });
   } catch (error) {
-    console.error('Register error:', error);
+    logger.error('Register error:', error);
     return res.status(500).json({ message: 'Failed to register' });
   }
 });
@@ -71,7 +72,7 @@ router.post('/login', async (req: Request, res: Response) => {
     setAuthCookie(res, token);
     return res.status(200).json({ message: 'Logged in', token, user: { id: (user as any).id, email: (user as any).email } });
   } catch (error) {
-    console.error('Login error:', error);
+    logger.error('Login error:', error);
     return res.status(500).json({ message: 'Failed to login' });
   }
 });
@@ -127,7 +128,7 @@ router.post('/extension-token', async (req: Request, res: Response) => {
       }
     });
   } catch (error) {
-    console.error('Extension token error:', error);
+    logger.error('Extension token error:', error);
     res.status(500).json({ message: 'Failed to generate token' });
   }
 });

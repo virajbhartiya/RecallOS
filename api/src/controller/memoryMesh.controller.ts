@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { memoryMeshService } from '../services/memoryMesh';
+import { logger } from '../utils/logger';
 
 export class MemoryMeshController {
   static async getMemoryMesh(req: AuthenticatedRequest, res: Response) {
@@ -29,7 +30,7 @@ export class MemoryMeshController {
         data: mesh,
       });
     } catch (error) {
-      console.error('Error getting memory mesh:', error);
+      logger.error('Error getting memory mesh:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -67,7 +68,7 @@ export class MemoryMeshController {
         data: memoryWithRelations,
       });
     } catch (error) {
-      console.error('Error getting memory with relations:', error);
+      logger.error('Error getting memory with relations:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -109,7 +110,7 @@ export class MemoryMeshController {
         data: cluster,
       });
     } catch (error) {
-      console.error('Error getting memory cluster:', error);
+      logger.error('Error getting memory cluster:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',
@@ -163,7 +164,7 @@ export class MemoryMeshController {
         },
       });
     } catch (error) {
-      console.error('Error processing memory for mesh:', error);
+      logger.error('Error processing memory for mesh:', error);
       res.status(500).json({
         success: false,
         error: 'Internal server error',

@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 import { getSessionCookieName } from '../utils/env';
+import { logger } from '../utils/logger';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -42,7 +43,7 @@ export async function authenticateToken(
     });
 
     if (!user) {
-      console.error('Auth middleware: User not found for userId:', payload.userId);
+      logger.error('Auth middleware: User not found for userId:', payload.userId);
       res.status(401).json({ message: 'User not found' });
       return;
     }
@@ -55,7 +56,7 @@ export async function authenticateToken(
 
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    logger.error('Auth middleware error:', error);
     res.status(500).json({ message: 'Authentication error' });
   }
 }

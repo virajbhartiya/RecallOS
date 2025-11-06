@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { tokenTracking } from '../services/tokenTracking';
+import { logger } from '../utils/logger';
 
 function extractDomain(url: string | null | undefined): string | null {
   if (!url || url === 'unknown') return null;
@@ -327,7 +328,7 @@ export class AnalyticsController {
         },
       });
     } catch (error) {
-      console.error('Error getting analytics:', error);
+      logger.error('Error getting analytics:', error);
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to get analytics',

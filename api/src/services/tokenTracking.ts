@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { logger } from '../utils/logger';
 
 export type OperationType = 
   | 'summarize' 
@@ -29,7 +30,7 @@ export const tokenTracking = {
         } as any,
       });
     } catch (error) {
-      console.error('Error recording token usage:', error);
+      logger.error('Error recording token usage:', error);
     }
   },
 

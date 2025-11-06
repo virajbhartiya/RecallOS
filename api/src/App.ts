@@ -23,6 +23,7 @@ import { prisma } from './lib/prisma';
 import { startContentWorker } from './workers/contentWorker';
 import { ensureCollection } from './lib/qdrant';
 import { aiProvider } from './services/aiProvider';
+import { logger } from './utils/logger';
 
 dotenv.config();
 
@@ -50,11 +51,14 @@ if (process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true'
 const port = process.env.PORT || 3000;
 
 process.on('uncaughtException', (err: Error) => {
-  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
-  console.error(err.name, err.message);
+  logger.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  logger.error(err.name, err.message);
   process.exit(1);
 });
-app.use(morgan('dev'));
+morgan.token('timestamp', () => {
+  return new Date().toISOString().replace('Z', '');
+});
+app.use(morgan(':timestamp :method :url :status :response-time ms - :res[content-length]'));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.json({ limit: '10mb' }));
 import { getAllowedOrigins } from './utils/env';
@@ -89,7 +93,7 @@ async function testDatabaseConnection() {
   try {
     await prisma.$connect();
   } catch (error) {
-    console.error('Database connection failed:', error);
+    logger.error('Database connection failed:', error);
     process.exit(1);
   }
 }
@@ -97,22 +101,22 @@ async function testDatabaseConnection() {
 server.listen(port, async () => {
   const protocol = (process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true') ? 'https' : 'http';
   await testDatabaseConnection();
-  console.log('[startup] database_connected');
+  logger.log('[startup] database_connected');
   try {
     await ensureCollection();
-    console.log('[startup] qdrant_ready');
+    logger.log('[startup] qdrant_ready');
   } catch (e) {
-    console.warn('[startup] qdrant_unavailable', String((e as Error)?.message || e));
+    logger.warn('[startup] qdrant_unavailable', String((e as Error)?.message || e));
   }
   const aiReady = aiProvider.isInitialized;
-  console.log('[startup] ai_provider', { initialized: aiReady });
+  logger.log('[startup] ai_provider', { initialized: aiReady });
   startContentWorker();
-  console.log('[startup] content_worker_started');
-  console.log('[startup] server_listening', { protocol, port });
+  logger.log('[startup] content_worker_started');
+  logger.log('[startup] server_listening', { protocol, port });
 });
 process.on('unhandledRejection', (err: Error) => {
-  console.error('Unhandled Rejection! 💥 Shutting down...');
-  console.error(err.name, err.message);
+  logger.error('Unhandled Rejection! 💥 Shutting down...');
+  logger.error(err.name, err.message);
   server.close(() => {
     process.exit(1);
   });

@@ -7,6 +7,7 @@ import { prisma } from '../lib/prisma';
 
 import AppError from '../utils/appError';
 import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text';
+import { logger } from '../utils/logger';
 
 export const submitContent = async (
   req: AuthenticatedRequest,
@@ -126,7 +127,7 @@ export const submitContent = async (
                 ? (existingMemory as any).timestamp.toString()
                 : null,
             };
-            console.log('[Content API] URL duplicate detected, skipping queue', { existingMemoryId: existingMemory.id, similarity, userId: user_id });
+            logger.log('[Content API] URL duplicate detected, skipping queue', { existingMemoryId: existingMemory.id, similarity, userId: user_id });
             return res.status(200).json({
               status: 'success',
               message: 'Duplicate memory detected by URL similarity, returning existing record',
@@ -149,7 +150,7 @@ export const submitContent = async (
 
     const job = await addContentJob(jobData);
     
-    console.log(`[Content API] Content submitted and queued for processing`, {
+    logger.log(`[Content API] Content submitted and queued for processing`, {
       jobId: job.id,
       userId: user_id,
       contentLength: raw_text.length,
@@ -169,7 +170,7 @@ export const submitContent = async (
       },
     });
   } catch (error) {
-    console.error('Error submitting content:', error);
+    logger.error('Error submitting content:', error);
     next(error);
   }
 };
@@ -233,7 +234,7 @@ export const getSummarizedContent = async (
       },
     });
   } catch (error) {
-    console.error('Error fetching summarized content:', error);
+    logger.error('Error fetching summarized content:', error);
     next(error);
   }
 };
@@ -287,7 +288,7 @@ export const getPendingJobs = async (
       },
     });
   } catch (error) {
-    console.error('Error fetching pending jobs:', error);
+    logger.error('Error fetching pending jobs:', error);
     next(error);
   }
 };
@@ -324,7 +325,7 @@ export const deletePendingJob = async (
       },
     });
   } catch (error) {
-    console.error('Error deleting pending job:', error);
+    logger.error('Error deleting pending job:', error);
     next(error);
   }
 };

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import Redis from 'ioredis';
 import { getRedisConnection } from '../utils/env';
+import { logger } from '../utils/logger';
 
 export type SearchJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
@@ -48,7 +49,7 @@ export function createSearchJob(): SearchJob {
   const client = getRedisClient();
   const key = `${JOB_PREFIX}${id}`;
   client.setex(key, JOB_TTL, JSON.stringify(job)).catch(err => {
-    console.error('Error creating search job in Redis:', err);
+    logger.error('Error creating search job in Redis:', err);
   });
   
   return job;
@@ -61,7 +62,7 @@ export async function setSearchJobResult(id: string, data: { answer?: string; ci
     const existing = await client.get(key);
     
     if (!existing) {
-      console.error('Search job not found:', id);
+      logger.error('Search job not found:', id);
       return;
     }
     
@@ -74,7 +75,7 @@ export async function setSearchJobResult(id: string, data: { answer?: string; ci
     
     await client.setex(key, JOB_TTL, JSON.stringify(job));
   } catch (error) {
-    console.error('Error updating search job result:', error);
+    logger.error('Error updating search job result:', error);
   }
 }
 
@@ -90,7 +91,7 @@ export async function getSearchJob(id: string): Promise<SearchJob | null> {
     
     return JSON.parse(data) as SearchJob;
   } catch (error) {
-    console.error('Error retrieving search job:', error);
+    logger.error('Error retrieving search job:', error);
     return null;
   }
 }
