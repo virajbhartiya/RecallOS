@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { getAuthToken } from '@/lib/userId';
+import { getAuthToken, requireAuthToken } from '@/lib/userId';
 
 const Popup: React.FC = () => {
   const [extensionEnabled, setExtensionEnabled] = useState(true);
@@ -52,9 +52,32 @@ const Popup: React.FC = () => {
         setIsConnected(false);
       }
 
-      // Check auth status
-      const token = getAuthToken();
-      setIsAuthenticated(!!token);
+      // Check auth status - try multiple sources like requireAuthToken does
+      let isAuth = false;
+      try {
+        // First check chrome.storage.local (works in popup)
+        const stored = await chrome.storage?.local?.get?.(['auth_token']);
+        if (stored && stored.auth_token) {
+          isAuth = true;
+        } else {
+          // Try localStorage (might work in popup)
+          const token = getAuthToken();
+          if (token) {
+            isAuth = true;
+          } else {
+            // Try requireAuthToken which checks cookies too
+            try {
+              await requireAuthToken();
+              isAuth = true;
+            } catch {
+              isAuth = false;
+            }
+          }
+        }
+      } catch (error) {
+        isAuth = false;
+      }
+      setIsAuthenticated(isAuth);
     } catch (error) {
       setIsConnected(false);
       setIsAuthenticated(false);
@@ -93,9 +116,9 @@ const Popup: React.FC = () => {
     }
   };
 
-  const addBlockedWebsite = async () => {
-    const website = newBlockedWebsite.trim();
-    if (!website) {
+  const addBlockedWebsite = async (website?: string) => {
+    const websiteToAdd = website || newBlockedWebsite.trim();
+    if (!websiteToAdd) {
       return;
     }
 
@@ -103,7 +126,7 @@ const Popup: React.FC = () => {
     try {
       const response = await chrome.runtime.sendMessage({
         type: 'ADD_BLOCKED_WEBSITE',
-        website: website,
+        website: websiteToAdd,
       });
       if (response && response.success) {
         setNewBlockedWebsite('');
@@ -111,6 +134,33 @@ const Popup: React.FC = () => {
       }
     } catch (error) {
       console.error('Error adding blocked website:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const blockCurrentDomain = async () => {
+    setIsLoading(true);
+    try {
+      // Get the current active tab
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs.length === 0 || !tabs[0].url) {
+        return;
+      }
+
+      const url = tabs[0].url;
+      try {
+        const urlObj = new URL(url);
+        const domain = urlObj.hostname.replace(/^www\./, '');
+        
+        if (domain) {
+          await addBlockedWebsite(domain);
+        }
+      } catch (error) {
+        console.error('Error extracting domain:', error);
+      }
+    } catch (error) {
+      console.error('Error getting current tab:', error);
     } finally {
       setIsLoading(false);
     }
@@ -219,13 +269,21 @@ const Popup: React.FC = () => {
               className="flex-1 border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-black"
             />
             <button
-              onClick={addBlockedWebsite}
+              onClick={() => addBlockedWebsite()}
               disabled={isLoading || !newBlockedWebsite.trim()}
               className="px-3 py-1.5 text-xs font-medium border border-black bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Add
             </button>
           </div>
+
+          <button
+            onClick={blockCurrentDomain}
+            disabled={isLoading}
+            className="w-full px-3 py-1.5 text-xs font-medium border border-gray-300 bg-white text-black hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Block Current Domain
+          </button>
 
           {blockedWebsites.length > 0 && (
             <div className="space-y-1.5 max-h-48 overflow-y-auto">
