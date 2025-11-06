@@ -22,6 +22,54 @@ async function getApiEndpoint(): Promise<string> {
   }
 }
 
+async function getApiBaseUrl(): Promise<string> {
+  try {
+    const endpoint = await getApiEndpoint();
+    const url = new URL(endpoint);
+    return `${url.protocol}//${url.host}`;
+  } catch (error) {
+    return 'http://localhost:3000';
+  }
+}
+
+async function checkApiHealth(): Promise<boolean> {
+  try {
+    const apiBase = await getApiBaseUrl();
+    const healthUrl = `${apiBase}/health`;
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    
+    try {
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        signal: controller.signal,
+        credentials: 'include',
+      });
+      clearTimeout(timeout);
+      return response.ok || response.status < 500;
+    } catch (error) {
+      clearTimeout(timeout);
+      // Try a simple endpoint if /health doesn't exist
+      try {
+        const searchUrl = `${apiBase}/api/search`;
+        const searchResponse = await fetch(searchUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'health-check', limit: 1 }),
+          signal: controller.signal,
+          credentials: 'include',
+        });
+        return searchResponse.status < 500;
+      } catch {
+        return false;
+      }
+    }
+  } catch (error) {
+    return false;
+  }
+}
+
 async function isExtensionEnabled(): Promise<boolean> {
   try {
     const result = await chrome.storage.sync.get(['extensionEnabled']);
@@ -388,6 +436,18 @@ chrome.runtime.onMessage.addListener(
         })
         .catch(error => {
           sendResponse({ success: false, blocked: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message?.type === 'CHECK_API_HEALTH') {
+      checkApiHealth()
+        .then(healthy => {
+          sendResponse({ success: true, healthy });
+        })
+        .catch(error => {
+          sendResponse({ success: false, healthy: false, error: error.message });
         });
 
       return true;
