@@ -17,6 +17,7 @@ model User {
   memories         Memory[]
   memory_snapshots MemorySnapshot[]
   token_usage      TokenUsage[]
+  profile          UserProfile?
 
   @@map("users")
 }
@@ -139,4 +140,21 @@ model TokenUsage {
   @@index([user_id, created_at])
   @@index([operation_type])
   @@map("token_usage")
+}
+
+model UserProfile {
+  id                  String   @id @default(uuid()) @db.Uuid
+  user_id             String   @unique @db.Uuid
+  static_profile_json Json?
+  static_profile_text String? @db.Text
+  dynamic_profile_json Json?
+  dynamic_profile_text String? @db.Text
+  last_updated        DateTime @default(now()) @updatedAt
+  last_memory_analyzed DateTime?
+  version             Int      @default(1)
+  user                User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([last_updated])
+  @@map("user_profiles")
 }
