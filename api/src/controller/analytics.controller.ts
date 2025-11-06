@@ -79,7 +79,7 @@ export class AnalyticsController {
       let totalContentLength = 0;
       const memoriesByDate: Record<string, number> = {};
 
-      memories.forEach(memory => {
+      memories.forEach((memory: any) => {
         const domain = extractDomain(memory.url);
         if (domain) {
           domainCounts[domain] = (domainCounts[domain] || 0) + 1;
@@ -126,7 +126,7 @@ export class AnalyticsController {
       const tokenUsageAggregated = await tokenTracking.getTokenUsageAggregated(userId);
 
       const tokenUsageByDate: Record<string, { input: number; output: number; total: number }> = {};
-      tokenUsageRecords.forEach(record => {
+      tokenUsageRecords.forEach((record: any) => {
         const dateKey = record.created_at.toISOString().split('T')[0];
         if (!tokenUsageByDate[dateKey]) {
           tokenUsageByDate[dateKey] = { input: 0, output: 0, total: 0 };
@@ -137,7 +137,7 @@ export class AnalyticsController {
       });
 
       const tokenUsageByOperation: Record<string, { input: number; output: number; total: number; count: number }> = {};
-      tokenUsageRecords.forEach(record => {
+      tokenUsageRecords.forEach((record: any) => {
         const op = record.operation_type;
         if (!tokenUsageByOperation[op]) {
           tokenUsageByOperation[op] = { input: 0, output: 0, total: 0, count: 0 };
@@ -154,7 +154,7 @@ export class AnalyticsController {
       const averageTokensPerMemory = memories.length > 0 ? tokenUsageAggregated.total / memories.length : 0;
 
       const searchesByDate: Record<string, number> = {};
-      queryEvents.forEach(event => {
+      queryEvents.forEach((event: any) => {
         const dateKey = event.created_at.toISOString().split('T')[0];
         searchesByDate[dateKey] = (searchesByDate[dateKey] || 0) + 1;
       });
@@ -162,6 +162,66 @@ export class AnalyticsController {
       const mostActiveDomain = topDomains[0]?.domain || null;
       const totalSearches = queryEvents.length;
       const averageResultsPerSearch = totalSearches > 0 ? memories.length / totalSearches : 0;
+
+      const now = new Date();
+      const firstMemory = memories.length > 0 ? memories.reduce((earliest: any, m: any) => 
+        m.created_at < earliest.created_at ? m : earliest
+      ) : null;
+      const lastMemory = memories.length > 0 ? memories.reduce((latest: any, m: any) => 
+        m.created_at > latest.created_at ? m : latest
+      ) : null;
+
+      const daysSinceFirst = firstMemory ? Math.floor((now.getTime() - firstMemory.created_at.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+      const daysSinceLast = lastMemory ? Math.floor((now.getTime() - lastMemory.created_at.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+      const memoriesPerDay = daysSinceFirst > 0 ? memories.length / daysSinceFirst : 0;
+      const tokensPerDay = daysSinceFirst > 0 ? tokenUsageAggregated.total / daysSinceFirst : 0;
+
+      const memoriesByHour: Record<number, number> = {};
+      const memoriesByDayOfWeek: Record<number, number> = {};
+      memories.forEach((memory: any) => {
+        const date = new Date(memory.created_at);
+        const hour = date.getHours();
+        const dayOfWeek = date.getDay();
+        memoriesByHour[hour] = (memoriesByHour[hour] || 0) + 1;
+        memoriesByDayOfWeek[dayOfWeek] = (memoriesByDayOfWeek[dayOfWeek] || 0) + 1;
+      });
+
+      const peakHour = Object.entries(memoriesByHour).sort(([, a], [, b]) => b - a)[0]?.[0] || null;
+      const peakDayOfWeek = Object.entries(memoriesByDayOfWeek).sort(([, a], [, b]) => b - a)[0]?.[0] || null;
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+      const uniqueDomains = Object.keys(domainCounts).length;
+      const uniqueCategories = Object.keys(categoryCounts).length;
+      const uniqueTopics = Object.keys(topicCounts).length;
+
+      const contentLengths = memories.map((m: any) => m.content?.length || 0).sort((a: number, b: number) => a - b);
+      const medianContentLength = contentLengths.length > 0 
+        ? contentLengths[Math.floor(contentLengths.length / 2)]
+        : 0;
+      const minContentLength = contentLengths[0] || 0;
+      const maxContentLength = contentLengths[contentLengths.length - 1] || 0;
+
+      const recentMemories = memories.filter((m: any) => {
+        const daysSince = (now.getTime() - m.created_at.getTime()) / (1000 * 60 * 60 * 24);
+        return daysSince <= 7;
+      }).length;
+
+      const recentMemories30 = memories.filter((m: any) => {
+        const daysSince = (now.getTime() - m.created_at.getTime()) / (1000 * 60 * 60 * 24);
+        return daysSince <= 30;
+      }).length;
+
+      const tokenUsageByWeek: Record<string, number> = {};
+      tokenUsageRecords.forEach((record: any) => {
+        const date = new Date(record.created_at);
+        const weekStart = new Date(date);
+        weekStart.setDate(date.getDate() - date.getDay());
+        const weekKey = weekStart.toISOString().split('T')[0];
+        if (!tokenUsageByWeek[weekKey]) {
+          tokenUsageByWeek[weekKey] = 0;
+        }
+        tokenUsageByWeek[weekKey] += record.input_tokens + record.output_tokens;
+      });
 
       res.status(200).json({
         success: true,
@@ -209,17 +269,13 @@ export class AnalyticsController {
             averageResultsPerSearch: Math.round(averageResultsPerSearch),
             byDate: searchesByDate,
           },
-          activityAnalytics: {
-            memoriesByDate,
-            totalMemories: memories.length,
-          },
           relationshipAnalytics: {
             totalRelations: memoryRelations.length,
             averageConnectionsPerMemory: Math.round(averageConnectionsPerMemory * 100) / 100,
             strongestRelations: memoryRelations
-              .sort((a, b) => b.similarity_score - a.similarity_score)
+              .sort((a: any, b: any) => b.similarity_score - a.similarity_score)
               .slice(0, 10)
-              .map(r => ({ similarity: r.similarity_score })),
+              .map((r: any) => ({ similarity: r.similarity_score })),
           },
           snapshotAnalytics: {
             totalSnapshots: memorySnapshots.length,
@@ -229,6 +285,44 @@ export class AnalyticsController {
             topCategories,
             topTopics,
             sentimentDistribution: sentimentCounts,
+          },
+          growthAnalytics: {
+            daysSinceFirst,
+            daysSinceLast,
+            memoriesPerDay: Math.round(memoriesPerDay * 100) / 100,
+            tokensPerDay: Math.round(tokensPerDay * 100) / 100,
+            recentMemories7Days: recentMemories,
+            recentMemories30Days: recentMemories30,
+          },
+          activityAnalytics: {
+            memoriesByDate,
+            memoriesByHour,
+            memoriesByDayOfWeek,
+            peakHour: peakHour !== null ? parseInt(peakHour) : null,
+            peakDayOfWeek: peakDayOfWeek !== null ? dayNames[parseInt(peakDayOfWeek)] : null,
+            totalMemories: memories.length,
+          },
+          diversityAnalytics: {
+            uniqueDomains,
+            uniqueCategories,
+            uniqueTopics,
+            domainDiversity: memories.length > 0 ? uniqueDomains / memories.length : 0,
+            categoryDiversity: memories.length > 0 ? uniqueCategories / memories.length : 0,
+            topicDiversity: memories.length > 0 ? uniqueTopics / memories.length : 0,
+          },
+          contentDistribution: {
+            average: Math.round(averageContentLength),
+            median: medianContentLength,
+            min: minContentLength,
+            max: maxContentLength,
+            total: totalContentLength,
+          },
+          tokenTrends: {
+            byWeek: tokenUsageByWeek,
+            averagePerMemory: Math.round(averageTokensPerMemory),
+            inputOutputRatio: tokenUsageAggregated.totalInput > 0 
+              ? Math.round((tokenUsageAggregated.totalOutput / tokenUsageAggregated.totalInput) * 100) / 100
+              : 0,
           },
         },
       });
