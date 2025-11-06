@@ -14,14 +14,14 @@ export interface UserProfile {
 }
 
 export class ProfileUpdateService {
-  async updateUserProfile(userId: string): Promise<UserProfile> {
+  async updateUserProfile(userId: string, force: boolean = false): Promise<UserProfile> {
     const existingProfile = await prisma.userProfile.findUnique({
       where: { user_id: userId },
     });
 
-    const lastAnalyzedDate = existingProfile?.last_memory_analyzed || null;
+    const lastAnalyzedDate = force ? null : (existingProfile?.last_memory_analyzed || null);
     
-    const memories = await prisma.memory.findMany({
+    const newMemories = await prisma.memory.findMany({
       where: {
         user_id: userId,
         ...(lastAnalyzedDate ? {
@@ -39,57 +39,42 @@ export class ProfileUpdateService {
       orderBy: { created_at: 'desc' } as any,
     });
 
-    if (memories.length === 0 && existingProfile) {
+    if (newMemories.length === 0 && existingProfile && !force) {
       return existingProfile as UserProfile;
+    }
+
+    const allMemories = await prisma.memory.findMany({
+      where: { user_id: userId },
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        content: true,
+        created_at: true,
+        page_metadata: true,
+      },
+      orderBy: { created_at: 'desc' } as any,
+      take: 200,
+    });
+
+    if (allMemories.length === 0) {
+      throw new Error('No memories found for user');
     }
 
     let extractionResult: ProfileExtractionResult;
     
-    if (existingProfile && lastAnalyzedDate) {
-      const allMemories = await prisma.memory.findMany({
-        where: { user_id: userId },
-        select: {
-          id: true,
-          title: true,
-          summary: true,
-          content: true,
-          created_at: true,
-          page_metadata: true,
-        },
-        orderBy: { created_at: 'desc' } as any,
-        take: 100,
-      });
+    extractionResult = await profileExtractionService.extractProfileFromMemories(
+      userId,
+      allMemories
+    );
 
-      extractionResult = await profileExtractionService.extractProfileFromMemories(
-        userId,
-        allMemories
-      );
-
+    if (existingProfile && !force && lastAnalyzedDate) {
       const merged = this.mergeProfiles(existingProfile, extractionResult);
       extractionResult = merged;
-    } else {
-      const allMemories = await prisma.memory.findMany({
-        where: { user_id: userId },
-        select: {
-          id: true,
-          title: true,
-          summary: true,
-          content: true,
-          created_at: true,
-          page_metadata: true,
-        },
-        orderBy: { created_at: 'desc' } as any,
-        take: 100,
-      });
-
-      extractionResult = await profileExtractionService.extractProfileFromMemories(
-        userId,
-        allMemories
-      );
     }
 
-    const latestMemory = memories.length > 0 
-      ? memories[0] 
+    const latestMemory = allMemories.length > 0 
+      ? allMemories[0] 
       : await prisma.memory.findFirst({
           where: { user_id: userId },
           orderBy: { created_at: 'desc' } as any,
@@ -152,6 +137,38 @@ export class ProfileUpdateService {
         existingStatic.expertise_areas || [],
         newExtraction.static_profile_json.expertise_areas || []
       ),
+      personality_traits: this.mergeArrays(
+        existingStatic.personality_traits || [],
+        newExtraction.static_profile_json.personality_traits || []
+      ),
+      work_style: {
+        ...existingStatic.work_style,
+        ...newExtraction.static_profile_json.work_style,
+      },
+      communication_style: {
+        ...existingStatic.communication_style,
+        ...newExtraction.static_profile_json.communication_style,
+      },
+      learning_preferences: {
+        ...existingStatic.learning_preferences,
+        ...newExtraction.static_profile_json.learning_preferences,
+      },
+      values_and_priorities: this.mergeArrays(
+        existingStatic.values_and_priorities || [],
+        newExtraction.static_profile_json.values_and_priorities || []
+      ),
+      technology_preferences: {
+        ...existingStatic.technology_preferences,
+        ...newExtraction.static_profile_json.technology_preferences,
+      },
+      lifestyle_patterns: {
+        ...existingStatic.lifestyle_patterns,
+        ...newExtraction.static_profile_json.lifestyle_patterns,
+      },
+      cognitive_style: {
+        ...existingStatic.cognitive_style,
+        ...newExtraction.static_profile_json.cognitive_style,
+      },
     };
 
     const mergedDynamic = {
@@ -166,6 +183,22 @@ export class ProfileUpdateService {
         newExtraction.dynamic_profile_json.recent_changes || []
       ),
       current_context: newExtraction.dynamic_profile_json.current_context || [],
+      active_goals: this.mergeArrays(
+        existingDynamic.active_goals || [],
+        newExtraction.dynamic_profile_json.active_goals || []
+      ),
+      current_challenges: newExtraction.dynamic_profile_json.current_challenges || [],
+      recent_achievements: this.mergeArrays(
+        existingDynamic.recent_achievements || [],
+        newExtraction.dynamic_profile_json.recent_achievements || []
+      ),
+      current_focus_areas: newExtraction.dynamic_profile_json.current_focus_areas || [],
+      emotional_state: {
+        ...existingDynamic.emotional_state,
+        ...newExtraction.dynamic_profile_json.emotional_state,
+      },
+      active_research_topics: newExtraction.dynamic_profile_json.active_research_topics || [],
+      upcoming_events: newExtraction.dynamic_profile_json.upcoming_events || [],
     };
 
     return {
