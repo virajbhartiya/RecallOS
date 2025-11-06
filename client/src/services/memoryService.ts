@@ -111,8 +111,7 @@ export class MemoryService {
       
       const responseData = response?.data
       if (responseData) {
-        // Backend returns: { query, results, meta_summary, answer, citations, job_id }
-        // Transform backend results to match frontend SearchResult interface
+
         const transformedResults = (responseData.results || []).map((result: {
           memory_id: string;
           user_id?: string;
@@ -165,9 +164,8 @@ export class MemoryService {
           page,
           limit,
           filters,
-          // Include search answer and meta summary if available
+          // Include search answer if available
           answer: responseData.answer,
-          meta_summary: responseData.meta_summary,
           citations: responseData.citations,
           job_id: responseData.job_id
         }
@@ -205,7 +203,7 @@ export class MemoryService {
       
       const responseData = response?.data
       if (responseData) {
-        // Backend returns: { query, results, meta_summary, answer, citations, job_id }
+        // Backend returns: { query, results, answer, citations, job_id }
         // Transform backend results to match frontend SearchResult interface
         const transformedResults = (responseData.results || []).map((result: {
           memory_id: string;
@@ -259,9 +257,8 @@ export class MemoryService {
           page,
           limit,
           filters,
-          // Include search answer and meta summary if available
+          // Include search answer if available
           answer: responseData.answer,
-          meta_summary: responseData.meta_summary,
           citations: responseData.citations,
           job_id: responseData.job_id
         }
@@ -535,5 +532,17 @@ export class MemoryService {
     requireAuthToken()
     const response = await getRequest(`/content/pending`)
     return response.data?.data || { jobs: [], counts: { total: 0, waiting: 0, active: 0, delayed: 0 } }
+  }
+
+  static async deleteMemory(memoryId: string): Promise<void> {
+    requireAuthToken()
+    const { deleteRequest } = await import('../utility/generalServices')
+    await deleteRequest(`${this.baseUrl}/${memoryId}`)
+  }
+
+  static async deletePendingJob(jobId: string): Promise<void> {
+    requireAuthToken()
+    const { deleteRequest } = await import('../utility/generalServices')
+    await deleteRequest(`/content/pending/${jobId}`)
   }
 }

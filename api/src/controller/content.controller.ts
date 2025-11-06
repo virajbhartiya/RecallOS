@@ -14,11 +14,7 @@ export const submitContent = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user?.id) {
-      return next(new AppError('Authentication required', 401));
-    }
-
-    const user_id = req.user.id;
+    const user_id = req.user!.id;
     const raw_text = (req.body.raw_text || req.body.content || req.body.full_content || req.body.meaningful_content) as string | undefined;
     const metadata = {
       ...(req.body.metadata || {}),
@@ -184,16 +180,12 @@ export const getSummarizedContent = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user?.id) {
-      return next(new AppError('Authentication required', 401));
-    }
-
     const { page = 1, limit = 10 } = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
 
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
+      where: { id: req.user!.id },
     });
 
     if (!user) {
@@ -252,10 +244,6 @@ export const getPendingJobs = async (
   next: NextFunction
 ) => {
   try {
-    if (!req.user?.id) {
-      return next(new AppError('Authentication required', 401));
-    }
-
     const [waiting, active, delayed] = await Promise.all([
       contentQueue.getWaiting(),
       contentQueue.getActive(),
@@ -268,7 +256,7 @@ export const getPendingJobs = async (
 
     let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs];
 
-    allJobs = allJobs.filter((item) => item.job.data.user_id === req.user.id);
+    allJobs = allJobs.filter((item) => item.job.data.user_id === req.user!.id);
 
     const jobs = allJobs
       .map((item) => ({
@@ -300,6 +288,43 @@ export const getPendingJobs = async (
     });
   } catch (error) {
     console.error('Error fetching pending jobs:', error);
+    next(error);
+  }
+};
+
+export const deletePendingJob = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { jobId } = req.params;
+
+    if (!jobId) {
+      return next(new AppError('Job ID is required', 400));
+    }
+
+    const job = await contentQueue.getJob(jobId);
+
+    if (!job) {
+      return next(new AppError('Job not found', 404));
+    }
+
+    if (job.data.user_id !== req.user!.id) {
+      return next(new AppError('You do not have permission to delete this job', 403));
+    }
+
+    await job.remove();
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Job deleted successfully',
+      data: {
+        jobId,
+      },
+    });
+  } catch (error) {
+    console.error('Error deleting pending job:', error);
     next(error);
   }
 };

@@ -2,13 +2,14 @@ import crypto from 'crypto';
 import Redis from 'ioredis';
 import { getRedisConnection } from '../utils/env';
 
-export type SearchJobStatus = 'pending' | 'completed' | 'failed';
+export type SearchJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface SearchJob {
   id: string;
   status: SearchJobStatus;
   answer?: string;
-  meta_summary?: string;
+  citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>;
+  results?: Array<{ memory_id: string; title: string | null; url: string | null; score: number }>;
   created_at: number;
   expires_at: number;
 }
@@ -53,7 +54,7 @@ export function createSearchJob(): SearchJob {
   return job;
 }
 
-export async function setSearchJobResult(id: string, data: { answer?: string; meta_summary?: string; status?: SearchJobStatus }): Promise<void> {
+export async function setSearchJobResult(id: string, data: { answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; results?: Array<{ memory_id: string; title: string | null; url: string | null; score: number }>; status?: SearchJobStatus }): Promise<void> {
   try {
     const client = getRedisClient();
     const key = `${JOB_PREFIX}${id}`;
@@ -65,9 +66,10 @@ export async function setSearchJobResult(id: string, data: { answer?: string; me
     }
     
     const job: SearchJob = JSON.parse(existing);
-    job.status = data.status || 'completed';
+    job.status = data.status || job.status || 'completed';
     if (data.answer !== undefined) job.answer = data.answer;
-    if (data.meta_summary !== undefined) job.meta_summary = data.meta_summary;
+    if (data.citations !== undefined) job.citations = data.citations;
+    if (data.results !== undefined) job.results = data.results;
     job.expires_at = Date.now() + (JOB_TTL * 1000);
     
     await client.setex(key, JOB_TTL, JSON.stringify(job));

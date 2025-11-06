@@ -2,10 +2,16 @@ import { GoogleGenAI } from '@google/genai';
 
 // In-process rate limiter queue to avoid Gemini 429 (quota) errors
 type QueueTask<T> = () => Promise<T>;
+type QueuedTask = { 
+  run: QueueTask<any>; 
+  resolve: (v: any) => void; 
+  reject: (e: any) => void;
+  priority: number; // Higher number = higher priority (search requests use 10, processing uses 0)
+};
 
 let isProcessingQueue = false;
 let nextAvailableAt = 0;
-const taskQueue: Array<{ run: QueueTask<any>; resolve: (v: any) => void; reject: (e: any) => void }> = [];
+const taskQueue: QueuedTask[] = [];
 
 // Default gap between requests; tuned for free-tier limits (~10 rpm). Adjust via Retry-After hints when returned
 let minIntervalMs = 2000; // Further reduced to 2000ms for faster processing
@@ -15,6 +21,9 @@ async function processQueue() {
   isProcessingQueue = true;
   try {
     while (taskQueue.length > 0) {
+      // Sort by priority (highest first) and take the highest priority task
+      taskQueue.sort((a, b) => b.priority - a.priority);
+      
       const now = Date.now();
       const waitMs = Math.max(0, nextAvailableAt - now);
       if (waitMs > 0) {
@@ -60,7 +69,7 @@ function extractRetryDelayMs(err: any): number | null {
   return null;
 }
 
-function runWithRateLimit<T>(task: QueueTask<T>, timeoutMs: number = 60000, bypassRateLimit: boolean = false): Promise<T> {
+function runWithRateLimit<T>(task: QueueTask<T>, timeoutMs: number = 60000, bypassRateLimit: boolean = false, priority: number = 0): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeoutId = setTimeout(() => {
       reject(new Error(`Operation timed out after ${timeoutMs}ms`));
@@ -84,7 +93,8 @@ function runWithRateLimit<T>(task: QueueTask<T>, timeoutMs: number = 60000, bypa
       taskQueue.push({ 
         run: executeTask, 
         resolve, 
-        reject 
+        reject,
+        priority
       });
       processQueue();
     }
@@ -149,7 +159,7 @@ export class GeminiService {
            err?.message?.toLowerCase().includes('too many requests');
   }
 
-  async generateContent(prompt: string): Promise<string> {
+  async generateContent(prompt: string, isSearchRequest: boolean = false): Promise<string> {
     this.ensureInit();
     
     const enhancedPrompt = `${prompt}
@@ -168,14 +178,20 @@ Return clean, readable plain text only.`;
 
     let lastError: any;
     const originalModelIndex = this.currentModelIndex;
+    // Search requests get high priority (10), processing tasks get normal priority (0)
+    const priority = isSearchRequest ? 10 : 0;
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
+        // Use longer timeout for search requests (5 minutes) vs processing (2 minutes)
+        const timeoutMs = isSearchRequest ? 300000 : 120000;
         const response = await runWithRateLimit(() =>
           this.ai.models.generateContent({
             model: this.getCurrentModel(),
             contents: enhancedPrompt,
-          }), 120000 // 2 minutes timeout
+          }), timeoutMs,
+          false, // don't bypass rate limit
+          priority // use priority for search requests
         );
         if (!response.text) throw new Error('No content generated from Gemini API');
         

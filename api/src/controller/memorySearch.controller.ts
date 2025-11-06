@@ -7,13 +7,6 @@ import { searchMemories } from '../services/memorySearch';
 export class MemorySearchController {
   static async searchMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const {
         query,
         category,
@@ -31,7 +24,7 @@ export class MemorySearchController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -79,7 +72,6 @@ export class MemorySearchController {
           })),
           query: searchResults.query,
           answer: searchResults.answer,
-          meta_summary: searchResults.meta_summary,
           citations: searchResults.citations
         },
       });
@@ -94,13 +86,6 @@ export class MemorySearchController {
 
   static async searchMemoriesWithEmbeddings(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const { 
         query, 
         category,
@@ -120,7 +105,7 @@ export class MemorySearchController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -234,13 +219,6 @@ export class MemorySearchController {
 
   static async searchMemoriesHybrid(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const { 
         query, 
         category,
@@ -260,7 +238,7 @@ export class MemorySearchController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {

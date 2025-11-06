@@ -24,5 +24,6 @@ router.get('/snapshot/:snapshotId', authenticateToken, MemorySnapshotController.
 router.post('/backfill-snapshots', authenticateToken, MemorySnapshotController.backfillMemorySnapshots);
 router.get('/health', MemoryController.healthCheck);
 router.get('/debug', authenticateToken, MemoryController.debugMemories);
+router.delete('/:memoryId', authenticateToken, MemoryController.deleteMemory);
 
 export default router;

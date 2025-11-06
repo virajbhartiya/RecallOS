@@ -6,14 +6,10 @@ import { memoryMeshService } from '../services/memoryMesh';
 export class MemoryMeshController {
   static async getMemoryMesh(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({ success: false, error: 'Authentication required' });
-      }
-
       const { limit = 50, threshold = 0.3 } = req.query;
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -43,13 +39,6 @@ export class MemoryMeshController {
 
   static async getMemoryWithRelations(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const { memoryId } = req.params;
 
       if (!memoryId) {
@@ -60,7 +49,7 @@ export class MemoryMeshController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -88,13 +77,6 @@ export class MemoryMeshController {
 
   static async getMemoryCluster(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const { memoryId } = req.params;
       const { depth = 2 } = req.query;
 
@@ -106,7 +88,7 @@ export class MemoryMeshController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -137,13 +119,6 @@ export class MemoryMeshController {
 
   static async processMemoryForMesh(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const { memoryId } = req.params;
 
       if (!memoryId) {
@@ -154,7 +129,7 @@ export class MemoryMeshController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {

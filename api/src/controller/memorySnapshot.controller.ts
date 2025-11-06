@@ -6,17 +6,10 @@ import { prisma } from '../lib/prisma';
 export class MemorySnapshotController {
   static async getMemorySnapshots(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const { limit = 20, page = 1 } = req.query;
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -73,13 +66,6 @@ export class MemorySnapshotController {
 
   static async getMemorySnapshot(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const { snapshotId } = req.params;
 
       if (!snapshotId) {
@@ -90,7 +76,7 @@ export class MemorySnapshotController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -139,15 +125,8 @@ export class MemorySnapshotController {
 
   static async backfillMemorySnapshots(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {

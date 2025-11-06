@@ -15,13 +15,6 @@ export class MemoryController {
     try {
       const { content, url, title, metadata } = req.body;
 
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       if (!content) {
         return res.status(400).json({
           success: false,
@@ -30,7 +23,7 @@ export class MemoryController {
       }
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -279,18 +272,11 @@ export class MemoryController {
 
   static async getRecentMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const { count } = req.query;
       const limit = count ? parseInt(count as string) : 10;
 
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (user) {
@@ -334,7 +320,7 @@ export class MemoryController {
       res.status(200).json({
         success: true,
         data: {
-          userId: req.user.id,
+          userId: req.user!.id,
           count: limit,
           memories,
           actualCount: memories.length,
@@ -352,15 +338,8 @@ export class MemoryController {
 
   static async getUserMemoryCount(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (user) {
@@ -377,7 +356,7 @@ export class MemoryController {
         });
       }
 
-      return res.status(200).json({ success: true, data: { userId: req.user.id, memoryCount: 0 } });
+      return res.status(200).json({ success: true, data: { userId: req.user!.id, memoryCount: 0 } });
     } catch (error) {
       console.error('Error getting user memory count:', error);
       res.status(500).json({
@@ -390,15 +369,8 @@ export class MemoryController {
 
   static async getMemoryInsights(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -519,15 +491,8 @@ export class MemoryController {
 
   static async debugMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      if (!req.user?.id) {
-        return res.status(401).json({
-          success: false,
-          error: 'Authentication required',
-        });
-      }
-
       const user = await prisma.user.findUnique({
-        where: { id: req.user.id },
+        where: { id: req.user!.id },
       });
 
       if (!user) {
@@ -563,6 +528,55 @@ export class MemoryController {
       res.status(500).json({
         success: false,
         error: 'Debug failed',
+      });
+    }
+  }
+
+  static async deleteMemory(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { memoryId } = req.params;
+
+      if (!memoryId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Memory ID is required',
+        });
+      }
+
+      const memory = await prisma.memory.findUnique({
+        where: { id: memoryId },
+      });
+
+      if (!memory) {
+        return res.status(404).json({
+          success: false,
+          error: 'Memory not found',
+        });
+      }
+
+      if (memory.user_id !== req.user!.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'You do not have permission to delete this memory',
+        });
+      }
+
+      await prisma.memory.delete({
+        where: { id: memoryId },
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Memory deleted successfully',
+        data: {
+          memoryId,
+        },
+      });
+    } catch (error) {
+      console.error('Error deleting memory:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Failed to delete memory',
       });
     }
   }

@@ -19,14 +19,14 @@ export class SearchService {
     limit: number = 10,
     contextOnly: boolean = false,
     signal?: AbortSignal
-  ): Promise<{ query: string; results: ApiSearchResult[]; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string; job_id?: string }> {
+  ): Promise<{ query: string; results: ApiSearchResult[]; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string; job_id?: string }> {
     requireAuthToken()
     const res = await postRequest('/search', { query, limit, contextOnly }, undefined, signal)
     if (!res || res.status >= 400) throw new Error('Search request failed')
     return res.data
   }
 
-  static async getJob(jobId: string): Promise<{ id: string; status: 'pending' | 'completed' | 'failed'; answer?: string; meta_summary?: string }> {
+  static async getJob(jobId: string): Promise<{ id: string; status: 'pending' | 'processing' | 'completed' | 'failed'; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }> }> {
     const res = await axiosInstance.get(`/search/job/${jobId}`)
     return res.data
   }
