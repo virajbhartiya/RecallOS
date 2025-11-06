@@ -86,7 +86,8 @@ export async function searchMemories(params: {
   let embedding: number[];
   try {
     console.log('[search] generating embedding', { ts: new Date().toISOString(), userId, queryLength: normalized.length });
-    embedding = await withTimeout(aiProvider.generateEmbedding(normalized), 30000); // 30 seconds
+    const embeddingResult = await withTimeout(aiProvider.generateEmbedding(normalized), 30000); // 30 seconds
+    embedding = typeof embeddingResult === 'object' && 'embedding' in embeddingResult ? (embeddingResult as any).embedding : (embeddingResult as number[]);
     console.log('[search] embedding generated', { ts: new Date().toISOString(), userId, embeddingLength: embedding.length });
   } catch (error) {
     try {
@@ -324,7 +325,8 @@ User query: "${normalized}"
 Evidence notes (ordered by relevance):
 ${bullets}`;
       console.log('[search] generating answer', { ts: new Date().toISOString(), userId, memoryCount: filteredRows.length });
-      answer = await withTimeout(aiProvider.generateContent(ansPrompt, true), 300000); // 5 minutes (accounts for queue delays + Gemini 2 min timeout), true = search request (high priority)
+      const answerResult = await withTimeout(aiProvider.generateContent(ansPrompt, true), 300000); // 5 minutes (accounts for queue delays + Gemini 2 min timeout), true = search request (high priority)
+      answer = typeof answerResult === 'string' ? answerResult : (answerResult as any).text || answerResult;
       console.log('[search] answer generated', { ts: new Date().toISOString(), userId, answerLength: answer?.length });
       // Build citations map aligned with [n]
       const allCitations = filteredRows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));

@@ -1,5 +1,6 @@
 import fetch from 'node-fetch'
 import { geminiService } from './gemini'
+import { tokenTracking } from './tokenTracking'
 
 type Provider = 'gemini' | 'ollama' | 'hybrid'
 
@@ -21,17 +22,33 @@ export const aiProvider = {
     return true
   },
 
-  async generateEmbedding(text: string): Promise<number[]> {
+  async generateEmbedding(text: string, userId?: string): Promise<number[]> {
+    let result: number[];
+    let modelUsed: string | undefined;
+    
     if (provider === 'gemini') {
-      return geminiService.generateEmbedding(text)
+      const response = await geminiService.generateEmbedding(text, userId);
+      result = response.embedding;
+      modelUsed = response.modelUsed;
+    } else if (provider === 'hybrid') {
+      result = await this.generateHybridEmbedding(text);
+    } else {
+      result = this.generateFallbackEmbedding(text);
     }
     
-    if (provider === 'hybrid') {
-      return this.generateHybridEmbedding(text)
+    if (userId) {
+      const inputTokens = tokenTracking.estimateTokens(text);
+      const outputTokens = 0;
+      await tokenTracking.recordTokenUsage({
+        userId,
+        operationType: 'generate_embedding',
+        inputTokens,
+        outputTokens,
+        modelUsed,
+      });
     }
     
-    // Since Ollama embedding models are not working properly, use fallback directly
-    return this.generateFallbackEmbedding(text)
+    return result;
   },
 
   async generateHybridEmbedding(text: string): Promise<number[]> {
@@ -210,29 +227,56 @@ export const aiProvider = {
     return Math.abs(hash)
   },
 
-  async generateContent(prompt: string, isSearchRequest: boolean = false): Promise<string> {
+  async generateContent(prompt: string, isSearchRequest: boolean = false, userId?: string): Promise<string> {
+    let result: string;
+    let modelUsed: string | undefined;
+    
     if (provider === 'gemini') {
-      return geminiService.generateContent(prompt, isSearchRequest)
+      const response = await geminiService.generateContent(prompt, isSearchRequest, userId);
+      result = response.text;
+      modelUsed = response.modelUsed;
+    } else {
+      const res = await fetch(`${OLLAMA_BASE}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: OLLAMA_GEN_MODEL, prompt, stream: false, options: { num_predict: 128, temperature: 0.3 } })
+      })
+      if (!res.ok) throw new Error(`Ollama generate failed: ${res.status}`)
+      const data: any = await res.json()
+      result = data?.response || data?.text || ''
+      if (!result) throw new Error('No content from Ollama')
+      modelUsed = OLLAMA_GEN_MODEL;
     }
-    const res = await fetch(`${OLLAMA_BASE}/api/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: OLLAMA_GEN_MODEL, prompt, stream: false, options: { num_predict: 128, temperature: 0.3 } })
-    })
-    if (!res.ok) throw new Error(`Ollama generate failed: ${res.status}`)
-    const data: any = await res.json()
-    const out: string = data?.response || data?.text || ''
-    if (!out) throw new Error('No content from Ollama')
-    return String(out)
+    
+    if (userId) {
+      const inputTokens = tokenTracking.estimateTokens(prompt);
+      const outputTokens = tokenTracking.estimateTokens(result);
+      await tokenTracking.recordTokenUsage({
+        userId,
+        operationType: isSearchRequest ? 'search' : 'generate_content',
+        inputTokens,
+        outputTokens,
+        modelUsed,
+      });
+    }
+    
+    return result;
   },
 
-  async summarizeContent(rawText: string, metadata?: any): Promise<string> {
-    if (provider === 'gemini') return geminiService.summarizeContent(rawText, metadata)
-    const contentType = metadata?.content_type || 'web_page'
-    const title = metadata?.title || ''
-    const url = metadata?.url || ''
-    const contextSummary = metadata?.content_summary || ''
-    const prompt = `Summarize the following ${contentType} for storage in a personal memory graph. Be concise (<=200 words), capture key ideas, why it matters, and any actionable takeaways.
+  async summarizeContent(rawText: string, metadata?: any, userId?: string): Promise<string> {
+    let result: string;
+    let modelUsed: string | undefined;
+    
+    if (provider === 'gemini') {
+      const response = await geminiService.summarizeContent(rawText, metadata, userId);
+      result = response.text;
+      modelUsed = response.modelUsed;
+    } else {
+      const contentType = metadata?.content_type || 'web_page'
+      const title = metadata?.title || ''
+      const url = metadata?.url || ''
+      const contextSummary = metadata?.content_summary || ''
+      const prompt = `Summarize the following ${contentType} for storage in a personal memory graph. Be concise (<=200 words), capture key ideas, why it matters, and any actionable takeaways.
 
 CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
 - No asterisks (*) for bold or italic text
@@ -252,10 +296,25 @@ Existing Summary: ${contextSummary}
 
 Text:
 ${rawText}`
-    return this.generateContent(prompt)
+      result = await this.generateContent(prompt, false, userId);
+    }
+    
+    if (userId) {
+      const inputTokens = tokenTracking.estimateTokens(rawText);
+      const outputTokens = tokenTracking.estimateTokens(result);
+      await tokenTracking.recordTokenUsage({
+        userId,
+        operationType: 'summarize',
+        inputTokens,
+        outputTokens,
+        modelUsed,
+      });
+    }
+    
+    return result;
   },
 
-  async extractContentMetadata(rawText: string, metadata?: any): Promise<{
+  async extractContentMetadata(rawText: string, metadata?: any, userId?: string): Promise<{
     topics: string[];
     categories: string[];
     keyPoints: string[];
@@ -265,10 +324,26 @@ ${rawText}`
     searchableTerms: string[];
     contextRelevance: string[];
   }> {
-    if (provider === 'gemini') return geminiService.extractContentMetadata(rawText, metadata)
-    const title = metadata?.title || ''
-    const contentType = metadata?.content_type || 'web_page'
-    const jsonPrompt = `Extract metadata from this content. Respond with ONLY a valid JSON object, no explanations or text before/after.
+    let result: {
+      topics: string[];
+      categories: string[];
+      keyPoints: string[];
+      sentiment: string;
+      importance: number;
+      usefulness: number;
+      searchableTerms: string[];
+      contextRelevance: string[];
+    };
+    let modelUsed: string | undefined;
+    
+    if (provider === 'gemini') {
+      const response = await geminiService.extractContentMetadata(rawText, metadata, userId);
+      result = response.metadata;
+      modelUsed = response.modelUsed;
+    } else {
+      const title = metadata?.title || ''
+      const contentType = metadata?.content_type || 'web_page'
+      const jsonPrompt = `Extract metadata from this content. Respond with ONLY a valid JSON object, no explanations or text before/after.
 
 CRITICAL: Return ONLY valid JSON. No explanations, no markdown formatting, no code blocks, no special characters. Just the JSON object.
 
@@ -287,48 +362,63 @@ Rules:
 - contextRelevance: array of relevant types from: educational, current_events, analysis, code_review, code_repository, issue_tracking, technical_documentation, devops, security, performance, general
 
 JSON ONLY:`
-    const out = await this.generateContent(jsonPrompt)
-    try {
-      // Clean up the response to extract JSON
-      let jsonStr = out.trim()
-      
-      // Remove common prefixes that AI models add
-      jsonStr = jsonStr.replace(/^(Here is|Here's|The JSON|JSON response|Response:|Answer:)/i, '')
-      jsonStr = jsonStr.replace(/^(Here is the|Here's the|The extracted|Extracted)/i, '')
-      
-      // Remove any markdown code blocks
-      jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '')
-      
-      // Remove any text before the first {
-      const firstBrace = jsonStr.indexOf('{')
-      if (firstBrace > 0) {
-        jsonStr = jsonStr.substring(firstBrace)
+      const out = await this.generateContent(jsonPrompt, false, userId)
+      try {
+        // Clean up the response to extract JSON
+        let jsonStr = out.trim()
+        
+        // Remove common prefixes that AI models add
+        jsonStr = jsonStr.replace(/^(Here is|Here's|The JSON|JSON response|Response:|Answer:)/i, '')
+        jsonStr = jsonStr.replace(/^(Here is the|Here's the|The extracted|Extracted)/i, '')
+        
+        // Remove any markdown code blocks
+        jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '')
+        
+        // Remove any text before the first {
+        const firstBrace = jsonStr.indexOf('{')
+        if (firstBrace > 0) {
+          jsonStr = jsonStr.substring(firstBrace)
+        }
+        
+        // Find the last } to extract complete JSON
+        const lastBrace = jsonStr.lastIndexOf('}')
+        if (lastBrace !== -1) {
+          jsonStr = jsonStr.substring(0, lastBrace + 1)
+        }
+        
+        // Remove any trailing text after the last }
+        jsonStr = jsonStr.trim()
+        
+        const obj = JSON.parse(jsonStr)
+        result = {
+          topics: Array.isArray(obj.topics) ? obj.topics : [],
+          categories: Array.isArray(obj.categories) ? obj.categories : [contentType],
+          keyPoints: Array.isArray(obj.keyPoints) ? obj.keyPoints : [],
+          sentiment: typeof obj.sentiment === 'string' ? obj.sentiment : 'neutral',
+          importance: Number(obj.importance) || 5,
+          usefulness: Number(obj.usefulness) || 5,
+          searchableTerms: Array.isArray(obj.searchableTerms) ? obj.searchableTerms : [],
+          contextRelevance: Array.isArray(obj.contextRelevance) ? obj.contextRelevance : [],
+        }
+      } catch (error) {
+        console.error('Error extracting metadata with AI, using fallback:', error)
+        result = this.generateFallbackMetadata(rawText, metadata)
       }
-      
-      // Find the last } to extract complete JSON
-      const lastBrace = jsonStr.lastIndexOf('}')
-      if (lastBrace !== -1) {
-        jsonStr = jsonStr.substring(0, lastBrace + 1)
-      }
-      
-      // Remove any trailing text after the last }
-      jsonStr = jsonStr.trim()
-      
-      const obj = JSON.parse(jsonStr)
-      return {
-        topics: Array.isArray(obj.topics) ? obj.topics : [],
-        categories: Array.isArray(obj.categories) ? obj.categories : [contentType],
-        keyPoints: Array.isArray(obj.keyPoints) ? obj.keyPoints : [],
-        sentiment: typeof obj.sentiment === 'string' ? obj.sentiment : 'neutral',
-        importance: Number(obj.importance) || 5,
-        usefulness: Number(obj.usefulness) || 5,
-        searchableTerms: Array.isArray(obj.searchableTerms) ? obj.searchableTerms : [],
-        contextRelevance: Array.isArray(obj.contextRelevance) ? obj.contextRelevance : [],
-      }
-    } catch (error) {
-      console.error('Error extracting metadata with AI, using fallback:', error)
-      return this.generateFallbackMetadata(rawText, metadata)
     }
+    
+    if (userId) {
+      const inputTokens = tokenTracking.estimateTokens(rawText);
+      const outputTokens = tokenTracking.estimateTokens(JSON.stringify(result));
+      await tokenTracking.recordTokenUsage({
+        userId,
+        operationType: 'extract_metadata',
+        inputTokens,
+        outputTokens,
+        modelUsed,
+      });
+    }
+    
+    return result;
   },
 
   generateFallbackMetadata(rawText: string, metadata?: any): {

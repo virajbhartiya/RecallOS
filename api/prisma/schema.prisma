@@ -16,6 +16,7 @@ model User {
   updated_at       DateTime         @default(now()) @updatedAt
   memories         Memory[]
   memory_snapshots MemorySnapshot[]
+  token_usage      TokenUsage[]
 
   @@map("users")
 }
@@ -121,4 +122,21 @@ model SearchCache {
   expires_at   DateTime
 
   @@map("search_cache")
+}
+
+model TokenUsage {
+  id            String   @id @default(uuid()) @db.Uuid
+  user_id       String   @db.Uuid
+  operation_type String
+  input_tokens  Int
+  output_tokens Int
+  model_used   String?
+  created_at    DateTime @default(now())
+  user          User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([created_at])
+  @@index([user_id, created_at])
+  @@index([operation_type])
+  @@map("token_usage")
 }

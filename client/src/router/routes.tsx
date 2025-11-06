@@ -6,6 +6,7 @@ const Memories = lazy(() => import('@/pages/Memories').then(module => ({ default
 const Search = lazy(() => import('@/pages/Search').then(module => ({ default: module.Search })))
 const Docs = lazy(() => import('@/pages/Docs').then(module => ({ default: module.Docs })))
 const Login = lazy(() => import('@/pages/Login').then(module => ({ default: module.Login })))
+const Analytics = lazy(() => import('@/pages/Analytics').then(module => ({ default: module.Analytics })))
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -22,6 +23,7 @@ const AppRoutes = () => {
         <Route path="/memories" element={<Memories />} />
         <Route path="/search" element={<Search />} />
         <Route path="/docs" element={<Docs />} />
+        <Route path="/analytics" element={<Analytics />} />
         
         <Route path="*" element={<Landing />} />
       </Routes>

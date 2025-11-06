@@ -159,7 +159,7 @@ export class GeminiService {
            err?.message?.toLowerCase().includes('too many requests');
   }
 
-  async generateContent(prompt: string, isSearchRequest: boolean = false): Promise<string> {
+  async generateContent(prompt: string, isSearchRequest: boolean = false, userId?: string): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
     this.ensureInit();
     
     const enhancedPrompt = `${prompt}
@@ -195,9 +195,14 @@ Return clean, readable plain text only.`;
         );
         if (!response.text) throw new Error('No content generated from Gemini API');
         
+        const usageMetadata = (response as any).usageMetadata;
+        const inputTokens = usageMetadata?.promptTokenCount || 0;
+        const outputTokens = usageMetadata?.candidatesTokenCount || 0;
+        const modelUsed = this.getCurrentModel();
+        
         // Reset to first model on success
         this.resetToFirstModel();
-        return response.text;
+        return { text: response.text, modelUsed, inputTokens, outputTokens };
       } catch (err) {
         lastError = err;
         // Content generation error
@@ -219,7 +224,7 @@ Return clean, readable plain text only.`;
     throw lastError;
   }
 
-  async generateEmbedding(text: string): Promise<number[]> {
+  async generateEmbedding(text: string, userId?: string): Promise<{ embedding: number[]; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
     this.ensureInit();
     
     
@@ -237,9 +242,14 @@ Return clean, readable plain text only.`;
         const values = response.embeddings?.[0]?.values;
         if (!values) throw new Error('No embedding generated from Gemini API');
         
+        const usageMetadata = (response as any).usageMetadata;
+        const inputTokens = usageMetadata?.promptTokenCount || 0;
+        const outputTokens = 0;
+        const modelUsed = 'text-embedding-004';
+        
         // Reset to first model on success
         this.resetToFirstModel();
-        return values;
+        return { embedding: values, modelUsed, inputTokens, outputTokens };
       } catch (err) {
         lastError = err;
         // Embedding error
@@ -262,7 +272,7 @@ Return clean, readable plain text only.`;
     throw lastError;
   }
 
-  async summarizeContent(rawText: string, metadata?: any): Promise<string> {
+  async summarizeContent(rawText: string, metadata?: any, userId?: string): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
     this.ensureInit();
 
     const contentType = metadata?.content_type || 'web_page';
@@ -328,9 +338,14 @@ Raw Content: ${rawText}
         );
         if (!res.text) throw new Error('No summary generated from Gemini API');
         
+        const usageMetadata = (res as any).usageMetadata;
+        const inputTokens = usageMetadata?.promptTokenCount || 0;
+        const outputTokens = usageMetadata?.candidatesTokenCount || 0;
+        const modelUsed = this.getCurrentModel();
+        
         // Reset to first model on success
         this.resetToFirstModel();
-        return res.text.trim();
+        return { text: res.text.trim(), modelUsed, inputTokens, outputTokens };
       } catch (err) {
         lastError = err;
         // Summarization error
@@ -354,17 +369,9 @@ Raw Content: ${rawText}
 
   async extractContentMetadata(
     rawText: string,
-    metadata?: any
-  ): Promise<{
-    topics: string[];
-    categories: string[];
-    keyPoints: string[];
-    sentiment: string;
-    importance: number;
-    usefulness: number;
-    searchableTerms: string[];
-    contextRelevance: string[];
-  }> {
+    metadata?: any,
+    userId?: string
+  ): Promise<{ metadata: { topics: string[]; categories: string[]; keyPoints: string[]; sentiment: string; importance: number; usefulness: number; searchableTerms: string[]; contextRelevance: string[] }; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
     this.ensureInit();
 
     const title = metadata?.title || '';
@@ -462,14 +469,19 @@ Return ONLY the JSON object:`;
             // Return default metadata if all parsing fails
             this.resetToFirstModel();
             return {
-              topics: [],
-              categories: ['web_page'],
-              keyPoints: [],
-              sentiment: 'neutral',
-              importance: 5,
-              usefulness: 5,
-              searchableTerms: [],
-              contextRelevance: []
+              metadata: {
+                topics: [],
+                categories: ['web_page'],
+                keyPoints: [],
+                sentiment: 'neutral',
+                importance: 5,
+                usefulness: 5,
+                searchableTerms: [],
+                contextRelevance: []
+              },
+              modelUsed: undefined,
+              inputTokens: 0,
+              outputTokens: 0,
             };
           }
         }
@@ -478,17 +490,27 @@ Return ONLY the JSON object:`;
         const validSentiments = ['educational', 'technical', 'neutral', 'analytical'];
         const sentiment = validSentiments.includes(data.sentiment) ? data.sentiment : 'neutral';
         
+        const usageMetadata = (res as any).usageMetadata;
+        const inputTokens = usageMetadata?.promptTokenCount || 0;
+        const outputTokens = usageMetadata?.candidatesTokenCount || 0;
+        const modelUsed = this.getCurrentModel();
+        
         // Reset to first model on success
         this.resetToFirstModel();
         return {
-          topics: Array.isArray(data.topics) ? data.topics.slice(0, 10) : [],
-          categories: Array.isArray(data.categories) ? data.categories.slice(0, 5) : ['web_page'],
-          keyPoints: Array.isArray(data.keyPoints) ? data.keyPoints.slice(0, 8) : [],
-          sentiment: sentiment,
-          importance: Math.max(1, Math.min(10, parseInt(data.importance) || 5)),
-          usefulness: Math.max(1, Math.min(10, parseInt(data.usefulness) || 5)),
-          searchableTerms: Array.isArray(data.searchableTerms) ? data.searchableTerms.slice(0, 15) : [],
-          contextRelevance: Array.isArray(data.contextRelevance) ? data.contextRelevance.slice(0, 5) : [],
+          metadata: {
+            topics: Array.isArray(data.topics) ? data.topics.slice(0, 10) : [],
+            categories: Array.isArray(data.categories) ? data.categories.slice(0, 5) : ['web_page'],
+            keyPoints: Array.isArray(data.keyPoints) ? data.keyPoints.slice(0, 8) : [],
+            sentiment: sentiment,
+            importance: Math.max(1, Math.min(10, parseInt(data.importance) || 5)),
+            usefulness: Math.max(1, Math.min(10, parseInt(data.usefulness) || 5)),
+            searchableTerms: Array.isArray(data.searchableTerms) ? data.searchableTerms.slice(0, 15) : [],
+            contextRelevance: Array.isArray(data.contextRelevance) ? data.contextRelevance.slice(0, 5) : [],
+          },
+          modelUsed,
+          inputTokens,
+          outputTokens,
         };
       } catch (err) {
         lastError = err;
@@ -509,14 +531,19 @@ Return ONLY the JSON object:`;
     // Reset to original model if all models failed
     this.currentModelIndex = originalModelIndex;
     return {
-      topics: metadata?.key_topics?.slice(0, 5) || [],
-      categories: [metadata?.content_type || 'web_page'],
-      keyPoints: [],
-      sentiment: 'neutral',
-      importance: 5,
-      usefulness: 5,
-      searchableTerms: [],
-      contextRelevance: [],
+      metadata: {
+        topics: metadata?.key_topics?.slice(0, 5) || [],
+        categories: [metadata?.content_type || 'web_page'],
+        keyPoints: [],
+        sentiment: 'neutral',
+        importance: 5,
+        usefulness: 5,
+        searchableTerms: [],
+        contextRelevance: [],
+      },
+      modelUsed: undefined,
+      inputTokens: 0,
+      outputTokens: 0,
     };
   }
 

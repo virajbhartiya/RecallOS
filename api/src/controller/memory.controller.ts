@@ -138,10 +138,12 @@ export class MemoryController {
 
       const aiStart = Date.now();
       console.log('[memory/process] ai_start', { ts: new Date().toISOString(), tasks: ['summarizeContent', 'extractContentMetadata'] });
-      const [summary, extractedMetadata] = await Promise.all([
-        aiProvider.summarizeContent(content, metadata),
-        aiProvider.extractContentMetadata(content, metadata),
+      const [summaryResult, extractedMetadataResult] = await Promise.all([
+        aiProvider.summarizeContent(content, metadata, user.id),
+        aiProvider.extractContentMetadata(content, metadata, user.id),
       ]);
+      const summary = typeof summaryResult === 'string' ? summaryResult : (summaryResult as any).text || summaryResult;
+      const extractedMetadata = typeof extractedMetadataResult === 'object' && 'topics' in extractedMetadataResult ? extractedMetadataResult : (extractedMetadataResult as any).metadata || extractedMetadataResult;
       console.log('[memory/process] ai_done', { ms: Date.now() - aiStart, hasSummary: !!summary, hasExtracted: !!extractedMetadata });
 
 
