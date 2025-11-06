@@ -210,9 +210,9 @@ export const aiProvider = {
     return Math.abs(hash)
   },
 
-  async generateContent(prompt: string): Promise<string> {
+  async generateContent(prompt: string, isSearchRequest: boolean = false): Promise<string> {
     if (provider === 'gemini') {
-      return geminiService.generateContent(prompt)
+      return geminiService.generateContent(prompt, isSearchRequest)
     }
     const res = await fetch(`${OLLAMA_BASE}/api/generate`, {
       method: 'POST',

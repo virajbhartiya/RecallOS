@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { MemoryService } from '@/services/memoryService'
 import { requireAuthToken } from '@/utils/userId'
-import { Clock, RefreshCw, AlertCircle, Loader, X } from 'lucide-react'
+import { Clock, RefreshCw, AlertCircle, Loader, X, Trash2 } from 'lucide-react'
 import { LoadingCard, ErrorMessage, EmptyState } from '@/components/ui/loading-spinner'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 interface PendingJob {
   id: string
@@ -29,6 +30,10 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; jobId: string | null }>({
+    isOpen: false,
+    jobId: null,
+  })
 
   const fetchPendingJobs = useCallback(async () => {
     try {
@@ -46,6 +51,26 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
       setIsLoading(false)
     }
   }, [])
+
+  const handleDeleteJobClick = useCallback((jobId: string) => {
+    setDeleteConfirm({ isOpen: true, jobId })
+  }, [])
+
+  const handleDeleteJobConfirm = useCallback(async () => {
+    if (!deleteConfirm.jobId) return
+
+    const jobId = deleteConfirm.jobId
+    setDeleteConfirm({ isOpen: false, jobId: null })
+
+    try {
+      requireAuthToken()
+      await MemoryService.deletePendingJob(jobId)
+      await fetchPendingJobs()
+    } catch (err: any) {
+      console.error('Error deleting job:', err)
+      setError(err.message || 'Failed to delete job')
+    }
+  }, [deleteConfirm.jobId, fetchPendingJobs])
 
   useEffect(() => {
     if (!isOpen) return
@@ -186,10 +211,19 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
               {jobs.map((job) => (
                 <div key={job.id} className="bg-white border border-gray-200 p-6 overflow-hidden">
                   <div className="mb-4">
-                    <div className="flex items-center space-x-3 mb-2 flex-wrap gap-2">
-                      {getStatusIcon(job.status)}
-                      {getStatusBadge(job.status)}
-                      <span className="text-xs font-mono text-gray-500 break-all">ID: {job.id}</span>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-3 flex-wrap gap-2">
+                        {getStatusIcon(job.status)}
+                        {getStatusBadge(job.status)}
+                        <span className="text-xs font-mono text-gray-500 break-all">ID: {job.id}</span>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteJobClick(job.id)}
+                        className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 border border-red-200 hover:border-red-300 transition-colors flex items-center space-x-1"
+                        title="Delete job"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                     <div className="text-sm font-mono text-gray-600 mb-2 break-all">
                       User: {job.user_id}
@@ -271,6 +305,16 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
             </div>
           )}
         </div>
+
+        <ConfirmDialog
+          isOpen={deleteConfirm.isOpen}
+          title="Delete Job"
+          message="Are you sure you want to delete this job from the queue?"
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleDeleteJobConfirm}
+          onCancel={() => setDeleteConfirm({ isOpen: false, jobId: null })}
+        />
       </div>
     </div>
   )

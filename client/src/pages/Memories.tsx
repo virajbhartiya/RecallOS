@@ -10,6 +10,8 @@ import { PendingJobsPanel } from '@/components/PendingJobsPanel'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
 import { requireAuthToken } from '@/utils/userId'
 import { useNavigate } from 'react-router-dom'
+import { Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 export const Memories: React.FC = () => {
   const navigate = useNavigate()
@@ -36,7 +38,6 @@ export const Memories: React.FC = () => {
   const [listSearchQuery, setListSearchQuery] = useState('')
   const [dialogSearchResults, setDialogSearchResults] = useState<MemorySearchResponse | null>(null)
   const [dialogSearchAnswer, setDialogSearchAnswer] = useState<string | null>(null)
-  const [dialogSearchMeta, setDialogSearchMeta] = useState<string | null>(null)
   const [dialogSearchCitations, setDialogSearchCitations] = useState<Array<{ label: number; memory_id: string; title: string | null; url: string | null }> | null>(null)
   const [dialogSearchJobId, setDialogSearchJobId] = useState<string | null>(null)
   const [dialogIsSearching, setDialogIsSearching] = useState(false)
@@ -52,6 +53,10 @@ export const Memories: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [showOnlyCited] = useState(true)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; memoryId: string | null }>({
+    isOpen: false,
+    memoryId: null,
+  })
   
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -78,6 +83,32 @@ export const Memories: React.FC = () => {
     }
   }, [])
 
+  const handleDeleteMemoryClick = useCallback((memoryId: string) => {
+    setDeleteConfirm({ isOpen: true, memoryId })
+  }, [])
+
+  const handleDeleteMemoryConfirm = useCallback(async () => {
+    if (!deleteConfirm.memoryId) return
+
+    const memoryId = deleteConfirm.memoryId
+    setDeleteConfirm({ isOpen: false, memoryId: null })
+
+    try {
+      requireAuthToken()
+      await MemoryService.deleteMemory(memoryId)
+      
+      if (selectedMemory?.id === memoryId) {
+        setSelectedMemory(null)
+        setClickedNodeId(null)
+      }
+      
+      await fetchMemories()
+    } catch (err: any) {
+      console.error('Error deleting memory:', err)
+      alert(err.message || 'Failed to delete memory')
+    }
+  }, [deleteConfirm.memoryId, selectedMemory, fetchMemories])
+
   const handleNodeClick = (memoryId: string) => {
     // Find the memory information
     const memoryInfo = memories.find(m => m.id === memoryId)
@@ -88,7 +119,6 @@ export const Memories: React.FC = () => {
       setListSearchQuery('')
       setDialogSearchResults(null)
       setDialogSearchAnswer(null)
-      setDialogSearchMeta(null)
       setDialogSearchCitations(null)
     }
     
@@ -184,7 +214,13 @@ export const Memories: React.FC = () => {
         const status = await SearchService.getJob(searchJobId)
         if (cancelled) return
         if (status.status === 'completed') {
-          if (status.answer) setSearchAnswer(status.answer)
+          if (status.answer) {
+            setSearchAnswer(status.answer)
+            if (status.citations) setSearchCitations(status.citations)
+          }
+          clearInterval(interval)
+          setSearchJobId(null)
+        } else if (status.status === 'failed') {
           clearInterval(interval)
           setSearchJobId(null)
         }
@@ -193,7 +229,7 @@ export const Memories: React.FC = () => {
       }
     }, 1500)
     return () => { cancelled = true; clearInterval(interval) }
-  }, [searchJobId, searchAnswer])
+  }, [searchJobId, searchAnswer, searchResults])
 
   
 
@@ -225,7 +261,6 @@ export const Memories: React.FC = () => {
     if (!query.trim()) {
       setDialogSearchResults(null)
       setDialogSearchAnswer(null)
-      setDialogSearchMeta(null)
       setDialogSearchCitations(null)
       setDialogIsSearching(false)
       return
@@ -249,7 +284,6 @@ export const Memories: React.FC = () => {
       
       setDialogSearchResults(response)
       setDialogSearchAnswer(response.answer || null)
-      setDialogSearchMeta(response.meta_summary || null)
       setDialogSearchCitations(response.citations || null)
       
       if (response.job_id && !response.answer) {
@@ -278,7 +312,6 @@ export const Memories: React.FC = () => {
     if (!listSearchQuery.trim()) {
       setDialogSearchResults(null)
       setDialogSearchAnswer(null)
-      setDialogSearchMeta(null)
       setDialogSearchCitations(null)
       return
     }
@@ -306,7 +339,10 @@ export const Memories: React.FC = () => {
         if (cancelled) return
         if (status.status === 'completed') {
           if (status.answer) setDialogSearchAnswer(status.answer)
-          if (status.meta_summary) setDialogSearchMeta(status.meta_summary)
+          if (status.citations) setDialogSearchCitations(status.citations)
+          clearInterval(interval)
+          setDialogSearchJobId(null)
+        } else if (status.status === 'failed') {
           clearInterval(interval)
           setDialogSearchJobId(null)
         }
@@ -455,7 +491,6 @@ export const Memories: React.FC = () => {
                     setListSearchQuery('')
                     setDialogSearchResults(null)
                     setDialogSearchAnswer(null)
-                    setDialogSearchMeta(null)
                     setDialogSearchCitations(null)
                     setSelectedMemory(null)
                     setClickedNodeId(null)
@@ -544,36 +579,52 @@ export const Memories: React.FC = () => {
                     )}
                     {!dialogIsSearching && listSearchQuery.trim() && dialogSearchResults && dialogSearchResults.results && dialogSearchResults.results.length > 0 ? (
                       dialogSearchResults.results.map((result) => (
-                        <button
+                        <div
                           key={result.memory.id}
-                          onClick={() => {
-                            setSelectedMemory(result.memory)
-                            setClickedNodeId(result.memory.id)
-                            setExpandedContent(false)
-                          }}
-                          className={`w-full text-left p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                            selectedMemory?.id === result.memory.id ? 'bg-black text-white border-l-2 border-l-black' : ''
+                          className={`group w-full border-b border-gray-100 transition-colors relative ${
+                            selectedMemory?.id === result.memory.id 
+                              ? 'bg-black text-white border-l-2 border-l-black hover:bg-gray-900' 
+                              : 'hover:bg-gray-50'
                           }`}
                         >
-                          <div className="flex items-center justify-between mb-1">
-                            <div className={`text-xs font-medium truncate ${selectedMemory?.id === result.memory.id ? 'text-white' : 'text-gray-900'}`}>
-                              {result.memory.title || 'Untitled Memory'}
+                          <button
+                            onClick={() => {
+                              setSelectedMemory(result.memory)
+                              setClickedNodeId(result.memory.id)
+                              setExpandedContent(false)
+                            }}
+                            className="w-full text-left p-3 pr-10"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className={`text-xs font-medium truncate ${selectedMemory?.id === result.memory.id ? 'text-white' : 'text-gray-900'}`}>
+                                {result.memory.title || 'Untitled Memory'}
+                              </div>
+                              {result.blended_score !== undefined && (
+                                <span className={`text-[10px] font-mono ml-2 flex-shrink-0 ${selectedMemory?.id === result.memory.id ? 'text-gray-200' : 'text-gray-500'}`}>
+                                  {(result.blended_score * 100).toFixed(0)}%
+                                </span>
+                              )}
                             </div>
-                            {result.blended_score !== undefined && (
-                              <span className={`text-[10px] font-mono ml-2 flex-shrink-0 ${selectedMemory?.id === result.memory.id ? 'text-gray-200' : 'text-gray-500'}`}>
-                                {(result.blended_score * 100).toFixed(0)}%
-                              </span>
+                            <div className={`text-[10px] font-mono ${selectedMemory?.id === result.memory.id ? 'text-gray-300' : 'text-gray-500'}`}>
+                              {result.memory.created_at ? new Date(result.memory.created_at).toLocaleDateString() : 'NO DATE'} • {result.memory.source || 'UNKNOWN'}
+                            </div>
+                            {result.memory.summary && (
+                              <div className={`text-[10px] mt-1 line-clamp-2 ${selectedMemory?.id === result.memory.id ? 'text-gray-300' : 'text-gray-600'}`}>
+                                {result.memory.summary}
+                              </div>
                             )}
-                          </div>
-                          <div className={`text-[10px] font-mono ${selectedMemory?.id === result.memory.id ? 'text-gray-300' : 'text-gray-500'}`}>
-                            {result.memory.created_at ? new Date(result.memory.created_at).toLocaleDateString() : 'NO DATE'} • {result.memory.source || 'UNKNOWN'}
-                          </div>
-                          {result.memory.summary && (
-                            <div className={`text-[10px] mt-1 line-clamp-2 ${selectedMemory?.id === result.memory.id ? 'text-gray-300' : 'text-gray-600'}`}>
-                              {result.memory.summary}
-                            </div>
-                          )}
-                        </button>
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteMemoryClick(result.memory.id)
+                            }}
+                            className={`absolute right-2 top-2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity ${selectedMemory?.id === result.memory.id ? 'text-gray-400 hover:text-red-300' : 'text-gray-400 hover:text-red-600'}`}
+                            title="Delete memory"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       ))
                     ) : !dialogIsSearching && listSearchQuery.trim() && dialogSearchResults && dialogSearchResults.results && dialogSearchResults.results.length === 0 ? (
                       <div className="p-4 text-center text-sm text-gray-500">
@@ -584,24 +635,40 @@ export const Memories: React.FC = () => {
                         memories
                           .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                           .map((memory) => (
-                          <button
+                          <div
                             key={memory.id}
-                            onClick={() => {
-                              setSelectedMemory(memory)
-                              setClickedNodeId(memory.id)
-                              setExpandedContent(false)
-                            }}
-                            className={`w-full text-left p-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
-                              selectedMemory?.id === memory.id ? 'bg-black text-white border-l-2 border-l-black' : ''
+                            className={`group w-full border-b border-gray-100 transition-colors relative ${
+                              selectedMemory?.id === memory.id 
+                                ? 'bg-black text-white border-l-2 border-l-black hover:bg-gray-900' 
+                                : 'hover:bg-gray-50'
                             }`}
                           >
-                            <div className={`text-xs font-medium truncate mb-1 ${selectedMemory?.id === memory.id ? 'text-white' : 'text-gray-900'}`}>
-                              {memory.title || 'Untitled Memory'}
-                            </div>
-                            <div className={`text-[10px] font-mono ${selectedMemory?.id === memory.id ? 'text-gray-300' : 'text-gray-500'}`}>
-                              {memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'NO DATE'} • {memory.source || 'UNKNOWN'}
-                            </div>
-                          </button>
+                            <button
+                              onClick={() => {
+                                setSelectedMemory(memory)
+                                setClickedNodeId(memory.id)
+                                setExpandedContent(false)
+                              }}
+                              className="w-full text-left p-3 pr-10"
+                            >
+                              <div className={`text-xs font-medium truncate mb-1 ${selectedMemory?.id === memory.id ? 'text-white' : 'text-gray-900'}`}>
+                                {memory.title || 'Untitled Memory'}
+                              </div>
+                              <div className={`text-[10px] font-mono ${selectedMemory?.id === memory.id ? 'text-gray-300' : 'text-gray-500'}`}>
+                                {memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'NO DATE'} • {memory.source || 'UNKNOWN'}
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteMemoryClick(memory.id)
+                              }}
+                              className={`absolute right-2 top-2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity ${selectedMemory?.id === memory.id ? 'text-gray-400 hover:text-red-300' : 'text-gray-400 hover:text-red-600'}`}
+                              title="Delete memory"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         ))
                       ) : (
                         <div className="p-4 text-center text-sm text-gray-500">
@@ -621,14 +688,6 @@ export const Memories: React.FC = () => {
                           <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">Answer</div>
                           <p className="text-sm text-gray-900 leading-relaxed break-words whitespace-pre-wrap">
                             {dialogSearchAnswer}
-                          </p>
-                        </div>
-                      )}
-                      {dialogSearchMeta && (
-                        <div className="bg-gray-50 border border-gray-200 p-4">
-                          <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">Meta Summary</div>
-                          <p className="text-sm text-gray-900 leading-relaxed break-words">
-                            {dialogSearchMeta}
                           </p>
                         </div>
                       )}
@@ -680,11 +739,20 @@ export const Memories: React.FC = () => {
                   {selectedMemory ? (
                     <div className="space-y-5">
                       <div>
-                        <div className="text-xs font-mono text-gray-500 flex items-center gap-2 mb-2">
-                          <span>{selectedMemory.created_at ? new Date(selectedMemory.created_at).toLocaleDateString() : 'NO DATE'}</span>
-                          {selectedMemory.source && (
-                            <span className="inline-flex items-center gap-1 uppercase bg-gray-100 px-2 py-0.5 border border-gray-200 text-gray-700">{selectedMemory.source}</span>
-                          )}
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-xs font-mono text-gray-500 flex items-center gap-2">
+                            <span>{selectedMemory.created_at ? new Date(selectedMemory.created_at).toLocaleDateString() : 'NO DATE'}</span>
+                            {selectedMemory.source && (
+                              <span className="inline-flex items-center gap-1 uppercase bg-gray-100 px-2 py-0.5 border border-gray-200 text-gray-700">{selectedMemory.source}</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => handleDeleteMemoryClick(selectedMemory.id)}
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 border border-red-200 hover:border-red-300 transition-colors flex items-center space-x-1"
+                            title="Delete memory"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                         <h3 className="text-xl font-medium text-gray-900 leading-snug break-words mb-4">
                           {selectedMemory.title || 'Untitled Memory'}
@@ -729,7 +797,7 @@ export const Memories: React.FC = () => {
                         </div>
                       )}
                     </div>
-                  ) : listSearchQuery.trim() && dialogSearchResults && (dialogSearchAnswer || dialogSearchMeta || (dialogSearchCitations && dialogSearchCitations.length > 0)) ? (
+                  ) : listSearchQuery.trim() && dialogSearchResults && (dialogSearchAnswer || (dialogSearchCitations && dialogSearchCitations.length > 0)) ? (
                     // When search results are shown but no memory selected, don't show message
                     null
                   ) : (
@@ -746,6 +814,16 @@ export const Memories: React.FC = () => {
         <PendingJobsPanel 
           isOpen={isPendingJobsOpen}
           onClose={() => setIsPendingJobsOpen(false)}
+        />
+
+        <ConfirmDialog
+          isOpen={deleteConfirm.isOpen}
+          title="Delete Memory"
+          message="Are you sure you want to delete this memory? This action cannot be undone."
+          confirmLabel="Delete"
+          cancelLabel="Cancel"
+          onConfirm={handleDeleteMemoryConfirm}
+          onCancel={() => setDeleteConfirm({ isOpen: false, memoryId: null })}
         />
       </div>
 

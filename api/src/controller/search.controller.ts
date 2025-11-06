@@ -8,39 +8,128 @@ import { prisma } from '../lib/prisma';
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   let job: { id: string } | null = null;
   try {
-    if (!req.user?.id) {
-      return next(new AppError('Authentication required', 401));
-    }
-
     const { query, limit, contextOnly } = req.body || {};
     if (!query) return next(new AppError('query is required', 400));
     
+    console.log('[search/controller] request received', {
+      ts: new Date().toISOString(),
+      userId: req.user!.id,
+      query: query.slice(0, 100),
+      limit,
+      contextOnly,
+    });
+    
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
+      where: { id: req.user!.id },
     });
 
     if (!user) {
       return next(new AppError('User not found', 404));
     }
     
-    // Only create job for async answer delivery if not in context-only mode
-    if (!contextOnly) {
-      job = createSearchJob();
-    }
+    const data = await searchMemories({ userId: user.external_id || user.id, query, limit, contextOnly, jobId: undefined });
     
-    const data = await searchMemories({ userId: user.external_id || user.id, query, limit, contextOnly, jobId: job?.id });
+    // Only create job and return jobId if we don't have an immediate answer (for async delivery)
+    if (!contextOnly && !data.answer) {
+      job = createSearchJob();
+      // Update job with initial results
+      setImmediate(async () => {
+        try {
+          const { setSearchJobResult } = await import('../services/searchJob');
+          await setSearchJobResult(job!.id, {
+            status: 'pending',
+            results: data.results.slice(0, 10).map(r => ({
+              memory_id: r.memory_id,
+              title: r.title,
+              url: r.url,
+              score: r.score
+            }))
+          });
+          // Generate answer asynchronously
+          const filteredRows = data.results.map(r => ({
+            id: r.memory_id,
+            title: r.title,
+            summary: r.summary,
+            url: r.url,
+            timestamp: BigInt(r.timestamp),
+            content: r.summary || '',
+          }));
+          const bullets = filteredRows.map((r, i) => {
+            const date = r.timestamp ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10) : '';
+            return `- [${i + 1}] ${date} ${r.summary || ''}`.trim();
+          }).join('\n');
+          const ansPrompt = `You are RecallOS. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
+
+Rules:
+- Use inline numeric citations like [1], [2].
+- Keep it concise (2-4 sentences).
+- Plain text only.
+
+CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
+- No asterisks (*) for bold or italic text
+- No underscores (_) for emphasis
+- No backticks for code blocks
+- No hash symbols (#) for headers
+- No brackets [] or parentheses () for links (except numeric citations [1], [2], etc.)
+- No special characters for formatting
+- No bullet points with dashes or asterisks
+- No numbered lists with special formatting
+
+Return clean, readable plain text only.
+
+User query: "${data.query}"
+Evidence notes (ordered by relevance):
+${bullets}`;
+          const { aiProvider } = await import('../services/aiProvider');
+          const { withTimeout } = await import('../services/memorySearch');
+          console.log('[search/controller] generating async answer', { ts: new Date().toISOString(), jobId: job.id });
+          const generatedAnswer = await withTimeout(aiProvider.generateContent(ansPrompt, true), 180000); // 3 minutes for async, true = search request (high priority)
+          console.log('[search/controller] async answer generated', { ts: new Date().toISOString(), jobId: job.id, answerLength: generatedAnswer?.length });
+          const allCitations = filteredRows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
+          const pickOrderFrom = (text: string | undefined) => {
+            if (!text) return [] as number[];
+            const order: number[] = [];
+            const seen = new Set<number>();
+            const re = /\[(\d+)\]/g;
+            let m: RegExpExecArray | null;
+            while ((m = re.exec(text))) {
+              const n = Number(m[1]);
+              if (!seen.has(n)) { seen.add(n); order.push(n); }
+            }
+            return order;
+          };
+          const order = pickOrderFrom(generatedAnswer);
+          const generatedCitations = order.length
+            ? order.map(n => allCitations.find(c => c.label === n)).filter((c): c is { label: number; memory_id: string; title: string | null; url: string | null } => Boolean(c))
+            : [];
+          await setSearchJobResult(job!.id, {
+            answer: generatedAnswer,
+            citations: generatedCitations,
+            status: 'completed'
+          });
+        } catch (error) {
+          console.error('[search] error generating async answer in controller:', error);
+          try {
+            const { setSearchJobResult } = await import('../services/searchJob');
+            await setSearchJobResult(job!.id, { status: 'failed' });
+          } catch (jobError) {
+            console.error('Error updating search job status:', jobError);
+          }
+        }
+      });
+    }
     
     // Return response with appropriate fields
     const response: any = { 
       query: data.query, 
       results: data.results, 
-      meta_summary: data.meta_summary, 
       answer: data.answer, 
       citations: data.citations,
       context: data.context
     };
     
-    if (job) {
+    // Only return jobId if we don't have an answer (meaning it's being generated async)
+    if (job && !data.answer) {
       response.job_id = job.id;
     }
     
@@ -79,15 +168,11 @@ export const getSearchJobStatus = async (req: Request, res: Response, next: Next
 
 export const getContext = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
-    if (!req.user?.id) {
-      return next(new AppError('Authentication required', 401));
-    }
-
     const { query, limit } = req.body || {};
     if (!query) return next(new AppError('query is required', 400));
 
     const user = await prisma.user.findUnique({
-      where: { id: req.user.id },
+      where: { id: req.user!.id },
     });
 
     if (!user) {
