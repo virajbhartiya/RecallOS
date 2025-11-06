@@ -75,14 +75,6 @@ export interface AnalyticsData {
     recentMemories7Days: number
     recentMemories30Days: number
   }
-  activityAnalytics: {
-    memoriesByDate: Record<string, number>
-    memoriesByHour: Record<number, number>
-    memoriesByDayOfWeek: Record<number, number>
-    peakHour: number | null
-    peakDayOfWeek: string | null
-    totalMemories: number
-  }
   diversityAnalytics: {
     uniqueDomains: number
     uniqueCategories: number
@@ -189,14 +181,6 @@ export async function getAnalytics(): Promise<AnalyticsData> {
         tokensPerDay: 0,
         recentMemories7Days: 0,
         recentMemories30Days: 0,
-      },
-      activityAnalytics: {
-        memoriesByDate: {},
-        memoriesByHour: {},
-        memoriesByDayOfWeek: {},
-        peakHour: null,
-        peakDayOfWeek: null,
-        totalMemories: 0,
       },
       diversityAnalytics: {
         uniqueDomains: 0,
