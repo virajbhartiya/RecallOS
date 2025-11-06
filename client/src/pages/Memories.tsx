@@ -1,17 +1,13 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
- 
- 
 import { MemoryService } from '@/services/memoryService'
 import { MemoryMesh3D } from '@/components/MemoryMesh3D'
 import { SearchService } from '@/services/search'
 import { PendingJobsPanel } from '@/components/PendingJobsPanel'
- 
-// removed unused Database import
+import { MemoryDialog } from '@/components/MemoryDialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Memory, SearchFilters, MemorySearchResponse } from '@/types/memory'
 import { requireAuthToken } from '@/utils/userId'
 import { useNavigate } from 'react-router-dom'
-import { Trash2 } from 'lucide-react'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
 export const Memories: React.FC = () => {
   const navigate = useNavigate()
@@ -32,7 +28,6 @@ export const Memories: React.FC = () => {
   const similarityThreshold = 0.3
   const [clickedNodeId, setClickedNodeId] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
-  const [expandedContent, setExpandedContent] = useState(false)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isPendingJobsOpen, setIsPendingJobsOpen] = useState(false)
   const [listSearchQuery, setListSearchQuery] = useState('')
@@ -61,8 +56,6 @@ export const Memories: React.FC = () => {
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Track viewport for responsive behavior (no sidebars now)
-  useEffect(() => {}, [])
 
   const fetchMemories = useCallback(async () => {
     try {
@@ -109,29 +102,24 @@ export const Memories: React.FC = () => {
     }
   }, [deleteConfirm.memoryId, selectedMemory, fetchMemories])
 
-  const handleNodeClick = (memoryId: string) => {
-    // Find the memory information
+  const handleNodeClick = useCallback((memoryId: string) => {
     const memoryInfo = memories.find(m => m.id === memoryId)
     if (memoryInfo) {
       setSelectedMemory(memoryInfo)
-      setExpandedContent(false)
       setIsDialogOpen(true)
       setListSearchQuery('')
       setDialogSearchResults(null)
       setDialogSearchAnswer(null)
       setDialogSearchCitations(null)
     }
-    
-    // Visual feedback - highlight the clicked node
     setClickedNodeId(memoryId)
-  }
+  }, [memories])
 
   const selectMemoryById = useCallback((memoryId: string) => {
     const mem = memories.find(m => m.id === memoryId) || dialogSearchResults?.results?.find(r => r.memory.id === memoryId)?.memory
     if (mem) {
       setSelectedMemory(mem)
       setClickedNodeId(mem.id)
-      setExpandedContent(false)
     }
   }, [memories, dialogSearchResults])
 
@@ -544,272 +532,28 @@ export const Memories: React.FC = () => {
           </div>
         </div>
 
-        {/* Memory Dialog */}
-        {isDialogOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setIsDialogOpen(false)}>
-            <div className="bg-white border border-gray-200 shadow-xl w-[1200px] h-[800px] max-w-[95vw] max-h-[95vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-              {/* Header */}
-              <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-white">
-                <h2 className="text-lg font-medium text-gray-900">Memory Details</h2>
-                <button
-                  onClick={() => { setIsDialogOpen(false); setSelectedMemory(null); setClickedNodeId(null) }}
-                  className="text-gray-400 hover:text-gray-900 transition-colors text-2xl leading-none w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded"
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="flex flex-1 overflow-hidden bg-white">
-                {/* Left: Searchable List */}
-                <div className="w-80 border-r border-gray-200 flex flex-col bg-white">
-                  <div className="p-4 border-b border-gray-200">
-                    <input
-                      type="text"
-                      placeholder="Search memories..."
-                      value={listSearchQuery}
-                      onChange={(e) => setListSearchQuery(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-black rounded-none"
-                    />
-                  </div>
-                  <div className="flex-1 overflow-y-auto">
-                    {dialogIsSearching && (
-                      <div className="p-4 text-center text-sm text-gray-500">
-                        Searching...
-                      </div>
-                    )}
-                    {!dialogIsSearching && listSearchQuery.trim() && dialogSearchResults && dialogSearchResults.results && dialogSearchResults.results.length > 0 ? (
-                      dialogSearchResults.results.map((result) => (
-                        <div
-                          key={result.memory.id}
-                          className={`group w-full border-b border-gray-100 transition-colors relative ${
-                            selectedMemory?.id === result.memory.id 
-                              ? 'bg-black text-white border-l-2 border-l-black hover:bg-gray-900' 
-                              : 'hover:bg-gray-50'
-                          }`}
-                        >
-                          <button
-                            onClick={() => {
-                              setSelectedMemory(result.memory)
-                              setClickedNodeId(result.memory.id)
-                              setExpandedContent(false)
-                            }}
-                            className="w-full text-left p-3 pr-10"
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <div className={`text-xs font-medium truncate ${selectedMemory?.id === result.memory.id ? 'text-white' : 'text-gray-900'}`}>
-                                {result.memory.title || 'Untitled Memory'}
-                              </div>
-                              {result.blended_score !== undefined && (
-                                <span className={`text-[10px] font-mono ml-2 flex-shrink-0 ${selectedMemory?.id === result.memory.id ? 'text-gray-200' : 'text-gray-500'}`}>
-                                  {(result.blended_score * 100).toFixed(0)}%
-                                </span>
-                              )}
-                            </div>
-                            <div className={`text-[10px] font-mono ${selectedMemory?.id === result.memory.id ? 'text-gray-300' : 'text-gray-500'}`}>
-                              {result.memory.created_at ? new Date(result.memory.created_at).toLocaleDateString() : 'NO DATE'} • {result.memory.source || 'UNKNOWN'}
-                            </div>
-                            {result.memory.summary && (
-                              <div className={`text-[10px] mt-1 line-clamp-2 ${selectedMemory?.id === result.memory.id ? 'text-gray-300' : 'text-gray-600'}`}>
-                                {result.memory.summary}
-                              </div>
-                            )}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteMemoryClick(result.memory.id)
-                            }}
-                            className={`absolute right-2 top-2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity ${selectedMemory?.id === result.memory.id ? 'text-gray-400 hover:text-red-300' : 'text-gray-400 hover:text-red-600'}`}
-                            title="Delete memory"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))
-                    ) : !dialogIsSearching && listSearchQuery.trim() && dialogSearchResults && dialogSearchResults.results && dialogSearchResults.results.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-gray-500">
-                        No results found
-                      </div>
-                    ) : !listSearchQuery.trim() ? (
-                      memories.length > 0 ? (
-                        memories
-                          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                          .map((memory) => (
-                          <div
-                            key={memory.id}
-                            className={`group w-full border-b border-gray-100 transition-colors relative ${
-                              selectedMemory?.id === memory.id 
-                                ? 'bg-black text-white border-l-2 border-l-black hover:bg-gray-900' 
-                                : 'hover:bg-gray-50'
-                            }`}
-                          >
-                            <button
-                              onClick={() => {
+        <MemoryDialog
+          isOpen={isDialogOpen}
+          memories={memories}
+          searchQuery={listSearchQuery}
+          searchResults={dialogSearchResults}
+          isSearching={dialogIsSearching}
+          searchAnswer={dialogSearchAnswer}
+          searchCitations={dialogSearchCitations}
+          selectedMemory={selectedMemory}
+          onClose={() => {
+            setIsDialogOpen(false)
+            setSelectedMemory(null)
+            setClickedNodeId(null)
+          }}
+          onSelectMemory={(memory) => {
                                 setSelectedMemory(memory)
                                 setClickedNodeId(memory.id)
-                                setExpandedContent(false)
-                              }}
-                              className="w-full text-left p-3 pr-10"
-                            >
-                              <div className={`text-xs font-medium truncate mb-1 ${selectedMemory?.id === memory.id ? 'text-white' : 'text-gray-900'}`}>
-                                {memory.title || 'Untitled Memory'}
-                              </div>
-                              <div className={`text-[10px] font-mono ${selectedMemory?.id === memory.id ? 'text-gray-300' : 'text-gray-500'}`}>
-                                {memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'NO DATE'} • {memory.source || 'UNKNOWN'}
-                              </div>
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleDeleteMemoryClick(memory.id)
-                              }}
-                              className={`absolute right-2 top-2 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity ${selectedMemory?.id === memory.id ? 'text-gray-400 hover:text-red-300' : 'text-gray-400 hover:text-red-600'}`}
-                              title="Delete memory"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-4 text-center text-sm text-gray-500">
-                          No memories available
-                        </div>
-                      )
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Right: Details */}
-                <div className="flex-1 overflow-y-auto p-6 bg-white">
-                  {listSearchQuery.trim() && dialogSearchResults && (
-                    <div className="space-y-4 mb-6">
-                      {dialogSearchAnswer && (
-                        <div className="bg-gray-50 border border-gray-200 p-4">
-                          <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">Answer</div>
-                          <p className="text-sm text-gray-900 leading-relaxed break-words whitespace-pre-wrap">
-                            {dialogSearchAnswer}
-                          </p>
-                        </div>
-                      )}
-                      {dialogSearchCitations && dialogSearchCitations.length > 0 && (
-                        <div className="bg-gray-50 border border-gray-200 p-4">
-                          <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">Citations</div>
-                          <div className="space-y-2">
-                            {dialogSearchCitations.map((citation, idx) => {
-                              const title = citation.title || 'Untitled Memory'
-                              const url = citation.url && citation.url !== 'unknown' ? citation.url : null
-                              return (
-                                <div key={idx} className="flex items-center justify-between gap-3 text-xs">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span className="text-gray-500">[{citation.label ?? idx + 1}]</span>
-                                    {url ? (
-                                      <a
-                                        href={url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        title={title}
-                                        className="text-blue-600 hover:text-black hover:underline truncate"
-                                      >
-                                        {title}
-                                      </a>
-                                    ) : (
-                                      <button
-                                        title={title}
-                                        onClick={() => selectMemoryById(citation.memory_id)}
-                                        className="text-blue-600 hover:text-black hover:underline truncate text-left"
-                                      >
-                                        {title}
-                                      </button>
-                                    )}
-                                  </div>
-                                  <button
-                                    onClick={() => selectMemoryById(citation.memory_id)}
-                                    className="text-gray-600 hover:text-black whitespace-nowrap"
-                                  >
-                                    Open
-                                  </button>
-                                </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {selectedMemory ? (
-                    <div className="space-y-5">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="text-xs font-mono text-gray-500 flex items-center gap-2">
-                            <span>{selectedMemory.created_at ? new Date(selectedMemory.created_at).toLocaleDateString() : 'NO DATE'}</span>
-                            {selectedMemory.source && (
-                              <span className="inline-flex items-center gap-1 uppercase bg-gray-100 px-2 py-0.5 border border-gray-200 text-gray-700">{selectedMemory.source}</span>
-                            )}
-                          </div>
-                          <button
-                            onClick={() => handleDeleteMemoryClick(selectedMemory.id)}
-                            className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 border border-red-200 hover:border-red-300 transition-colors flex items-center space-x-1"
-                            title="Delete memory"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <h3 className="text-xl font-medium text-gray-900 leading-snug break-words mb-4">
-                          {selectedMemory.title || 'Untitled Memory'}
-                        </h3>
-                      </div>
-
-                      {selectedMemory.summary ? (
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">Summary</div>
-                          <p className="text-sm text-gray-800 leading-relaxed break-words">
-                            {selectedMemory.summary}
-                          </p>
-                        </div>
-                      ) : selectedMemory.content ? (
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">Content</div>
-                          <p className={`text-sm text-gray-800 leading-relaxed break-words ${expandedContent ? '' : 'line-clamp-10'}`}>
-                            {selectedMemory.content}
-                          </p>
-                          {selectedMemory.content && selectedMemory.content.length > 500 && (
-                            <button
-                              onClick={() => setExpandedContent(!expandedContent)}
-                              className="mt-2 text-xs font-medium text-gray-700 hover:text-black px-2 py-1 border border-gray-300 hover:border-black hover:bg-black hover:text-white transition-all rounded-none"
-                            >
-                              {expandedContent ? 'Collapse' : 'Expand'}
-                            </button>
-                          )}
-                        </div>
-                      ) : null}
-
-                      {selectedMemory.url && selectedMemory.url !== 'unknown' && (
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">Source</div>
-                          <a
-                            href={selectedMemory.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:text-black break-all hover:underline"
-                          >
-                            {selectedMemory.url}
-                          </a>
-                        </div>
-                      )}
-                    </div>
-                  ) : listSearchQuery.trim() && dialogSearchResults && (dialogSearchAnswer || (dialogSearchCitations && dialogSearchCitations.length > 0)) ? (
-                    // When search results are shown but no memory selected, don't show message
-                    null
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-sm text-gray-500">
-                      {listSearchQuery.trim() ? 'Select a memory from search results' : 'Select a memory from the list'}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+          }}
+          onSelectMemoryById={selectMemoryById}
+          onDeleteMemory={handleDeleteMemoryClick}
+          onSearchQueryChange={setListSearchQuery}
+        />
 
         <PendingJobsPanel 
           isOpen={isPendingJobsOpen}
@@ -826,37 +570,6 @@ export const Memories: React.FC = () => {
           onCancel={() => setDeleteConfirm({ isOpen: false, memoryId: null })}
         />
       </div>
-
-      {/* Memory Stats Overlay */}
-      {/* {insights && (memories || []).length > 0 && (
-        <div className="fixed bottom-16 left-4 bg-white/95 backdrop-blur-sm border border-gray-200/60 shadow-lg rounded-xl p-4 z-40">
-          <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
-            [MEMORY STATS]
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-sm font-mono">
-            <div>
-              <div className="text-gray-500">TOTAL</div>
-              <div className="text-gray-900 font-semibold">{insights.total_memories}</div>
-            </div>
-            <div>
-              <div className="text-gray-500">CONFIRMED</div>
-              <div className="text-gray-900 font-semibold">{insights.confirmed_transactions}</div>
-            </div>
-            <div>
-              <div className="text-gray-500">PENDING</div>
-              <div className="text-gray-900 font-semibold">{insights.pending_transactions}</div>
-            </div>
-            <div>
-              <div className="text-gray-500">NODES</div>
-              <div className="text-gray-900 font-semibold">{insights.total_memories}</div>
-            </div>
-          </div>
-        </div>
-      )} */}
-
-      
-
-      
 
     </div>
   )
