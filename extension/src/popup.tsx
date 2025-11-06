@@ -22,6 +22,8 @@ const Popup: React.FC = () => {
   const [isDepositModalOpen] = useState(false);
   const [isBalanceLoading] = useState(false);
   const [extensionEnabled, setExtensionEnabled] = useState(true);
+  const [blockedWebsites, setBlockedWebsites] = useState<string[]>([]);
+  const [newBlockedWebsite, setNewBlockedWebsite] = useState('');
 
   useEffect(() => {
     loadSettings();
@@ -48,6 +50,13 @@ const Popup: React.FC = () => {
       if (extensionResponse && extensionResponse.success) {
         setExtensionEnabled(extensionResponse.enabled);
       }
+
+      const blockedResponse = await chrome.runtime.sendMessage({
+        type: 'GET_BLOCKED_WEBSITES',
+      });
+      if (blockedResponse && blockedResponse.success) {
+        setBlockedWebsites(blockedResponse.websites || []);
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
       setStatus({ message: 'Failed to load settings', type: 'error' });
@@ -69,10 +78,10 @@ const Popup: React.FC = () => {
         type: 'SET_ENDPOINT',
         endpoint,
       });
-      if (response.success) {
+      if (response && response.success) {
         setStatus({ message: 'Configuration saved successfully!', type: 'success' });
       } else {
-        setStatus({ message: `Error: ${response.error}`, type: 'error' });
+        setStatus({ message: `Error: ${response?.error || 'Failed to save configuration'}`, type: 'error' });
       }
     } catch (error) {
       setStatus({ message: `Error: ${error}`, type: 'error' });
@@ -120,21 +129,38 @@ const Popup: React.FC = () => {
     setIsLoading(true);
     try {
       const newState = !extensionEnabled;
+      
+      // Check for Chrome runtime errors first
+      if (chrome.runtime.lastError) {
+        setStatus({ message: `Error: ${chrome.runtime.lastError.message}`, type: 'error' });
+        setIsLoading(false);
+        return;
+      }
+      
       const response = await chrome.runtime.sendMessage({
         type: 'SET_EXTENSION_ENABLED',
         enabled: newState,
       });
-      if (response.success) {
+      
+      // Check for runtime errors after sending message
+      if (chrome.runtime.lastError) {
+        setStatus({ message: `Error: ${chrome.runtime.lastError.message}`, type: 'error' });
+        setIsLoading(false);
+        return;
+      }
+      
+      if (response && response.success) {
         setExtensionEnabled(newState);
         setStatus({ 
           message: `Extension ${newState ? 'enabled' : 'disabled'} successfully!`, 
           type: 'success' 
         });
       } else {
-        setStatus({ message: `Error: ${response.error}`, type: 'error' });
+        setStatus({ message: `Error: ${response?.error || 'Failed to update extension state'}`, type: 'error' });
       }
     } catch (error) {
-      setStatus({ message: `Error: ${error}`, type: 'error' });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setStatus({ message: `Error: ${errorMessage}`, type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -145,6 +171,53 @@ const Popup: React.FC = () => {
     setTimeout(() => {
       setStatus(null);
     }, 3000);
+  };
+
+  const addBlockedWebsite = async () => {
+    const website = newBlockedWebsite.trim();
+    if (!website) {
+      setStatus({ message: 'Please enter a website URL or domain', type: 'error' });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'ADD_BLOCKED_WEBSITE',
+        website: website,
+      });
+      if (response && response.success) {
+        setNewBlockedWebsite('');
+        await loadSettings();
+        setStatus({ message: 'Website added to blocked list', type: 'success' });
+      } else {
+        setStatus({ message: `Error: ${response?.error || 'Failed to add website'}`, type: 'error' });
+      }
+    } catch (error) {
+      setStatus({ message: `Error: ${error}`, type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const removeBlockedWebsite = async (website: string) => {
+    setIsLoading(true);
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'REMOVE_BLOCKED_WEBSITE',
+        website: website,
+      });
+      if (response && response.success) {
+        await loadSettings();
+        setStatus({ message: 'Website unblocked successfully', type: 'success' });
+      } else {
+        setStatus({ message: `Error: ${response?.error || 'Failed to unblock website'}`, type: 'error' });
+      }
+    } catch (error) {
+      setStatus({ message: `Error: ${error}`, type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -244,6 +317,74 @@ const Popup: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Blocked Websites Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Blocked Websites</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="blockedWebsite" className="text-sm">Add Website to Block</Label>
+            <div className="flex gap-2">
+              <Input
+                id="blockedWebsite"
+                type="text"
+                placeholder="example.com or https://example.com"
+                value={newBlockedWebsite}
+                onChange={(e) => setNewBlockedWebsite(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    addBlockedWebsite();
+                  }
+                }}
+                className="h-8 flex-1"
+              />
+              <Button
+                onClick={addBlockedWebsite}
+                disabled={isLoading}
+                size="sm"
+                variant="outline"
+              >
+                Add
+              </Button>
+            </div>
+            <div className="text-xs text-gray-500">
+              Enter a domain (e.g., example.com) or full URL. Data collection will be disabled for these websites.
+            </div>
+          </div>
+
+          {blockedWebsites.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm">Blocked Websites ({blockedWebsites.length})</Label>
+              <div className="max-h-48 overflow-y-auto space-y-1 border rounded p-2">
+                {blockedWebsites.map((website, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-2 bg-gray-50 rounded text-sm"
+                  >
+                    <span className="truncate flex-1">{website}</span>
+                    <Button
+                      onClick={() => removeBlockedWebsite(website)}
+                      disabled={isLoading}
+                      size="sm"
+                      variant="ghost"
+                      className="ml-2 h-6 px-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+                    >
+                      Unblock
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {blockedWebsites.length === 0 && (
+            <div className="text-xs text-gray-500 text-center py-2">
+              No websites blocked. Add websites above to disable data collection for specific sites.
+            </div>
+          )}
+        </CardContent>
+      </Card>
       
     </div>
   );
