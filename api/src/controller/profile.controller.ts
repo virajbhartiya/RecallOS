@@ -57,7 +57,7 @@ export class ProfileController {
         userId,
       });
 
-      const profile = await profileUpdateService.updateUserProfile(userId);
+      const profile = await profileUpdateService.updateUserProfile(userId, true);
 
       console.log('[profile/refresh] completed', {
         ts: new Date().toISOString(),

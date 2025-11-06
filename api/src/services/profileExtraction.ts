@@ -13,6 +13,39 @@ export interface StaticProfile {
   long_term_patterns: string[];
   domains: string[];
   expertise_areas: string[];
+  personality_traits?: string[];
+  work_style?: {
+    preferred_work_hours?: string;
+    collaboration_style?: string;
+    decision_making_style?: string;
+    problem_solving_approach?: string;
+  };
+  communication_style?: {
+    preferred_channels?: string[];
+    communication_frequency?: string;
+    tone_preference?: string;
+  };
+  learning_preferences?: {
+    preferred_learning_methods?: string[];
+    learning_pace?: string;
+    knowledge_retention_style?: string;
+  };
+  values_and_priorities?: string[];
+  technology_preferences?: {
+    preferred_tools?: string[];
+    tech_comfort_level?: string;
+    preferred_platforms?: string[];
+  };
+  lifestyle_patterns?: {
+    activity_level?: string;
+    social_patterns?: string;
+    productivity_patterns?: string;
+  };
+  cognitive_style?: {
+    thinking_pattern?: string;
+    information_processing?: string;
+    creativity_level?: string;
+  };
 }
 
 export interface DynamicProfile {
@@ -21,6 +54,17 @@ export interface DynamicProfile {
   temporary_interests: string[];
   recent_changes: string[];
   current_context: string[];
+  active_goals?: string[];
+  current_challenges?: string[];
+  recent_achievements?: string[];
+  current_focus_areas?: string[];
+  emotional_state?: {
+    current_concerns?: string[];
+    current_excitements?: string[];
+    stress_level?: string;
+  };
+  active_research_topics?: string[];
+  upcoming_events?: string[];
 }
 
 export interface ProfileExtractionResult {
@@ -96,43 +140,102 @@ ${allMemories}`;
   }
 
   private buildExtractionPrompt(memoryContext: string): string {
-    return `You are RecallOS profile extraction system. Analyze the user's memories to build a comprehensive profile.
+    return `You are RecallOS profile extraction system. Your task is to deeply understand WHO this user is as a person, not just what they do. Analyze their memories to build a comprehensive, deeply personalized profile that captures their essence, personality, preferences, and unique characteristics.
 
 CRITICAL: Return ONLY valid JSON. No explanations, no markdown formatting, no code blocks, no special characters. Just the JSON object.
+
+IMPORTANT JSON RULES:
+- All strings must be properly escaped (use \\" for quotes inside strings, \\n for newlines)
+- No trailing commas
+- All property names must be in double quotes
+- All string values must be in double quotes
+- Escape all special characters in strings (quotes, newlines, backslashes)
+- Do not include any text before or after the JSON object
+- The JSON must be valid and parseable
 
 Return a JSON object with this exact structure:
 {
   "static_profile_json": {
-    "interests": ["long-term interests"],
-    "skills": ["skills and expertise"],
-    "profession": "profession or field",
+    "interests": ["long-term interests and passions"],
+    "skills": ["skills, expertise, and competencies"],
+    "profession": "profession, field, or career path",
     "demographics": {
       "age_range": "age range if evident",
       "location": "location if evident",
       "education": "education level if evident"
     },
-    "long_term_patterns": ["persistent patterns"],
-    "domains": ["knowledge domains"],
-    "expertise_areas": ["areas of expertise"]
+    "long_term_patterns": ["persistent behavioral patterns, habits, or tendencies"],
+    "domains": ["knowledge domains and areas of focus"],
+    "expertise_areas": ["areas of deep expertise"],
+    "personality_traits": ["personality characteristics inferred from behavior and content"],
+    "work_style": {
+      "preferred_work_hours": "when they seem most active or productive",
+      "collaboration_style": "how they work with others (independent, collaborative, etc.)",
+      "decision_making_style": "how they make decisions (analytical, intuitive, etc.)",
+      "problem_solving_approach": "how they approach problems (systematic, creative, etc.)"
+    },
+    "communication_style": {
+      "preferred_channels": ["communication methods they use"],
+      "communication_frequency": "how often they communicate",
+      "tone_preference": "formal, casual, technical, etc."
+    },
+    "learning_preferences": {
+      "preferred_learning_methods": ["how they learn (reading, videos, hands-on, etc.)"],
+      "learning_pace": "fast, methodical, deep-dive, etc.",
+      "knowledge_retention_style": "how they retain information"
+    },
+    "values_and_priorities": ["core values and what matters to them"],
+    "technology_preferences": {
+      "preferred_tools": ["tools, platforms, or technologies they use"],
+      "tech_comfort_level": "early adopter, mainstream, cautious, etc.",
+      "preferred_platforms": ["platforms they prefer"]
+    },
+    "lifestyle_patterns": {
+      "activity_level": "active, balanced, focused, etc.",
+      "social_patterns": "social preferences and patterns",
+      "productivity_patterns": "how they organize and manage productivity"
+    },
+    "cognitive_style": {
+      "thinking_pattern": "analytical, creative, practical, strategic, etc.",
+      "information_processing": "how they process information (detail-oriented, big-picture, etc.)",
+      "creativity_level": "highly creative, methodical, balanced, etc."
+    }
   },
-  "static_profile_text": "Natural language description of long-term stable facts about the user (e.g., 'User is a techie who works in tech industry, interested in AI and software development')",
+  "static_profile_text": "A rich, detailed natural language description (300-600 words) that captures WHO this user is as a person. Include their personality, work style, values, preferences, thinking patterns, and what makes them unique. Write as if you truly know them - be specific, personal, and insightful. Example: This user is a deeply analytical technologist who thrives on understanding complex systems. They have a methodical approach to problem-solving, preferring to dive deep into technical details before making decisions. They value efficiency and productivity, often researching tools and methods to optimize their workflow. Their communication style is technical and precise, suggesting they work in a field that requires accuracy. They show patterns of continuous learning, particularly in emerging technologies, and seem to be an early adopter of new tools. Their interests span from practical productivity tools to deep technical concepts, indicating a balance between pragmatism and intellectual curiosity. They appear to be someone who thinks systematically, values quality over speed, and has a strong preference for well-designed, functional solutions.",
   "dynamic_profile_json": {
-    "recent_activities": ["recent activities"],
-    "current_projects": ["current projects"],
-    "temporary_interests": ["temporary interests"],
-    "recent_changes": ["recent life changes"],
-    "current_context": ["current context"]
+    "recent_activities": ["recent activities and behaviors"],
+    "current_projects": ["active projects or initiatives"],
+    "temporary_interests": ["temporary or emerging interests"],
+    "recent_changes": ["recent life or work changes"],
+    "current_context": ["current situational context"],
+    "active_goals": ["goals they're actively pursuing"],
+    "current_challenges": ["challenges they're facing"],
+    "recent_achievements": ["recent accomplishments or milestones"],
+    "current_focus_areas": ["what they're currently focusing on"],
+    "emotional_state": {
+      "current_concerns": ["current worries or concerns"],
+      "current_excitements": ["what they're excited about"],
+      "stress_level": "high, medium, low, or inferred level"
+    },
+    "active_research_topics": ["topics they're actively researching"],
+    "upcoming_events": ["upcoming events or deadlines"]
   },
-  "dynamic_profile_text": "Natural language description of recent context (e.g., 'User recently got a job, currently researching mouse options, interested in productivity tools')"
+  "dynamic_profile_text": "A detailed natural language description (200-400 words) of their current state, recent changes, active goals, challenges, and what's happening in their life right now. Be specific and personal. Example: Currently, this user is in an active research phase, exploring productivity tools and optimization methods. They recently seem to have taken on new responsibilities or projects, as evidenced by their increased focus on workflow efficiency. They are actively researching specific tools like mice for productivity, suggesting they are making practical decisions about their work setup. There is a pattern of them seeking to improve their daily operations, indicating they might be preparing for increased workload or new challenges. Their current focus appears to be on practical, actionable improvements to their work environment and processes."
 }
 
-Rules:
-- Static profile: Facts that persist across time (e.g., "techie", "works in tech", "interested in AI")
-- Dynamic profile: Recent context and temporary interests (e.g., "recently got a job", "currently researching X")
-- All arrays can be empty if no relevant items
-- static_profile_text and dynamic_profile_text should be concise but comprehensive (200-500 words each)
-- Do not include information that cannot be inferred from the memories
-- Be specific and factual, avoid generic statements
+Deep Analysis Guidelines:
+- Go beyond surface-level facts - understand their personality, motivations, and unique characteristics
+- Infer work style from when and how they engage with content
+- Understand their thinking patterns from the types of content they consume
+- Identify their values from what they prioritize and focus on
+- Recognize their communication style from the language and topics they engage with
+- Understand their learning preferences from how they consume information
+- Identify patterns in their behavior, interests, and focus areas
+- Be specific and personal - avoid generic statements
+- Only include information that can be reasonably inferred from the memories
+- For personality traits, think about: Are they analytical? Creative? Methodical? Spontaneous? Detail-oriented? Big-picture? Introverted? Extroverted? Practical? Theoretical?
+- For work style, consider: When do they work? How do they approach tasks? Do they prefer structure or flexibility?
+- For values, think about: What do they prioritize? What matters to them? What drives their decisions?
 
 Memory Context:
 ${memoryContext}
@@ -146,23 +249,30 @@ Return ONLY the JSON object:`;
       
       if (!jsonMatch) {
         jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-        if (jsonMatch) {
+        if (jsonMatch && jsonMatch[1]) {
           jsonMatch[0] = jsonMatch[1];
         }
       }
       
-      if (!jsonMatch) {
+      if (!jsonMatch || !jsonMatch[0]) {
         throw new Error('No JSON found in response');
       }
 
+      let jsonStr = jsonMatch[0];
       let data;
+
       try {
-        data = JSON.parse(jsonMatch[0]);
+        data = JSON.parse(jsonStr);
       } catch (parseError) {
-        let fixedJson = jsonMatch[0];
-        fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
-        fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
-        data = JSON.parse(fixedJson);
+        try {
+          jsonStr = this.fixJson(jsonStr);
+          data = JSON.parse(jsonStr);
+        } catch (secondError) {
+          console.error('Error parsing profile response after fixes:', secondError);
+          console.error('JSON string (first 1000 chars):', jsonStr.substring(0, 1000));
+          console.error('JSON string (last 500 chars):', jsonStr.substring(Math.max(0, jsonStr.length - 500)));
+          throw new Error('Failed to parse JSON after fixes');
+        }
       }
 
       return {
@@ -175,6 +285,43 @@ Return ONLY the JSON object:`;
       console.error('Error parsing profile response:', error);
       return this.getEmptyProfile();
     }
+  }
+
+  private fixJson(jsonStr: string): string {
+    let fixed = jsonStr;
+
+    fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
+    
+    fixed = fixed.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+
+    const textFields = ['static_profile_text', 'dynamic_profile_text'];
+    for (const field of textFields) {
+      const regex = new RegExp(`"${field}"\\s*:\\s*"([^"]*(?:\\\\.[^"]*)*)"`, 'g');
+      fixed = fixed.replace(regex, (match, value) => {
+        const escaped = value
+          .replace(/\\\\/g, '\\')
+          .replace(/\\"/g, '"')
+          .replace(/\\n/g, '\n')
+          .replace(/\\r/g, '\r')
+          .replace(/\\t/g, '\t')
+          .replace(/\\/g, '\\\\')
+          .replace(/"/g, '\\"')
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '\\r')
+          .replace(/\t/g, '\\t');
+        return `"${field}": "${escaped}"`;
+      });
+    }
+
+    fixed = fixed.replace(/:\s*"([^"]*(?:\\.[^"]*)*)"\s*([,}\]])/g, (match, value, end) => {
+      if (value.includes('"') && !value.match(/\\"/)) {
+        const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        return `: "${escaped}"${end}`;
+      }
+      return match;
+    });
+
+    return fixed;
   }
 
   private extractProfileFallback(
@@ -220,6 +367,14 @@ Return ONLY the JSON object:`;
       long_term_patterns: Array.from(allCategories).slice(0, 5),
       domains: Array.from(allCategories).slice(0, 5),
       expertise_areas: Array.from(allTopics).slice(0, 5),
+      personality_traits: [],
+      work_style: {},
+      communication_style: {},
+      learning_preferences: {},
+      values_and_priorities: [],
+      technology_preferences: {},
+      lifestyle_patterns: {},
+      cognitive_style: {},
     };
 
     const dynamicProfile: DynamicProfile = {
@@ -228,6 +383,13 @@ Return ONLY the JSON object:`;
       temporary_interests: Array.from(recentTopics).slice(0, 5),
       recent_changes: [],
       current_context: Array.from(recentCategories).slice(0, 3),
+      active_goals: [],
+      current_challenges: [],
+      recent_achievements: [],
+      current_focus_areas: [],
+      emotional_state: {},
+      active_research_topics: Array.from(recentTopics).slice(0, 5),
+      upcoming_events: [],
     };
 
     return {
@@ -246,6 +408,14 @@ Return ONLY the JSON object:`;
         long_term_patterns: [],
         domains: [],
         expertise_areas: [],
+        personality_traits: [],
+        work_style: {},
+        communication_style: {},
+        learning_preferences: {},
+        values_and_priorities: [],
+        technology_preferences: {},
+        lifestyle_patterns: {},
+        cognitive_style: {},
       },
       static_profile_text: 'No profile information available yet.',
       dynamic_profile_json: {
@@ -254,6 +424,13 @@ Return ONLY the JSON object:`;
         temporary_interests: [],
         recent_changes: [],
         current_context: [],
+        active_goals: [],
+        current_challenges: [],
+        recent_achievements: [],
+        current_focus_areas: [],
+        emotional_state: {},
+        active_research_topics: [],
+        upcoming_events: [],
       },
       dynamic_profile_text: 'No recent context available yet.',
     };
