@@ -11,14 +11,7 @@ interface ApiSearchResult {
   timestamp: number
   created_at?: string
   full_content?: string
-  page_metadata?: {
-    title?: string
-    description?: string
-    keywords?: string[]
-    author?: string
-    published_date?: string
-    [key: string]: string | string[] | number | boolean | undefined
-  }
+  page_metadata?: Record<string, unknown>
   importance_score?: number
   access_count?: number
   last_accessed?: string
@@ -38,7 +31,19 @@ export function transformApiSearchResult(result: ApiSearchResult): SearchResult 
       timestamp: result.timestamp,
       created_at: result.created_at || new Date(result.timestamp * 1000).toISOString(),
       full_content: result.full_content,
-      page_metadata: result.page_metadata,
+      page_metadata: result.page_metadata ? {
+        ...Object.fromEntries(
+          Object.entries(result.page_metadata).map(([k, v]) => [
+            k,
+            typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || Array.isArray(v) ? v : String(v)
+          ])
+        ),
+        title: (result.page_metadata as any).title as string | undefined,
+        description: (result.page_metadata as any).description as string | undefined,
+        keywords: (result.page_metadata as any).keywords as string[] | undefined,
+        author: (result.page_metadata as any).author as string | undefined,
+        published_date: (result.page_metadata as any).published_date as string | undefined,
+      } as Memory['page_metadata'] : undefined,
       importance_score: result.importance_score,
       access_count: result.access_count || 0,
       last_accessed: result.last_accessed || new Date().toISOString(),
@@ -75,7 +80,19 @@ export function transformApiMemoryResponse(mem: {
     content: mem.content || '',
     source: mem.source || 'extension',
     url: mem.url,
-    page_metadata: mem.page_metadata,
+    page_metadata: mem.page_metadata ? {
+      ...Object.fromEntries(
+        Object.entries(mem.page_metadata).map(([k, v]) => [
+          k,
+          typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || Array.isArray(v) ? v : String(v)
+        ])
+      ),
+      title: (mem.page_metadata as any).title as string | undefined,
+      description: (mem.page_metadata as any).description as string | undefined,
+      keywords: (mem.page_metadata as any).keywords as string[] | undefined,
+      author: (mem.page_metadata as any).author as string | undefined,
+      published_date: (mem.page_metadata as any).published_date as string | undefined,
+    } as Memory['page_metadata'] : undefined,
     access_count: mem.access_count || 0,
     last_accessed: mem.last_accessed || new Date().toISOString(),
   }

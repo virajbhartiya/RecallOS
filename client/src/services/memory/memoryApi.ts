@@ -1,4 +1,4 @@
-import { getRequest, postRequest } from '../../utility/generalServices'
+import { getRequest } from '../../utility/generalServices'
 import { requireAuthToken } from '../../utils/userId'
 import { transformApiMemoryResponse } from '../../utils/memoryTransform'
 import type { Memory } from '../../types/memory'
