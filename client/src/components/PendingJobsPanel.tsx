@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { MemoryService } from '@/services/memoryService'
 import { requireAuthToken } from '@/utils/userId'
-import { Clock, RefreshCw, AlertCircle, Loader, X, Trash2 } from 'lucide-react'
+import { Clock, RefreshCw, AlertCircle, Loader, X, Trash2, Search, CheckSquare, Square } from 'lucide-react'
 import { LoadingCard, ErrorMessage, EmptyState } from '@/components/ui/loading-spinner'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
@@ -30,7 +30,9 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(false)
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; jobId: string | null }>({
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set())
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; jobId: string | null; jobIds?: string[] }>({
     isOpen: false,
     jobId: null,
   })
@@ -53,24 +55,89 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
   }, [])
 
   const handleDeleteJobClick = useCallback((jobId: string) => {
-    setDeleteConfirm({ isOpen: true, jobId })
+    setDeleteConfirm({ isOpen: true, jobId, jobIds: undefined })
   }, [])
 
-  const handleDeleteJobConfirm = useCallback(async () => {
-    if (!deleteConfirm.jobId) return
+  const handleBatchDeleteClick = useCallback(() => {
+    if (selectedJobs.size === 0) return
+    setDeleteConfirm({ isOpen: true, jobId: null, jobIds: Array.from(selectedJobs) })
+  }, [selectedJobs])
 
+  const handleDeleteJobConfirm = useCallback(async () => {
     const jobId = deleteConfirm.jobId
-    setDeleteConfirm({ isOpen: false, jobId: null })
+    const jobIds = deleteConfirm.jobIds
+    setDeleteConfirm({ isOpen: false, jobId: null, jobIds: undefined })
 
     try {
       requireAuthToken()
-      await MemoryService.deletePendingJob(jobId)
+      
+      if (jobIds && jobIds.length > 0) {
+        // Batch delete multiple jobs
+        await Promise.all(jobIds.map(id => MemoryService.deletePendingJob(id)))
+        setSelectedJobs(new Set())
+      } else if (jobId) {
+        // Single job delete
+        await MemoryService.deletePendingJob(jobId)
+      }
+      
       await fetchPendingJobs()
     } catch (err: any) {
-      console.error('Error deleting job:', err)
-      setError(err.message || 'Failed to delete job')
+      console.error('Error deleting job(s):', err)
+      setError(err.message || 'Failed to delete job(s)')
     }
-  }, [deleteConfirm.jobId, fetchPendingJobs])
+  }, [deleteConfirm.jobId, deleteConfirm.jobIds, fetchPendingJobs])
+
+  // Filter jobs based on search query
+  const filteredJobs = useMemo(() => {
+    if (!searchQuery.trim()) return jobs
+
+    const query = searchQuery.toLowerCase().trim()
+    return jobs.filter((job) => {
+      // Search in job ID
+      if (job.id.toLowerCase().includes(query)) return true
+      
+      // Search in user ID
+      if (job.user_id.toLowerCase().includes(query)) return true
+      
+      // Search in status
+      if (job.status.toLowerCase().includes(query)) return true
+      
+      // Search in raw text
+      if (job.raw_text.toLowerCase().includes(query)) return true
+      
+      // Search in metadata title
+      const title = job.metadata?.title
+      if (title && typeof title === 'string' && title.toLowerCase().includes(query)) return true
+      
+      // Search in metadata URL
+      const url = job.metadata?.url
+      if (url && typeof url === 'string' && url.toLowerCase().includes(query)) return true
+      
+      return false
+    })
+  }, [jobs, searchQuery])
+
+  const handleSelectJob = useCallback((jobId: string) => {
+    setSelectedJobs(prev => {
+      const next = new Set(prev)
+      if (next.has(jobId)) {
+        next.delete(jobId)
+      } else {
+        next.add(jobId)
+      }
+      return next
+    })
+  }, [])
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedJobs.size === filteredJobs.length) {
+      // Deselect all
+      setSelectedJobs(new Set())
+    } else {
+      // Select all filtered jobs
+      setSelectedJobs(new Set(filteredJobs.map(job => job.id)))
+    }
+  }, [selectedJobs.size, filteredJobs])
 
   useEffect(() => {
     if (!isOpen) return
@@ -149,7 +216,26 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
         <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 bg-gray-50">
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4 flex-wrap gap-4">
-              <div className="flex items-center space-x-4 flex-wrap">
+              <div className="flex items-center space-x-4 flex-wrap flex-1 min-w-0">
+                <div className="relative flex-1 min-w-[200px] max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search jobs by ID, text, title, URL, status..."
+                    className="w-full pl-10 pr-4 py-2 text-sm font-mono border border-gray-200 bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                  />
+                </div>
+                {selectedJobs.size > 0 && (
+                  <button
+                    onClick={handleBatchDeleteClick}
+                    className="px-4 py-2 text-sm font-mono bg-red-600 text-white hover:bg-red-700 border border-red-600 flex items-center space-x-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Selected ({selectedJobs.size})</span>
+                  </button>
+                )}
                 <button
                   onClick={() => setAutoRefresh(!autoRefresh)}
                   className={`px-4 py-2 text-sm font-mono border flex items-center space-x-2 ${
@@ -204,15 +290,51 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
 
           {isLoading && jobs.length === 0 ? (
             <LoadingCard />
-          ) : jobs.length === 0 ? (
-            <EmptyState title="No pending jobs found in the queue" />
+          ) : filteredJobs.length === 0 ? (
+            <EmptyState title={searchQuery ? `No jobs found matching "${searchQuery}"` : "No pending jobs found in the queue"} />
           ) : (
             <div className="space-y-4">
-              {jobs.map((job) => (
-                <div key={job.id} className="bg-white border border-gray-200 p-6 overflow-hidden">
+              <div className="flex items-center justify-between mb-2">
+                {searchQuery && (
+                  <div className="text-sm font-mono text-gray-600">
+                    Showing {filteredJobs.length} of {jobs.length} jobs
+                  </div>
+                )}
+                {filteredJobs.length > 0 && (
+                  <button
+                    onClick={handleSelectAll}
+                    className="text-sm font-mono text-gray-700 hover:text-gray-900 flex items-center space-x-2 px-3 py-1 border border-gray-200 hover:bg-gray-50"
+                  >
+                    {selectedJobs.size === filteredJobs.length ? (
+                      <>
+                        <CheckSquare className="w-4 h-4" />
+                        <span>Deselect All</span>
+                      </>
+                    ) : (
+                      <>
+                        <Square className="w-4 h-4" />
+                        <span>Select All</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+              {filteredJobs.map((job) => (
+                <div key={job.id} className={`bg-white border p-6 overflow-hidden ${selectedJobs.has(job.id) ? 'border-black bg-gray-50' : 'border-gray-200'}`}>
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-3 flex-wrap gap-2">
+                        <button
+                          onClick={() => handleSelectJob(job.id)}
+                          className="text-gray-600 hover:text-black transition-colors"
+                          title={selectedJobs.has(job.id) ? 'Deselect' : 'Select'}
+                        >
+                          {selectedJobs.has(job.id) ? (
+                            <CheckSquare className="w-5 h-5" />
+                          ) : (
+                            <Square className="w-5 h-5" />
+                          )}
+                        </button>
                         {getStatusIcon(job.status)}
                         {getStatusBadge(job.status)}
                         <span className="text-xs font-mono text-gray-500 break-all">ID: {job.id}</span>
@@ -308,12 +430,16 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
 
         <ConfirmDialog
           isOpen={deleteConfirm.isOpen}
-          title="Delete Job"
-          message="Are you sure you want to delete this job from the queue?"
+          title={deleteConfirm.jobIds ? `Delete ${deleteConfirm.jobIds.length} Jobs` : "Delete Job"}
+          message={deleteConfirm.jobIds 
+            ? `Are you sure you want to delete ${deleteConfirm.jobIds.length} selected job(s) from the queue?`
+            : "Are you sure you want to delete this job from the queue?"}
           confirmLabel="Delete"
           cancelLabel="Cancel"
           onConfirm={handleDeleteJobConfirm}
-          onCancel={() => setDeleteConfirm({ isOpen: false, jobId: null })}
+          onCancel={() => {
+            setDeleteConfirm({ isOpen: false, jobId: null, jobIds: undefined })
+          }}
         />
       </div>
     </div>
