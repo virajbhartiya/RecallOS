@@ -1,0 +1,255 @@
+import { prisma } from '../lib/prisma';
+import { profileExtractionService, ProfileExtractionResult } from './profileExtraction';
+
+export interface UserProfile {
+  id: string;
+  user_id: string;
+  static_profile_json: any;
+  static_profile_text: string | null;
+  dynamic_profile_json: any;
+  dynamic_profile_text: string | null;
+  last_updated: Date;
+  last_memory_analyzed: Date | null;
+  version: number;
+}
+
+export class ProfileUpdateService {
+  async updateUserProfile(userId: string): Promise<UserProfile> {
+    const existingProfile = await prisma.userProfile.findUnique({
+      where: { user_id: userId },
+    });
+
+    const lastAnalyzedDate = existingProfile?.last_memory_analyzed || null;
+    
+    const memories = await prisma.memory.findMany({
+      where: {
+        user_id: userId,
+        ...(lastAnalyzedDate ? {
+          created_at: { gt: lastAnalyzedDate } as any,
+        } : {}),
+      },
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        content: true,
+        created_at: true,
+        page_metadata: true,
+      },
+      orderBy: { created_at: 'desc' } as any,
+    });
+
+    if (memories.length === 0 && existingProfile) {
+      return existingProfile as UserProfile;
+    }
+
+    let extractionResult: ProfileExtractionResult;
+    
+    if (existingProfile && lastAnalyzedDate) {
+      const allMemories = await prisma.memory.findMany({
+        where: { user_id: userId },
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          content: true,
+          created_at: true,
+          page_metadata: true,
+        },
+        orderBy: { created_at: 'desc' } as any,
+        take: 100,
+      });
+
+      extractionResult = await profileExtractionService.extractProfileFromMemories(
+        userId,
+        allMemories
+      );
+
+      const merged = this.mergeProfiles(existingProfile, extractionResult);
+      extractionResult = merged;
+    } else {
+      const allMemories = await prisma.memory.findMany({
+        where: { user_id: userId },
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          content: true,
+          created_at: true,
+          page_metadata: true,
+        },
+        orderBy: { created_at: 'desc' } as any,
+        take: 100,
+      });
+
+      extractionResult = await profileExtractionService.extractProfileFromMemories(
+        userId,
+        allMemories
+      );
+    }
+
+    const latestMemory = memories.length > 0 
+      ? memories[0] 
+      : await prisma.memory.findFirst({
+          where: { user_id: userId },
+          orderBy: { created_at: 'desc' } as any,
+        });
+
+    const profile = await prisma.userProfile.upsert({
+      where: { user_id: userId },
+      create: {
+        user_id: userId,
+        static_profile_json: extractionResult.static_profile_json as any,
+        static_profile_text: extractionResult.static_profile_text,
+        dynamic_profile_json: extractionResult.dynamic_profile_json as any,
+        dynamic_profile_text: extractionResult.dynamic_profile_text,
+        last_memory_analyzed: latestMemory?.created_at || null,
+        version: 1,
+      },
+      update: {
+        static_profile_json: extractionResult.static_profile_json as any,
+        static_profile_text: extractionResult.static_profile_text,
+        dynamic_profile_json: extractionResult.dynamic_profile_json as any,
+        dynamic_profile_text: extractionResult.dynamic_profile_text,
+        last_memory_analyzed: latestMemory?.created_at || null,
+        version: { increment: 1 } as any,
+      },
+    });
+
+    return profile as UserProfile;
+  }
+
+  private mergeProfiles(
+    existing: any,
+    newExtraction: ProfileExtractionResult
+  ): ProfileExtractionResult {
+    const existingStatic = existing.static_profile_json || {};
+    const existingDynamic = existing.dynamic_profile_json || {};
+
+    const mergedStatic = {
+      interests: this.mergeArrays(
+        existingStatic.interests || [],
+        newExtraction.static_profile_json.interests || []
+      ),
+      skills: this.mergeArrays(
+        existingStatic.skills || [],
+        newExtraction.static_profile_json.skills || []
+      ),
+      profession: newExtraction.static_profile_json.profession || existingStatic.profession,
+      demographics: {
+        ...existingStatic.demographics,
+        ...newExtraction.static_profile_json.demographics,
+      },
+      long_term_patterns: this.mergeArrays(
+        existingStatic.long_term_patterns || [],
+        newExtraction.static_profile_json.long_term_patterns || []
+      ),
+      domains: this.mergeArrays(
+        existingStatic.domains || [],
+        newExtraction.static_profile_json.domains || []
+      ),
+      expertise_areas: this.mergeArrays(
+        existingStatic.expertise_areas || [],
+        newExtraction.static_profile_json.expertise_areas || []
+      ),
+    };
+
+    const mergedDynamic = {
+      recent_activities: newExtraction.dynamic_profile_json.recent_activities || [],
+      current_projects: this.mergeArrays(
+        existingDynamic.current_projects || [],
+        newExtraction.dynamic_profile_json.current_projects || []
+      ),
+      temporary_interests: newExtraction.dynamic_profile_json.temporary_interests || [],
+      recent_changes: this.mergeArrays(
+        existingDynamic.recent_changes || [],
+        newExtraction.dynamic_profile_json.recent_changes || []
+      ),
+      current_context: newExtraction.dynamic_profile_json.current_context || [],
+    };
+
+    return {
+      static_profile_json: mergedStatic,
+      static_profile_text: newExtraction.static_profile_text || existing.static_profile_text || '',
+      dynamic_profile_json: mergedDynamic,
+      dynamic_profile_text: newExtraction.dynamic_profile_text || existing.dynamic_profile_text || '',
+    };
+  }
+
+  private mergeArrays(existing: string[], newItems: string[]): string[] {
+    const merged = new Set([...existing, ...newItems]);
+    return Array.from(merged).slice(0, 20);
+  }
+
+  async getUserProfile(userId: string): Promise<UserProfile | null> {
+    const profile = await prisma.userProfile.findUnique({
+      where: { user_id: userId },
+    });
+
+    return profile as UserProfile | null;
+  }
+
+  async getProfileContext(userId: string): Promise<string> {
+    const profile = await this.getUserProfile(userId);
+    
+    if (!profile) {
+      return '';
+    }
+
+    const staticText = profile.static_profile_text || '';
+    const dynamicText = profile.dynamic_profile_text || '';
+
+    if (!staticText && !dynamicText) {
+      return '';
+    }
+
+    const parts: string[] = [];
+    
+    if (staticText) {
+      parts.push(`User Profile (Long-term): ${staticText}`);
+    }
+    
+    if (dynamicText) {
+      parts.push(`Recent Context: ${dynamicText}`);
+    }
+
+    return parts.join('\n\n');
+  }
+
+  async shouldUpdateProfile(userId: string, daysSinceLastUpdate: number = 7): Promise<boolean> {
+    const profile = await this.getUserProfile(userId);
+    
+    if (!profile) {
+      return true;
+    }
+
+    const daysSince = (Date.now() - profile.last_updated.getTime()) / (1000 * 60 * 60 * 24);
+    return daysSince >= daysSinceLastUpdate;
+  }
+
+  async getUsersNeedingUpdate(daysSinceLastUpdate: number = 7): Promise<string[]> {
+    const cutoffDate = new Date(Date.now() - daysSinceLastUpdate * 24 * 60 * 60 * 1000);
+
+    const allUsers = await prisma.user.findMany({
+      select: { id: true },
+    });
+
+    const usersNeedingUpdate: string[] = [];
+
+    for (const user of allUsers) {
+      const profile = await prisma.userProfile.findUnique({
+        where: { user_id: user.id },
+        select: { last_updated: true },
+      });
+
+      if (!profile || profile.last_updated < cutoffDate) {
+        usersNeedingUpdate.push(user.id);
+      }
+    }
+
+    return usersNeedingUpdate;
+  }
+}
+
+export const profileUpdateService = new ProfileUpdateService();
+

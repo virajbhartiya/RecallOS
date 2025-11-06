@@ -6,6 +6,7 @@ import { LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-
 import type { Memory, SearchFilters, MemorySearchResponse } from '../types/memory'
 import { requireAuthToken } from '@/utils/userId'
 import { useNavigate } from 'react-router-dom'
+import { getProfileContext } from '../services/profile'
 
 export const Search: React.FC = () => {
   const navigate = useNavigate()
@@ -16,6 +17,7 @@ export const Search: React.FC = () => {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [showOnlyCited, setShowOnlyCited] = useState(true)
+  const [profileContext, setProfileContext] = useState<string>('')
 
   useEffect(() => {
     try {
@@ -25,6 +27,21 @@ export const Search: React.FC = () => {
       navigate('/login')
     }
   }, [navigate])
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    const fetchProfileContext = async () => {
+      try {
+        const context = await getProfileContext()
+        setProfileContext(context)
+      } catch (error) {
+        console.error('Error fetching profile context:', error)
+      }
+    }
+
+    fetchProfileContext()
+  }, [isAuthenticated])
 
   const handleSearch = useCallback(async (
     query: string, 
@@ -105,12 +122,25 @@ export const Search: React.FC = () => {
 
         {/* Search Interface */}
         <div className="mb-8">
+          {/* Profile Context */}
+          {profileContext && (
+            <div className="bg-blue-50 border border-blue-200 p-4 mb-4">
+              <div className="text-xs font-mono text-blue-600 mb-2 uppercase tracking-wide">
+                [PROFILE CONTEXT - USED IN SEARCH]
+              </div>
+              <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {profileContext}
+              </div>
+            </div>
+          )}
+
           <MemorySearch
             onSearch={handleSearch}
             onClearFilters={handleClearFilters}
             isLoading={isLoading}
             resultCount={searchResults?.total}
             className="mb-6"
+            profileContext={profileContext}
           />
           
           {/* Show Only Cited Memories Toggle */}

@@ -9,6 +9,7 @@ interface MemorySearchProps {
   resultCount?: number
   className?: string
   compact?: boolean
+  profileContext?: string
 }
 
 export const MemorySearch: React.FC<MemorySearchProps> = ({
@@ -17,7 +18,8 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
   isLoading = false,
   resultCount,
   className = '',
-  compact = false
+  compact = false,
+  profileContext = ''
 }) => {
   const [query, setQuery] = useState('')
   const [filters, setFilters] = useState<SearchFilters>({})
@@ -55,6 +57,18 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
         [SEARCH & FILTER]
       </div>
 
+      {/* Profile Context Hint */}
+      {profileContext && (
+        <div className="mb-3 p-2 bg-gray-50 border border-gray-200">
+          <div className="text-xs font-mono text-gray-500 mb-1 uppercase tracking-wide">
+            [PROFILE CONTEXT INJECTED]
+          </div>
+          <div className="text-xs text-gray-600 leading-relaxed line-clamp-2">
+            {profileContext.substring(0, 150)}...
+          </div>
+        </div>
+      )}
+
       {/* Search Input */}
       <div className={compact ? 'mb-2' : 'mb-3'}>
         <div className="flex flex-col space-y-2 mb-2">
@@ -63,9 +77,10 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Search memories..."
+            placeholder={profileContext ? "Search memories (profile context will be used)..." : "Search memories..."}
             className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
             disabled={isLoading}
+            title={profileContext ? `Profile context: ${profileContext.substring(0, 200)}...` : undefined}
           />
           <button
             onClick={handleSearch}

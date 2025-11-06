@@ -84,7 +84,7 @@ const CommandMenuComponent = () => {
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Settings">
-            <CommandItem>
+            <CommandItem onSelect={() => navigate('/profile')}>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
               <CommandShortcut>⌘P</CommandShortcut>

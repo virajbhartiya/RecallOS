@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import { ContentJobData } from '../lib/queue';
 import { aiProvider } from '../services/aiProvider';
 import { memoryMeshService } from '../services/memoryMesh';
+import { profileUpdateService } from '../services/profileUpdate';
 import { prisma } from '../lib/prisma';
 import { createHash } from 'crypto';
 import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../utils/env';
@@ -139,6 +140,27 @@ export const startContentWorker = () => {
           memoryId: metadata.memory_id,
           timestamp: new Date().toISOString(),
         });
+
+        setImmediate(async () => {
+          try {
+            const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 7);
+            if (shouldUpdate) {
+              console.log(`[Redis Worker] Triggering profile update`, {
+                jobId: job.id,
+                userId: user_id,
+                timestamp: new Date().toISOString(),
+              });
+              await profileUpdateService.updateUserProfile(user_id);
+              console.log(`[Redis Worker] Profile update completed`, {
+                jobId: job.id,
+                userId: user_id,
+                timestamp: new Date().toISOString(),
+              });
+            }
+          } catch (profileError) {
+            console.error(`[Redis Worker] Error updating profile:`, profileError);
+          }
+        });
       } else {
         const user = await prisma.user.findUnique({
           where: { id: user_id },
@@ -269,6 +291,27 @@ export const startContentWorker = () => {
             userId: user_id,
             memoryId: memory.id,
             timestamp: new Date().toISOString(),
+          });
+
+          setImmediate(async () => {
+            try {
+              const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 7);
+              if (shouldUpdate) {
+                console.log(`[Redis Worker] Triggering profile update`, {
+                  jobId: job.id,
+                  userId: user_id,
+                  timestamp: new Date().toISOString(),
+                });
+                await profileUpdateService.updateUserProfile(user_id);
+                console.log(`[Redis Worker] Profile update completed`, {
+                  jobId: job.id,
+                  userId: user_id,
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            } catch (profileError) {
+              console.error(`[Redis Worker] Error updating profile:`, profileError);
+            }
           });
         }
       }

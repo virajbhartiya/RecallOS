@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { aiProvider } from './aiProvider';
 import { setSearchJobResult } from './searchJob';
 import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant';
+import { profileUpdateService } from './profileUpdate';
 
 type SearchResult = {
   memory_id: string;
@@ -287,7 +288,12 @@ export async function searchMemories(params: {
   
   // Generate context for external AI tools (like ChatGPT)
   if (contextOnly) {
-    context = filteredRows.map((r, i) => {
+    const profileContext = await profileUpdateService.getProfileContext(userId);
+    const profileSection = profileContext 
+      ? `\n\nUser Profile Context:\n${profileContext}\n\n`
+      : '';
+    
+    context = profileSection + filteredRows.map((r, i) => {
       const date = r.timestamp ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10) : '';
       const title = r.title ? `Title: ${r.title}` : '';
       const url = r.url ? `URL: ${r.url}` : '';
@@ -302,12 +308,19 @@ ${title ? title + '\n' : ''}${url ? url + '\n' : ''}Summary: ${summary}`;
         const date = r.timestamp ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10) : '';
         return `- [${i + 1}] ${date} ${r.summary || ''}`.trim();
       }).join('\n');
+      
+      const profileContext = await profileUpdateService.getProfileContext(userId);
+      const profileSection = profileContext 
+        ? `\n\nUser Profile Context:\n${profileContext}\n`
+        : '';
+
       const ansPrompt = `You are RecallOS. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
 
 Rules:
 - Use inline numeric citations like [1], [2].
 - Keep it concise (2-4 sentences).
 - Plain text only.
+- Consider the user's profile context when answering to provide more relevant and personalized responses.
 
 CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
 - No asterisks (*) for bold or italic text
@@ -321,7 +334,7 @@ CRITICAL: Return ONLY plain text content. Do not use any markdown formatting inc
 
 Return clean, readable plain text only.
 
-User query: "${normalized}"
+User query: "${normalized}"${profileSection}
 Evidence notes (ordered by relevance):
 ${bullets}`;
       console.log('[search] generating answer', { ts: new Date().toISOString(), userId, memoryCount: filteredRows.length });
