@@ -22,6 +22,54 @@ async function getApiEndpoint(): Promise<string> {
   }
 }
 
+async function getApiBaseUrl(): Promise<string> {
+  try {
+    const endpoint = await getApiEndpoint();
+    const url = new URL(endpoint);
+    return `${url.protocol}//${url.host}`;
+  } catch (error) {
+    return 'http://localhost:3000';
+  }
+}
+
+async function checkApiHealth(): Promise<boolean> {
+  try {
+    const apiBase = await getApiBaseUrl();
+    const healthUrl = `${apiBase}/health`;
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    
+    try {
+      const response = await fetch(healthUrl, {
+        method: 'GET',
+        signal: controller.signal,
+        credentials: 'include',
+      });
+      clearTimeout(timeout);
+      return response.ok || response.status < 500;
+    } catch (error) {
+      clearTimeout(timeout);
+      // Try a simple endpoint if /health doesn't exist
+      try {
+        const searchUrl = `${apiBase}/api/search`;
+        const searchResponse = await fetch(searchUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: 'health-check', limit: 1 }),
+          signal: controller.signal,
+          credentials: 'include',
+        });
+        return searchResponse.status < 500;
+      } catch {
+        return false;
+      }
+    }
+  } catch (error) {
+    return false;
+  }
+}
+
 async function isExtensionEnabled(): Promise<boolean> {
   try {
     const result = await chrome.storage.sync.get(['extensionEnabled']);
@@ -34,8 +82,64 @@ async function isExtensionEnabled(): Promise<boolean> {
 async function setExtensionEnabled(enabled: boolean): Promise<void> {
   try {
     await chrome.storage.sync.set({ extensionEnabled: enabled });
+    if (chrome.runtime.lastError) {
+      throw new Error(chrome.runtime.lastError.message);
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to save extension state');
+  }
+}
+
+async function getBlockedWebsites(): Promise<string[]> {
+  try {
+    const result = await chrome.storage.sync.get(['blockedWebsites']);
+    return result.blockedWebsites || [];
+  } catch (error) {
+    return [];
+  }
+}
+
+async function setBlockedWebsites(websites: string[]): Promise<void> {
+  try {
+    await chrome.storage.sync.set({ blockedWebsites: websites });
   } catch (error) {
     // Ignore errors
+  }
+}
+
+function extractDomain(url: string): string {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.replace(/^www\./, '');
+  } catch (error) {
+    return '';
+  }
+}
+
+async function isWebsiteBlocked(url: string): Promise<boolean> {
+  try {
+    const blockedWebsites = await getBlockedWebsites();
+    if (blockedWebsites.length === 0) {
+      return false;
+    }
+    
+    const domain = extractDomain(url);
+    if (!domain) {
+      return false;
+    }
+    
+    return blockedWebsites.some(blocked => {
+      const blockedDomain = extractDomain(blocked);
+      if (!blockedDomain) {
+        return url.includes(blocked) || blocked.includes(url);
+      }
+      return domain === blockedDomain || domain.endsWith('.' + blockedDomain) || blockedDomain.endsWith('.' + domain);
+    });
+  } catch (error) {
+    return false;
   }
 }
 
@@ -59,6 +163,12 @@ async function sendToBackend(data: ContextData): Promise<void> {
     // Check if extension is enabled
     const enabled = await isExtensionEnabled();
     if (!enabled) {
+      return;
+    }
+
+    // Check if website is blocked
+    const blocked = await isWebsiteBlocked(data.url);
+    if (blocked) {
       return;
     }
 
@@ -174,7 +284,7 @@ async function setApiEndpoint(endpoint: string): Promise<void> {
 
 
 chrome.runtime.onMessage.addListener(
-  async (
+  (
     message: {
       type?: string;
       data?: ContextData;
@@ -209,14 +319,16 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message?.type === 'SYNC_AUTH_TOKEN') {
-      try {
-        const token = (message as any).token;
-        if (token) {
-          await chrome.storage.local.set({ auth_token: token });
+      (async () => {
+        try {
+          const token = (message as any).token;
+          if (token) {
+            await chrome.storage.local.set({ auth_token: token });
+          }
+        } catch (error) {
+          // Ignore errors
         }
-      } catch (error) {
-        // Ignore errors
-      }
+      })();
     }
 
     if (message?.type === 'GET_ENDPOINT') {
@@ -245,12 +357,97 @@ chrome.runtime.onMessage.addListener(
     }
 
     if (message?.type === 'SET_EXTENSION_ENABLED' && typeof message.enabled === 'boolean') {
-      setExtensionEnabled(message.enabled)
-        .then(() => {
+      (async () => {
+        try {
+          await setExtensionEnabled(message.enabled!);
           sendResponse({ success: true, message: 'Extension state updated' });
+        } catch (error) {
+          sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to update extension state' });
+        }
+      })();
+      return true;
+    }
+
+    if (message?.type === 'GET_BLOCKED_WEBSITES') {
+      getBlockedWebsites()
+        .then(websites => {
+          sendResponse({ success: true, websites });
         })
         .catch(error => {
           sendResponse({ success: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message?.type === 'SET_BLOCKED_WEBSITES' && Array.isArray((message as any).websites)) {
+      setBlockedWebsites((message as any).websites)
+        .then(() => {
+          sendResponse({ success: true, message: 'Blocked websites updated' });
+        })
+        .catch(error => {
+          sendResponse({ success: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message?.type === 'ADD_BLOCKED_WEBSITE' && (message as any).website) {
+      getBlockedWebsites()
+        .then(websites => {
+          const website = (message as any).website.trim();
+          if (website && !websites.includes(website)) {
+            websites.push(website);
+            return setBlockedWebsites(websites);
+          }
+          return Promise.resolve();
+        })
+        .then(() => {
+          sendResponse({ success: true, message: 'Website added to blocked list' });
+        })
+        .catch(error => {
+          sendResponse({ success: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message?.type === 'REMOVE_BLOCKED_WEBSITE' && (message as any).website) {
+      getBlockedWebsites()
+        .then(websites => {
+          const website = (message as any).website.trim();
+          const filtered = websites.filter(w => w !== website);
+          return setBlockedWebsites(filtered);
+        })
+        .then(() => {
+          sendResponse({ success: true, message: 'Website removed from blocked list' });
+        })
+        .catch(error => {
+          sendResponse({ success: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message?.type === 'CHECK_WEBSITE_BLOCKED' && (message as any).url) {
+      isWebsiteBlocked((message as any).url)
+        .then(blocked => {
+          sendResponse({ success: true, blocked });
+        })
+        .catch(error => {
+          sendResponse({ success: false, blocked: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message?.type === 'CHECK_API_HEALTH') {
+      checkApiHealth()
+        .then(healthy => {
+          sendResponse({ success: true, healthy });
+        })
+        .catch(error => {
+          sendResponse({ success: false, healthy: false, error: error.message });
         });
 
       return true;
