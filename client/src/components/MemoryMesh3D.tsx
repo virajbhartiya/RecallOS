@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react'
+import React, { useMemo, useState, useEffect, useCallback, useRef, memo } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Line } from '@react-three/drei'
 import { MemoryService } from '../services/memoryService'
@@ -58,7 +58,7 @@ interface MemoryNodeProps {
   onClick: (memoryId: string) => void
 }
 
-const MemoryNode: React.FC<MemoryNodeProps> = ({
+const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
   position,
   memoryId,
   color,
@@ -112,6 +112,8 @@ const MemoryNode: React.FC<MemoryNodeProps> = ({
   )
 }
 
+const MemoryNode = memo(MemoryNodeComponent)
+
 interface MemoryEdgeProps {
   start: [number, number, number]
   end: [number, number, number]
@@ -119,7 +121,7 @@ interface MemoryEdgeProps {
   relationType?: string
 }
 
-const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
+const MemoryEdgeComponent: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
   const points = useMemo(() => [
     new THREE.Vector3(...start),
     new THREE.Vector3(...end)
@@ -150,6 +152,8 @@ const MemoryEdge: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
   )
 }
 
+const MemoryEdge = memo(MemoryEdgeComponent)
+
 interface SceneProps {
   meshData: MemoryMesh
   selectedMemoryId?: string
@@ -160,7 +164,7 @@ interface SceneProps {
   isCompactView?: boolean
 }
 
-const Scene: React.FC<SceneProps> = ({
+const SceneComponent: React.FC<SceneProps> = ({
   meshData,
   selectedMemoryId,
   highlightedMemoryIds,
@@ -324,6 +328,8 @@ const Scene: React.FC<SceneProps> = ({
     </>
   )
 }
+
+const Scene = memo(SceneComponent)
 
 const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({ 
   className = '', 

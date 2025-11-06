@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Calculator,
@@ -22,7 +22,7 @@ import {
   CommandShortcut,
 } from '@/components/ui/command'
 
-export const CommandMenu = () => {
+const CommandMenuComponent = () => {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
 
@@ -105,3 +105,7 @@ export const CommandMenu = () => {
     </>
   )
 }
+
+const CommandMenu = memo(CommandMenuComponent)
+CommandMenu.displayName = 'CommandMenu'
+export { CommandMenu }

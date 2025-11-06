@@ -3,7 +3,7 @@ import type { SearchFilters } from '../types/memory'
 import { LoadingSpinner } from './ui/loading-spinner'
 
 interface MemorySearchProps {
-  onSearch: (query: string, filters: SearchFilters, useSemantic: boolean) => void
+  onSearch: (query: string, filters: SearchFilters) => void
   onClearFilters: () => void
   isLoading?: boolean
   resultCount?: number
@@ -20,12 +20,11 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
   compact = false
 }) => {
   const [query, setQuery] = useState('')
-  const [useSemantic, setUseSemantic] = useState(false)
   const [filters, setFilters] = useState<SearchFilters>({})
 
   const handleSearch = () => {
     if (query.trim()) {
-      onSearch(query.trim(), filters, useSemantic)
+      onSearch(query.trim(), filters)
     }
   }
 
@@ -82,28 +81,6 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
               <span>SEARCH</span>
             )}
           </button>
-        </div>
-
-        {/* Search Type Toggle */}
-        <div className="flex flex-col space-y-2 text-xs font-mono text-gray-600">
-          <label className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="radio"
-              checked={!useSemantic}
-              onChange={() => setUseSemantic(false)}
-              className="border-gray-300"
-            />
-            <span>KEYWORD SEARCH</span>
-          </label>
-          <label className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="radio"
-              checked={useSemantic}
-              onChange={() => setUseSemantic(true)}
-              className="border-gray-300"
-            />
-            <span>SEMANTIC SEARCH</span>
-          </label>
         </div>
       </div>
 
