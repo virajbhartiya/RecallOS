@@ -3,6 +3,7 @@ import { MemoryController } from '../controller/memory.controller';
 import { MemorySearchController } from '../controller/memorySearch.controller';
 import { MemoryMeshController } from '../controller/memoryMesh.controller';
 import { MemorySnapshotController } from '../controller/memorySnapshot.controller';
+import { AnalyticsController } from '../controller/analytics.controller';
 import { submitContent } from '../controller/content.controller';
 import { authenticateToken } from '../middleware/auth';
 
@@ -13,6 +14,7 @@ router.get('/user/count', authenticateToken, MemoryController.getUserMemoryCount
 router.get('/user/recent', authenticateToken, MemoryController.getRecentMemories);
 router.get('/search', authenticateToken, MemorySearchController.searchMemories);
 router.get('/insights', authenticateToken, MemoryController.getMemoryInsights);
+router.get('/analytics', authenticateToken, AnalyticsController.getAnalytics);
 router.get('/mesh', authenticateToken, MemoryMeshController.getMemoryMesh);
 router.get('/relations/:memoryId', authenticateToken, MemoryMeshController.getMemoryWithRelations);
 router.get('/cluster/:memoryId', authenticateToken, MemoryMeshController.getMemoryCluster);

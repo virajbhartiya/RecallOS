@@ -73,7 +73,8 @@ export class MemoryMeshService {
   ): Promise<void> {
     try {
       await ensureCollection();
-      const embedding = await aiProvider.generateEmbedding(text);
+      const embeddingResult = await aiProvider.generateEmbedding(text);
+      const embedding: number[] = typeof embeddingResult === 'object' && 'embedding' in embeddingResult ? (embeddingResult as any).embedding : (embeddingResult as number[]);
 
       const pointId = randomUUID();
       await qdrantClient.upsert(COLLECTION_NAME, {
@@ -925,7 +926,8 @@ Return a JSON array with one object per candidate memory:
 
 Be strict about relevance - only mark as relevant if there's substantial conceptual or topical connection.`;
 
-      const response = await aiProvider.generateContent(prompt);
+      const responseResult = await aiProvider.generateContent(prompt);
+      const response = typeof responseResult === 'string' ? responseResult : (responseResult as any).text || responseResult;
 
       if (!response) {
         throw new Error('No batch evaluation generated from Gemini API');
@@ -1590,7 +1592,8 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     try {
       let queryEmbedding: number[] | null = null;
       try {
-        queryEmbedding = await aiProvider.generateEmbedding(query);
+        const embeddingResult = await aiProvider.generateEmbedding(query);
+        queryEmbedding = typeof embeddingResult === 'object' && 'embedding' in embeddingResult ? (embeddingResult as any).embedding : (embeddingResult as number[]);
       } catch (e) {
         console.warn('Embedding generation unavailable, falling back to metadata-based search');
       }

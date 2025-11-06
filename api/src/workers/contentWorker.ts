@@ -57,7 +57,8 @@ export const startContentWorker = () => {
               timestamp: new Date().toISOString(),
             });
           }
-          summary = await aiProvider.summarizeContent(raw_text, metadata);
+          const summaryResult = await aiProvider.summarizeContent(raw_text, metadata);
+          summary = typeof summaryResult === 'string' ? summaryResult : (summaryResult as any).text || summaryResult;
           if (attempt > 1) {
             console.log(`[Redis Worker] Job retry successful`, {
               jobId: job.id,

@@ -83,7 +83,8 @@ ${bullets}`;
           const { aiProvider } = await import('../services/aiProvider');
           const { withTimeout } = await import('../services/memorySearch');
           console.log('[search/controller] generating async answer', { ts: new Date().toISOString(), jobId: job.id });
-          const generatedAnswer = await withTimeout(aiProvider.generateContent(ansPrompt, true), 180000); // 3 minutes for async, true = search request (high priority)
+          const answerResult = await withTimeout(aiProvider.generateContent(ansPrompt, true), 180000); // 3 minutes for async, true = search request (high priority)
+          const generatedAnswer = typeof answerResult === 'string' ? answerResult : (answerResult as any).text || answerResult;
           console.log('[search/controller] async answer generated', { ts: new Date().toISOString(), jobId: job.id, answerLength: generatedAnswer?.length });
           const allCitations = filteredRows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
           const pickOrderFrom = (text: string | undefined) => {
