@@ -47,6 +47,10 @@ export interface AnalyticsData {
   }
   activityAnalytics: {
     memoriesByDate: Record<string, number>
+    memoriesByHour: Record<number, number>
+    memoriesByDayOfWeek: Record<number, number>
+    peakHour: number | null
+    peakDayOfWeek: string | null
     totalMemories: number
   }
   relationshipAnalytics: {
@@ -62,6 +66,42 @@ export interface AnalyticsData {
     topCategories: Array<{ category: string; count: number }>
     topTopics: Array<{ topic: string; count: number }>
     sentimentDistribution: Record<string, number>
+  }
+  growthAnalytics: {
+    daysSinceFirst: number
+    daysSinceLast: number
+    memoriesPerDay: number
+    tokensPerDay: number
+    recentMemories7Days: number
+    recentMemories30Days: number
+  }
+  activityAnalytics: {
+    memoriesByDate: Record<string, number>
+    memoriesByHour: Record<number, number>
+    memoriesByDayOfWeek: Record<number, number>
+    peakHour: number | null
+    peakDayOfWeek: string | null
+    totalMemories: number
+  }
+  diversityAnalytics: {
+    uniqueDomains: number
+    uniqueCategories: number
+    uniqueTopics: number
+    domainDiversity: number
+    categoryDiversity: number
+    topicDiversity: number
+  }
+  contentDistribution: {
+    average: number
+    median: number
+    min: number
+    max: number
+    total: number
+  }
+  tokenTrends: {
+    byWeek: Record<string, number>
+    averagePerMemory: number
+    inputOutputRatio: number
   }
 }
 
@@ -122,6 +162,10 @@ export async function getAnalytics(): Promise<AnalyticsData> {
       },
       activityAnalytics: {
         memoriesByDate: {},
+        memoriesByHour: {},
+        memoriesByDayOfWeek: {},
+        peakHour: null,
+        peakDayOfWeek: null,
         totalMemories: 0,
       },
       relationshipAnalytics: {
@@ -137,6 +181,42 @@ export async function getAnalytics(): Promise<AnalyticsData> {
         topCategories: [],
         topTopics: [],
         sentimentDistribution: {},
+      },
+      growthAnalytics: {
+        daysSinceFirst: 0,
+        daysSinceLast: 0,
+        memoriesPerDay: 0,
+        tokensPerDay: 0,
+        recentMemories7Days: 0,
+        recentMemories30Days: 0,
+      },
+      activityAnalytics: {
+        memoriesByDate: {},
+        memoriesByHour: {},
+        memoriesByDayOfWeek: {},
+        peakHour: null,
+        peakDayOfWeek: null,
+        totalMemories: 0,
+      },
+      diversityAnalytics: {
+        uniqueDomains: 0,
+        uniqueCategories: 0,
+        uniqueTopics: 0,
+        domainDiversity: 0,
+        categoryDiversity: 0,
+        topicDiversity: 0,
+      },
+      contentDistribution: {
+        average: 0,
+        median: 0,
+        min: 0,
+        max: 0,
+        total: 0,
+      },
+      tokenTrends: {
+        byWeek: {},
+        averagePerMemory: 0,
+        inputOutputRatio: 0,
       },
     }
   } catch (error) {
