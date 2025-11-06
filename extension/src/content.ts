@@ -793,6 +793,13 @@ async function sendContextToBackground() {
     if (!enabled) {
       return;
     }
+
+    // Check if website is blocked
+    const currentUrl = window.location.href;
+    const isBlocked = await checkWebsiteBlocked(currentUrl);
+    if (isBlocked) {
+      return;
+    }
     
     const now = Date.now();
     if (now - lastCaptureTime < MIN_CAPTURE_INTERVAL) {
@@ -1525,6 +1532,18 @@ async function checkExtensionEnabled(): Promise<boolean> {
   } catch (error) {
     console.error('RecallOS: Error checking extension enabled state:', error);
     return true; // Default to enabled on error
+  }
+}
+
+async function checkWebsiteBlocked(url: string): Promise<boolean> {
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'CHECK_WEBSITE_BLOCKED',
+      url: url,
+    });
+    return response.success ? response.blocked : false;
+  } catch (error) {
+    return false;
   }
 }
 
