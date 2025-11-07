@@ -423,6 +423,12 @@ export const Memories: React.FC = () => {
                 Analytics
               </button>
               <button
+                onClick={() => window.location.href = '/profile'}
+                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
+              >
+                Profile
+              </button>
+              <button
                 onClick={() => setIsPendingJobsOpen(true)}
                 className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
               >

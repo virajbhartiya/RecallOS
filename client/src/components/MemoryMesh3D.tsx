@@ -202,24 +202,15 @@ const SceneComponent: React.FC<SceneProps> = ({
     const spanX = Math.max(1e-6, maxX - minX)
     const spanY = Math.max(1e-6, maxY - minY)
     const spanZ = Math.max(1e-6, maxZ - minZ)
-    const radius = isCompactView ? 1.0 : 1.6 // draw nodes closer together
+    const radius = isCompactView ? 1.0 : 1.6
     const zRadius = radius * 0.8
 
-    return meshData.nodes.map((n, i) => {
-      const sourceType = memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
-      const url = memoryUrls && n.memory_id ? memoryUrls[n.memory_id] : undefined
-      const color = resolveNodeColor(String(sourceType || n.type), url)
-      const isSelected = selectedMemoryId === n.memory_id
-      const isHighlighted = highlightedMemoryIds.includes(n.memory_id || '')
-      const inLatentSpace = n.hasEmbedding === true
-      
-      // Use 3D coordinates if available, otherwise generate them
+    // First pass: normalize all positions
+    const normalizedPositions = meshData.nodes.map((n, i) => {
       let position: [number, number, number]
       if (Number.isFinite(n.x) && Number.isFinite(n.y)) {
-        // Normalize XY into [-radius, radius]
         const nx = ((n.x - cx) / spanX) * radius * 2
         const ny = ((n.y - cy) / spanY) * radius * 2
-        // Prefer backend Z if present; fallback to importance
         let iz: number
         if (Number.isFinite((n as any).z)) {
           iz = (((n as any).z - cz) / spanZ) * zRadius * 2
@@ -228,7 +219,6 @@ const SceneComponent: React.FC<SceneProps> = ({
         }
         position = [nx, ny, iz]
       } else {
-        // Generate 3D position using spherical coordinates with tighter clustering
         const rr = (isCompactView ? radius * 0.4 : radius * 0.55) + (i * 0.008)
         const theta = (i / Math.max(1, meshData.nodes.length)) * Math.PI * 2
         const phi = Math.acos(2 * Math.random() - 1)
@@ -238,6 +228,28 @@ const SceneComponent: React.FC<SceneProps> = ({
           rr * Math.cos(phi)
         ]
       }
+      return position
+    })
+
+    // Calculate center of mass and subtract it to ensure true centering at (0,0,0)
+    const centerX = normalizedPositions.reduce((sum, p) => sum + p[0], 0) / normalizedPositions.length
+    const centerY = normalizedPositions.reduce((sum, p) => sum + p[1], 0) / normalizedPositions.length
+    const centerZ = normalizedPositions.reduce((sum, p) => sum + p[2], 0) / normalizedPositions.length
+
+    return meshData.nodes.map((n, i) => {
+      const sourceType = memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
+      const url = memoryUrls && n.memory_id ? memoryUrls[n.memory_id] : undefined
+      const color = resolveNodeColor(String(sourceType || n.type), url)
+      const isSelected = selectedMemoryId === n.memory_id
+      const isHighlighted = highlightedMemoryIds.includes(n.memory_id || '')
+      const inLatentSpace = n.hasEmbedding === true
+      
+      // Center the position by subtracting the center of mass
+      const position: [number, number, number] = [
+        normalizedPositions[i][0] - centerX,
+        normalizedPositions[i][1] - centerY,
+        normalizedPositions[i][2] - centerZ
+      ]
       
       return {
         id: n.id,
@@ -250,7 +262,7 @@ const SceneComponent: React.FC<SceneProps> = ({
         inLatentSpace
       }
     })
-  }, [meshData, selectedMemoryId, highlightedMemoryIds, memorySources, memoryUrls])
+  }, [meshData, selectedMemoryId, highlightedMemoryIds, memorySources, memoryUrls, isCompactView])
 
   const edges = useMemo(() => {
     if (!meshData?.edges?.length) return []
@@ -347,50 +359,12 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   const [isCompactView, setIsCompactView] = useState(false)
   const controlsRef = useRef<any>(null)
 
-  // Re-center orbit target at the cursor on drag start
-  useEffect(() => {
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement | null
-    if (!canvas) return
-
-    const handlePointerDown = (evt: PointerEvent) => {
-      if (!controlsRef.current) return
-      const rect = canvas.getBoundingClientRect()
-      const x = ((evt.clientX - rect.left) / rect.width) * 2 - 1
-      const y = -(((evt.clientY - rect.top) / rect.height) * 2 - 1)
-
-      // Access the most recent renderer/camera via three provided on global THREE
-      // We compute the ray manually using the canvas' current WebGL renderer if available
-      // Fallback to window globals if needed via three.js
-      const renderer = (canvas as any).__r3f?.root?.store?.getState?.().gl
-      const camera = (canvas as any).__r3f?.root?.store?.getState?.().camera
-      if (!renderer || !camera) return
-
-      const mouse = new THREE.Vector2(x, y)
-      const raycaster = new THREE.Raycaster()
-      raycaster.setFromCamera(mouse, camera)
-
-      const dir = new THREE.Vector3()
-      camera.getWorldDirection(dir)
-      const currentTarget: THREE.Vector3 = controlsRef.current.target?.clone?.() || new THREE.Vector3(0, 0, 0)
-      const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(dir, currentTarget)
-      const hitPoint = new THREE.Vector3()
-
-      const intersection = raycaster.ray.intersectPlane(plane, hitPoint)
-      if (intersection) {
-        controlsRef.current.target.copy(intersection)
-        controlsRef.current.update()
-      }
-    }
-
-    canvas.addEventListener('pointerdown', handlePointerDown, { passive: true })
-    return () => canvas.removeEventListener('pointerdown', handlePointerDown)
-  }, [])
-
-  // Ensure zooming focuses the point under the cursor
+  // Ensure OrbitControls target is always at (0,0,0) - the center of the mesh
   useEffect(() => {
     if (!controlsRef.current) return
-    controlsRef.current.zoomToCursor = true
-  }, [controlsRef])
+    controlsRef.current.target.set(0, 0, 0)
+    controlsRef.current.update()
+  }, [controlsRef, meshData])
 
   useEffect(() => {
     const fetchMeshData = async () => {
@@ -498,6 +472,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
             zoomSpeed={1.2}
             panSpeed={0.8}
             rotateSpeed={0.5}
+            target={[0, 0, 0]}
           />
         </Canvas>
 

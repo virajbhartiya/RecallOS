@@ -72,6 +72,15 @@ export const Profile: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
+          <div className="flex items-center gap-4 mb-4">
+            <button 
+              onClick={() => navigate('/')}
+              className="text-sm font-medium text-gray-700 hover:text-black transition-colors relative group"
+            >
+              <span className="relative z-10">← Back</span>
+              <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
+            </button>
+          </div>
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-3xl font-mono font-bold text-gray-900">
               [USER PROFILE]
