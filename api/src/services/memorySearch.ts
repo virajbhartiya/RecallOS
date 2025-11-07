@@ -172,7 +172,7 @@ export async function searchMemories(params: {
   }
 
   logger.log('[search] searching qdrant', { ts: new Date().toISOString(), userId, memoryCount: userMemoryIds.length, searchLimit: searchLimit * 3 });
-  const searchResult = await qdrantClient.search(COLLECTION_NAME, {
+  const qdrantSearchResult = await qdrantClient.search(COLLECTION_NAME, {
     vector: embedding,
     filter: {
       must: [
@@ -182,13 +182,13 @@ export async function searchMemories(params: {
     limit: searchLimit * 3,
     with_payload: true,
   });
-  logger.log('[search] qdrant search completed', { ts: new Date().toISOString(), userId, resultCount: searchResult.length });
+  logger.log('[search] qdrant search completed', { ts: new Date().toISOString(), userId, resultCount: qdrantSearchResult.length });
 
-  if (!searchResult || searchResult.length === 0) {
+  if (!qdrantSearchResult || qdrantSearchResult.length === 0) {
       return { query: normalized, results: [], answer: undefined, context: undefined };
   }
 
-  const searchMemoryIds = searchResult
+  const searchMemoryIds = qdrantSearchResult
     .map(result => result.payload?.memory_id as string)
     .filter((id): id is string => !!id);
 
@@ -203,7 +203,7 @@ export async function searchMemories(params: {
   const memoryMap = new Map(memories.map(m => [m.id, m]));
   const scoreMap = new Map<string, number>();
 
-  searchResult.forEach((result) => {
+  qdrantSearchResult.forEach((result) => {
     const memoryId = result.payload?.memory_id as string;
     if (memoryId) {
       const existingScore = scoreMap.get(memoryId);
