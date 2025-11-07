@@ -15,47 +15,34 @@ export interface UserProfile {
 
 export class ProfileUpdateService {
   async updateUserProfile(userId: string, force: boolean = false): Promise<UserProfile> {
-    const existingProfile = await prisma.userProfile.findUnique({
-      where: { user_id: userId },
-    });
+    const [existingProfile, allMemories] = await Promise.all([
+      prisma.userProfile.findUnique({
+        where: { user_id: userId },
+      }),
+      prisma.memory.findMany({
+        where: { user_id: userId },
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          content: true,
+          created_at: true,
+          page_metadata: true,
+        },
+        orderBy: { created_at: 'desc' } as any,
+        take: 200,
+      }),
+    ]);
 
     const lastAnalyzedDate = force ? null : (existingProfile?.last_memory_analyzed || null);
     
-    const newMemories = await prisma.memory.findMany({
-      where: {
-        user_id: userId,
-        ...(lastAnalyzedDate ? {
-          created_at: { gt: lastAnalyzedDate } as any,
-        } : {}),
-      },
-      select: {
-        id: true,
-        title: true,
-        summary: true,
-        content: true,
-        created_at: true,
-        page_metadata: true,
-      },
-      orderBy: { created_at: 'desc' } as any,
-    });
+    const newMemories = lastAnalyzedDate
+      ? allMemories.filter(m => m.created_at > lastAnalyzedDate)
+      : allMemories;
 
     if (newMemories.length === 0 && existingProfile && !force) {
       return existingProfile as UserProfile;
     }
-
-    const allMemories = await prisma.memory.findMany({
-      where: { user_id: userId },
-      select: {
-        id: true,
-        title: true,
-        summary: true,
-        content: true,
-        created_at: true,
-        page_metadata: true,
-      },
-      orderBy: { created_at: 'desc' } as any,
-      take: 200,
-    });
 
     if (allMemories.length === 0) {
       throw new Error('No memories found for user');
