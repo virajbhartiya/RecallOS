@@ -5,9 +5,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 const prismaOptions: Prisma.PrismaClientOptions = {
-  log: process.env.NODE_ENV === 'development' 
-    ? ['query', 'error', 'warn'] as Prisma.LogLevel[]
-    : ['error'] as Prisma.LogLevel[],
+  log: ['error'] as Prisma.LogLevel[],
 };
 
 export const prisma = globalForPrisma.prisma ?? new PrismaClient(prismaOptions);
