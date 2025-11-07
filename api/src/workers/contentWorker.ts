@@ -24,10 +24,77 @@ export const startContentWorker = () => {
         timestamp: new Date().toISOString(),
       });
 
+      if (!metadata?.memory_id) {
+        const user = await prisma.user.findUnique({
+          where: { id: user_id },
+        });
+
+        if (user) {
+          const canonicalText = normalizeText(raw_text);
+          const canonicalHash = hashCanonical(canonicalText);
+
+          const existingByCanonical = await prisma.memory.findFirst({
+            where: { user_id: user.id, canonical_hash: canonicalHash } as any,
+          });
+
+          if (existingByCanonical) {
+            logger.log(`[Redis Worker] Duplicate memory detected, skipping processing`, {
+              jobId: job.id,
+              userId: user_id,
+              existingMemoryId: existingByCanonical.id,
+              timestamp: new Date().toISOString(),
+            });
+            return {
+              success: true,
+              contentId: existingByCanonical.id,
+              memoryId: existingByCanonical.id,
+              summary: existingByCanonical.summary?.substring(0, 100) + '...' || 'Duplicate memory',
+            };
+          }
+
+          if (metadata?.url && metadata.url !== 'unknown') {
+            const normalizedUrl = normalizeUrl(metadata.url);
+            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+            
+            const recentMemories = await prisma.memory.findMany({
+              where: {
+                user_id,
+                created_at: { gte: oneHourAgo } as any,
+              } as any,
+              orderBy: { created_at: 'desc' } as any,
+              take: 50,
+            });
+
+            for (const existingMemory of recentMemories) {
+              const existingUrl = (existingMemory as any).url;
+              if (existingUrl && typeof existingUrl === 'string' && normalizeUrl(existingUrl) === normalizedUrl) {
+                const existingCanonical = normalizeText((existingMemory as any).content || '');
+                const similarity = calculateSimilarity(canonicalText, existingCanonical);
+                
+                if (similarity > 0.9) {
+                  logger.log(`[Redis Worker] URL duplicate detected, skipping processing`, {
+                    jobId: job.id,
+                    userId: user_id,
+                    existingMemoryId: existingMemory.id,
+                    similarity,
+                    timestamp: new Date().toISOString(),
+                  });
+                  return {
+                    success: true,
+                    contentId: existingMemory.id,
+                    memoryId: existingMemory.id,
+                    summary: existingMemory.summary?.substring(0, 100) + '...' || 'Duplicate memory',
+                  };
+                }
+              }
+            }
+          }
+        }
+      }
+
       const isRetryableError = (err: any): boolean => {
         const msg = String(err?.message || '').toLowerCase();
         const status = Number((err?.status ?? err?.code) || 0);
-        // Treat transient provider failures as retryable
         return (
           status === 429 ||
           status === 500 ||
@@ -43,7 +110,6 @@ export const startContentWorker = () => {
 
       const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-      // In-job retry loop so we don't mark the job failed on transient provider issues
       const maxAttempts = 8;
       const baseDelayMs = 3000;
       const maxDelayMs = 60_000;
@@ -69,7 +135,7 @@ export const startContentWorker = () => {
               timestamp: new Date().toISOString(),
             });
           }
-          break; // success
+          break;
         } catch (err: any) {
           if (!isRetryableError(err) || attempt === maxAttempts) {
             logger.error(`[Redis Worker] Job failed permanently`, {
@@ -80,7 +146,7 @@ export const startContentWorker = () => {
               isRetryable: isRetryableError(err),
               timestamp: new Date().toISOString(),
             });
-            throw err; // non-retryable or exhausted
+            throw err;
           }
           const backoff = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
           const jitter = Math.floor(Math.random() * 500);
@@ -168,67 +234,8 @@ export const startContentWorker = () => {
         });
 
         if (user) {
-          // Exact duplicate check on canonicalized content per user
           const canonicalText = normalizeText(raw_text);
           const canonicalHash = hashCanonical(canonicalText);
-
-          const existingByCanonical = await prisma.memory.findFirst({
-            where: { user_id: user.id, canonical_hash: canonicalHash } as any,
-          });
-
-          if (existingByCanonical) {
-            logger.log(`[Redis Worker] Duplicate memory detected, skipping creation`, {
-              jobId: job.id,
-              userId: user_id,
-              existingMemoryId: existingByCanonical.id,
-              timestamp: new Date().toISOString(),
-            });
-            return {
-              success: true,
-              contentId: existingByCanonical.id,
-              memoryId: existingByCanonical.id,
-              summary: summary.substring(0, 100) + '...',
-            };
-          }
-
-          // Fallback: Check for URL-based duplicates within the last hour (for dynamic content)
-          if (metadata?.url && metadata.url !== 'unknown') {
-            const normalizedUrl = normalizeUrl(metadata.url);
-            const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-            
-            const recentMemories = await prisma.memory.findMany({
-              where: {
-                user_id,
-                created_at: { gte: oneHourAgo } as any,
-              } as any,
-              orderBy: { created_at: 'desc' } as any,
-              take: 50,
-            });
-
-            for (const existingMemory of recentMemories) {
-              const existingUrl = (existingMemory as any).url;
-              if (existingUrl && typeof existingUrl === 'string' && normalizeUrl(existingUrl) === normalizedUrl) {
-                const existingCanonical = normalizeText((existingMemory as any).content || '');
-                const similarity = calculateSimilarity(canonicalText, existingCanonical);
-                
-                if (similarity > 0.9) {
-                  logger.log(`[Redis Worker] URL duplicate detected, skipping creation`, {
-                    jobId: job.id,
-                    userId: user_id,
-                    existingMemoryId: existingMemory.id,
-                    similarity,
-                    timestamp: new Date().toISOString(),
-                  });
-                  return {
-                    success: true,
-                    contentId: existingMemory.id,
-                    memoryId: existingMemory.id,
-                    summary: summary.substring(0, 100) + '...',
-                  };
-                }
-              }
-            }
-          }
           const timestamp = Math.floor(Date.now() / 1000);
 
           let memory;
