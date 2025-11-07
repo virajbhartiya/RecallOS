@@ -179,7 +179,8 @@ export const getSummarizedContent = async (
   try {
     const { page = 1, limit = 10 } = req.query;
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const limitNum = Math.min(Number(limit), 100);
+    const skip = (Number(page) - 1) * limitNum;
 
     if (!req.user) {
       return next(new AppError('User not authenticated', 401));
@@ -192,7 +193,7 @@ export const getSummarizedContent = async (
         where: { user_id: userId },
         orderBy: { created_at: 'desc' },
         skip,
-        take: Number(limit),
+        take: limitNum,
         select: {
           id: true,
           summary: true,
@@ -221,9 +222,9 @@ export const getSummarizedContent = async (
         })),
         pagination: {
           page: Number(page),
-          limit: Number(limit),
+          limit: limitNum,
           total,
-          pages: Math.ceil(total / Number(limit)),
+          pages: Math.ceil(total / limitNum),
         },
       },
     });

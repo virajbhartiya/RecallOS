@@ -62,12 +62,13 @@ export async function searchMemories(params: {
   jobId?: string;
 }): Promise<{ query: string; results: SearchResult[]; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string }>{
   const { userId, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', contextOnly = false, jobId } = params;
+  const searchLimit = Math.min(Number(limit), 100);
 
   logger.log('[search] processing started', {
     ts: new Date().toISOString(),
     userId,
     query: query.slice(0, 100),
-    limit,
+    limit: searchLimit,
     enableReasoning,
     contextOnly,
     jobId,
@@ -122,7 +123,7 @@ export async function searchMemories(params: {
       return { query: normalized, results: [], answer: undefined, context: undefined };
   }
 
-  logger.log('[search] searching qdrant', { ts: new Date().toISOString(), userId, memoryCount: userMemoryIds.length, searchLimit: Number(limit) * 3 });
+  logger.log('[search] searching qdrant', { ts: new Date().toISOString(), userId, memoryCount: userMemoryIds.length, searchLimit: searchLimit * 3 });
   const searchResult = await qdrantClient.search(COLLECTION_NAME, {
     vector: embedding,
     filter: {
@@ -130,7 +131,7 @@ export async function searchMemories(params: {
         { key: 'memory_id', match: { any: userMemoryIds } },
       ],
     },
-    limit: Number(limit) * 3,
+    limit: searchLimit * 3,
     with_payload: true,
   });
   logger.log('[search] qdrant search completed', { ts: new Date().toISOString(), userId, resultCount: searchResult.length });
@@ -247,7 +248,7 @@ export async function searchMemories(params: {
       return row.semantic_score >= 0.15 || row.keyword_score >= 0.3 || row.coverage_ratio >= 0.5;
     })
     .sort((a, b) => b.final_score - a.final_score)
-    .slice(0, Number(limit));
+    .slice(0, searchLimit);
   
   logger.log('[search] results filtered and sorted', { ts: new Date().toISOString(), userId, filteredCount: filteredRows.length, totalScored: scoredRows.length });
   

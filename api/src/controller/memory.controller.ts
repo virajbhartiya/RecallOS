@@ -274,7 +274,7 @@ export class MemoryController {
   static async getRecentMemories(req: AuthenticatedRequest, res: Response) {
     try {
       const { count } = req.query;
-      const limit = count ? parseInt(count as string) : 10;
+      const limit = Math.min(count ? parseInt(count as string) : 10, 100);
 
       if (!req.user) {
         return res.status(401).json({
