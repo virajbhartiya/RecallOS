@@ -113,7 +113,7 @@ export async function refreshProfile(): Promise<UserProfile> {
   requireAuthToken()
   
   try {
-    const response = await postRequest('/profile/refresh', {})
+    const response = await postRequest('/profile/refresh', {}, undefined, undefined, 300000)
     
     if (response.data?.success === false) {
       console.error('API error:', response.data?.error)

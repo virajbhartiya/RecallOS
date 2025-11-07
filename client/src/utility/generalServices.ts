@@ -24,18 +24,22 @@ export const postRequest = async (
   route: string,
   data: any,
   callback?: (res: AxiosResponse) => void,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  timeout?: number
 ) => {
   try {
     const res = await axiosInstance.post(route, data, { 
       signal,
-      timeout: signal ? 0 : 30000 // Disable timeout if AbortSignal is provided
+      timeout: timeout !== undefined ? timeout : (signal ? 0 : 30000) // Use provided timeout, or disable if AbortSignal is provided, or default to 30s
     })
     if (callback) callback(res)
     return res
   } catch (err: any) {
-    if (callback) callback(err.response)
-    return err.response
+    if (callback) callback(err.response || err)
+    if (err.response) {
+      return err.response
+    }
+    throw err
   }
 }
 

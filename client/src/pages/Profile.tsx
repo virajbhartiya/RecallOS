@@ -49,7 +49,11 @@ export const Profile: React.FC = () => {
       setProfile(data)
     } catch (err: any) {
       console.error('Error refreshing profile:', err)
-      setError(err.message || 'Failed to refresh profile')
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        setError('Profile refresh is taking longer than expected. Please try again in a moment.')
+      } else {
+        setError(err.message || 'Failed to refresh profile')
+      }
     } finally {
       setIsRefreshing(false)
     }
