@@ -343,6 +343,15 @@ const SceneComponent: React.FC<SceneProps> = ({
 
 const Scene = memo(SceneComponent)
 
+const ControlsUpdater: React.FC<{ controlsRef: React.RefObject<any> }> = ({ controlsRef }) => {
+  useFrame(() => {
+    if (controlsRef.current) {
+      controlsRef.current.update()
+    }
+  })
+  return null
+}
+
 const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({ 
   className = '', 
   onNodeClick, 
@@ -473,7 +482,10 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
             panSpeed={0.8}
             rotateSpeed={0.5}
             target={[0, 0, 0]}
+            enableDamping={true}
+            dampingFactor={0.05}
           />
+          <ControlsUpdater controlsRef={controlsRef} />
         </Canvas>
 
       </div>
