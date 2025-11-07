@@ -1,5 +1,8 @@
+import Redis from 'ioredis';
 import { prisma } from '../lib/prisma';
 import { profileExtractionService, ProfileExtractionResult } from './profileExtraction';
+import { getRedisConnection } from '../utils/env';
+import { logger } from '../utils/logger';
 
 export interface UserProfile {
   id: string;
@@ -11,6 +14,50 @@ export interface UserProfile {
   last_updated: Date;
   last_memory_analyzed: Date | null;
   version: number;
+}
+
+const PROFILE_CACHE_PREFIX = 'user_profile:';
+const PROFILE_CACHE_TTL = 10 * 60; // 10 minutes in seconds
+const PROFILE_CONTEXT_CACHE_PREFIX = 'user_profile_context:';
+const PROFILE_CONTEXT_CACHE_TTL = 5 * 60; // 5 minutes in seconds
+
+let redisClient: Redis | null = null;
+
+function getRedisClient(): Redis {
+  if (!redisClient) {
+    const connection = getRedisConnection();
+    if ('url' in connection) {
+      redisClient = new Redis(connection.url);
+    } else {
+      redisClient = new Redis({
+        host: connection.host,
+        port: connection.port,
+        username: connection.username,
+        password: connection.password,
+      });
+    }
+  }
+  return redisClient;
+}
+
+function getProfileCacheKey(userId: string): string {
+  return `${PROFILE_CACHE_PREFIX}${userId}`;
+}
+
+function getProfileContextCacheKey(userId: string): string {
+  return `${PROFILE_CONTEXT_CACHE_PREFIX}${userId}`;
+}
+
+async function invalidateProfileCache(userId: string): Promise<void> {
+  try {
+    const client = getRedisClient();
+    await Promise.all([
+      client.del(getProfileCacheKey(userId)),
+      client.del(getProfileContextCacheKey(userId)),
+    ]);
+  } catch (error) {
+    logger.warn('[profile] cache invalidation error', { error: error instanceof Error ? error.message : String(error) });
+  }
 }
 
 export class ProfileUpdateService {
@@ -87,6 +134,9 @@ export class ProfileUpdateService {
         version: { increment: 1 } as any,
       },
     });
+
+    // Invalidate cache after profile update
+    await invalidateProfileCache(userId);
 
     return profile as UserProfile;
   }
@@ -202,14 +252,48 @@ export class ProfileUpdateService {
   }
 
   async getUserProfile(userId: string): Promise<UserProfile | null> {
+    try {
+      const cacheKey = getProfileCacheKey(userId);
+      const client = getRedisClient();
+      const cached = await client.get(cacheKey);
+      
+      if (cached) {
+        return JSON.parse(cached) as UserProfile;
+      }
+    } catch (error) {
+      logger.warn('[profile] cache read error, continuing without cache', { error: error instanceof Error ? error.message : String(error) });
+    }
+
     const profile = await prisma.userProfile.findUnique({
       where: { user_id: userId },
     });
+
+    if (profile) {
+      try {
+        const cacheKey = getProfileCacheKey(userId);
+        const client = getRedisClient();
+        await client.setex(cacheKey, PROFILE_CACHE_TTL, JSON.stringify(profile));
+      } catch (error) {
+        logger.warn('[profile] cache write error', { error: error instanceof Error ? error.message : String(error) });
+      }
+    }
 
     return profile as UserProfile | null;
   }
 
   async getProfileContext(userId: string): Promise<string> {
+    try {
+      const cacheKey = getProfileContextCacheKey(userId);
+      const client = getRedisClient();
+      const cached = await client.get(cacheKey);
+      
+      if (cached) {
+        return cached;
+      }
+    } catch (error) {
+      logger.warn('[profile] context cache read error, continuing without cache', { error: error instanceof Error ? error.message : String(error) });
+    }
+
     const profile = await this.getUserProfile(userId);
     
     if (!profile) {
@@ -233,7 +317,17 @@ export class ProfileUpdateService {
       parts.push(`Recent Context: ${dynamicText}`);
     }
 
-    return parts.join('\n\n');
+    const context = parts.join('\n\n');
+
+    try {
+      const cacheKey = getProfileContextCacheKey(userId);
+      const client = getRedisClient();
+      await client.setex(cacheKey, PROFILE_CONTEXT_CACHE_TTL, context);
+    } catch (error) {
+      logger.warn('[profile] context cache write error', { error: error instanceof Error ? error.message : String(error) });
+    }
+
+    return context;
   }
 
   async shouldUpdateProfile(userId: string, daysSinceLastUpdate: number = 7): Promise<boolean> {
