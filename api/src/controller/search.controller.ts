@@ -3,7 +3,6 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import AppError from '../utils/appError';
 import { searchMemories } from '../services/memorySearch';
 import { createSearchJob, getSearchJob } from '../services/searchJob';
-import { prisma } from '../lib/prisma';
 import { logger } from '../utils/logger';
 
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -12,23 +11,21 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
     const { query, limit, contextOnly } = req.body || {};
     if (!query) return next(new AppError('query is required', 400));
     
+    if (!req.user) {
+      return next(new AppError('User not authenticated', 401));
+    }
+
+    const userId = req.user.externalId || req.user.id;
+
     logger.log('[search/controller] request received', {
       ts: new Date().toISOString(),
-      userId: req.user!.id,
+      userId: userId,
       query: query.slice(0, 100),
       limit,
       contextOnly,
     });
     
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-    });
-
-    if (!user) {
-      return next(new AppError('User not found', 404));
-    }
-    
-    const data = await searchMemories({ userId: user.external_id || user.id, query, limit, contextOnly, jobId: undefined });
+    const data = await searchMemories({ userId: userId, query, limit, contextOnly, jobId: undefined });
     
     // Only create job and return jobId if we don't have an immediate answer (for async delivery)
     if (!contextOnly && !data.answer) {
@@ -173,15 +170,13 @@ export const getContext = async (req: AuthenticatedRequest, res: Response, next:
     const { query, limit } = req.body || {};
     if (!query) return next(new AppError('query is required', 400));
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-    });
-
-    if (!user) {
-      return next(new AppError('User not found', 404));
+    if (!req.user) {
+      return next(new AppError('User not authenticated', 401));
     }
+
+    const userId = req.user.externalId || req.user.id;
     
-    const data = await searchMemories({ userId: user.external_id || user.id, query, limit, contextOnly: true });
+    const data = await searchMemories({ userId: userId, query, limit, contextOnly: true });
     
     res.status(200).json({
       query: data.query,
