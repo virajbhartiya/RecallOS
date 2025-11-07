@@ -377,6 +377,7 @@ export class MemoryController {
           timestamp: true,
           source: true,
         },
+        take: 1000,
       });
 
       const topicCounts: { [key: string]: number } = {};

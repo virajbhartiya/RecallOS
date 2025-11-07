@@ -1,6 +1,5 @@
 import crypto from 'crypto';
-import Redis from 'ioredis';
-import { getRedisConnection } from '../utils/env';
+import { getRedisClient } from '../lib/redis';
 import { logger } from '../utils/logger';
 
 export type SearchJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
@@ -17,25 +16,6 @@ export interface SearchJob {
 
 const JOB_PREFIX = 'search_job:';
 const JOB_TTL = 15 * 60; // 15 minutes in seconds
-
-let redisClient: Redis | null = null;
-
-function getRedisClient(): Redis {
-  if (!redisClient) {
-    const connection = getRedisConnection();
-    if ('url' in connection) {
-      redisClient = new Redis(connection.url);
-    } else {
-      redisClient = new Redis({
-        host: connection.host,
-        port: connection.port,
-        username: connection.username,
-        password: connection.password,
-      });
-    }
-  }
-  return redisClient;
-}
 
 export function createSearchJob(): SearchJob {
   const id = crypto.randomUUID();

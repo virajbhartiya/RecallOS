@@ -1,12 +1,11 @@
 import crypto from 'crypto';
-import Redis from 'ioredis';
 import { prisma } from '../lib/prisma';
 import { aiProvider } from './aiProvider';
 import { setSearchJobResult } from './searchJob';
 import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant';
 import { profileUpdateService } from './profileUpdate';
 import { logger } from '../utils/logger';
-import { getRedisConnection } from '../utils/env';
+import { getRedisClient } from '../lib/redis';
 
 type SearchResult = {
   memory_id: string;
@@ -49,25 +48,6 @@ function sha256Hex(input: string): string {
 
 const SEARCH_CACHE_PREFIX = 'search_cache:';
 const SEARCH_CACHE_TTL = 5 * 60; // 5 minutes in seconds
-
-let redisClient: Redis | null = null;
-
-function getRedisClient(): Redis {
-  if (!redisClient) {
-    const connection = getRedisConnection();
-    if ('url' in connection) {
-      redisClient = new Redis(connection.url);
-    } else {
-      redisClient = new Redis({
-        host: connection.host,
-        port: connection.port,
-        username: connection.username,
-        password: connection.password,
-      });
-    }
-  }
-  return redisClient;
-}
 
 function getCacheKey(userId: string, query: string, limit: number): string {
   const normalized = normalizeText(query);

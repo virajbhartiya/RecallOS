@@ -1,7 +1,6 @@
-import Redis from 'ioredis';
 import { prisma } from '../lib/prisma';
 import { profileExtractionService, ProfileExtractionResult } from './profileExtraction';
-import { getRedisConnection } from '../utils/env';
+import { getRedisClient } from '../lib/redis';
 import { logger } from '../utils/logger';
 
 export interface UserProfile {
@@ -20,25 +19,6 @@ const PROFILE_CACHE_PREFIX = 'user_profile:';
 const PROFILE_CACHE_TTL = 10 * 60; // 10 minutes in seconds
 const PROFILE_CONTEXT_CACHE_PREFIX = 'user_profile_context:';
 const PROFILE_CONTEXT_CACHE_TTL = 5 * 60; // 5 minutes in seconds
-
-let redisClient: Redis | null = null;
-
-function getRedisClient(): Redis {
-  if (!redisClient) {
-    const connection = getRedisConnection();
-    if ('url' in connection) {
-      redisClient = new Redis(connection.url);
-    } else {
-      redisClient = new Redis({
-        host: connection.host,
-        port: connection.port,
-        username: connection.username,
-        password: connection.password,
-      });
-    }
-  }
-  return redisClient;
-}
 
 function getProfileCacheKey(userId: string): string {
   return `${PROFILE_CACHE_PREFIX}${userId}`;
