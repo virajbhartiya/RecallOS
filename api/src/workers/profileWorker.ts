@@ -71,3 +71,56 @@ export const runProfileWorker = async () => {
   return await startProfileWorker(daysSinceLastUpdate);
 };
 
+let profileWorkerInterval: NodeJS.Timeout | null = null;
+
+export const startCyclicProfileWorker = () => {
+  const intervalHours = Number(process.env.PROFILE_UPDATE_CYCLE_HOURS || 24);
+  const intervalMs = intervalHours * 60 * 60 * 1000;
+  const daysSinceLastUpdate = Number(process.env.PROFILE_UPDATE_INTERVAL_DAYS || 7);
+
+  logger.log('[Profile Worker] Starting cyclic profile update worker', {
+    ts: new Date().toISOString(),
+    intervalHours,
+    intervalMs,
+    daysSinceLastUpdate,
+  });
+
+  const runUpdate = async () => {
+    try {
+      logger.log('[Profile Worker] Cyclic update cycle started', {
+        ts: new Date().toISOString(),
+      });
+      await startProfileWorker(daysSinceLastUpdate);
+      logger.log('[Profile Worker] Cyclic update cycle completed', {
+        ts: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error('[Profile Worker] Cyclic update cycle failed', {
+        ts: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
+
+  runUpdate();
+
+  profileWorkerInterval = setInterval(runUpdate, intervalMs);
+
+  logger.log('[Profile Worker] Cyclic profile update worker started', {
+    ts: new Date().toISOString(),
+    nextUpdateIn: `${intervalHours} hours`,
+  });
+
+  return profileWorkerInterval;
+};
+
+export const stopCyclicProfileWorker = () => {
+  if (profileWorkerInterval) {
+    clearInterval(profileWorkerInterval);
+    profileWorkerInterval = null;
+    logger.log('[Profile Worker] Cyclic profile update worker stopped', {
+      ts: new Date().toISOString(),
+    });
+  }
+};
+
