@@ -30,12 +30,8 @@ export const submitContent = async (
       return next(new AppError('user_id and raw_text are required', 400));
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: user_id },
-    });
-
-    if (!user) {
-      return next(new AppError('User not found', 404));
+    if (!req.user || req.user.id !== user_id) {
+      return next(new AppError('User not authenticated', 401));
     }
 
     if (raw_text.length > 100000) {
@@ -185,17 +181,15 @@ export const getSummarizedContent = async (
 
     const skip = (Number(page) - 1) * Number(limit);
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-    });
-
-    if (!user) {
-      return next(new AppError('User not found', 404));
+    if (!req.user) {
+      return next(new AppError('User not authenticated', 401));
     }
+
+    const userId = req.user.id;
 
     const [memories, total] = await Promise.all([
       prisma.memory.findMany({
-        where: { user_id: user.id },
+        where: { user_id: userId },
         orderBy: { created_at: 'desc' },
         skip,
         take: Number(limit),
@@ -209,7 +203,7 @@ export const getSummarizedContent = async (
         },
       }),
       prisma.memory.count({
-        where: { user_id: user.id },
+        where: { user_id: userId },
       }),
     ]);
 
