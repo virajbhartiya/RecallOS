@@ -65,6 +65,31 @@ import { getAllowedOrigins } from './utils/env';
 import { validateRequestSize } from './utils/validation';
 
 app.use(validateRequestSize(10 * 1024 * 1024)); // 10MB limit
+
+const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 60000); // 60 seconds default
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(408).json({
+        success: false,
+        error: 'Request timeout',
+        message: 'The request took too long to process',
+      });
+    }
+  }, REQUEST_TIMEOUT_MS);
+
+  res.on('finish', () => {
+    clearTimeout(timeout);
+  });
+
+  res.on('close', () => {
+    clearTimeout(timeout);
+  });
+
+  next();
+});
+
 app.use(
   cors({
     origin: (origin, callback) => {
