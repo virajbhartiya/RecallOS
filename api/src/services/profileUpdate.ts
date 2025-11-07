@@ -317,7 +317,10 @@ export class ProfileUpdateService {
       return true;
     }
 
-    const daysSince = (Date.now() - profile.last_updated.getTime()) / (1000 * 60 * 60 * 24);
+    const lastUpdated = profile.last_updated instanceof Date 
+      ? profile.last_updated 
+      : new Date(profile.last_updated);
+    const daysSince = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
     return daysSince >= daysSinceLastUpdate;
   }
 
@@ -336,7 +339,16 @@ export class ProfileUpdateService {
         select: { last_updated: true },
       });
 
-      if (!profile || profile.last_updated < cutoffDate) {
+      if (!profile) {
+        usersNeedingUpdate.push(user.id);
+        continue;
+      }
+
+      const lastUpdated = profile.last_updated instanceof Date 
+        ? profile.last_updated 
+        : new Date(profile.last_updated);
+      
+      if (lastUpdated < cutoffDate) {
         usersNeedingUpdate.push(user.id);
       }
     }
