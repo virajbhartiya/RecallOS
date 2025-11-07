@@ -58,13 +58,95 @@ process.on('uncaughtException', (err: Error) => {
 morgan.token('timestamp', () => {
   return new Date().toISOString().replace('Z', '');
 });
-app.use(morgan(':timestamp :method :url :status :response-time ms - :res[content-length]'));
+
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  dim: '\x1b[2m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m',
+};
+
+const shouldUseColors = process.stdout.isTTY && process.env.NO_COLOR !== '1';
+
+const getMethodColor = (method: string): string => {
+  if (!shouldUseColors) return '';
+  switch (method) {
+    case 'GET': return colors.green;
+    case 'POST': return colors.blue;
+    case 'PUT': return colors.yellow;
+    case 'PATCH': return colors.magenta;
+    case 'DELETE': return colors.red;
+    default: return colors.cyan;
+  }
+};
+
+const getStatusColor = (status: number): string => {
+  if (!shouldUseColors) return '';
+  if (status >= 500) return colors.red;
+  if (status >= 400) return colors.yellow;
+  if (status >= 300) return colors.cyan;
+  if (status >= 200) return colors.green;
+  return colors.reset;
+};
+
+const coloredMorganFormat = (tokens: any, req: any, res: any): string => {
+  const method = tokens.method(req, res);
+  const status = tokens.status(req, res);
+  const url = tokens.url(req, res);
+  const responseTime = tokens['response-time'](req, res);
+  const contentLength = tokens.res(req, res, 'content-length');
+  const timestamp = tokens.timestamp(req, res);
+
+  const methodColor = getMethodColor(method);
+  const statusColor = getStatusColor(Number(status));
+  const timestampColor = shouldUseColors ? colors.dim + colors.gray : '';
+  const resetColor = shouldUseColors ? colors.reset : '';
+
+  const coloredMethod = shouldUseColors ? `${methodColor}${method}${resetColor}` : method;
+  const coloredStatus = shouldUseColors ? `${statusColor}${status}${resetColor}` : status;
+  const coloredTimestamp = shouldUseColors ? `${timestampColor}${timestamp}${resetColor}` : timestamp;
+
+  return `${coloredTimestamp} ${coloredMethod} ${url} ${coloredStatus} ${responseTime} ms - ${contentLength || '-'}`;
+};
+
+app.use(morgan(coloredMorganFormat));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(express.json({ limit: '10mb' }));
 import { getAllowedOrigins } from './utils/env';
 import { validateRequestSize } from './utils/validation';
 
 app.use(validateRequestSize(10 * 1024 * 1024)); // 10MB limit
+
+const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 60000); // 60 seconds default
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const timeout = setTimeout(() => {
+    if (!res.headersSent) {
+      res.status(408).json({
+        success: false,
+        error: 'Request timeout',
+        message: 'The request took too long to process',
+      });
+    }
+  }, REQUEST_TIMEOUT_MS);
+
+  res.on('finish', () => {
+    clearTimeout(timeout);
+  });
+
+  res.on('close', () => {
+    clearTimeout(timeout);
+  });
+
+  next();
+});
+
 app.use(
   cors({
     origin: (origin, callback) => {

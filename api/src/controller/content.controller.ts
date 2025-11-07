@@ -30,12 +30,8 @@ export const submitContent = async (
       return next(new AppError('user_id and raw_text are required', 400));
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: user_id },
-    });
-
-    if (!user) {
-      return next(new AppError('User not found', 404));
+    if (!req.user || req.user.id !== user_id) {
+      return next(new AppError('User not authenticated', 401));
     }
 
     if (raw_text.length > 100000) {
@@ -183,22 +179,21 @@ export const getSummarizedContent = async (
   try {
     const { page = 1, limit = 10 } = req.query;
 
-    const skip = (Number(page) - 1) * Number(limit);
+    const limitNum = Math.min(Number(limit), 100);
+    const skip = (Number(page) - 1) * limitNum;
 
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-    });
-
-    if (!user) {
-      return next(new AppError('User not found', 404));
+    if (!req.user) {
+      return next(new AppError('User not authenticated', 401));
     }
+
+    const userId = req.user.id;
 
     const [memories, total] = await Promise.all([
       prisma.memory.findMany({
-        where: { user_id: user.id },
+        where: { user_id: userId },
         orderBy: { created_at: 'desc' },
         skip,
-        take: Number(limit),
+        take: limitNum,
         select: {
           id: true,
           summary: true,
@@ -209,7 +204,7 @@ export const getSummarizedContent = async (
         },
       }),
       prisma.memory.count({
-        where: { user_id: user.id },
+        where: { user_id: userId },
       }),
     ]);
 
@@ -227,9 +222,9 @@ export const getSummarizedContent = async (
         })),
         pagination: {
           page: Number(page),
-          limit: Number(limit),
+          limit: limitNum,
           total,
-          pages: Math.ceil(total / Number(limit)),
+          pages: Math.ceil(total / limitNum),
         },
       },
     });

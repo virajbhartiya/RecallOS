@@ -23,20 +23,18 @@ export class MemoryController {
         });
       }
 
-      const user = await prisma.user.findUnique({
-        where: { id: req.user!.id },
-      });
-
-      if (!user) {
-        return res.status(404).json({
+      if (!req.user) {
+        return res.status(401).json({
           success: false,
-          error: 'User not found',
+          error: 'User not authenticated',
         });
       }
 
+      const userId = req.user.id;
+
       logger.log('[memory/process] inbound', {
         ts: new Date().toISOString(),
-        userId: user.id,
+        userId: userId,
         url: typeof url === 'string' ? url.slice(0, 200) : undefined,
         title: typeof title === 'string' ? title.slice(0, 200) : undefined,
         contentLen: typeof content === 'string' ? content.length : undefined,
@@ -48,7 +46,7 @@ export class MemoryController {
       const canonicalHash = hashCanonical(canonicalText);
 
       const existingByCanonical = await prisma.memory.findFirst({
-        where: { user_id: user.id, canonical_hash: canonicalHash } as any,
+        where: { user_id: userId, canonical_hash: canonicalHash } as any,
         select: {
           id: true,
           title: true,
@@ -75,7 +73,7 @@ export class MemoryController {
           success: true,
           message: 'Duplicate memory detected, returning existing record',
           data: {
-            userId: user.id,
+            userId: userId,
             memory: serializedExisting,
             isDuplicate: true,
           },
@@ -89,7 +87,7 @@ export class MemoryController {
         
         const recentMemories = await prisma.memory.findMany({
           where: {
-            user_id: user.id,
+            user_id: userId,
             created_at: { gte: oneHourAgo } as any,
           } as any,
           select: {
@@ -122,12 +120,12 @@ export class MemoryController {
                   ? (existingMemory as any).timestamp.toString()
                   : null,
               };
-              logger.log('[memory/process] url_duplicate_detected', { existingMemoryId: existingMemory.id, similarity, userId: user.id });
+              logger.log('[memory/process] url_duplicate_detected', { existingMemoryId: existingMemory.id, similarity, userId: userId });
               return res.status(200).json({
                 success: true,
                 message: 'Duplicate memory detected by URL similarity, returning existing record',
                 data: {
-                  userId: user.id,
+                  userId: userId,
                   memory: serializedExisting,
                   isDuplicate: true,
                 },
@@ -140,8 +138,8 @@ export class MemoryController {
       const aiStart = Date.now();
       logger.log('[memory/process] ai_start', { ts: new Date().toISOString(), tasks: ['summarizeContent', 'extractContentMetadata'] });
       const [summaryResult, extractedMetadataResult] = await Promise.all([
-        aiProvider.summarizeContent(content, metadata, user.id),
-        aiProvider.extractContentMetadata(content, metadata, user.id),
+        aiProvider.summarizeContent(content, metadata, userId),
+        aiProvider.extractContentMetadata(content, metadata, userId),
       ]);
       const summary = typeof summaryResult === 'string' ? summaryResult : (summaryResult as any).text || summaryResult;
       const extractedMetadata = typeof extractedMetadataResult === 'object' && 'topics' in extractedMetadataResult ? extractedMetadataResult : (extractedMetadataResult as any).metadata || extractedMetadataResult;
@@ -159,7 +157,7 @@ export class MemoryController {
       try {
         memory = await prisma.memory.create({
           data: {
-            user_id: user.id,
+            user_id: userId,
             source: metadata?.source || 'extension',
             url: url || 'unknown',
             title: title || 'Untitled',
@@ -181,11 +179,11 @@ export class MemoryController {
             },
           } as any,
         });
-        logger.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id, userId: user.id });
+        logger.log('[memory/process] db_memory_created', { ms: Date.now() - dbCreateStart, memoryId: memory.id, userId: userId });
       } catch (createError: any) {
         if (createError.code === 'P2002') {
           const existingMemory = await prisma.memory.findFirst({
-            where: { user_id: user.id, canonical_hash: canonicalHash } as any,
+            where: { user_id: userId, canonical_hash: canonicalHash } as any,
             select: {
               id: true,
               title: true,
@@ -208,12 +206,12 @@ export class MemoryController {
                 ? (existingMemory as any).timestamp.toString()
                 : null,
             };
-            logger.log('[memory/process] duplicate_detected_on_create', { existingMemoryId: existingMemory.id, userId: user.id });
+            logger.log('[memory/process] duplicate_detected_on_create', { existingMemoryId: existingMemory.id, userId: userId });
             return res.status(200).json({
               success: true,
               message: 'Duplicate memory detected, returning existing record',
               data: {
-                userId: user.id,
+                userId: userId,
                 memory: serializedExisting,
                 isDuplicate: true,
               },
@@ -232,7 +230,7 @@ export class MemoryController {
 
           await prisma.memorySnapshot.create({
             data: {
-              user_id: user.id,
+              user_id: userId,
               raw_text: content,
               summary: summary,
               summary_hash: summaryHash,
@@ -245,8 +243,8 @@ export class MemoryController {
 
         try {
           const meshStart = Date.now();
-          logger.log('[memory/process] mesh_start', { memoryId: memory.id, userId: user.id });
-          await memoryMeshService.processMemoryForMesh(memory.id, user.id);
+          logger.log('[memory/process] mesh_start', { memoryId: memory.id, userId: userId });
+          await memoryMeshService.processMemoryForMesh(memory.id, userId);
           logger.log('[memory/process] mesh_done', { ms: Date.now() - meshStart, memoryId: memory.id });
         } catch (meshError) {
           logger.error(`Error processing memory ${memory.id} for mesh:`, meshError);
@@ -257,7 +255,7 @@ export class MemoryController {
         success: true,
         message: 'Content processed and stored successfully',
         data: {
-          userId: user.id,
+          userId: userId,
           memoryId: memory.id,
           urlHash,
           transactionDetails: null,
@@ -276,15 +274,19 @@ export class MemoryController {
   static async getRecentMemories(req: AuthenticatedRequest, res: Response) {
     try {
       const { count } = req.query;
-      const limit = count ? parseInt(count as string) : 10;
+      const limit = Math.min(count ? parseInt(count as string) : 10, 100);
 
-      const user = await prisma.user.findUnique({
-        where: { id: req.user!.id },
-      });
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated',
+        });
+      }
 
-      if (user) {
-        const memories = await prisma.memory.findMany({
-          where: { user_id: user.id },
+      const userId = req.user.id;
+
+      const memories = await prisma.memory.findMany({
+        where: { user_id: userId },
           select: {
             id: true,
             title: true,
@@ -306,26 +308,12 @@ export class MemoryController {
           timestamp: memory.timestamp ? memory.timestamp.toString() : null,
         }));
 
-        return res.status(200).json({
-          success: true,
-          data: {
-            userId: user.id,
-            count: limit,
-            memories: serializedMemories,
-            actualCount: memories.length,
-          },
-        });
-      }
-
-      // Return empty array if no database records
-      const memories: any[] = [];
-
       res.status(200).json({
         success: true,
         data: {
-          userId: req.user!.id,
+          userId: userId,
           count: limit,
-          memories,
+          memories: serializedMemories,
           actualCount: memories.length,
         },
       });
@@ -341,25 +329,26 @@ export class MemoryController {
 
   static async getUserMemoryCount(req: AuthenticatedRequest, res: Response) {
     try {
-      const user = await prisma.user.findUnique({
-        where: { id: req.user!.id },
-      });
-
-      if (user) {
-        const count = await prisma.memory.count({
-          where: { user_id: user.id },
-        });
-
-        return res.status(200).json({
-          success: true,
-          data: {
-            userId: user.id,
-            memoryCount: count,
-          },
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated',
         });
       }
 
-      return res.status(200).json({ success: true, data: { userId: req.user!.id, memoryCount: 0 } });
+      const userId = req.user.id;
+
+      const count = await prisma.memory.count({
+        where: { user_id: userId },
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          userId: userId,
+          memoryCount: count,
+        },
+      });
     } catch (error) {
       logger.error('Error getting user memory count:', error);
       res.status(500).json({
@@ -372,28 +361,23 @@ export class MemoryController {
 
   static async getMemoryInsights(req: AuthenticatedRequest, res: Response) {
     try {
-      const user = await prisma.user.findUnique({
-        where: { id: req.user!.id },
-      });
-
-      if (!user) {
-        return res.status(200).json({
-          success: true,
-          data: {
-            memories: [],
-            transactionStats: {},
-            totalMemories: 0,
-          },
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          error: 'User not authenticated',
         });
       }
 
+      const userId = req.user.id;
+
       const memories = await prisma.memory.findMany({
-        where: { user_id: user.id },
+        where: { user_id: userId },
         select: {
           page_metadata: true,
           timestamp: true,
           source: true,
         },
+        take: 1000,
       });
 
       const topicCounts: { [key: string]: number } = {};
@@ -494,19 +478,17 @@ export class MemoryController {
 
   static async debugMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      const user = await prisma.user.findUnique({
-        where: { id: req.user!.id },
-      });
-
-      if (!user) {
-        return res.status(404).json({
+      if (!req.user) {
+        return res.status(401).json({
           success: false,
-          error: 'User not found',
+          error: 'User not authenticated',
         });
       }
 
+      const userId = req.user.id;
+
       const memories = await prisma.memory.findMany({
-        where: { user_id: user.id },
+        where: { user_id: userId },
         select: {
           id: true,
           title: true,
@@ -521,7 +503,7 @@ export class MemoryController {
       res.status(200).json({
         success: true,
         data: {
-          user_id: user.id,
+          user_id: userId,
           total_memories: memories.length,
           recent_memories: memories,
         },

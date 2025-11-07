@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../lib/prisma';
 import { verifyToken, extractTokenFromHeader } from '../utils/jwt';
 import { getSessionCookieName } from '../utils/env';
 import { logger } from '../utils/logger';
+import { getUserWithCache } from '../utils/userCache';
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -36,11 +36,7 @@ export async function authenticateToken(
       return;
     }
 
-    // Verify user still exists
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: { id: true, email: true, external_id: true }
-    });
+    const user = await getUserWithCache(payload.userId);
 
     if (!user) {
       logger.error('Auth middleware: User not found for userId:', payload.userId);

@@ -1,5 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { profileExtractionService, ProfileExtractionResult } from './profileExtraction';
+import { getRedisClient } from '../lib/redis';
+import { logger } from '../utils/logger';
 
 export interface UserProfile {
   id: string;
@@ -13,49 +15,61 @@ export interface UserProfile {
   version: number;
 }
 
+const PROFILE_CACHE_PREFIX = 'user_profile:';
+const PROFILE_CACHE_TTL = 10 * 60; // 10 minutes in seconds
+const PROFILE_CONTEXT_CACHE_PREFIX = 'user_profile_context:';
+const PROFILE_CONTEXT_CACHE_TTL = 5 * 60; // 5 minutes in seconds
+
+function getProfileCacheKey(userId: string): string {
+  return `${PROFILE_CACHE_PREFIX}${userId}`;
+}
+
+function getProfileContextCacheKey(userId: string): string {
+  return `${PROFILE_CONTEXT_CACHE_PREFIX}${userId}`;
+}
+
+async function invalidateProfileCache(userId: string): Promise<void> {
+  try {
+    const client = getRedisClient();
+    await Promise.all([
+      client.del(getProfileCacheKey(userId)),
+      client.del(getProfileContextCacheKey(userId)),
+    ]);
+  } catch (error) {
+    logger.warn('[profile] cache invalidation error', { error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
 export class ProfileUpdateService {
   async updateUserProfile(userId: string, force: boolean = false): Promise<UserProfile> {
-    const existingProfile = await prisma.userProfile.findUnique({
-      where: { user_id: userId },
-    });
+    const [existingProfile, allMemories] = await Promise.all([
+      prisma.userProfile.findUnique({
+        where: { user_id: userId },
+      }),
+      prisma.memory.findMany({
+        where: { user_id: userId },
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          content: true,
+          created_at: true,
+          page_metadata: true,
+        },
+        orderBy: { created_at: 'desc' } as any,
+        take: 200,
+      }),
+    ]);
 
     const lastAnalyzedDate = force ? null : (existingProfile?.last_memory_analyzed || null);
     
-    const newMemories = await prisma.memory.findMany({
-      where: {
-        user_id: userId,
-        ...(lastAnalyzedDate ? {
-          created_at: { gt: lastAnalyzedDate } as any,
-        } : {}),
-      },
-      select: {
-        id: true,
-        title: true,
-        summary: true,
-        content: true,
-        created_at: true,
-        page_metadata: true,
-      },
-      orderBy: { created_at: 'desc' } as any,
-    });
+    const newMemories = lastAnalyzedDate
+      ? allMemories.filter(m => m.created_at > lastAnalyzedDate)
+      : allMemories;
 
     if (newMemories.length === 0 && existingProfile && !force) {
       return existingProfile as UserProfile;
     }
-
-    const allMemories = await prisma.memory.findMany({
-      where: { user_id: userId },
-      select: {
-        id: true,
-        title: true,
-        summary: true,
-        content: true,
-        created_at: true,
-        page_metadata: true,
-      },
-      orderBy: { created_at: 'desc' } as any,
-      take: 200,
-    });
 
     if (allMemories.length === 0) {
       throw new Error('No memories found for user');
@@ -100,6 +114,9 @@ export class ProfileUpdateService {
         version: { increment: 1 } as any,
       },
     });
+
+    // Invalidate cache after profile update
+    await invalidateProfileCache(userId);
 
     return profile as UserProfile;
   }
@@ -215,14 +232,48 @@ export class ProfileUpdateService {
   }
 
   async getUserProfile(userId: string): Promise<UserProfile | null> {
+    try {
+      const cacheKey = getProfileCacheKey(userId);
+      const client = getRedisClient();
+      const cached = await client.get(cacheKey);
+      
+      if (cached) {
+        return JSON.parse(cached) as UserProfile;
+      }
+    } catch (error) {
+      logger.warn('[profile] cache read error, continuing without cache', { error: error instanceof Error ? error.message : String(error) });
+    }
+
     const profile = await prisma.userProfile.findUnique({
       where: { user_id: userId },
     });
+
+    if (profile) {
+      try {
+        const cacheKey = getProfileCacheKey(userId);
+        const client = getRedisClient();
+        await client.setex(cacheKey, PROFILE_CACHE_TTL, JSON.stringify(profile));
+      } catch (error) {
+        logger.warn('[profile] cache write error', { error: error instanceof Error ? error.message : String(error) });
+      }
+    }
 
     return profile as UserProfile | null;
   }
 
   async getProfileContext(userId: string): Promise<string> {
+    try {
+      const cacheKey = getProfileContextCacheKey(userId);
+      const client = getRedisClient();
+      const cached = await client.get(cacheKey);
+      
+      if (cached) {
+        return cached;
+      }
+    } catch (error) {
+      logger.warn('[profile] context cache read error, continuing without cache', { error: error instanceof Error ? error.message : String(error) });
+    }
+
     const profile = await this.getUserProfile(userId);
     
     if (!profile) {
@@ -246,7 +297,17 @@ export class ProfileUpdateService {
       parts.push(`Recent Context: ${dynamicText}`);
     }
 
-    return parts.join('\n\n');
+    const context = parts.join('\n\n');
+
+    try {
+      const cacheKey = getProfileContextCacheKey(userId);
+      const client = getRedisClient();
+      await client.setex(cacheKey, PROFILE_CONTEXT_CACHE_TTL, context);
+    } catch (error) {
+      logger.warn('[profile] context cache write error', { error: error instanceof Error ? error.message : String(error) });
+    }
+
+    return context;
   }
 
   async shouldUpdateProfile(userId: string, daysSinceLastUpdate: number = 7): Promise<boolean> {

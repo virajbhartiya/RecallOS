@@ -5,6 +5,7 @@ import { setSearchJobResult } from './searchJob';
 import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant';
 import { profileUpdateService } from './profileUpdate';
 import { logger } from '../utils/logger';
+import { getRedisClient } from '../lib/redis';
 
 type SearchResult = {
   memory_id: string;
@@ -45,6 +46,15 @@ function sha256Hex(input: string): string {
   return crypto.createHash('sha256').update(input).digest('hex');
 }
 
+const SEARCH_CACHE_PREFIX = 'search_cache:';
+const SEARCH_CACHE_TTL = 5 * 60; // 5 minutes in seconds
+
+function getCacheKey(userId: string, query: string, limit: number): string {
+  const normalized = normalizeText(query);
+  const hash = sha256Hex(`${userId}:${normalized}:${limit}`);
+  return `${SEARCH_CACHE_PREFIX}${hash}`;
+}
+
 
 export async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -62,16 +72,35 @@ export async function searchMemories(params: {
   jobId?: string;
 }): Promise<{ query: string; results: SearchResult[]; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; context?: string }>{
   const { userId, query, limit = Number(process.env.SEARCH_TOP_K || 10), enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false', contextOnly = false, jobId } = params;
+  const searchLimit = Math.min(Number(limit), 100);
 
   logger.log('[search] processing started', {
     ts: new Date().toISOString(),
     userId,
     query: query.slice(0, 100),
-    limit,
+    limit: searchLimit,
     enableReasoning,
     contextOnly,
     jobId,
   });
+
+  // Skip caching for contextOnly or jobId requests
+  const shouldCache = !contextOnly && !jobId;
+  
+  if (shouldCache) {
+    try {
+      const cacheKey = getCacheKey(userId, query, searchLimit);
+      const client = getRedisClient();
+      const cached = await client.get(cacheKey);
+      
+      if (cached) {
+        logger.log('[search] cache hit', { ts: new Date().toISOString(), userId, query: query.slice(0, 100) });
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      logger.warn('[search] cache read error, continuing without cache', { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
 
   if (!aiProvider.isInitialized) {
     logger.error('AI Provider not initialized. Check GEMINI_API_KEY or AI_PROVIDER configuration.');
@@ -122,24 +151,24 @@ export async function searchMemories(params: {
       return { query: normalized, results: [], answer: undefined, context: undefined };
   }
 
-  logger.log('[search] searching qdrant', { ts: new Date().toISOString(), userId, memoryCount: userMemoryIds.length, searchLimit: Number(limit) * 3 });
-  const searchResult = await qdrantClient.search(COLLECTION_NAME, {
+  logger.log('[search] searching qdrant', { ts: new Date().toISOString(), userId, memoryCount: userMemoryIds.length, searchLimit: searchLimit * 3 });
+  const qdrantSearchResult = await qdrantClient.search(COLLECTION_NAME, {
     vector: embedding,
     filter: {
       must: [
         { key: 'memory_id', match: { any: userMemoryIds } },
       ],
     },
-    limit: Number(limit) * 3,
+    limit: searchLimit * 3,
     with_payload: true,
   });
-  logger.log('[search] qdrant search completed', { ts: new Date().toISOString(), userId, resultCount: searchResult.length });
+  logger.log('[search] qdrant search completed', { ts: new Date().toISOString(), userId, resultCount: qdrantSearchResult.length });
 
-  if (!searchResult || searchResult.length === 0) {
+  if (!qdrantSearchResult || qdrantSearchResult.length === 0) {
       return { query: normalized, results: [], answer: undefined, context: undefined };
   }
 
-  const searchMemoryIds = searchResult
+  const searchMemoryIds = qdrantSearchResult
     .map(result => result.payload?.memory_id as string)
     .filter((id): id is string => !!id);
 
@@ -154,7 +183,7 @@ export async function searchMemories(params: {
   const memoryMap = new Map(memories.map(m => [m.id, m]));
   const scoreMap = new Map<string, number>();
 
-  searchResult.forEach((result) => {
+  qdrantSearchResult.forEach((result) => {
     const memoryId = result.payload?.memory_id as string;
     if (memoryId) {
       const existingScore = scoreMap.get(memoryId);
@@ -247,7 +276,7 @@ export async function searchMemories(params: {
       return row.semantic_score >= 0.15 || row.keyword_score >= 0.3 || row.coverage_ratio >= 0.5;
     })
     .sort((a, b) => b.final_score - a.final_score)
-    .slice(0, Number(limit));
+    .slice(0, searchLimit);
   
   logger.log('[search] results filtered and sorted', { ts: new Date().toISOString(), userId, filteredCount: filteredRows.length, totalScored: scoredRows.length });
   
@@ -440,7 +469,21 @@ ${bullets}`;
     jobId,
   });
   
-  return { query: normalized, results, answer, citations, context };
+  const searchResult = { query: normalized, results, answer, citations, context };
+  
+  // Cache the results if caching is enabled
+  if (shouldCache) {
+    try {
+      const cacheKey = getCacheKey(userId, query, searchLimit);
+      const client = getRedisClient();
+      await client.setex(cacheKey, SEARCH_CACHE_TTL, JSON.stringify(searchResult));
+      logger.log('[search] cache write', { ts: new Date().toISOString(), userId, query: query.slice(0, 100) });
+    } catch (error) {
+      logger.warn('[search] cache write error', { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  
+  return searchResult;
 }
 
 
