@@ -1,10 +1,12 @@
 import crypto from 'crypto';
+import Redis from 'ioredis';
 import { prisma } from '../lib/prisma';
 import { aiProvider } from './aiProvider';
 import { setSearchJobResult } from './searchJob';
 import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant';
 import { profileUpdateService } from './profileUpdate';
 import { logger } from '../utils/logger';
+import { getRedisConnection } from '../utils/env';
 
 type SearchResult = {
   memory_id: string;
@@ -45,6 +47,34 @@ function sha256Hex(input: string): string {
   return crypto.createHash('sha256').update(input).digest('hex');
 }
 
+const SEARCH_CACHE_PREFIX = 'search_cache:';
+const SEARCH_CACHE_TTL = 5 * 60; // 5 minutes in seconds
+
+let redisClient: Redis | null = null;
+
+function getRedisClient(): Redis {
+  if (!redisClient) {
+    const connection = getRedisConnection();
+    if ('url' in connection) {
+      redisClient = new Redis(connection.url);
+    } else {
+      redisClient = new Redis({
+        host: connection.host,
+        port: connection.port,
+        username: connection.username,
+        password: connection.password,
+      });
+    }
+  }
+  return redisClient;
+}
+
+function getCacheKey(userId: string, query: string, limit: number): string {
+  const normalized = normalizeText(query);
+  const hash = sha256Hex(`${userId}:${normalized}:${limit}`);
+  return `${SEARCH_CACHE_PREFIX}${hash}`;
+}
+
 
 export async function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -73,6 +103,24 @@ export async function searchMemories(params: {
     contextOnly,
     jobId,
   });
+
+  // Skip caching for contextOnly or jobId requests
+  const shouldCache = !contextOnly && !jobId;
+  
+  if (shouldCache) {
+    try {
+      const cacheKey = getCacheKey(userId, query, searchLimit);
+      const client = getRedisClient();
+      const cached = await client.get(cacheKey);
+      
+      if (cached) {
+        logger.log('[search] cache hit', { ts: new Date().toISOString(), userId, query: query.slice(0, 100) });
+        return JSON.parse(cached);
+      }
+    } catch (error) {
+      logger.warn('[search] cache read error, continuing without cache', { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
 
   if (!aiProvider.isInitialized) {
     logger.error('AI Provider not initialized. Check GEMINI_API_KEY or AI_PROVIDER configuration.');
@@ -441,7 +489,21 @@ ${bullets}`;
     jobId,
   });
   
-  return { query: normalized, results, answer, citations, context };
+  const searchResult = { query: normalized, results, answer, citations, context };
+  
+  // Cache the results if caching is enabled
+  if (shouldCache) {
+    try {
+      const cacheKey = getCacheKey(userId, query, searchLimit);
+      const client = getRedisClient();
+      await client.setex(cacheKey, SEARCH_CACHE_TTL, JSON.stringify(searchResult));
+      logger.log('[search] cache write', { ts: new Date().toISOString(), userId, query: query.slice(0, 100) });
+    } catch (error) {
+      logger.warn('[search] cache write error', { error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  
+  return searchResult;
 }
 
 
