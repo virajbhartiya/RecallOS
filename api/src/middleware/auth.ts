@@ -36,7 +36,6 @@ export async function authenticateToken(
       return;
     }
 
-    // Verify user still exists using cache
     const user = await getUserWithCache(payload.userId);
 
     if (!user) {
