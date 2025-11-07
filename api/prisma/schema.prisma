@@ -47,6 +47,8 @@ model Memory {
   @@index([user_id])
   @@index([created_at])
   @@index([user_id, created_at])
+  @@index([canonical_hash])
+  @@index([url])
   @@unique([user_id, canonical_hash])
   @@map("memories")
 }
@@ -63,6 +65,8 @@ model MemoryRelation {
 
   @@unique([memory_id, related_memory_id])
   @@index([memory_id])
+  @@index([related_memory_id])
+  @@index([memory_id, related_memory_id])
   @@index([similarity_score])
   @@map("memory_relations")
 }
@@ -91,6 +95,8 @@ model QueryEvent {
   created_at     DateTime             @default(now())
   related        QueryRelatedMemory[]
 
+  @@index([user_id])
+  @@index([user_id, created_at])
   @@map("query_events")
 }
 
