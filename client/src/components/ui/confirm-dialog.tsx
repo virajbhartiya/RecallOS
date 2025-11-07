@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, memo } from 'react'
+import React, { useEffect, useCallback, useRef, memo } from 'react'
 import { X } from 'lucide-react'
 
 interface ConfirmDialogProps {
@@ -20,24 +20,41 @@ const ConfirmDialogComponent: React.FC<ConfirmDialogProps> = ({
   onConfirm,
   onCancel,
 }) => {
+  const confirmButtonRef = useRef<HTMLButtonElement>(null)
+
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (!isOpen) return
+
+    const target = e.target as HTMLElement
+    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+
+    if (e.key === 'Escape') {
       e.preventDefault()
-      onConfirm()
-    } else if (e.key === 'Escape') {
-      e.preventDefault()
+      e.stopPropagation()
       onCancel()
+    } else if (e.key === 'Enter' && !isInput && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault()
+      e.stopPropagation()
+      onConfirm()
     }
-  }, [onConfirm, onCancel])
+  }, [isOpen, onConfirm, onCancel])
 
   useEffect(() => {
     if (!isOpen) return
 
-    window.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleKeyDown, true)
     return () => {
-      window.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keydown', handleKeyDown, true)
     }
   }, [isOpen, handleKeyDown])
+
+  useEffect(() => {
+    if (isOpen && confirmButtonRef.current) {
+      setTimeout(() => {
+        confirmButtonRef.current?.focus()
+      }, 100)
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -69,8 +86,9 @@ const ConfirmDialogComponent: React.FC<ConfirmDialogProps> = ({
               {cancelLabel}
             </button>
             <button
+              ref={confirmButtonRef}
               onClick={onConfirm}
-              className="px-4 py-2 text-sm font-mono bg-black text-white hover:bg-gray-800 border border-black transition-colors"
+              className="px-4 py-2 text-sm font-mono bg-black text-white hover:bg-gray-800 border border-black transition-colors focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2"
             >
               {confirmLabel}
             </button>

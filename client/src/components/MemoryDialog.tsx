@@ -1,4 +1,4 @@
-import React, { memo } from 'react'
+import React, { useEffect, useCallback, memo } from 'react'
 import { MemoryList } from './MemoryList'
 import { MemoryDetails } from './MemoryDetails'
 import type { Memory, MemorySearchResponse } from '../types/memory'
@@ -34,6 +34,28 @@ const MemoryDialogComponent: React.FC<MemoryDialogProps> = ({
   onDeleteMemory,
   onSearchQueryChange,
 }) => {
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!isOpen) return
+
+    const target = e.target as HTMLElement
+    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+
+    if (e.key === 'Escape' && !isInput) {
+      e.preventDefault()
+      e.stopPropagation()
+      onClose()
+    }
+  }, [isOpen, onClose])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown, true)
+    }
+  }, [isOpen, handleKeyDown])
+
   if (!isOpen) return null
 
   return (

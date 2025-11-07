@@ -86,6 +86,28 @@ export const Search: React.FC = () => {
     setSelectedMemory(null)
   }, [])
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isPopupOpen) return
+
+      const target = e.target as HTMLElement
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+
+      if (e.key === 'Escape' && !isInput) {
+        e.preventDefault()
+        e.stopPropagation()
+        handleClosePopup()
+      }
+    }
+
+    if (isPopupOpen) {
+      document.addEventListener('keydown', handleKeyDown, true)
+      return () => {
+        document.removeEventListener('keydown', handleKeyDown, true)
+      }
+    }
+  }, [isPopupOpen, handleClosePopup])
+
   // Filter results to show only cited memories
   const getFilteredResults = () => {
     if (!searchResults) return []
@@ -270,8 +292,14 @@ export const Search: React.FC = () => {
 
       {/* Memory Detail Popup */}
       {isPopupOpen && selectedMemory && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleClosePopup}
+        >
+          <div 
+            className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-mono font-bold text-gray-900">
