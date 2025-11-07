@@ -1,8 +1,11 @@
 -- CreateTable
 CREATE TABLE "users" (
     "id" UUID NOT NULL,
-    "external_id" TEXT NOT NULL,
+    "external_id" TEXT,
+    "email" TEXT,
+    "password_hash" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
 );
@@ -16,7 +19,8 @@ CREATE TABLE "memories" (
     "title" TEXT,
     "content" TEXT NOT NULL,
     "summary" TEXT,
-    "hash" TEXT,
+    "canonical_text" TEXT,
+    "canonical_hash" TEXT,
     "timestamp" BIGINT NOT NULL,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "full_content" TEXT,
@@ -24,12 +28,6 @@ CREATE TABLE "memories" (
     "importance_score" DOUBLE PRECISION DEFAULT 0.0,
     "access_count" INTEGER NOT NULL DEFAULT 0,
     "last_accessed" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "tx_hash" TEXT,
-    "block_number" BIGINT,
-    "gas_used" TEXT,
-    "tx_status" TEXT DEFAULT 'pending',
-    "blockchain_network" TEXT DEFAULT 'sepolia',
-    "confirmed_at" TIMESTAMP(3),
 
     CONSTRAINT "memories_pkey" PRIMARY KEY ("id")
 );
@@ -56,30 +54,6 @@ CREATE TABLE "memory_snapshots" (
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "memory_snapshots_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "blockscout_transactions" (
-    "id" UUID NOT NULL,
-    "tx_hash" TEXT NOT NULL,
-    "network" TEXT NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'pending',
-    "block_number" BIGINT,
-    "gas_used" TEXT,
-    "gas_price" TEXT,
-    "from_address" TEXT,
-    "to_address" TEXT,
-    "value" TEXT,
-    "timestamp" BIGINT,
-    "finality_reached" BOOLEAN NOT NULL DEFAULT false,
-    "finality_confirmed_at" TIMESTAMP(3),
-    "raw_data" JSONB,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-    "last_checked_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "check_count" INTEGER NOT NULL DEFAULT 0,
-
-    CONSTRAINT "blockscout_transactions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -123,14 +97,57 @@ CREATE TABLE "search_cache" (
     CONSTRAINT "search_cache_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "token_usage" (
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
+    "operation_type" TEXT NOT NULL,
+    "input_tokens" INTEGER NOT NULL,
+    "output_tokens" INTEGER NOT NULL,
+    "model_used" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "token_usage_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "user_profiles" (
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
+    "static_profile_json" JSONB,
+    "static_profile_text" TEXT,
+    "dynamic_profile_json" JSONB,
+    "dynamic_profile_text" TEXT,
+    "last_updated" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "last_memory_analyzed" TIMESTAMP(3),
+    "version" INTEGER NOT NULL DEFAULT 1,
+
+    CONSTRAINT "user_profiles_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "users_external_id_key" ON "users"("external_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "memories_hash_key" ON "memories"("hash");
+CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "memories_tx_hash_key" ON "memories"("tx_hash");
+CREATE INDEX "memories_user_id_idx" ON "memories"("user_id");
+
+-- CreateIndex
+CREATE INDEX "memories_created_at_idx" ON "memories"("created_at");
+
+-- CreateIndex
+CREATE INDEX "memories_user_id_created_at_idx" ON "memories"("user_id", "created_at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "memories_user_id_canonical_hash_key" ON "memories"("user_id", "canonical_hash");
+
+-- CreateIndex
+CREATE INDEX "memory_relations_memory_id_idx" ON "memory_relations"("memory_id");
+
+-- CreateIndex
+CREATE INDEX "memory_relations_similarity_score_idx" ON "memory_relations"("similarity_score");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "memory_relations_memory_id_related_memory_id_key" ON "memory_relations"("memory_id", "related_memory_id");
@@ -139,13 +156,37 @@ CREATE UNIQUE INDEX "memory_relations_memory_id_related_memory_id_key" ON "memor
 CREATE UNIQUE INDEX "memory_snapshots_summary_hash_key" ON "memory_snapshots"("summary_hash");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "blockscout_transactions_tx_hash_key" ON "blockscout_transactions"("tx_hash");
+CREATE INDEX "memory_snapshots_user_id_idx" ON "memory_snapshots"("user_id");
+
+-- CreateIndex
+CREATE INDEX "memory_snapshots_user_id_created_at_idx" ON "memory_snapshots"("user_id", "created_at");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "query_related_memories_query_event_id_memory_id_key" ON "query_related_memories"("query_event_id", "memory_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "search_cache_query_hash_key" ON "search_cache"("query_hash");
+
+-- CreateIndex
+CREATE INDEX "token_usage_user_id_idx" ON "token_usage"("user_id");
+
+-- CreateIndex
+CREATE INDEX "token_usage_created_at_idx" ON "token_usage"("created_at");
+
+-- CreateIndex
+CREATE INDEX "token_usage_user_id_created_at_idx" ON "token_usage"("user_id", "created_at");
+
+-- CreateIndex
+CREATE INDEX "token_usage_operation_type_idx" ON "token_usage"("operation_type");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_profiles_user_id_key" ON "user_profiles"("user_id");
+
+-- CreateIndex
+CREATE INDEX "user_profiles_user_id_idx" ON "user_profiles"("user_id");
+
+-- CreateIndex
+CREATE INDEX "user_profiles_last_updated_idx" ON "user_profiles"("last_updated");
 
 -- AddForeignKey
 ALTER TABLE "memories" ADD CONSTRAINT "memories_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -164,3 +205,9 @@ ALTER TABLE "query_related_memories" ADD CONSTRAINT "query_related_memories_quer
 
 -- AddForeignKey
 ALTER TABLE "query_related_memories" ADD CONSTRAINT "query_related_memories_memory_id_fkey" FOREIGN KEY ("memory_id") REFERENCES "memories"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "token_usage" ADD CONSTRAINT "token_usage_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;

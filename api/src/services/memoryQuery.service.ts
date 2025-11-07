@@ -54,8 +54,8 @@ export class MemoryQueryService {
   }
 
   static async getMemoryByHash(hash: string) {
-    return prisma.memory.findUnique({
-      where: { hash },
+    return prisma.memory.findFirst({
+      where: { canonical_hash: hash },
     });
   }
 
