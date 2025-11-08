@@ -1,9 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@200;300;400;500;600;700&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap');
 @import url('https://db.onlinewebfonts.com/c/23ed6ab5114b3c4b57abae46cf8a5029?family=PP+Editorial+New+Ultralight');
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
 
 @layer base {
   :root {
@@ -53,8 +53,8 @@
 }
 
 @font-face {
-  font-family: "geist";
-  src: url("/fonts/GeistVariableVF.woff2") format("woff2");
+  font-family: 'geist';
+  src: url('/fonts/GeistVariableVF.woff2') format('woff2');
 }
 
 @layer base {
@@ -106,5 +106,5 @@ html {
 }
 
 .gradient {
-  @apply bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text
+  @apply bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text;
 }

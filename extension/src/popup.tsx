@@ -1,210 +1,201 @@
-import React, { useState, useEffect } from 'react';
-import { createRoot } from 'react-dom/client';
-import { getAuthToken, requireAuthToken } from '@/lib/userId';
-import { runtime, storage, tabs } from '@/lib/browser';
+import React, { useState, useEffect } from 'react'
+import { createRoot } from 'react-dom/client'
+import { getAuthToken, requireAuthToken } from '@/lib/userId'
+import { runtime, storage, tabs } from '@/lib/browser'
 
 const Popup: React.FC = () => {
-  const [extensionEnabled, setExtensionEnabled] = useState(true);
-  const [memoryInjectionEnabled, setMemoryInjectionEnabled] = useState(true);
-  const [blockedWebsites, setBlockedWebsites] = useState<string[]>([]);
-  const [newBlockedWebsite, setNewBlockedWebsite] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isCheckingHealth, setIsCheckingHealth] = useState(true);
+  const [extensionEnabled, setExtensionEnabled] = useState(true)
+  const [memoryInjectionEnabled, setMemoryInjectionEnabled] = useState(true)
+  const [blockedWebsites, setBlockedWebsites] = useState<string[]>([])
+  const [newBlockedWebsite, setNewBlockedWebsite] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [isConnected, setIsConnected] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isCheckingHealth, setIsCheckingHealth] = useState(true)
 
   useEffect(() => {
-    loadSettings();
-    checkStatus();
-    const interval = setInterval(checkStatus, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    loadSettings()
+    checkStatus()
+    const interval = setInterval(checkStatus, 10000)
+    return () => clearInterval(interval)
+  }, [])
 
   const loadSettings = async () => {
     try {
-      const extensionResponse = await new Promise<any>((resolve) => {
-        runtime.sendMessage({ type: 'GET_EXTENSION_ENABLED' }, resolve);
-      });
+      const extensionResponse = await new Promise<any>(resolve => {
+        runtime.sendMessage({ type: 'GET_EXTENSION_ENABLED' }, resolve)
+      })
       if (extensionResponse && extensionResponse.success) {
-        setExtensionEnabled(extensionResponse.enabled);
+        setExtensionEnabled(extensionResponse.enabled)
       }
 
-      const memoryInjectionResponse = await new Promise<any>((resolve) => {
-        runtime.sendMessage({ type: 'GET_MEMORY_INJECTION_ENABLED' }, resolve);
-      });
+      const memoryInjectionResponse = await new Promise<any>(resolve => {
+        runtime.sendMessage({ type: 'GET_MEMORY_INJECTION_ENABLED' }, resolve)
+      })
       if (memoryInjectionResponse && memoryInjectionResponse.success) {
-        setMemoryInjectionEnabled(memoryInjectionResponse.enabled);
+        setMemoryInjectionEnabled(memoryInjectionResponse.enabled)
       }
 
-      const blockedResponse = await new Promise<any>((resolve) => {
-        runtime.sendMessage({ type: 'GET_BLOCKED_WEBSITES' }, resolve);
-      });
+      const blockedResponse = await new Promise<any>(resolve => {
+        runtime.sendMessage({ type: 'GET_BLOCKED_WEBSITES' }, resolve)
+      })
       if (blockedResponse && blockedResponse.success) {
-        setBlockedWebsites(blockedResponse.websites || []);
+        setBlockedWebsites(blockedResponse.websites || [])
       }
     } catch (error) {
-      console.error('Error loading settings:', error);
+      console.error('Error loading settings:', error)
     }
-  };
+  }
 
   const checkStatus = async () => {
-    setIsCheckingHealth(true);
+    setIsCheckingHealth(true)
     try {
-      const healthResponse = await new Promise<any>((resolve) => {
-        runtime.sendMessage({ type: 'CHECK_API_HEALTH' }, resolve);
-      });
+      const healthResponse = await new Promise<any>(resolve => {
+        runtime.sendMessage({ type: 'CHECK_API_HEALTH' }, resolve)
+      })
       if (healthResponse && healthResponse.success) {
-        setIsConnected(healthResponse.healthy);
+        setIsConnected(healthResponse.healthy)
       } else {
-        setIsConnected(false);
+        setIsConnected(false)
       }
 
-      let isAuth = false;
+      let isAuth = false
       try {
-        const stored = await storage.local.get(['auth_token']);
+        const stored = await storage.local.get(['auth_token'])
         if (stored && stored.auth_token) {
-          isAuth = true;
+          isAuth = true
         } else {
-          const token = getAuthToken();
+          const token = getAuthToken()
           if (token) {
-            isAuth = true;
+            isAuth = true
           } else {
             try {
-              await requireAuthToken();
-              isAuth = true;
+              await requireAuthToken()
+              isAuth = true
             } catch {
-              isAuth = false;
+              isAuth = false
             }
           }
         }
       } catch (error) {
-        isAuth = false;
+        isAuth = false
       }
-      setIsAuthenticated(isAuth);
+      setIsAuthenticated(isAuth)
     } catch (error) {
-      setIsConnected(false);
-      setIsAuthenticated(false);
+      setIsConnected(false)
+      setIsAuthenticated(false)
     } finally {
-      setIsCheckingHealth(false);
+      setIsCheckingHealth(false)
     }
-  };
+  }
 
   const toggleExtension = async () => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const newState = !extensionEnabled;
-      
-      const response = await new Promise<any>((resolve) => {
-        runtime.sendMessage(
-          { type: 'SET_EXTENSION_ENABLED', enabled: newState },
-          resolve
-        );
-      });
-      
+      const newState = !extensionEnabled
+
+      const response = await new Promise<any>(resolve => {
+        runtime.sendMessage({ type: 'SET_EXTENSION_ENABLED', enabled: newState }, resolve)
+      })
+
       if (response && response.success) {
-        setExtensionEnabled(newState);
+        setExtensionEnabled(newState)
       }
     } catch (error) {
-      console.error('Error toggling extension:', error);
+      console.error('Error toggling extension:', error)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const toggleMemoryInjection = async () => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const newState = !memoryInjectionEnabled;
-      
-      const response = await new Promise<any>((resolve) => {
-        runtime.sendMessage(
-          { type: 'SET_MEMORY_INJECTION_ENABLED', enabled: newState },
-          resolve
-        );
-      });
-      
+      const newState = !memoryInjectionEnabled
+
+      const response = await new Promise<any>(resolve => {
+        runtime.sendMessage({ type: 'SET_MEMORY_INJECTION_ENABLED', enabled: newState }, resolve)
+      })
+
       if (response && response.success) {
-        setMemoryInjectionEnabled(newState);
+        setMemoryInjectionEnabled(newState)
       }
     } catch (error) {
-      console.error('Error toggling memory injection:', error);
+      console.error('Error toggling memory injection:', error)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const addBlockedWebsite = async (website?: string) => {
-    const websiteToAdd = website || newBlockedWebsite.trim();
+    const websiteToAdd = website || newBlockedWebsite.trim()
     if (!websiteToAdd) {
-      return;
+      return
     }
 
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const response = await new Promise<any>((resolve) => {
-        runtime.sendMessage(
-          { type: 'ADD_BLOCKED_WEBSITE', website: websiteToAdd },
-          resolve
-        );
-      });
+      const response = await new Promise<any>(resolve => {
+        runtime.sendMessage({ type: 'ADD_BLOCKED_WEBSITE', website: websiteToAdd }, resolve)
+      })
       if (response && response.success) {
-        setNewBlockedWebsite('');
-        await loadSettings();
+        setNewBlockedWebsite('')
+        await loadSettings()
       }
     } catch (error) {
-      console.error('Error adding blocked website:', error);
+      console.error('Error adding blocked website:', error)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const blockCurrentDomain = async () => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const activeTabs = await tabs.query({ active: true, currentWindow: true });
+      const activeTabs = await tabs.query({ active: true, currentWindow: true })
       if (activeTabs.length === 0 || !activeTabs[0].url) {
-        return;
+        return
       }
 
-      const url = activeTabs[0].url;
+      const url = activeTabs[0].url
       try {
-        const urlObj = new URL(url);
-        const domain = urlObj.hostname.replace(/^www\./, '');
-        
+        const urlObj = new URL(url)
+        const domain = urlObj.hostname.replace(/^www\./, '')
+
         if (domain) {
-          await addBlockedWebsite(domain);
+          await addBlockedWebsite(domain)
         }
       } catch (error) {
-        console.error('Error extracting domain:', error);
+        console.error('Error extracting domain:', error)
       }
     } catch (error) {
-      console.error('Error getting current tab:', error);
+      console.error('Error getting current tab:', error)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   const removeBlockedWebsite = async (website: string) => {
-    setIsLoading(true);
+    setIsLoading(true)
     try {
-      const response = await new Promise<any>((resolve) => {
-        runtime.sendMessage(
-          { type: 'REMOVE_BLOCKED_WEBSITE', website: website },
-          resolve
-        );
-      });
+      const response = await new Promise<any>(resolve => {
+        runtime.sendMessage({ type: 'REMOVE_BLOCKED_WEBSITE', website: website }, resolve)
+      })
       if (response && response.success) {
-        await loadSettings();
+        await loadSettings()
       }
     } catch (error) {
-      console.error('Error removing blocked website:', error);
+      console.error('Error removing blocked website:', error)
     } finally {
-      setIsLoading(false);
+      setIsLoading(false)
     }
-  };
+  }
 
   return (
-    <div className="w-80 bg-white text-black font-primary" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+    <div
+      className="w-80 bg-white text-black font-primary"
+      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}
+    >
       {/* Header */}
       <div className="border-b border-gray-200 px-4 py-3">
         <div className="flex items-center gap-3">
@@ -213,7 +204,9 @@ const Popup: React.FC = () => {
           </div>
           <div className="flex flex-col">
             <span className="text-base font-bold text-black">RecallOS</span>
-            <span className="text-xs text-gray-600 font-mono -mt-0.5">Remember what the web showed you</span>
+            <span className="text-xs text-gray-600 font-mono -mt-0.5">
+              Remember what the web showed you
+            </span>
           </div>
         </div>
       </div>
@@ -222,7 +215,7 @@ const Popup: React.FC = () => {
         {/* Status Section */}
         <div className="border border-gray-200 bg-white p-3 space-y-2">
           <div className="text-sm font-medium text-black mb-2">Status</div>
-          
+
           {/* API Connection Status */}
           <div className="flex items-center justify-between py-1">
             <span className="text-xs text-gray-700">API</span>
@@ -231,8 +224,12 @@ const Popup: React.FC = () => {
                 <span className="text-xs text-gray-400">Checking...</span>
               ) : (
                 <>
-                  <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-black' : 'bg-gray-400'}`} />
-                  <span className="text-xs text-gray-600">{isConnected ? 'Connected' : 'Not connected'}</span>
+                  <div
+                    className={`w-2 h-2 rounded-full ${isConnected ? 'bg-black' : 'bg-gray-400'}`}
+                  />
+                  <span className="text-xs text-gray-600">
+                    {isConnected ? 'Connected' : 'Not connected'}
+                  </span>
                 </>
               )}
             </div>
@@ -242,8 +239,12 @@ const Popup: React.FC = () => {
           <div className="flex items-center justify-between py-1">
             <span className="text-xs text-gray-700">Auth</span>
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-black' : 'bg-gray-400'}`} />
-              <span className="text-xs text-gray-600">{isAuthenticated ? 'Authenticated' : 'Not authenticated'}</span>
+              <div
+                className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-black' : 'bg-gray-400'}`}
+              />
+              <span className="text-xs text-gray-600">
+                {isAuthenticated ? 'Authenticated' : 'Not authenticated'}
+              </span>
             </div>
           </div>
         </div>
@@ -297,16 +298,16 @@ const Popup: React.FC = () => {
         {/* Blocked Websites */}
         <div className="border border-gray-200 bg-white p-3 space-y-3">
           <div className="text-sm font-medium text-black">Blocked Websites</div>
-          
+
           <div className="flex gap-2">
             <input
               type="text"
               placeholder="example.com"
               value={newBlockedWebsite}
-              onChange={(e) => setNewBlockedWebsite(e.target.value)}
-              onKeyPress={(e) => {
+              onChange={e => setNewBlockedWebsite(e.target.value)}
+              onKeyPress={e => {
                 if (e.key === 'Enter') {
-                  addBlockedWebsite();
+                  addBlockedWebsite()
                 }
               }}
               className="flex-1 border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-black"
@@ -349,18 +350,16 @@ const Popup: React.FC = () => {
           )}
 
           {blockedWebsites.length === 0 && (
-            <div className="text-xs text-gray-500 text-center py-2">
-              No websites blocked
-            </div>
+            <div className="text-xs text-gray-500 text-center py-2">No websites blocked</div>
           )}
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-const container = document.getElementById('root');
+const container = document.getElementById('root')
 if (container) {
-  const root = createRoot(container);
-  root.render(<Popup />);
+  const root = createRoot(container)
+  root.render(<Popup />)
 }

@@ -41,11 +41,13 @@ RecallOS is a browser extension that automatically captures and processes your w
 ### Step 3: Enable Developer Mode in Chrome/Edge
 
 #### For Google Chrome:
+
 1. Open Chrome and navigate to `chrome://extensions/`
 2. In the top-right corner, toggle **"Developer mode"** to ON
 3. You should see new buttons appear: "Load unpacked", "Pack extension", and "Update"
 
 #### For Microsoft Edge:
+
 1. Open Edge and navigate to `edge://extensions/`
 2. In the left sidebar, click on **"Developer mode"** to enable it
 3. You should see new options appear for loading unpacked extensions
@@ -83,6 +85,7 @@ RecallOS is a browser extension that automatically captures and processes your w
 **Problem**: The extension doesn't appear after clicking "Load unpacked"
 
 **Solutions**:
+
 - Make sure you selected the correct folder (the one containing `manifest.json`)
 - Check that Developer mode is enabled
 - Try refreshing the extensions page (`chrome://extensions/` or `edge://extensions/`)
@@ -93,6 +96,7 @@ RecallOS is a browser extension that automatically captures and processes your w
 **Problem**: Can't find the RecallOS icon in the toolbar
 
 **Solutions**:
+
 - Click the puzzle piece icon (Chrome) or extensions icon (Edge) in the toolbar
 - Look for RecallOS in the list and click the pin icon to pin it to the toolbar
 - Check if the extension is enabled in the extensions page
@@ -102,6 +106,7 @@ RecallOS is a browser extension that automatically captures and processes your w
 **Problem**: Can't connect the extension to the API
 
 **Solutions**:
+
 - Ensure the API server is running and reachable
 - Verify the API URL in the extension settings
 - Check browser DevTools console for errors
@@ -111,6 +116,7 @@ RecallOS is a browser extension that automatically captures and processes your w
 **Problem**: Extension shows permission errors
 
 **Solutions**:
+
 - Go to the extensions page and click "Details" on RecallOS
 - Review and approve all required permissions
 - Make sure the extension has access to the sites you want to monitor
@@ -158,6 +164,7 @@ If you encounter issues not covered in this guide:
 ## Quick Reference
 
 ### Installation Checklist
+
 - [ ] Downloaded extension from GitHub releases
 - [ ] Extracted zip file to a folder
 - [ ] Enabled Developer mode in Chrome/Edge
@@ -166,11 +173,13 @@ If you encounter issues not covered in this guide:
 - [ ] Started browsing to test capture
 
 ### Common Commands
+
 - **Extensions Page**: `chrome://extensions/` or `edge://extensions/`
 - **Developer Mode**: Toggle in top-right corner (Chrome) or left sidebar (Edge)
 - **Load Unpacked**: Click button to select extension folder
 
 ### Need Help?
+
 - 📖 **This Guide**: Complete installation and troubleshooting
 - 🐛 **Report Issues**: [GitHub Issues](https://github.com/virajbhartiya/RecallOS/issues)
 - 💬 **Get Support**: [GitHub Discussions](https://github.com/virajbhartiya/RecallOS/discussions)
