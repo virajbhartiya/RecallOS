@@ -16,6 +16,21 @@ async function copyPublic() {
   await mkdir(outDir, { recursive: true });
   // Copy static assets like manifest.json and popup.html
   await cp(publicDir, outDir, { recursive: true });
+  
+  // Create Firefox-compatible manifest
+  const manifestPath = resolve(publicDir, 'manifest.json');
+  const manifestContent = await readFile(manifestPath, 'utf-8');
+  const manifest = JSON.parse(manifestContent);
+  
+  // For Firefox, use background.scripts instead of service_worker
+  if (manifest.background?.service_worker) {
+    manifest.background = {
+      scripts: [manifest.background.service_worker]
+    };
+  }
+  
+  // Write Firefox manifest
+  await writeFile(resolve(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2));
 }
 
 async function buildCSS() {
