@@ -6,6 +6,7 @@ import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant';
 import { profileUpdateService } from './profileUpdate';
 import { logger } from '../utils/logger';
 import { getRedisClient } from '../lib/redis';
+import { GEMINI_EMBED_MODEL } from './gemini';
 
 type SearchResult = {
   memory_id: string;
@@ -135,7 +136,7 @@ export async function searchMemories(params: {
     }
   }
   const salt = process.env.SEARCH_EMBED_SALT || 'recallos';
-  const embeddingHash = sha256Hex(JSON.stringify({ model: 'text-embedding-004', values: embedding.slice(0, 64), salt }));
+  const embeddingHash = sha256Hex(JSON.stringify({ model: GEMINI_EMBED_MODEL, values: embedding.slice(0, 64), salt }));
 
   await ensureCollection();
 

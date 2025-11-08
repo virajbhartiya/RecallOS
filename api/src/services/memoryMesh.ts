@@ -4,6 +4,7 @@ import { UMAP } from 'umap-js';
 import { qdrantClient, COLLECTION_NAME, ensureCollection, EMBEDDING_DIMENSION } from '../lib/qdrant';
 import { randomUUID } from 'crypto';
 import { logger } from '../utils/logger';
+import { GEMINI_EMBED_MODEL } from './gemini';
 
 export class MemoryMeshService {
   private relationshipCache = new Map<string, any>();
@@ -88,7 +89,7 @@ export class MemoryMeshService {
               memory_id: memoryId,
               user_id: userId,
               embedding_type: type,
-              model_name: 'text-embedding-004',
+              model_name: GEMINI_EMBED_MODEL,
               created_at: new Date().toISOString(),
             },
           },
