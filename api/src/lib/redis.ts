@@ -1,17 +1,17 @@
-import Redis from 'ioredis';
-import { getRedisConnection } from '../utils/env';
+import Redis from 'ioredis'
+import { getRedisConnection } from '../utils/env'
 
-let redisClient: Redis | null = null;
+let redisClient: Redis | null = null
 
 export function getRedisClient(): Redis {
   if (!redisClient) {
-    const connection = getRedisConnection();
+    const connection = getRedisConnection()
     if ('url' in connection) {
       redisClient = new Redis(connection.url, {
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,
         lazyConnect: true,
-      });
+      })
     } else {
       redisClient = new Redis({
         host: connection.host,
@@ -21,9 +21,8 @@ export function getRedisClient(): Redis {
         maxRetriesPerRequest: 3,
         enableReadyCheck: true,
         lazyConnect: true,
-      });
+      })
     }
   }
-  return redisClient;
+  return redisClient
 }
-

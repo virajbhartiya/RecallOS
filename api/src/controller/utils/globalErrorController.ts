@@ -1,6 +1,6 @@
 interface IError extends Error {
-  statusCode?: number;
-  status?: string;
+  statusCode?: number
+  status?: string
 }
 
 const sendErrorDev = (err: IError, req: { originalUrl: string }, res: any) => {
@@ -10,14 +10,14 @@ const sendErrorDev = (err: IError, req: { originalUrl: string }, res: any) => {
       error: err,
       message: err.message,
       stack: err.stack,
-    });
+    })
   }
 
-  throw err.message;
-};
+  throw err.message
+}
 
 export default (err: IError, req: any, res: any) => {
-  err.statusCode = err.statusCode || 500;
-  err.status = err.status || 'error';
-  sendErrorDev(err, req, res);
-};
+  err.statusCode = err.statusCode || 500
+  err.status = err.status || 'error'
+  sendErrorDev(err, req, res)
+}

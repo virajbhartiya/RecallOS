@@ -1,152 +1,154 @@
-import { aiProvider } from './aiProvider';
-import { prisma } from '../lib/prisma';
-import { logger } from '../utils/logger';
+import { aiProvider } from './aiProvider'
+import { prisma } from '../lib/prisma'
+import { logger } from '../utils/logger'
 
 export interface StaticProfile {
-  interests: string[];
-  skills: string[];
-  profession?: string;
+  interests: string[]
+  skills: string[]
+  profession?: string
   demographics?: {
-    age_range?: string;
-    location?: string;
-    education?: string;
-  };
-  long_term_patterns: string[];
-  domains: string[];
-  expertise_areas: string[];
-  personality_traits?: string[];
+    age_range?: string
+    location?: string
+    education?: string
+  }
+  long_term_patterns: string[]
+  domains: string[]
+  expertise_areas: string[]
+  personality_traits?: string[]
   work_style?: {
-    preferred_work_hours?: string;
-    collaboration_style?: string;
-    decision_making_style?: string;
-    problem_solving_approach?: string;
-  };
+    preferred_work_hours?: string
+    collaboration_style?: string
+    decision_making_style?: string
+    problem_solving_approach?: string
+  }
   communication_style?: {
-    preferred_channels?: string[];
-    communication_frequency?: string;
-    tone_preference?: string;
-  };
+    preferred_channels?: string[]
+    communication_frequency?: string
+    tone_preference?: string
+  }
   learning_preferences?: {
-    preferred_learning_methods?: string[];
-    learning_pace?: string;
-    knowledge_retention_style?: string;
-  };
-  values_and_priorities?: string[];
+    preferred_learning_methods?: string[]
+    learning_pace?: string
+    knowledge_retention_style?: string
+  }
+  values_and_priorities?: string[]
   technology_preferences?: {
-    preferred_tools?: string[];
-    tech_comfort_level?: string;
-    preferred_platforms?: string[];
-  };
+    preferred_tools?: string[]
+    tech_comfort_level?: string
+    preferred_platforms?: string[]
+  }
   lifestyle_patterns?: {
-    activity_level?: string;
-    social_patterns?: string;
-    productivity_patterns?: string;
-  };
+    activity_level?: string
+    social_patterns?: string
+    productivity_patterns?: string
+  }
   cognitive_style?: {
-    thinking_pattern?: string;
-    information_processing?: string;
-    creativity_level?: string;
-  };
+    thinking_pattern?: string
+    information_processing?: string
+    creativity_level?: string
+  }
 }
 
 export interface DynamicProfile {
-  recent_activities: string[];
-  current_projects: string[];
-  temporary_interests: string[];
-  recent_changes: string[];
-  current_context: string[];
-  active_goals?: string[];
-  current_challenges?: string[];
-  recent_achievements?: string[];
-  current_focus_areas?: string[];
+  recent_activities: string[]
+  current_projects: string[]
+  temporary_interests: string[]
+  recent_changes: string[]
+  current_context: string[]
+  active_goals?: string[]
+  current_challenges?: string[]
+  recent_achievements?: string[]
+  current_focus_areas?: string[]
   emotional_state?: {
-    current_concerns?: string[];
-    current_excitements?: string[];
-    stress_level?: string;
-  };
-  active_research_topics?: string[];
-  upcoming_events?: string[];
+    current_concerns?: string[]
+    current_excitements?: string[]
+    stress_level?: string
+  }
+  active_research_topics?: string[]
+  upcoming_events?: string[]
 }
 
 export interface ProfileExtractionResult {
-  static_profile_json: StaticProfile;
-  static_profile_text: string;
-  dynamic_profile_json: DynamicProfile;
-  dynamic_profile_text: string;
+  static_profile_json: StaticProfile
+  static_profile_text: string
+  dynamic_profile_json: DynamicProfile
+  dynamic_profile_text: string
 }
 
 export class ProfileExtractionService {
   async extractProfileFromMemories(
     userId: string,
     memories: Array<{
-      id: string;
-      title: string | null;
-      summary: string | null;
-      content: string;
-      created_at: Date;
-      page_metadata: any;
+      id: string
+      title: string | null
+      summary: string | null
+      content: string
+      created_at: Date
+      page_metadata: any
     }>
   ): Promise<ProfileExtractionResult> {
     if (memories.length === 0) {
-      return this.getEmptyProfile();
+      return this.getEmptyProfile()
     }
 
-    const memoryContext = this.prepareMemoryContext(memories);
-    const prompt = this.buildExtractionPrompt(memoryContext);
+    const memoryContext = this.prepareMemoryContext(memories)
+    const prompt = this.buildExtractionPrompt(memoryContext)
 
     try {
-      const response = await aiProvider.generateContent(prompt, false, userId);
-      const parsed = this.parseProfileResponse(response);
-      return parsed;
+      const response = await aiProvider.generateContent(prompt, false, userId)
+      const parsed = this.parseProfileResponse(response)
+      return parsed
     } catch (error) {
-      logger.error('Error extracting profile from memories, retrying once:', error);
-      
+      logger.error('Error extracting profile from memories, retrying once:', error)
+
       try {
-        const retryResponse = await aiProvider.generateContent(prompt, false, userId);
-        const retryParsed = this.parseProfileResponse(retryResponse);
-        logger.log('Profile extraction succeeded on retry');
-        return retryParsed;
+        const retryResponse = await aiProvider.generateContent(prompt, false, userId)
+        const retryParsed = this.parseProfileResponse(retryResponse)
+        logger.log('Profile extraction succeeded on retry')
+        return retryParsed
       } catch (retryError) {
-        logger.error('Error extracting profile from memories on retry, using fallback:', retryError);
-        return this.extractProfileFallback(memories);
+        logger.error('Error extracting profile from memories on retry, using fallback:', retryError)
+        return this.extractProfileFallback(memories)
       }
     }
   }
 
   private prepareMemoryContext(
     memories: Array<{
-      id: string;
-      title: string | null;
-      summary: string | null;
-      content: string;
-      created_at: Date;
-      page_metadata: any;
+      id: string
+      title: string | null
+      summary: string | null
+      content: string
+      created_at: Date
+      page_metadata: any
     }>
   ): string {
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const now = new Date()
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-    const allMemories = memories.map((m, idx) => {
-      const metadata = m.page_metadata as any;
-      const daysAgo = Math.floor((now.getTime() - m.created_at.getTime()) / (1000 * 60 * 60 * 24));
-      const isRecent = m.created_at >= thirtyDaysAgo;
+    const allMemories = memories
+      .map((m, idx) => {
+        const metadata = m.page_metadata as any
+        const daysAgo = Math.floor((now.getTime() - m.created_at.getTime()) / (1000 * 60 * 60 * 24))
+        const isRecent = m.created_at >= thirtyDaysAgo
 
-      return `Memory ${idx + 1} (${daysAgo} days ago${isRecent ? ', RECENT' : ''}):
+        return `Memory ${idx + 1} (${daysAgo} days ago${isRecent ? ', RECENT' : ''}):
 Title: ${m.title || 'Untitled'}
 Summary: ${m.summary || 'No summary'}
 Topics: ${metadata?.topics?.join(', ') || 'N/A'}
 Categories: ${metadata?.categories?.join(', ') || 'N/A'}
-Content preview: ${m.content.substring(0, 200)}...`;
-    }).join('\n\n');
+Content preview: ${m.content.substring(0, 200)}...`
+      })
+      .join('\n\n')
 
-    const recentCount = memories.filter(m => m.created_at >= thirtyDaysAgo).length;
-    const totalCount = memories.length;
+    const recentCount = memories.filter(m => m.created_at >= thirtyDaysAgo).length
+    const totalCount = memories.length
 
     return `Total memories: ${totalCount}
 Recent memories (last 30 days): ${recentCount}
 
 Memories:
-${allMemories}`;
+${allMemories}`
   }
 
   private buildExtractionPrompt(memoryContext: string): string {
@@ -250,39 +252,42 @@ Deep Analysis Guidelines:
 Memory Context:
 ${memoryContext}
 
-Return ONLY the JSON object:`;
+Return ONLY the JSON object:`
   }
 
   private parseProfileResponse(response: string): ProfileExtractionResult {
-    let jsonStr = this.extractJsonString(response);
-    
+    let jsonStr = this.extractJsonString(response)
+
     if (!jsonStr) {
-      throw new Error('No JSON found in response');
+      throw new Error('No JSON found in response')
     }
 
-    let data;
+    let data
 
     try {
-      data = JSON.parse(jsonStr);
+      data = JSON.parse(jsonStr)
     } catch (parseError) {
       try {
-        jsonStr = this.fixJson(jsonStr);
-        data = JSON.parse(jsonStr);
+        jsonStr = this.fixJson(jsonStr)
+        data = JSON.parse(jsonStr)
       } catch (secondError) {
         try {
-          jsonStr = this.fixJsonAdvanced(jsonStr);
-          data = JSON.parse(jsonStr);
+          jsonStr = this.fixJsonAdvanced(jsonStr)
+          data = JSON.parse(jsonStr)
         } catch (thirdError) {
-          logger.error('Error parsing profile response after fixes:', thirdError);
-          logger.error('JSON string (first 1000 chars):', jsonStr.substring(0, 1000));
-          logger.error('JSON string (last 500 chars):', jsonStr.substring(Math.max(0, jsonStr.length - 500)));
-          throw new Error('Failed to parse JSON after fixes');
+          logger.error('Error parsing profile response after fixes:', thirdError)
+          logger.error('JSON string (first 1000 chars):', jsonStr.substring(0, 1000))
+          logger.error(
+            'JSON string (last 500 chars):',
+            jsonStr.substring(Math.max(0, jsonStr.length - 500))
+          )
+          throw new Error('Failed to parse JSON after fixes')
         }
       }
     }
 
     if (!data.static_profile_json || !data.dynamic_profile_json) {
-      throw new Error('Invalid profile structure: missing required fields');
+      throw new Error('Invalid profile structure: missing required fields')
     }
 
     return {
@@ -290,76 +295,76 @@ Return ONLY the JSON object:`;
       static_profile_text: data.static_profile_text || '',
       dynamic_profile_json: data.dynamic_profile_json,
       dynamic_profile_text: data.dynamic_profile_text || '',
-    };
+    }
   }
 
   private extractJsonString(response: string): string | null {
-    let jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+    let jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/)
     if (jsonMatch && jsonMatch[1]) {
-      return jsonMatch[1];
+      return jsonMatch[1]
     }
 
-    const firstBrace = response.indexOf('{');
+    const firstBrace = response.indexOf('{')
     if (firstBrace === -1) {
-      return null;
+      return null
     }
 
-    let braceCount = 0;
-    let inString = false;
-    let escapeNext = false;
-    let lastValidBrace = -1;
+    let braceCount = 0
+    let inString = false
+    let escapeNext = false
+    let lastValidBrace = -1
 
     for (let i = firstBrace; i < response.length; i++) {
-      const char = response[i];
+      const char = response[i]
 
       if (escapeNext) {
-        escapeNext = false;
-        continue;
+        escapeNext = false
+        continue
       }
 
       if (char === '\\') {
-        escapeNext = true;
-        continue;
+        escapeNext = true
+        continue
       }
 
       if (char === '"' && !escapeNext) {
-        inString = !inString;
-        continue;
+        inString = !inString
+        continue
       }
 
       if (inString) {
-        continue;
+        continue
       }
 
       if (char === '{') {
-        braceCount++;
-        lastValidBrace = i;
+        braceCount++
+        lastValidBrace = i
       } else if (char === '}') {
-        braceCount--;
+        braceCount--
         if (braceCount === 0) {
-          return response.substring(firstBrace, i + 1);
+          return response.substring(firstBrace, i + 1)
         }
-        lastValidBrace = i;
+        lastValidBrace = i
       }
     }
 
     if (lastValidBrace > firstBrace) {
-      return response.substring(firstBrace, lastValidBrace + 1);
+      return response.substring(firstBrace, lastValidBrace + 1)
     }
 
-    return null;
+    return null
   }
 
   private fixJson(jsonStr: string): string {
-    let fixed = jsonStr;
+    let fixed = jsonStr
 
-    fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
-    
-    fixed = fixed.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+    fixed = fixed.replace(/,(\s*[}\]])/g, '$1')
 
-    const textFields = ['static_profile_text', 'dynamic_profile_text'];
+    fixed = fixed.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+
+    const textFields = ['static_profile_text', 'dynamic_profile_text']
     for (const field of textFields) {
-      const regex = new RegExp(`"${field}"\\s*:\\s*"([^"]*(?:\\\\.[^"]*)*)"`, 'g');
+      const regex = new RegExp(`"${field}"\\s*:\\s*"([^"]*(?:\\\\.[^"]*)*)"`, 'g')
       fixed = fixed.replace(regex, (match, value) => {
         const escaped = value
           .replace(/\\\\/g, '\\')
@@ -371,118 +376,126 @@ Return ONLY the JSON object:`;
           .replace(/"/g, '\\"')
           .replace(/\n/g, '\\n')
           .replace(/\r/g, '\\r')
-          .replace(/\t/g, '\\t');
-        return `"${field}": "${escaped}"`;
-      });
+          .replace(/\t/g, '\\t')
+        return `"${field}": "${escaped}"`
+      })
     }
 
     fixed = fixed.replace(/:\s*"([^"]*(?:\\.[^"]*)*)"\s*([,}\]])/g, (match, value, end) => {
       if (value.includes('"') && !value.match(/\\"/)) {
-        const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-        return `: "${escaped}"${end}`;
+        const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+        return `: "${escaped}"${end}`
       }
-      return match;
-    });
+      return match
+    })
 
-    return fixed;
+    return fixed
   }
 
   private fixJsonAdvanced(jsonStr: string): string {
-    let fixed = jsonStr;
+    let fixed = jsonStr
 
-    fixed = fixed.replace(/,(\s*[}\]])/g, '$1');
-    
-    fixed = fixed.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+    fixed = fixed.replace(/,(\s*[}\]])/g, '$1')
 
-    const lastBrace = fixed.lastIndexOf('}');
+    fixed = fixed.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+
+    const lastBrace = fixed.lastIndexOf('}')
     if (lastBrace !== -1 && lastBrace < fixed.length - 1) {
-      fixed = fixed.substring(0, lastBrace + 1);
+      fixed = fixed.substring(0, lastBrace + 1)
     }
 
-    fixed = this.escapeUnescapedQuotesInStrings(fixed);
+    fixed = this.escapeUnescapedQuotesInStrings(fixed)
 
-    return fixed;
+    return fixed
   }
 
   private escapeUnescapedQuotesInStrings(jsonStr: string): string {
-    let result = '';
-    let inString = false;
-    let escapeNext = false;
-    let stringStart = -1;
+    let result = ''
+    let inString = false
+    let escapeNext = false
+    let stringStart = -1
 
     for (let i = 0; i < jsonStr.length; i++) {
-      const char = jsonStr[i];
+      const char = jsonStr[i]
 
       if (escapeNext) {
-        result += char;
-        escapeNext = false;
-        continue;
+        result += char
+        escapeNext = false
+        continue
       }
 
       if (char === '\\') {
-        result += char;
-        escapeNext = true;
-        continue;
+        result += char
+        escapeNext = true
+        continue
       }
 
       if (char === '"') {
         if (!inString) {
-          inString = true;
-          stringStart = i;
-          result += char;
+          inString = true
+          stringStart = i
+          result += char
         } else {
-          const nextChar = i + 1 < jsonStr.length ? jsonStr[i + 1] : '';
-          if (nextChar === ':' || nextChar === ',' || nextChar === '}' || nextChar === ']' || nextChar === '\n' || nextChar === '\r' || nextChar === ' ') {
-            inString = false;
-            result += char;
+          const nextChar = i + 1 < jsonStr.length ? jsonStr[i + 1] : ''
+          if (
+            nextChar === ':' ||
+            nextChar === ',' ||
+            nextChar === '}' ||
+            nextChar === ']' ||
+            nextChar === '\n' ||
+            nextChar === '\r' ||
+            nextChar === ' '
+          ) {
+            inString = false
+            result += char
           } else {
-            result += '\\"';
+            result += '\\"'
           }
         }
       } else {
-        result += char;
+        result += char
       }
     }
 
-    return result;
+    return result
   }
 
   private extractProfileFallback(
     memories: Array<{
-      id: string;
-      title: string | null;
-      summary: string | null;
-      content: string;
-      created_at: Date;
-      page_metadata: any;
+      id: string
+      title: string | null
+      summary: string | null
+      content: string
+      created_at: Date
+      page_metadata: any
     }>
   ): ProfileExtractionResult {
-    const now = new Date();
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const now = new Date()
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-    const allTopics = new Set<string>();
-    const allCategories = new Set<string>();
-    const recentTopics = new Set<string>();
-    const recentCategories = new Set<string>();
+    const allTopics = new Set<string>()
+    const allCategories = new Set<string>()
+    const recentTopics = new Set<string>()
+    const recentCategories = new Set<string>()
 
     memories.forEach(m => {
-      const metadata = m.page_metadata as any;
-      const isRecent = m.created_at >= thirtyDaysAgo;
+      const metadata = m.page_metadata as any
+      const isRecent = m.created_at >= thirtyDaysAgo
 
       if (metadata?.topics) {
         metadata.topics.forEach((topic: string) => {
-          allTopics.add(topic);
-          if (isRecent) recentTopics.add(topic);
-        });
+          allTopics.add(topic)
+          if (isRecent) recentTopics.add(topic)
+        })
       }
 
       if (metadata?.categories) {
         metadata.categories.forEach((cat: string) => {
-          allCategories.add(cat);
-          if (isRecent) recentCategories.add(cat);
-        });
+          allCategories.add(cat)
+          if (isRecent) recentCategories.add(cat)
+        })
       }
-    });
+    })
 
     const staticProfile: StaticProfile = {
       interests: Array.from(allTopics).slice(0, 10),
@@ -498,7 +511,7 @@ Return ONLY the JSON object:`;
       technology_preferences: {},
       lifestyle_patterns: {},
       cognitive_style: {},
-    };
+    }
 
     const dynamicProfile: DynamicProfile = {
       recent_activities: Array.from(recentTopics).slice(0, 5),
@@ -513,14 +526,14 @@ Return ONLY the JSON object:`;
       emotional_state: {},
       active_research_topics: Array.from(recentTopics).slice(0, 5),
       upcoming_events: [],
-    };
+    }
 
     return {
       static_profile_json: staticProfile,
       static_profile_text: `User is interested in: ${Array.from(allTopics).slice(0, 5).join(', ')}. Active in domains: ${Array.from(allCategories).slice(0, 3).join(', ')}.`,
       dynamic_profile_json: dynamicProfile,
       dynamic_profile_text: `Recently interested in: ${Array.from(recentTopics).slice(0, 5).join(', ')}.`,
-    };
+    }
   }
 
   private getEmptyProfile(): ProfileExtractionResult {
@@ -556,9 +569,8 @@ Return ONLY the JSON object:`;
         upcoming_events: [],
       },
       dynamic_profile_text: 'No recent context available yet.',
-    };
+    }
   }
 }
 
-export const profileExtractionService = new ProfileExtractionService();
-
+export const profileExtractionService = new ProfileExtractionService()

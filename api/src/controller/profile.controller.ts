@@ -1,14 +1,14 @@
-import { Request, Response } from 'express';
-import { AuthenticatedRequest } from '../middleware/auth';
-import { profileUpdateService } from '../services/profileUpdate';
-import { logger } from '../utils/logger';
+import { Request, Response } from 'express'
+import { AuthenticatedRequest } from '../middleware/auth'
+import { profileUpdateService } from '../services/profileUpdate'
+import { logger } from '../utils/logger'
 
 export class ProfileController {
   static async getProfile(req: AuthenticatedRequest, res: Response) {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.id
 
-      const profile = await profileUpdateService.getUserProfile(userId);
+      const profile = await profileUpdateService.getUserProfile(userId)
 
       if (!profile) {
         return res.status(200).json({
@@ -17,7 +17,7 @@ export class ProfileController {
             profile: null,
             message: 'Profile not yet created. Process some content to generate a profile.',
           },
-        });
+        })
       }
 
       res.status(200).json({
@@ -39,36 +39,36 @@ export class ProfileController {
             version: profile.version,
           },
         },
-      });
+      })
     } catch (error) {
-      logger.error('Error getting profile:', error);
+      logger.error('Error getting profile:', error)
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get profile',
-      });
+      })
     }
   }
 
   static async refreshProfile(req: AuthenticatedRequest, res: Response) {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.id
 
       logger.log('[profile/refresh] starting', {
         ts: new Date().toISOString(),
         userId,
-      });
+      })
 
-      let profile;
+      let profile
       try {
-        profile = await profileUpdateService.updateUserProfile(userId, true);
+        profile = await profileUpdateService.updateUserProfile(userId, true)
       } catch (error) {
-        logger.error('Error refreshing profile, retrying once:', error);
-        
+        logger.error('Error refreshing profile, retrying once:', error)
+
         try {
-          profile = await profileUpdateService.updateUserProfile(userId, true);
+          profile = await profileUpdateService.updateUserProfile(userId, true)
         } catch (retryError) {
-          logger.error('Error refreshing profile on retry:', retryError);
-          throw retryError;
+          logger.error('Error refreshing profile on retry:', retryError)
+          throw retryError
         }
       }
 
@@ -76,7 +76,7 @@ export class ProfileController {
         ts: new Date().toISOString(),
         userId,
         version: profile.version,
-      });
+      })
 
       res.status(200).json({
         success: true,
@@ -98,35 +98,34 @@ export class ProfileController {
             version: profile.version,
           },
         },
-      });
+      })
     } catch (error) {
-      logger.error('Error refreshing profile:', error);
+      logger.error('Error refreshing profile:', error)
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to refresh profile',
-      });
+      })
     }
   }
 
   static async getProfileContext(req: AuthenticatedRequest, res: Response) {
     try {
-      const userId = req.user!.id;
+      const userId = req.user!.id
 
-      const context = await profileUpdateService.getProfileContext(userId);
+      const context = await profileUpdateService.getProfileContext(userId)
 
       res.status(200).json({
         success: true,
         data: {
           context: context || '',
         },
-      });
+      })
     } catch (error) {
-      logger.error('Error getting profile context:', error);
+      logger.error('Error getting profile context:', error)
       res.status(500).json({
         success: false,
         error: error instanceof Error ? error.message : 'Failed to get profile context',
-      });
+      })
     }
   }
 }
-

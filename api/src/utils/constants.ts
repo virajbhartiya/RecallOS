@@ -7,7 +7,7 @@ export const MEMORY_CONSTANTS = {
   DEFAULT_MESH_THRESHOLD: 0.3, // Default similarity threshold for mesh
   DEFAULT_SNAPSHOT_LIMIT: 20, // Default snapshot pagination limit
   DEFAULT_CLUSTER_DEPTH: 2, // Default cluster traversal depth
-} as const;
+} as const
 
 // Search constants
 export const SEARCH_CONSTANTS = {
@@ -21,7 +21,7 @@ export const SEARCH_CONSTANTS = {
   EMBEDDING_TIMEOUT: 600000, // 10 minutes in milliseconds
   AI_GENERATION_TIMEOUT: 120000, // 2 minutes in milliseconds
   AI_ANSWER_TIMEOUT: 180000, // 3 minutes in milliseconds
-} as const;
+} as const
 
 // Mesh and relation constants
 export const MESH_CONSTANTS = {
@@ -38,7 +38,7 @@ export const MESH_CONSTANTS = {
   MIN_DEGREE: 3, // Minimum degree per node in mesh
   CLUSTER_EPSILON: 250, // Distance threshold for clustering
   CLUSTER_MIN_POINTS: 2, // Minimum points to form a cluster
-} as const;
+} as const
 
 // Cache and TTL constants
 export const CACHE_CONSTANTS = {
@@ -46,7 +46,7 @@ export const CACHE_CONSTANTS = {
   SEARCH_JOB_TTL: 15 * 60, // 15 minutes in seconds
   RELATIONSHIP_CACHE_TTL: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
   CACHE_CLEANUP_INTERVAL: 60 * 60 * 1000, // 1 hour in milliseconds
-} as const;
+} as const
 
 // Request and validation constants
 export const REQUEST_CONSTANTS = {
@@ -54,7 +54,7 @@ export const REQUEST_CONSTANTS = {
   MAX_CONTENT_SIZE: 100000, // Maximum content length in characters
   DEFAULT_PAGE_SIZE: 10, // Default pagination page size
   MAX_PAGE_SIZE: 100, // Maximum pagination page size
-} as const;
+} as const
 
 // AI provider constants
 export const AI_CONSTANTS = {
@@ -65,7 +65,7 @@ export const AI_CONSTANTS = {
   MAX_RETRY_ATTEMPTS: 8, // Maximum retry attempts for AI calls
   BASE_RETRY_DELAY: 3000, // Base retry delay in milliseconds
   MAX_RETRY_DELAY: 60000, // Maximum retry delay in milliseconds
-} as const;
+} as const
 
 // Queue constants
 export const QUEUE_CONSTANTS = {
@@ -73,5 +73,4 @@ export const QUEUE_CONSTANTS = {
   DEFAULT_MAX_JOBS: 1000, // Default max jobs to keep
   DEFAULT_ATTEMPTS: 1, // Default job attempts
   DEFAULT_BACKOFF_DELAY: 5000, // Default backoff delay in milliseconds
-} as const;
-
+} as const

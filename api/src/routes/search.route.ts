@@ -1,13 +1,11 @@
-import { Router } from 'express';
-import { postSearch, getSearchJobStatus, getContext } from '../controller/search.controller';
-import { authenticateToken } from '../middleware/auth';
+import { Router } from 'express'
+import { postSearch, getSearchJobStatus, getContext } from '../controller/search.controller'
+import { authenticateToken } from '../middleware/auth'
 
-const router = Router();
+const router = Router()
 
-router.post('/', authenticateToken, postSearch);
-router.post('/context', authenticateToken, getContext);
-router.get('/job/:id', getSearchJobStatus);
+router.post('/', authenticateToken, postSearch)
+router.post('/context', authenticateToken, getContext)
+router.get('/job/:id', getSearchJobStatus)
 
-export default router;
-
-
+export default router
