@@ -34,7 +34,13 @@ export const aiProvider = {
     } else if (provider === 'hybrid') {
       result = await this.generateHybridEmbedding(text);
     } else {
-      result = this.generateFallbackEmbedding(text);
+      try {
+        result = await this.tryOllamaEmbedding(text, OLLAMA_EMBED_MODEL);
+        modelUsed = OLLAMA_EMBED_MODEL;
+      } catch (error) {
+        logger.error('Ollama embedding failed, using fallback:', error);
+        result = this.generateFallbackEmbedding(text);
+      }
     }
     
     if (userId) {

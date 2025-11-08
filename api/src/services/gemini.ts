@@ -1,5 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 
+export const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'text-embedding-004';
+
 // In-process rate limiter queue to avoid Gemini 429 (quota) errors
 type QueueTask<T> = () => Promise<T>;
 type QueuedTask = { 
@@ -235,7 +237,7 @@ Return clean, readable plain text only.`;
       try {
         const response = await runWithRateLimit(() =>
           this.ai.models.embedContent({
-            model: 'text-embedding-004',
+            model: GEMINI_EMBED_MODEL,
             contents: text,
           }), 180000, true // 3 minutes timeout for embeddings, bypass rate limit for critical operations
         );
@@ -245,7 +247,7 @@ Return clean, readable plain text only.`;
         const usageMetadata = (response as any).usageMetadata;
         const inputTokens = usageMetadata?.promptTokenCount || 0;
         const outputTokens = 0;
-        const modelUsed = 'text-embedding-004';
+        const modelUsed = GEMINI_EMBED_MODEL;
         
         // Reset to first model on success
         this.resetToFirstModel();

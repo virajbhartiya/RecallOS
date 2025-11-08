@@ -1,4 +1,5 @@
 import { getUserId, requireAuthToken } from '@/lib/userId'
+import { runtime, storage } from '@/lib/browser'
 
 interface ContextData {
   source: string;
@@ -780,7 +781,7 @@ function isLocalhost(): boolean {
 
 async function sendContextToBackground() {
   try {
-    if (!chrome.runtime?.id) {
+    if (!runtime.id) {
       return;
     }
     
@@ -824,17 +825,13 @@ async function sendContextToBackground() {
       type: privacyExtensionType,
       compatibility_mode: privacyExtensionDetected,
     };
-    chrome.runtime.sendMessage(
+    runtime.sendMessage(
       { type: 'CAPTURE_CONTEXT', data: contextData },
       response => {
-        if (chrome.runtime.lastError) {
-          return;
-        }
       }
     );
     lastCaptureTime = now;
   } catch (error) {
-    // Ignore errors
   }
 }
 if (document.readyState === 'loading') {
@@ -860,8 +857,8 @@ window.addEventListener('focus', () => {
   hasUserActivity = true;
   lastActivityTime = Date.now();
 });
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!chrome.runtime?.id) {
+runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!runtime.id) {
     return false;
   }
   if (message.type === 'CAPTURE_CONTEXT_NOW') {
@@ -995,7 +992,7 @@ function startContinuousMonitoring() {
   updateActivityLevel();
   const interval = getMonitoringInterval();
   captureInterval = setInterval(() => {
-    if (!chrome.runtime?.id) {
+    if (!runtime.id) {
       stopContinuousMonitoring();
       return;
     }
@@ -1117,7 +1114,7 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
     // Derive API base from extension settings
     let apiBase = 'http://localhost:3000/api';
     try {
-      const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+      const cfg = await storage.sync.get(['apiEndpoint']);
       const endpoint = cfg?.apiEndpoint as string | undefined;
       if (endpoint) {
         const u = new URL(endpoint);
@@ -1173,7 +1170,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
     // Derive API base from extension settings
     let apiBase = 'http://localhost:3000/api';
     try {
-      const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+      const cfg = await storage.sync.get(['apiEndpoint']);
       const endpoint = cfg?.apiEndpoint as string | undefined;
       if (endpoint) {
         const u = new URL(endpoint);
@@ -1294,7 +1291,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
 
 async function getApiEndpointForMemory(): Promise<string> {
   try {
-    const result = await chrome.storage.sync.get(['apiEndpoint']);
+    const result = await storage.sync.get(['apiEndpoint']);
     return result.apiEndpoint || 'http://localhost:3000/api/memory/process';
   } catch (error) {
     console.error('RecallOS: Error getting API endpoint:', error);
@@ -1331,10 +1328,13 @@ async function autoInjectMemories(userText: string): Promise<void> {
   
   if (userText.includes('[RecallOS Memory Context]')) return;
   
-  // Check if extension is enabled
   const enabled = await checkExtensionEnabled();
   if (!enabled) {
-    console.log('RecallOS: Extension is disabled, skipping memory injection');
+    return;
+  }
+  
+  const memoryInjectionEnabled = await checkMemoryInjectionEnabled();
+  if (!memoryInjectionEnabled) {
     return;
   }
   
@@ -1432,6 +1432,25 @@ function handleTyping(): void {
   }, 1500); 
 }
 
+function calculateIconPosition(): string {
+  if (chatSendButton && chatInput) {
+    try {
+      const container = (chatInput as HTMLElement).closest('div');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const buttonRect = chatSendButton.getBoundingClientRect();
+        const buttonRightFromContainer = containerRect.right - buttonRect.right;
+        const buttonWidth = buttonRect.width || 40;
+        const spacing = 12;
+        const rightPosition = buttonRightFromContainer + buttonWidth + spacing;
+        return `${Math.max(rightPosition, 60)}px`;
+      }
+    } catch (error) {
+    }
+  }
+  return '60px';
+}
+
 async function createRecallOSIcon(): Promise<HTMLElement> {
   const icon = document.createElement('div');
   icon.id = 'recallos-extension-icon';
@@ -1443,15 +1462,16 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
     </svg>
   `;
   
-  // Check if extension is enabled to set initial state
   const enabled = await checkExtensionEnabled();
   const baseColor = enabled ? '#10a37f' : '#8e8ea0';
   const bgColor = enabled ? 'rgba(16, 163, 127, 0.1)' : 'rgba(142, 142, 160, 0.1)';
   const borderColor = enabled ? 'rgba(16, 163, 127, 0.2)' : 'rgba(142, 142, 160, 0.2)';
   
+  const rightPosition = calculateIconPosition();
+  
   icon.style.cssText = `
     position: absolute !important;
-    right: 12px !important;
+    right: ${rightPosition} !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
     width: 32px !important;
@@ -1463,7 +1483,7 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
     cursor: pointer !important;
     border-radius: 8px !important;
     transition: all 0.2s ease !important;
-    z-index: 99999 !important;
+    z-index: 1 !important;
     background: ${bgColor} !important;
     border: 1px solid ${borderColor} !important;
     padding: 0 !important;
@@ -1525,23 +1545,46 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
 
 async function checkExtensionEnabled(): Promise<boolean> {
   try {
-    const response = await chrome.runtime.sendMessage({
-      type: 'GET_EXTENSION_ENABLED',
+    return new Promise((resolve) => {
+      runtime.sendMessage(
+        { type: 'GET_EXTENSION_ENABLED' },
+        (response: any) => {
+          resolve(response?.success ? response.enabled : true);
+        }
+      );
     });
-    return response.success ? response.enabled : true; // Default to enabled on error
   } catch (error) {
     console.error('RecallOS: Error checking extension enabled state:', error);
-    return true; // Default to enabled on error
+    return true;
+  }
+}
+
+async function checkMemoryInjectionEnabled(): Promise<boolean> {
+  try {
+    return new Promise((resolve) => {
+      runtime.sendMessage(
+        { type: 'GET_MEMORY_INJECTION_ENABLED' },
+        (response: any) => {
+          resolve(response?.success ? response.enabled : true);
+        }
+      );
+    });
+  } catch (error) {
+    console.error('RecallOS: Error checking memory injection enabled state:', error);
+    return true;
   }
 }
 
 async function checkWebsiteBlocked(url: string): Promise<boolean> {
   try {
-    const response = await chrome.runtime.sendMessage({
-      type: 'CHECK_WEBSITE_BLOCKED',
-      url: url,
+    return new Promise((resolve) => {
+      runtime.sendMessage(
+        { type: 'CHECK_WEBSITE_BLOCKED', url: url },
+        (response: any) => {
+          resolve(response?.success ? response.blocked : false);
+        }
+      );
     });
-    return response.success ? response.blocked : false;
   } catch (error) {
     return false;
   }
@@ -1746,6 +1789,12 @@ function setupAIChatIntegration(): void {
       createRecallOSIcon().then(icon => {
         recallOSIcon = icon;
         inputContainer.appendChild(recallOSIcon);
+        setTimeout(() => {
+          if (recallOSIcon && chatSendButton) {
+            const newRightPosition = calculateIconPosition();
+            recallOSIcon.style.right = newRightPosition;
+          }
+        }, 100);
       });
       
       const ensureIconVisible = () => {
@@ -1787,6 +1836,12 @@ function setupAIChatIntegration(): void {
               createRecallOSIcon().then(icon => {
                 recallOSIcon = icon;
                 newContainer.appendChild(recallOSIcon);
+                setTimeout(() => {
+                  if (recallOSIcon && chatSendButton) {
+                    const newRightPosition = calculateIconPosition();
+                    recallOSIcon.style.right = newRightPosition;
+                  }
+                }, 100);
               });
             }
           }

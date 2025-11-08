@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { getAuthToken, requireAuthToken } from '@/lib/userId';
+import { runtime, storage, tabs } from '@/lib/browser';
 
 const Popup: React.FC = () => {
   const [extensionEnabled, setExtensionEnabled] = useState(true);
+  const [memoryInjectionEnabled, setMemoryInjectionEnabled] = useState(true);
   const [blockedWebsites, setBlockedWebsites] = useState<string[]>([]);
   const [newBlockedWebsite, setNewBlockedWebsite] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -14,22 +16,28 @@ const Popup: React.FC = () => {
   useEffect(() => {
     loadSettings();
     checkStatus();
-    // Check health periodically
     const interval = setInterval(checkStatus, 10000);
     return () => clearInterval(interval);
   }, []);
 
   const loadSettings = async () => {
     try {
-      const extensionResponse = await chrome.runtime.sendMessage({
-        type: 'GET_EXTENSION_ENABLED',
+      const extensionResponse = await new Promise<any>((resolve) => {
+        runtime.sendMessage({ type: 'GET_EXTENSION_ENABLED' }, resolve);
       });
       if (extensionResponse && extensionResponse.success) {
         setExtensionEnabled(extensionResponse.enabled);
       }
 
-      const blockedResponse = await chrome.runtime.sendMessage({
-        type: 'GET_BLOCKED_WEBSITES',
+      const memoryInjectionResponse = await new Promise<any>((resolve) => {
+        runtime.sendMessage({ type: 'GET_MEMORY_INJECTION_ENABLED' }, resolve);
+      });
+      if (memoryInjectionResponse && memoryInjectionResponse.success) {
+        setMemoryInjectionEnabled(memoryInjectionResponse.enabled);
+      }
+
+      const blockedResponse = await new Promise<any>((resolve) => {
+        runtime.sendMessage({ type: 'GET_BLOCKED_WEBSITES' }, resolve);
       });
       if (blockedResponse && blockedResponse.success) {
         setBlockedWebsites(blockedResponse.websites || []);
@@ -42,9 +50,8 @@ const Popup: React.FC = () => {
   const checkStatus = async () => {
     setIsCheckingHealth(true);
     try {
-      // Check API health
-      const healthResponse = await chrome.runtime.sendMessage({
-        type: 'CHECK_API_HEALTH',
+      const healthResponse = await new Promise<any>((resolve) => {
+        runtime.sendMessage({ type: 'CHECK_API_HEALTH' }, resolve);
       });
       if (healthResponse && healthResponse.success) {
         setIsConnected(healthResponse.healthy);
@@ -52,20 +59,16 @@ const Popup: React.FC = () => {
         setIsConnected(false);
       }
 
-      // Check auth status - try multiple sources like requireAuthToken does
       let isAuth = false;
       try {
-        // First check chrome.storage.local (works in popup)
-        const stored = await chrome.storage?.local?.get?.(['auth_token']);
+        const stored = await storage.local.get(['auth_token']);
         if (stored && stored.auth_token) {
           isAuth = true;
         } else {
-          // Try localStorage (might work in popup)
           const token = getAuthToken();
           if (token) {
             isAuth = true;
           } else {
-            // Try requireAuthToken which checks cookies too
             try {
               await requireAuthToken();
               isAuth = true;
@@ -91,26 +94,40 @@ const Popup: React.FC = () => {
     try {
       const newState = !extensionEnabled;
       
-      if (chrome.runtime.lastError) {
-        setIsLoading(false);
-        return;
-      }
-      
-      const response = await chrome.runtime.sendMessage({
-        type: 'SET_EXTENSION_ENABLED',
-        enabled: newState,
+      const response = await new Promise<any>((resolve) => {
+        runtime.sendMessage(
+          { type: 'SET_EXTENSION_ENABLED', enabled: newState },
+          resolve
+        );
       });
-      
-      if (chrome.runtime.lastError) {
-        setIsLoading(false);
-        return;
-      }
       
       if (response && response.success) {
         setExtensionEnabled(newState);
       }
     } catch (error) {
       console.error('Error toggling extension:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleMemoryInjection = async () => {
+    setIsLoading(true);
+    try {
+      const newState = !memoryInjectionEnabled;
+      
+      const response = await new Promise<any>((resolve) => {
+        runtime.sendMessage(
+          { type: 'SET_MEMORY_INJECTION_ENABLED', enabled: newState },
+          resolve
+        );
+      });
+      
+      if (response && response.success) {
+        setMemoryInjectionEnabled(newState);
+      }
+    } catch (error) {
+      console.error('Error toggling memory injection:', error);
     } finally {
       setIsLoading(false);
     }
@@ -124,9 +141,11 @@ const Popup: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'ADD_BLOCKED_WEBSITE',
-        website: websiteToAdd,
+      const response = await new Promise<any>((resolve) => {
+        runtime.sendMessage(
+          { type: 'ADD_BLOCKED_WEBSITE', website: websiteToAdd },
+          resolve
+        );
       });
       if (response && response.success) {
         setNewBlockedWebsite('');
@@ -142,13 +161,12 @@ const Popup: React.FC = () => {
   const blockCurrentDomain = async () => {
     setIsLoading(true);
     try {
-      // Get the current active tab
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs.length === 0 || !tabs[0].url) {
+      const activeTabs = await tabs.query({ active: true, currentWindow: true });
+      if (activeTabs.length === 0 || !activeTabs[0].url) {
         return;
       }
 
-      const url = tabs[0].url;
+      const url = activeTabs[0].url;
       try {
         const urlObj = new URL(url);
         const domain = urlObj.hostname.replace(/^www\./, '');
@@ -169,9 +187,11 @@ const Popup: React.FC = () => {
   const removeBlockedWebsite = async (website: string) => {
     setIsLoading(true);
     try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'REMOVE_BLOCKED_WEBSITE',
-        website: website,
+      const response = await new Promise<any>((resolve) => {
+        runtime.sendMessage(
+          { type: 'REMOVE_BLOCKED_WEBSITE', website: website },
+          resolve
+        );
       });
       if (response && response.success) {
         await loadSettings();
@@ -251,6 +271,29 @@ const Popup: React.FC = () => {
           </div>
         </div>
 
+        {/* Memory Injection Toggle */}
+        <div className="border border-gray-200 bg-white p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="text-sm font-medium text-black mb-0.5">Memory Injection</div>
+              <div className="text-xs text-gray-600">
+                {memoryInjectionEnabled ? 'Enabled' : 'Disabled'}
+              </div>
+            </div>
+            <button
+              onClick={toggleMemoryInjection}
+              disabled={isLoading}
+              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${
+                memoryInjectionEnabled
+                  ? 'border-black bg-black text-white hover:bg-gray-800'
+                  : 'border-gray-300 bg-white text-black hover:bg-gray-50'
+              }`}
+            >
+              {isLoading ? '...' : memoryInjectionEnabled ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+        </div>
+
         {/* Blocked Websites */}
         <div className="border border-gray-200 bg-white p-3 space-y-3">
           <div className="text-sm font-medium text-black">Blocked Websites</div>
@@ -316,7 +359,6 @@ const Popup: React.FC = () => {
   );
 };
 
-// Initialize React app
 const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);
