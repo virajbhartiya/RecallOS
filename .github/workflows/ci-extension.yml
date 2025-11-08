@@ -1,0 +1,41 @@
+name: CI - Extension
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'extension/**'
+      - '.github/workflows/ci-extension.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'extension/**'
+      - '.github/workflows/ci-extension.yml'
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install dependencies
+        working-directory: extension
+        run: npm ci
+
+      - name: Check formatting
+        working-directory: extension
+        run: npm run format:check
+
+      - name: Build project
+        working-directory: extension
+        run: npm run build
+

@@ -23,6 +23,9 @@
     "setup": "npm run docker:up && sleep 10 && npm run db:setup",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lint": "eslint . --ext ts --max-warnings 0",
+    "lint:fix": "eslint . --ext ts --fix",
+    "fix": "npm run lint:fix && npm run format",
     "clean:qdrant": "node -r ts-node/register src/scripts/cleanQdrant.ts",
     "clean:db": "npm run db:reset",
     "clean:all": "npm run clean:qdrant && npm run clean:db",
@@ -42,6 +45,7 @@
     "@types/node": "^20.12.12",
     "@typescript-eslint/eslint-plugin": "^8.46.0",
     "@typescript-eslint/parser": "^8.46.0",
+    "eslint": "^8.56.0",
     "nodemon": "^3.0.1",
     "prettier": "^3.2.5",
     "prisma": "^6.19.0"
