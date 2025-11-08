@@ -77,10 +77,30 @@ export class ProfileUpdateService {
 
     let extractionResult: ProfileExtractionResult;
     
-    extractionResult = await profileExtractionService.extractProfileFromMemories(
-      userId,
-      allMemories
-    );
+    try {
+      extractionResult = await profileExtractionService.extractProfileFromMemories(
+        userId,
+        allMemories
+      );
+    } catch (error) {
+      logger.error('Error extracting profile, retrying once:', error);
+      
+      try {
+        extractionResult = await profileExtractionService.extractProfileFromMemories(
+          userId,
+          allMemories
+        );
+      } catch (retryError) {
+        logger.error('Error extracting profile on retry:', retryError);
+        
+        if (existingProfile) {
+          logger.log('Preserving existing profile due to extraction failure');
+          return existingProfile as UserProfile;
+        }
+        
+        throw new Error('Failed to extract profile and no existing profile to preserve');
+      }
+    }
 
     if (existingProfile && !force && lastAnalyzedDate) {
       const merged = this.mergeProfiles(existingProfile, extractionResult);

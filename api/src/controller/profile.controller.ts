@@ -58,7 +58,19 @@ export class ProfileController {
         userId,
       });
 
-      const profile = await profileUpdateService.updateUserProfile(userId, true);
+      let profile;
+      try {
+        profile = await profileUpdateService.updateUserProfile(userId, true);
+      } catch (error) {
+        logger.error('Error refreshing profile, retrying once:', error);
+        
+        try {
+          profile = await profileUpdateService.updateUserProfile(userId, true);
+        } catch (retryError) {
+          logger.error('Error refreshing profile on retry:', retryError);
+          throw retryError;
+        }
+      }
 
       logger.log('[profile/refresh] completed', {
         ts: new Date().toISOString(),

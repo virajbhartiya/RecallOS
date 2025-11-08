@@ -99,8 +99,17 @@ export class ProfileExtractionService {
       const parsed = this.parseProfileResponse(response);
       return parsed;
     } catch (error) {
-      logger.error('Error extracting profile from memories:', error);
-      return this.extractProfileFallback(memories);
+      logger.error('Error extracting profile from memories, retrying once:', error);
+      
+      try {
+        const retryResponse = await aiProvider.generateContent(prompt, false, userId);
+        const retryParsed = this.parseProfileResponse(retryResponse);
+        logger.log('Profile extraction succeeded on retry');
+        return retryParsed;
+      } catch (retryError) {
+        logger.error('Error extracting profile from memories on retry, using fallback:', retryError);
+        return this.extractProfileFallback(memories);
+      }
     }
   }
 
@@ -245,47 +254,46 @@ Return ONLY the JSON object:`;
   }
 
   private parseProfileResponse(response: string): ProfileExtractionResult {
-    try {
-      let jsonMatch = response.match(/\{[\s\S]*\}/);
-      
-      if (!jsonMatch) {
-        jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
-        if (jsonMatch && jsonMatch[1]) {
-          jsonMatch[0] = jsonMatch[1];
-        }
+    let jsonMatch = response.match(/\{[\s\S]*\}/);
+    
+    if (!jsonMatch) {
+      jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch && jsonMatch[1]) {
+        jsonMatch[0] = jsonMatch[1];
       }
-      
-      if (!jsonMatch || !jsonMatch[0]) {
-        throw new Error('No JSON found in response');
-      }
-
-      let jsonStr = jsonMatch[0];
-      let data;
-
-      try {
-        data = JSON.parse(jsonStr);
-      } catch (parseError) {
-        try {
-          jsonStr = this.fixJson(jsonStr);
-          data = JSON.parse(jsonStr);
-        } catch (secondError) {
-          logger.error('Error parsing profile response after fixes:', secondError);
-          logger.error('JSON string (first 1000 chars):', jsonStr.substring(0, 1000));
-          logger.error('JSON string (last 500 chars):', jsonStr.substring(Math.max(0, jsonStr.length - 500)));
-          throw new Error('Failed to parse JSON after fixes');
-        }
-      }
-
-      return {
-        static_profile_json: data.static_profile_json || this.getEmptyProfile().static_profile_json,
-        static_profile_text: data.static_profile_text || '',
-        dynamic_profile_json: data.dynamic_profile_json || this.getEmptyProfile().dynamic_profile_json,
-        dynamic_profile_text: data.dynamic_profile_text || '',
-      };
-    } catch (error) {
-      logger.error('Error parsing profile response:', error);
-      return this.getEmptyProfile();
     }
+    
+    if (!jsonMatch || !jsonMatch[0]) {
+      throw new Error('No JSON found in response');
+    }
+
+    let jsonStr = jsonMatch[0];
+    let data;
+
+    try {
+      data = JSON.parse(jsonStr);
+    } catch (parseError) {
+      try {
+        jsonStr = this.fixJson(jsonStr);
+        data = JSON.parse(jsonStr);
+      } catch (secondError) {
+        logger.error('Error parsing profile response after fixes:', secondError);
+        logger.error('JSON string (first 1000 chars):', jsonStr.substring(0, 1000));
+        logger.error('JSON string (last 500 chars):', jsonStr.substring(Math.max(0, jsonStr.length - 500)));
+        throw new Error('Failed to parse JSON after fixes');
+      }
+    }
+
+    if (!data.static_profile_json || !data.dynamic_profile_json) {
+      throw new Error('Invalid profile structure: missing required fields');
+    }
+
+    return {
+      static_profile_json: data.static_profile_json,
+      static_profile_text: data.static_profile_text || '',
+      dynamic_profile_json: data.dynamic_profile_json,
+      dynamic_profile_text: data.dynamic_profile_text || '',
+    };
   }
 
   private fixJson(jsonStr: string): string {
