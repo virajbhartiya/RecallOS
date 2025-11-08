@@ -1328,10 +1328,13 @@ async function autoInjectMemories(userText: string): Promise<void> {
   
   if (userText.includes('[RecallOS Memory Context]')) return;
   
-  // Check if extension is enabled
   const enabled = await checkExtensionEnabled();
   if (!enabled) {
-    console.log('RecallOS: Extension is disabled, skipping memory injection');
+    return;
+  }
+  
+  const memoryInjectionEnabled = await checkMemoryInjectionEnabled();
+  if (!memoryInjectionEnabled) {
     return;
   }
   
@@ -1532,7 +1535,23 @@ async function checkExtensionEnabled(): Promise<boolean> {
     });
   } catch (error) {
     console.error('RecallOS: Error checking extension enabled state:', error);
-    return true; // Default to enabled on error
+    return true;
+  }
+}
+
+async function checkMemoryInjectionEnabled(): Promise<boolean> {
+  try {
+    return new Promise((resolve) => {
+      runtime.sendMessage(
+        { type: 'GET_MEMORY_INJECTION_ENABLED' },
+        (response: any) => {
+          resolve(response?.success ? response.enabled : true);
+        }
+      );
+    });
+  } catch (error) {
+    console.error('RecallOS: Error checking memory injection enabled state:', error);
+    return true;
   }
 }
 

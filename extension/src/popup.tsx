@@ -5,6 +5,7 @@ import { runtime, storage, tabs } from '@/lib/browser';
 
 const Popup: React.FC = () => {
   const [extensionEnabled, setExtensionEnabled] = useState(true);
+  const [memoryInjectionEnabled, setMemoryInjectionEnabled] = useState(true);
   const [blockedWebsites, setBlockedWebsites] = useState<string[]>([]);
   const [newBlockedWebsite, setNewBlockedWebsite] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -26,6 +27,13 @@ const Popup: React.FC = () => {
       });
       if (extensionResponse && extensionResponse.success) {
         setExtensionEnabled(extensionResponse.enabled);
+      }
+
+      const memoryInjectionResponse = await new Promise<any>((resolve) => {
+        runtime.sendMessage({ type: 'GET_MEMORY_INJECTION_ENABLED' }, resolve);
+      });
+      if (memoryInjectionResponse && memoryInjectionResponse.success) {
+        setMemoryInjectionEnabled(memoryInjectionResponse.enabled);
       }
 
       const blockedResponse = await new Promise<any>((resolve) => {
@@ -98,6 +106,28 @@ const Popup: React.FC = () => {
       }
     } catch (error) {
       console.error('Error toggling extension:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const toggleMemoryInjection = async () => {
+    setIsLoading(true);
+    try {
+      const newState = !memoryInjectionEnabled;
+      
+      const response = await new Promise<any>((resolve) => {
+        runtime.sendMessage(
+          { type: 'SET_MEMORY_INJECTION_ENABLED', enabled: newState },
+          resolve
+        );
+      });
+      
+      if (response && response.success) {
+        setMemoryInjectionEnabled(newState);
+      }
+    } catch (error) {
+      console.error('Error toggling memory injection:', error);
     } finally {
       setIsLoading(false);
     }
@@ -237,6 +267,29 @@ const Popup: React.FC = () => {
               }`}
             >
               {isLoading ? '...' : extensionEnabled ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+        </div>
+
+        {/* Memory Injection Toggle */}
+        <div className="border border-gray-200 bg-white p-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="text-sm font-medium text-black mb-0.5">Memory Injection</div>
+              <div className="text-xs text-gray-600">
+                {memoryInjectionEnabled ? 'Enabled' : 'Disabled'}
+              </div>
+            </div>
+            <button
+              onClick={toggleMemoryInjection}
+              disabled={isLoading}
+              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${
+                memoryInjectionEnabled
+                  ? 'border-black bg-black text-white hover:bg-gray-800'
+                  : 'border-gray-300 bg-white text-black hover:bg-gray-50'
+              }`}
+            >
+              {isLoading ? '...' : memoryInjectionEnabled ? 'Disable' : 'Enable'}
             </button>
           </div>
         </div>

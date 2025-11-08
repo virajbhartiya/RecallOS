@@ -1,5 +1,6 @@
 import { getUserId, requireAuthToken, clearAuthToken } from '@/lib/userId'
 import { storage, runtime, tabs } from '@/lib/browser'
+import { DEFAULT_API_ENDPOINT, DEFAULT_API_BASE, STORAGE_KEYS, MESSAGE_TYPES } from '@/lib/constants'
 
 interface ContextData {
   source: string;
@@ -15,10 +16,10 @@ interface ContextData {
 
 async function getApiEndpoint(): Promise<string> {
   try {
-    const result = await storage.sync.get(['apiEndpoint']);
-    return result.apiEndpoint || 'http://localhost:3000/api/memory/process';
+    const result = await storage.sync.get([STORAGE_KEYS.API_ENDPOINT]);
+    return result[STORAGE_KEYS.API_ENDPOINT] || DEFAULT_API_ENDPOINT;
   } catch (error) {
-    return 'http://localhost:3000/api/memory/process';
+    return DEFAULT_API_ENDPOINT;
   }
 }
 
@@ -28,7 +29,7 @@ async function getApiBaseUrl(): Promise<string> {
     const url = new URL(endpoint);
     return `${url.protocol}//${url.host}`;
   } catch (error) {
-    return 'http://localhost:3000';
+    return DEFAULT_API_BASE;
   }
 }
 
@@ -71,8 +72,8 @@ async function checkApiHealth(): Promise<boolean> {
 
 async function isExtensionEnabled(): Promise<boolean> {
   try {
-    const result = await storage.sync.get(['extensionEnabled']);
-    return result.extensionEnabled !== false;
+    const result = await storage.sync.get([STORAGE_KEYS.EXTENSION_ENABLED]);
+    return result[STORAGE_KEYS.EXTENSION_ENABLED] !== false;
   } catch (error) {
     return true;
   }
@@ -80,7 +81,7 @@ async function isExtensionEnabled(): Promise<boolean> {
 
 async function setExtensionEnabled(enabled: boolean): Promise<void> {
   try {
-    await storage.sync.set({ extensionEnabled: enabled });
+    await storage.sync.set({ [STORAGE_KEYS.EXTENSION_ENABLED]: enabled });
   } catch (error) {
     if (error instanceof Error) {
       throw error;
@@ -91,8 +92,8 @@ async function setExtensionEnabled(enabled: boolean): Promise<void> {
 
 async function getBlockedWebsites(): Promise<string[]> {
   try {
-    const result = await storage.sync.get(['blockedWebsites']);
-    return result.blockedWebsites || [];
+    const result = await storage.sync.get([STORAGE_KEYS.BLOCKED_WEBSITES]);
+    return result[STORAGE_KEYS.BLOCKED_WEBSITES] || [];
   } catch (error) {
     return [];
   }
@@ -100,9 +101,28 @@ async function getBlockedWebsites(): Promise<string[]> {
 
 async function setBlockedWebsites(websites: string[]): Promise<void> {
   try {
-    await storage.sync.set({ blockedWebsites: websites });
+    await storage.sync.set({ [STORAGE_KEYS.BLOCKED_WEBSITES]: websites });
   } catch (error) {
-    // Ignore errors
+  }
+}
+
+async function isMemoryInjectionEnabled(): Promise<boolean> {
+  try {
+    const result = await storage.sync.get([STORAGE_KEYS.MEMORY_INJECTION_ENABLED]);
+    return result[STORAGE_KEYS.MEMORY_INJECTION_ENABLED] !== false;
+  } catch (error) {
+    return true;
+  }
+}
+
+async function setMemoryInjectionEnabled(enabled: boolean): Promise<void> {
+  try {
+    await storage.sync.set({ [STORAGE_KEYS.MEMORY_INJECTION_ENABLED]: enabled });
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('Failed to save memory injection state');
   }
 }
 
@@ -231,7 +251,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
 
     if (response && !response.ok) {
       if (response.status === 401) {
-        await storage.local.remove('auth_token');
+        await storage.local.remove(STORAGE_KEYS.AUTH_TOKEN);
         clearAuthToken();
       }
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -255,7 +275,7 @@ tabs.onActivated.addListener(async activeInfo => {
 tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
     try {
-      tabs.sendMessage(tabId, { type: 'CAPTURE_CONTEXT_NOW' });
+      tabs.sendMessage(tabId, { type: MESSAGE_TYPES.CAPTURE_CONTEXT_NOW });
     } catch (error) {
     }
   }
@@ -281,7 +301,7 @@ runtime.onMessage.addListener(
     _sender: chrome.runtime.MessageSender,
     sendResponse: (response: unknown) => void
   ) => {
-    if (message?.type === 'CAPTURE_CONTEXT' && message.data) {
+    if (message?.type === MESSAGE_TYPES.CAPTURE_CONTEXT && message.data) {
       sendToBackend(message.data)
         .then(() => {
           sendResponse({ success: true, message: 'Context sent to backend' });
@@ -293,7 +313,7 @@ runtime.onMessage.addListener(
       return true; // Keep message channel open for async response
     }
 
-    if (message?.type === 'SET_ENDPOINT' && message.endpoint) {
+    if (message?.type === MESSAGE_TYPES.SET_ENDPOINT && message.endpoint) {
       setApiEndpoint(message.endpoint)
         .then(() => {
           sendResponse({ success: true, message: 'API endpoint updated' });
@@ -305,19 +325,19 @@ runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'SYNC_AUTH_TOKEN') {
+    if (message?.type === MESSAGE_TYPES.SYNC_AUTH_TOKEN) {
       (async () => {
         try {
           const token = (message as any).token;
           if (token) {
-            await storage.local.set({ auth_token: token });
+            await storage.local.set({ [STORAGE_KEYS.AUTH_TOKEN]: token });
           }
         } catch (error) {
         }
       })();
     }
 
-    if (message?.type === 'GET_ENDPOINT') {
+    if (message?.type === MESSAGE_TYPES.GET_ENDPOINT) {
       getApiEndpoint()
         .then(endpoint => {
           sendResponse({ success: true, endpoint });
@@ -330,7 +350,7 @@ runtime.onMessage.addListener(
     }
     
 
-    if (message?.type === 'GET_EXTENSION_ENABLED') {
+    if (message?.type === MESSAGE_TYPES.GET_EXTENSION_ENABLED) {
       isExtensionEnabled()
         .then(enabled => {
           sendResponse({ success: true, enabled });
@@ -342,7 +362,7 @@ runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'SET_EXTENSION_ENABLED' && typeof message.enabled === 'boolean') {
+    if (message?.type === MESSAGE_TYPES.SET_EXTENSION_ENABLED && typeof message.enabled === 'boolean') {
       (async () => {
         try {
           await setExtensionEnabled(message.enabled!);
@@ -354,7 +374,7 @@ runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'GET_BLOCKED_WEBSITES') {
+    if (message?.type === MESSAGE_TYPES.GET_BLOCKED_WEBSITES) {
       getBlockedWebsites()
         .then(websites => {
           sendResponse({ success: true, websites });
@@ -366,7 +386,7 @@ runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'SET_BLOCKED_WEBSITES' && Array.isArray((message as any).websites)) {
+    if (message?.type === MESSAGE_TYPES.SET_BLOCKED_WEBSITES && Array.isArray((message as any).websites)) {
       setBlockedWebsites((message as any).websites)
         .then(() => {
           sendResponse({ success: true, message: 'Blocked websites updated' });
@@ -378,7 +398,7 @@ runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'ADD_BLOCKED_WEBSITE' && (message as any).website) {
+    if (message?.type === MESSAGE_TYPES.ADD_BLOCKED_WEBSITE && (message as any).website) {
       getBlockedWebsites()
         .then(websites => {
           const website = (message as any).website.trim();
@@ -398,7 +418,7 @@ runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'REMOVE_BLOCKED_WEBSITE' && (message as any).website) {
+    if (message?.type === MESSAGE_TYPES.REMOVE_BLOCKED_WEBSITE && (message as any).website) {
       getBlockedWebsites()
         .then(websites => {
           const website = (message as any).website.trim();
@@ -415,7 +435,7 @@ runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'CHECK_WEBSITE_BLOCKED' && (message as any).url) {
+    if (message?.type === MESSAGE_TYPES.CHECK_WEBSITE_BLOCKED && (message as any).url) {
       isWebsiteBlocked((message as any).url)
         .then(blocked => {
           sendResponse({ success: true, blocked });
@@ -427,7 +447,7 @@ runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'CHECK_API_HEALTH') {
+    if (message?.type === MESSAGE_TYPES.CHECK_API_HEALTH) {
       checkApiHealth()
         .then(healthy => {
           sendResponse({ success: true, healthy });
@@ -439,7 +459,31 @@ runtime.onMessage.addListener(
       return true;
     }
 
-    if (message?.type === 'PING') {
+    if (message?.type === MESSAGE_TYPES.GET_MEMORY_INJECTION_ENABLED) {
+      isMemoryInjectionEnabled()
+        .then(enabled => {
+          sendResponse({ success: true, enabled });
+        })
+        .catch(error => {
+          sendResponse({ success: false, error: error.message });
+        });
+
+      return true;
+    }
+
+    if (message?.type === MESSAGE_TYPES.SET_MEMORY_INJECTION_ENABLED && typeof message.enabled === 'boolean') {
+      (async () => {
+        try {
+          await setMemoryInjectionEnabled(message.enabled!);
+          sendResponse({ success: true, message: 'Memory injection state updated' });
+        } catch (error) {
+          sendResponse({ success: false, error: error instanceof Error ? error.message : 'Failed to update memory injection state' });
+        }
+      })();
+      return true;
+    }
+
+    if (message?.type === MESSAGE_TYPES.PING) {
       sendResponse({ type: 'PONG', from: 'background' });
     }
   }
