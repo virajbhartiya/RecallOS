@@ -16,7 +16,10 @@ declare global {
     chrome?: {
       runtime?: {
         id?: string
-        sendMessage?: (extensionId: string, message: any) => Promise<void>
+        sendMessage?: (
+          extensionId: string,
+          message: { type: string; [key: string]: unknown }
+        ) => Promise<void>
       }
     }
   }

@@ -7,11 +7,12 @@ import React, {
   useState,
 } from "react"
 import { Line, OrbitControls } from "@react-three/drei"
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
 
 import { MemoryService } from "../services/memoryService"
-import type { MemoryMesh, MemoryMeshEdge } from "../types/memory"
+import type { MemoryMesh, MemoryMeshEdge, MemoryMeshNode } from "../types/memory"
 import { requireAuthToken } from "../utils/userId"
 import { ErrorMessage, LoadingSpinner } from "./ui/loading-spinner"
 
@@ -94,9 +95,10 @@ const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
     const nodePosition = meshRef.current.position
     const distance = camera.position.distanceTo(nodePosition)
     // Convert camera fov to radians for approximate world-space pixel scaling
-    const fovRad = (camera as any).fov
-      ? ((camera as any).fov * Math.PI) / 180
-      : (60 * Math.PI) / 180
+    const fovRad =
+      camera instanceof THREE.PerspectiveCamera && camera.fov
+        ? (camera.fov * Math.PI) / 180
+        : (60 * Math.PI) / 180
     const worldPerceivedScale = Math.tan(fovRad / 2) * 2
     // Tune multiplier to get roughly dot-like size; clamp to avoid extremes
     const dynamicScale = Math.min(
@@ -223,14 +225,16 @@ const SceneComponent: React.FC<SceneProps> = ({
     const maxY = finiteNodes.length
       ? Math.max(...finiteNodes.map((nn) => nn.y))
       : 1
-    const finiteZ = meshData.nodes.filter((nn: any) =>
-      Number.isFinite((nn as any).z)
-    ) as Array<any>
+    type NodeWithZ = MemoryMeshNode & { z?: number }
+    const finiteZ = meshData.nodes.filter(
+      (nn: MemoryMeshNode): nn is NodeWithZ =>
+        "z" in nn && typeof nn.z === "number" && Number.isFinite(nn.z)
+    )
     const minZ = finiteZ.length
-      ? Math.min(...finiteZ.map((nn: any) => (nn as any).z))
+      ? Math.min(...finiteZ.map((nn: NodeWithZ) => nn.z!))
       : 0
     const maxZ = finiteZ.length
-      ? Math.max(...finiteZ.map((nn: any) => (nn as any).z))
+      ? Math.max(...finiteZ.map((nn: NodeWithZ) => nn.z!))
       : 1
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
@@ -248,8 +252,8 @@ const SceneComponent: React.FC<SceneProps> = ({
         const nx = ((n.x - cx) / spanX) * radius * 2
         const ny = ((n.y - cy) / spanY) * radius * 2
         let iz: number
-        if (Number.isFinite((n as any).z)) {
-          iz = (((n as any).z - cz) / spanZ) * zRadius * 2
+        if ("z" in n && typeof n.z === "number" && Number.isFinite(n.z)) {
+          iz = ((n.z - cz) / spanZ) * zRadius * 2
         } else {
           iz = ((n.importance_score ?? 0.5) - 0.5) * 2 * zRadius
         }
@@ -404,9 +408,9 @@ const SceneComponent: React.FC<SceneProps> = ({
 
 const Scene = memo(SceneComponent)
 
-const ControlsUpdater: React.FC<{ controlsRef: React.RefObject<any> }> = ({
-  controlsRef,
-}) => {
+const ControlsUpdater: React.FC<{
+  controlsRef: React.RefObject<OrbitControlsImpl | null>
+}> = ({ controlsRef }) => {
   useFrame(() => {
     if (controlsRef.current) {
       controlsRef.current.update()
@@ -429,7 +433,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isCompactView, setIsCompactView] = useState(false)
-  const controlsRef = useRef<any>(null)
+  const controlsRef = useRef<OrbitControlsImpl | null>(null)
 
   // Ensure OrbitControls target is always at (0,0,0) - the center of the mesh
   useEffect(() => {

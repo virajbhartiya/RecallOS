@@ -47,17 +47,25 @@ export function transformApiSearchResult(
                   : String(v),
               ])
             ),
-            title: (result.page_metadata as any).title as string | undefined,
-            description: (result.page_metadata as any).description as
-              | string
-              | undefined,
-            keywords: (result.page_metadata as any).keywords as
-              | string[]
-              | undefined,
-            author: (result.page_metadata as any).author as string | undefined,
-            published_date: (result.page_metadata as any).published_date as
-              | string
-              | undefined,
+            title:
+              typeof result.page_metadata.title === "string"
+                ? result.page_metadata.title
+                : undefined,
+            description:
+              typeof result.page_metadata.description === "string"
+                ? result.page_metadata.description
+                : undefined,
+            keywords: Array.isArray(result.page_metadata.keywords)
+              ? (result.page_metadata.keywords as string[])
+              : undefined,
+            author:
+              typeof result.page_metadata.author === "string"
+                ? result.page_metadata.author
+                : undefined,
+            published_date:
+              typeof result.page_metadata.published_date === "string"
+                ? result.page_metadata.published_date
+                : undefined,
           } as Memory["page_metadata"])
         : undefined,
       importance_score: result.importance_score,
@@ -114,15 +122,25 @@ export function transformApiMemoryResponse(mem: {
                 : String(v),
             ])
           ),
-          title: (mem.page_metadata as any).title as string | undefined,
-          description: (mem.page_metadata as any).description as
-            | string
-            | undefined,
-          keywords: (mem.page_metadata as any).keywords as string[] | undefined,
-          author: (mem.page_metadata as any).author as string | undefined,
-          published_date: (mem.page_metadata as any).published_date as
-            | string
-            | undefined,
+          title:
+            typeof mem.page_metadata.title === "string"
+              ? mem.page_metadata.title
+              : undefined,
+          description:
+            typeof mem.page_metadata.description === "string"
+              ? mem.page_metadata.description
+              : undefined,
+          keywords: Array.isArray(mem.page_metadata.keywords)
+            ? (mem.page_metadata.keywords as string[])
+            : undefined,
+          author:
+            typeof mem.page_metadata.author === "string"
+              ? mem.page_metadata.author
+              : undefined,
+          published_date:
+            typeof mem.page_metadata.published_date === "string"
+              ? mem.page_metadata.published_date
+              : undefined,
         } as Memory["page_metadata"])
       : undefined,
     access_count: mem.access_count || 0,

@@ -1,7 +1,7 @@
 import React, { createContext, ReactNode, useContext } from "react"
 
 interface NotificationContextType {
-  openTxToast: (chainId: string, txHash: string) => Promise<void>
+  openTxToast: () => Promise<void>
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -15,7 +15,7 @@ interface NotificationProviderProps {
 export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   children,
 }) => {
-  const openTxToast = async (_chainId: string, _txHash: string) => {
+  const openTxToast = async () => {
     return
   }
 
@@ -26,6 +26,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNotification = () => {
   const context = useContext(NotificationContext)
   if (context === undefined) {

@@ -14,9 +14,12 @@ export const Landing = () => {
     if (typeof window !== "undefined" && typeof history !== "undefined") {
       try {
         if ("scrollRestoration" in history) {
-          ;(history as any).scrollRestoration = "manual"
+          ;(history as { scrollRestoration?: string }).scrollRestoration =
+            "manual"
         }
-      } catch {}
+      } catch {
+        // Ignore errors setting scroll restoration
+      }
       window.scrollTo({ top: 0, left: 0, behavior: "auto" })
     }
 

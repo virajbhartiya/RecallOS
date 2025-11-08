@@ -49,16 +49,23 @@ export const Login = () => {
       if (response.data?.token) {
         try {
           localStorage.setItem("auth_token", response.data.token)
-        } catch {}
+        } catch {
+          // Ignore localStorage errors
+        }
       }
 
       setTimeout(() => {
         navigate("/memories")
       }, 1000)
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as {
+        response?: { data?: { message?: string } }
+        message?: string
+      }
       console.error("Auth error:", err)
       setError(
-        err.response?.data?.message ||
+        error.response?.data?.message ||
+          error.message ||
           `Failed to ${isRegister ? "register" : "login"}. Please try again.`
       )
     } finally {
@@ -72,7 +79,9 @@ export const Login = () => {
       setUser(null)
       try {
         localStorage.removeItem("auth_token")
-      } catch {}
+      } catch {
+        // Ignore localStorage errors
+      }
       setEmail("")
       setPassword("")
       setError("")
@@ -82,7 +91,9 @@ export const Login = () => {
       setUser(null)
       try {
         localStorage.removeItem("auth_token")
-      } catch {}
+      } catch {
+        // Ignore localStorage errors
+      }
       navigate("/login")
     }
   }
@@ -98,7 +109,9 @@ export const Login = () => {
       try {
         localStorage.removeItem("auth_token")
         localStorage.removeItem("user_id")
-      } catch {}
+      } catch {
+        // Ignore localStorage errors
+      }
     }
   }
 

@@ -28,9 +28,10 @@ export const Analytics: React.FC = () => {
         setError(null)
         const data = await getAnalytics()
         setAnalytics(data)
-      } catch (err: any) {
+      } catch (err) {
+        const error = err as { message?: string }
         console.error("Error fetching analytics:", err)
-        setError(err.message || "Failed to load analytics")
+        setError(error.message || "Failed to load analytics")
       } finally {
         setIsLoading(false)
       }

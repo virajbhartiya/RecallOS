@@ -58,16 +58,9 @@ export const Memories: React.FC = () => {
   const [searchAnswer, setSearchAnswer] = useState<string | null>(null)
 
   const [searchJobId, setSearchJobId] = useState<string | null>(null)
-  const [searchCitations, setSearchCitations] = useState<Array<{
-    label: number
-    memory_id: string
-    title: string | null
-    url: string | null
-  }> | null>(null)
   const [isSearchMode, setIsSearchMode] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState<string>("")
-  const [showOnlyCited] = useState(true)
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean
     memoryId: string | null
@@ -93,7 +86,6 @@ export const Memories: React.FC = () => {
       setTotalMemoryCount(totalCount || 0)
     } catch (err) {
       console.error("Error fetching memories:", err)
-    } finally {
     }
   }, [])
 
@@ -117,9 +109,10 @@ export const Memories: React.FC = () => {
       }
 
       await fetchMemories()
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as { message?: string }
       console.error("Error deleting memory:", err)
-      alert(err.message || "Failed to delete memory")
+      alert(error.message || "Failed to delete memory")
     }
   }, [deleteConfirm.memoryId, selectedMemory, fetchMemories])
 
@@ -167,7 +160,6 @@ export const Memories: React.FC = () => {
       setSearchResults(null)
       setIsSearchMode(true)
       setSearchAnswer(null)
-      setSearchCitations(null)
 
       try {
         const signal = abortControllerRef.current?.signal
@@ -190,7 +182,6 @@ export const Memories: React.FC = () => {
         // Set all the response data immediately
         setSearchResults(response)
         setSearchAnswer(response.answer || null)
-        setSearchCitations(response.citations || null)
 
         // Only set job_id for polling if we don't have an immediate answer
         if (response.job_id && !response.answer) {
@@ -204,10 +195,12 @@ export const Memories: React.FC = () => {
         }
         // Only set error if not aborted
         if (!abortControllerRef.current?.signal.aborted) {
+          // Error handling can be added here if needed
         }
       } finally {
         // Only set searching to false if not aborted
         if (!abortControllerRef.current?.signal.aborted) {
+          // Cleanup can be added here if needed
         }
       }
     },
@@ -218,7 +211,6 @@ export const Memories: React.FC = () => {
     setSearchResults(null)
     setSearchAnswer(null)
     setSearchJobId(null)
-    setSearchCitations(null)
     setIsSearchMode(false)
     setSearchQuery("")
   }, [])
@@ -234,7 +226,6 @@ export const Memories: React.FC = () => {
         if (status.status === "completed") {
           if (status.answer) {
             setSearchAnswer(status.answer)
-            if (status.citations) setSearchCitations(status.citations)
           }
           clearInterval(interval)
           setSearchJobId(null)
@@ -251,25 +242,6 @@ export const Memories: React.FC = () => {
       clearInterval(interval)
     }
   }, [searchJobId, searchAnswer, searchResults])
-
-  // Filter results to show only cited memories
-  const getFilteredMemories = () => {
-    if (!isSearchMode || !searchResults || !searchResults.results) {
-      return memories
-    }
-
-    if (!showOnlyCited || !searchCitations || searchCitations.length === 0) {
-      return searchResults.results.map((r) => r.memory)
-    }
-
-    // Get memory IDs from citations
-    const citedMemoryIds = searchCitations.map((citation) => citation.memory_id)
-
-    // Filter results to only include cited memories
-    return searchResults.results
-      .filter((result) => citedMemoryIds.includes(result.memory.id))
-      .map((result) => result.memory)
-  }
 
   // Dialog search handler
   const handleDialogSearch = useCallback(async (query: string) => {
@@ -425,12 +397,6 @@ export const Memories: React.FC = () => {
   if (!isAuthenticated) {
     return null
   }
-
-  let currentMemories = getFilteredMemories()
-  currentMemories = [...(currentMemories || [])].sort(
-    (a, b) =>
-      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  )
 
   return (
     <div

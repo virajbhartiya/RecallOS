@@ -1,7 +1,7 @@
 import React, { createContext, ReactNode, useContext } from "react"
 
 interface TransactionPopupContextType {
-  openPopup: (options: { chainId: string; address?: string }) => void
+  openPopup: () => void
 }
 
 const TransactionPopupContext = createContext<
@@ -15,7 +15,7 @@ interface TransactionPopupProviderProps {
 export const TransactionPopupProvider: React.FC<
   TransactionPopupProviderProps
 > = ({ children }) => {
-  const openPopup = (_opts: { chainId: string; address?: string }) => {
+  const openPopup = () => {
     return
   }
 
@@ -26,6 +26,7 @@ export const TransactionPopupProvider: React.FC<
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTransactionPopup = () => {
   const context = useContext(TransactionPopupContext)
   if (context === undefined) {

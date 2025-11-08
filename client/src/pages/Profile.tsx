@@ -35,9 +35,10 @@ export const Profile: React.FC = () => {
         setError(null)
         const data = await getProfile()
         setProfile(data)
-      } catch (err: any) {
+      } catch (err) {
+        const error = err as { message?: string }
         console.error("Error fetching profile:", err)
-        setError(err.message || "Failed to load profile")
+        setError(error.message || "Failed to load profile")
       } finally {
         setIsLoading(false)
       }
@@ -52,14 +53,15 @@ export const Profile: React.FC = () => {
       setError(null)
       const data = await refreshProfile()
       setProfile(data)
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as { code?: string; message?: string }
       console.error("Error refreshing profile:", err)
-      if (err.code === "ECONNABORTED" || err.message?.includes("timeout")) {
+      if (error.code === "ECONNABORTED" || error.message?.includes("timeout")) {
         setError(
           "Profile refresh is taking longer than expected. Please try again in a moment."
         )
       } else {
-        setError(err.message || "Failed to refresh profile")
+        setError(error.message || "Failed to refresh profile")
       }
     } finally {
       setIsRefreshing(false)

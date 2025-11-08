@@ -73,9 +73,10 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
       const result = await MemoryService.getPendingJobs()
       setJobs(result.jobs)
       setCounts(result.counts)
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as { message?: string }
       console.error("Error fetching pending jobs:", err)
-      setError(err.message || "Failed to fetch pending jobs")
+      setError(error.message || "Failed to fetch pending jobs")
     } finally {
       setIsLoading(false)
     }
@@ -114,9 +115,10 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
       }
 
       await fetchPendingJobs()
-    } catch (err: any) {
+    } catch (err) {
+      const error = err as { message?: string }
       console.error("Error deleting job(s):", err)
-      setError(err.message || "Failed to delete job(s)")
+      setError(error.message || "Failed to delete job(s)")
     }
   }, [deleteConfirm.jobId, deleteConfirm.jobIds, fetchPendingJobs])
 
