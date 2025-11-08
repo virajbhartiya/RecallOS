@@ -50,7 +50,6 @@ async function checkApiHealth(): Promise<boolean> {
       return response.ok || response.status < 500;
     } catch (error) {
       clearTimeout(timeout);
-      // Try a simple endpoint if /health doesn't exist
       try {
         const searchUrl = `${apiBase}/api/search`;
         const searchResponse = await fetch(searchUrl, {
@@ -157,13 +156,11 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 
 async function sendToBackend(data: ContextData): Promise<void> {
   try {
-    // Check if extension is enabled
     const enabled = await isExtensionEnabled();
     if (!enabled) {
       return;
     }
 
-    // Check if website is blocked
     const blocked = await isWebsiteBlocked(data.url);
     if (blocked) {
       return;
@@ -174,14 +171,12 @@ async function sendToBackend(data: ContextData): Promise<void> {
     const privacyInfo = (data as any).privacy_extension_info;
     const hasPrivacyConflicts = privacyInfo?.detected || false;
 
-    // Validate content before sending
     const content = data.meaningful_content || data.content_snippet || data.full_content || '';
     const isValidContent = content && 
                           content.length > 50 && 
                           !content.includes('Content extraction failed') &&
                           !content.includes('No content available');
 
-    // Don't send if content is invalid or privacy extensions are blocking
     if (!isValidContent) {
       return;
     }
@@ -210,7 +205,6 @@ async function sendToBackend(data: ContextData): Promise<void> {
     };
 
 
-    // Require authentication token
     let authToken: string
     try {
       authToken = await requireAuthToken()
@@ -236,17 +230,13 @@ async function sendToBackend(data: ContextData): Promise<void> {
     const response = await withTimeout(fetchPromise, 4000).catch((_e) => null);
 
     if (response && !response.ok) {
-      // Handle 401 - clear invalid token
       if (response.status === 401) {
         await storage.local.remove('auth_token');
         clearAuthToken();
       }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-
-    // Fire-and-forget: do not wait on response body; API queues work and returns 202 quickly
   } catch (error) {
-    // Ignore errors
   }
 }
 
@@ -323,7 +313,6 @@ runtime.onMessage.addListener(
             await storage.local.set({ auth_token: token });
           }
         } catch (error) {
-          // Ignore errors
         }
       })();
     }

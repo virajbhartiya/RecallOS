@@ -828,12 +828,10 @@ async function sendContextToBackground() {
     runtime.sendMessage(
       { type: 'CAPTURE_CONTEXT', data: contextData },
       response => {
-        // Response handled by abstraction
       }
     );
     lastCaptureTime = now;
   } catch (error) {
-    // Ignore errors
   }
 }
 if (document.readyState === 'loading') {

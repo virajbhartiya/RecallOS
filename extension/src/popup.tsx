@@ -15,7 +15,6 @@ const Popup: React.FC = () => {
   useEffect(() => {
     loadSettings();
     checkStatus();
-    // Check health periodically
     const interval = setInterval(checkStatus, 10000);
     return () => clearInterval(interval);
   }, []);
@@ -43,7 +42,6 @@ const Popup: React.FC = () => {
   const checkStatus = async () => {
     setIsCheckingHealth(true);
     try {
-      // Check API health
       const healthResponse = await new Promise<any>((resolve) => {
         runtime.sendMessage({ type: 'CHECK_API_HEALTH' }, resolve);
       });
@@ -53,20 +51,16 @@ const Popup: React.FC = () => {
         setIsConnected(false);
       }
 
-      // Check auth status - try multiple sources like requireAuthToken does
       let isAuth = false;
       try {
-        // First check storage.local (works in popup)
         const stored = await storage.local.get(['auth_token']);
         if (stored && stored.auth_token) {
           isAuth = true;
         } else {
-          // Try localStorage (might work in popup)
           const token = getAuthToken();
           if (token) {
             isAuth = true;
           } else {
-            // Try requireAuthToken which checks cookies too
             try {
               await requireAuthToken();
               isAuth = true;
@@ -137,7 +131,6 @@ const Popup: React.FC = () => {
   const blockCurrentDomain = async () => {
     setIsLoading(true);
     try {
-      // Get the current active tab
       const activeTabs = await tabs.query({ active: true, currentWindow: true });
       if (activeTabs.length === 0 || !activeTabs[0].url) {
         return;
@@ -313,7 +306,6 @@ const Popup: React.FC = () => {
   );
 };
 
-// Initialize React app
 const container = document.getElementById('root');
 if (container) {
   const root = createRoot(container);
