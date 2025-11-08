@@ -5,8 +5,9 @@ async function cleanQdrant() {
   try {
     await qdrantClient.deleteCollection(COLLECTION_NAME)
     logger.log(`Qdrant collection '${COLLECTION_NAME}' deleted successfully`)
-  } catch (error: any) {
-    if (error.status === 404 || error.message?.includes("doesn't exist")) {
+  } catch (error: unknown) {
+    const err = error as { status?: number; message?: string }
+    if (err.status === 404 || err.message?.includes("doesn't exist")) {
       logger.log(`Qdrant collection '${COLLECTION_NAME}' does not exist`)
     } else {
       logger.error('Error deleting Qdrant collection:', error)

@@ -168,7 +168,7 @@ export async function searchMemories(params: {
   const normalized = normalizeText(query)
 
   const user = await prisma.user.findFirst({
-    where: { OR: [{ external_id: userId } as any, { id: userId } as any] } as any,
+    where: { OR: [{ external_id: userId }, { id: userId }] },
   })
   if (!user) {
     return { query: normalized, results: [] }
@@ -182,9 +182,10 @@ export async function searchMemories(params: {
       queryLength: normalized.length,
     })
     const embeddingResult = await withTimeout(aiProvider.generateEmbedding(normalized), 30000) // 30 seconds
+    type EmbeddingResult = number[] | { embedding: number[] }
     embedding =
       typeof embeddingResult === 'object' && 'embedding' in embeddingResult
-        ? (embeddingResult as any).embedding
+        ? (embeddingResult as EmbeddingResult).embedding
         : (embeddingResult as number[])
     logger.log('[search] embedding generated', {
       ts: new Date().toISOString(),
@@ -375,7 +376,7 @@ export async function searchMemories(params: {
           user_id: userId,
           query: normalized,
           embedding_hash: embeddingHash,
-        } as any,
+        },
       })
     } catch {
       // Ignore database errors
@@ -470,8 +471,9 @@ ${bullets}`
         memoryCount: filteredRows.length,
       })
       const answerResult = await withTimeout(aiProvider.generateContent(ansPrompt, true), 300000) // 5 minutes (accounts for queue delays + Gemini 2 min timeout), true = search request (high priority)
+      type AnswerResult = string | { text?: string }
       answer =
-        typeof answerResult === 'string' ? answerResult : (answerResult as any).text || answerResult
+        typeof answerResult === 'string' ? answerResult : (answerResult as AnswerResult).text || answerResult
       logger.log('[search] answer generated', {
         ts: new Date().toISOString(),
         userId,
@@ -575,7 +577,7 @@ ${bullets}`
       user_id: userId,
       query: normalized,
       embedding_hash: embeddingHash,
-    } as any,
+    },
   })
 
   if (filteredRows.length) {
@@ -585,7 +587,7 @@ ${bullets}`
         memory_id: r.id,
         rank: idx + 1,
         score: r.score,
-      })) as any,
+      })),
       skipDuplicates: true,
     })
   }

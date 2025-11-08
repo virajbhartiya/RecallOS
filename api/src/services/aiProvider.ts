@@ -94,14 +94,15 @@ export const aiProvider = {
       throw new Error(`Ollama embeddings failed: ${res.status}`)
     }
 
-    const data: any = await res.json()
+    type EmbeddingResponse = { embedding?: number[]; embeddings?: number[] }
+    const data = await res.json() as EmbeddingResponse
     const vec: number[] = data?.embedding || data?.embeddings || []
 
     if (!Array.isArray(vec) || vec.length === 0) {
       throw new Error('Empty embedding array')
     }
 
-    return vec.map((v: any) => Number(v) || 0)
+    return vec.map((v: number | string) => Number(v) || 0)
   },
 
   generateFallbackEmbedding(text: string): number[] {
@@ -299,7 +300,8 @@ export const aiProvider = {
         }),
       })
       if (!res.ok) throw new Error(`Ollama generate failed: ${res.status}`)
-      const data: any = await res.json()
+      type OllamaResponse = { response?: string; text?: string }
+      const data = await res.json() as OllamaResponse
       result = data?.response || data?.text || ''
       if (!result) throw new Error('No content from Ollama')
       modelUsed = OLLAMA_GEN_MODEL
@@ -320,7 +322,7 @@ export const aiProvider = {
     return result
   },
 
-  async summarizeContent(rawText: string, metadata?: any, userId?: string): Promise<string> {
+  async summarizeContent(rawText: string, metadata?: Record<string, unknown>, userId?: string): Promise<string> {
     let result: string
     let modelUsed: string | undefined
 
@@ -373,7 +375,7 @@ ${rawText}`
 
   async extractContentMetadata(
     rawText: string,
-    metadata?: any,
+    metadata?: Record<string, unknown>,
     userId?: string
   ): Promise<{
     topics: string[]
@@ -484,7 +486,7 @@ JSON ONLY:`
 
   generateFallbackMetadata(
     rawText: string,
-    metadata?: any
+    metadata?: Record<string, unknown>
   ): {
     topics: string[]
     categories: string[]
@@ -495,8 +497,8 @@ JSON ONLY:`
     searchableTerms: string[]
     contextRelevance: string[]
   } {
-    const title = metadata?.title || ''
-    const contentType = metadata?.content_type || 'web_page'
+    const title = typeof metadata?.title === 'string' ? metadata.title : ''
+    const contentType = typeof metadata?.content_type === 'string' ? metadata.content_type : 'web_page'
     const text = (title + ' ' + rawText).toLowerCase()
 
     // Extract topics based on common keywords

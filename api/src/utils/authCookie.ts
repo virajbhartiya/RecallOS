@@ -12,7 +12,16 @@ export function setAuthCookie(
   const isLocalhost =
     process.env.NODE_ENV !== 'production' || !cookieDomain || cookieDomain === '.recallos.xyz'
 
-  const cookieOptions: any = {
+  interface CookieOptions {
+    httpOnly: boolean
+    secure: boolean
+    sameSite: 'lax' | 'strict' | 'none'
+    path: string
+    maxAge: number
+    domain?: string
+  }
+
+  const cookieOptions: CookieOptions = {
     httpOnly: true,
     secure: isLocalhost ? false : isCookieSecure(),
     sameSite: isLocalhost ? 'lax' : 'none',
@@ -52,7 +61,7 @@ export function clearAuthCookie(res: Response): void {
       sameSite: 'none',
       domain: cookieDomain,
       path: '/',
-    } as any)
+    })
   }
 
   // Also clear without domain (for localhost)
@@ -61,5 +70,5 @@ export function clearAuthCookie(res: Response): void {
     secure: false,
     sameSite: 'lax',
     path: '/',
-  } as any)
+  })
 }

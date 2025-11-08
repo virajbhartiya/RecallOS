@@ -1,5 +1,6 @@
 import { aiProvider } from './aiProvider'
 import { logger } from '../utils/logger'
+import { Prisma } from '@prisma/client'
 
 export interface StaticProfile {
   interests: string[]
@@ -83,7 +84,7 @@ export class ProfileExtractionService {
       summary: string | null
       content: string
       created_at: Date
-      page_metadata: any
+      page_metadata: Prisma.JsonValue
     }>
   ): Promise<ProfileExtractionResult> {
     if (memories.length === 0) {
@@ -119,7 +120,7 @@ export class ProfileExtractionService {
       summary: string | null
       content: string
       created_at: Date
-      page_metadata: any
+      page_metadata: Prisma.JsonValue
     }>
   ): string {
     const now = new Date()
@@ -127,15 +128,17 @@ export class ProfileExtractionService {
 
     const allMemories = memories
       .map((m, idx) => {
-        const metadata = m.page_metadata as any
+        const metadata = m.page_metadata as Record<string, unknown> | null
         const daysAgo = Math.floor((now.getTime() - m.created_at.getTime()) / (1000 * 60 * 60 * 24))
         const isRecent = m.created_at >= thirtyDaysAgo
+        const topics = Array.isArray(metadata?.topics) ? metadata.topics.filter((t): t is string => typeof t === 'string').join(', ') : 'N/A'
+        const categories = Array.isArray(metadata?.categories) ? metadata.categories.filter((c): c is string => typeof c === 'string').join(', ') : 'N/A'
 
         return `Memory ${idx + 1} (${daysAgo} days ago${isRecent ? ', RECENT' : ''}):
 Title: ${m.title || 'Untitled'}
 Summary: ${m.summary || 'No summary'}
-Topics: ${metadata?.topics?.join(', ') || 'N/A'}
-Categories: ${metadata?.categories?.join(', ') || 'N/A'}
+Topics: ${topics}
+Categories: ${categories}
 Content preview: ${m.content.substring(0, 200)}...`
       })
       .join('\n\n')
@@ -464,7 +467,7 @@ Return ONLY the JSON object:`
       summary: string | null
       content: string
       created_at: Date
-      page_metadata: any
+      page_metadata: Prisma.JsonValue
     }>
   ): ProfileExtractionResult {
     const now = new Date()
@@ -476,20 +479,24 @@ Return ONLY the JSON object:`
     const recentCategories = new Set<string>()
 
     memories.forEach(m => {
-      const metadata = m.page_metadata as any
+      const metadata = m.page_metadata as Record<string, unknown> | null
       const isRecent = m.created_at >= thirtyDaysAgo
 
-      if (metadata?.topics) {
-        metadata.topics.forEach((topic: string) => {
-          allTopics.add(topic)
-          if (isRecent) recentTopics.add(topic)
+      if (metadata?.topics && Array.isArray(metadata.topics)) {
+        metadata.topics.forEach((topic: unknown) => {
+          if (typeof topic === 'string') {
+            allTopics.add(topic)
+            if (isRecent) recentTopics.add(topic)
+          }
         })
       }
 
-      if (metadata?.categories) {
-        metadata.categories.forEach((cat: string) => {
-          allCategories.add(cat)
-          if (isRecent) recentCategories.add(cat)
+      if (metadata?.categories && Array.isArray(metadata.categories)) {
+        metadata.categories.forEach((cat: unknown) => {
+          if (typeof cat === 'string') {
+            allCategories.add(cat)
+            if (isRecent) recentCategories.add(cat)
+          }
         })
       }
     })

@@ -2,12 +2,39 @@ import { GoogleGenAI } from '@google/genai'
 
 export const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'text-embedding-004'
 
+type UsageMetadata = {
+  promptTokenCount?: number
+  candidatesTokenCount?: number
+}
+
+type GeminiResponse = {
+  text: string
+  usageMetadata?: UsageMetadata
+}
+
+type GeminiError = {
+  status?: number
+  message?: string
+  details?: Array<{
+    retryDelay?: string
+    [key: string]: unknown
+  }>
+}
+
+type ContentMetadata = {
+  content_type?: string
+  title?: string
+  url?: string
+  content_summary?: string
+  key_topics?: string[]
+}
+
 // In-process rate limiter queue to avoid Gemini 429 (quota) errors
 type QueueTask<T> = () => Promise<T>
-type QueuedTask = {
-  run: QueueTask<any>
-  resolve: (v: any) => void
-  reject: (e: any) => void
+type QueuedTask<T = unknown> = {
+  run: QueueTask<T>
+  resolve: (v: T) => void
+  reject: (e: Error | GeminiError) => void
   priority: number // Higher number = higher priority (search requests use 10, processing uses 0)
 }
 
@@ -37,10 +64,11 @@ async function processQueue() {
         const result = await run()
         resolve(result)
         nextAvailableAt = Date.now() + minIntervalMs
-      } catch (err: any) {
-        const retryDelayMs = extractRetryDelayMs(err) ?? minIntervalMs
+      } catch (err) {
+        const error = err as Error | GeminiError
+        const retryDelayMs = extractRetryDelayMs(error) ?? minIntervalMs
         nextAvailableAt = Date.now() + retryDelayMs
-        reject(err)
+        reject(error)
       }
     }
   } finally {
@@ -48,8 +76,9 @@ async function processQueue() {
   }
 }
 
-function extractRetryDelayMs(err: any): number | null {
-  const details = err?.details
+function extractRetryDelayMs(err: Error | GeminiError): number | null {
+  const error = err as GeminiError
+  const details = error?.details
   if (Array.isArray(details)) {
     for (const d of details) {
       if (typeof d?.retryDelay === 'string') {
@@ -62,12 +91,12 @@ function extractRetryDelayMs(err: any): number | null {
       }
     }
   }
-  const msg: string | undefined = err?.message
+  const msg: string | undefined = error?.message
   if (msg) {
     const m = msg.match(/retry in\s+([0-9]+(?:\.[0-9]+)?)s/i)
     if (m) return Math.max(Math.floor(parseFloat(m[1]) * 1000), 1000)
   }
-  if (err?.status === 429) return 8000
+  if (error?.status === 429) return 8000
   return null
 }
 
@@ -123,14 +152,14 @@ export class GeminiService {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       // GEMINI_API_KEY not set. Gemini service disabled.
-      this.ai = null as any
+      this.ai = null
       return
     }
     try {
       this.ai = new GoogleGenAI({ apiKey })
     } catch {
       // Failed to initialize Gemini service
-      this.ai = null as any
+      this.ai = null
     }
   }
 
@@ -158,12 +187,13 @@ export class GeminiService {
     this.currentModelIndex = 0
   }
 
-  private isRateLimitError(err: any): boolean {
+  private isRateLimitError(err: Error | GeminiError): boolean {
+    const error = err as GeminiError
     return (
-      err?.status === 429 ||
-      err?.message?.toLowerCase().includes('quota') ||
-      err?.message?.toLowerCase().includes('rate limit') ||
-      err?.message?.toLowerCase().includes('too many requests')
+      error?.status === 429 ||
+      error?.message?.toLowerCase().includes('quota') ||
+      error?.message?.toLowerCase().includes('rate limit') ||
+      error?.message?.toLowerCase().includes('too many requests')
     )
   }
 
@@ -187,7 +217,7 @@ CRITICAL: Return ONLY plain text content. Do not use any markdown formatting inc
 
 Return clean, readable plain text only.`
 
-    let lastError: any
+    let lastError: Error | GeminiError | undefined
     const originalModelIndex = this.currentModelIndex
     // Search requests get high priority (10), processing tasks get normal priority (0)
     const priority = isSearchRequest ? 10 : 0
@@ -208,7 +238,7 @@ Return clean, readable plain text only.`
         )
         if (!response.text) throw new Error('No content generated from Gemini API')
 
-        const usageMetadata = (response as any).usageMetadata
+        const usageMetadata = (response as GeminiResponse).usageMetadata
         const inputTokens = usageMetadata?.promptTokenCount || 0
         const outputTokens = usageMetadata?.candidatesTokenCount || 0
         const modelUsed = this.getCurrentModel()
@@ -217,10 +247,11 @@ Return clean, readable plain text only.`
         this.resetToFirstModel()
         return { text: response.text, modelUsed, inputTokens, outputTokens }
       } catch (err) {
-        lastError = err
+        const error = err as Error | GeminiError
+        lastError = error
         // Content generation error
 
-        if (this.isRateLimitError(err)) {
+        if (this.isRateLimitError(error)) {
           if (!this.switchToNextModel()) {
             // No more models to try
             break
@@ -237,9 +268,7 @@ Return clean, readable plain text only.`
     throw lastError
   }
 
-  async generateEmbedding(
-    text: string
-  ): Promise<{
+  async generateEmbedding(text: string): Promise<{
     embedding: number[]
     modelUsed?: string
     inputTokens?: number
@@ -247,7 +276,7 @@ Return clean, readable plain text only.`
   }> {
     this.ensureInit()
 
-    let lastError: any
+    let lastError: Error | GeminiError | undefined
     const originalModelIndex = this.currentModelIndex
 
     while (this.currentModelIndex < this.availableModels.length) {
@@ -264,7 +293,7 @@ Return clean, readable plain text only.`
         const values = response.embeddings?.[0]?.values
         if (!values) throw new Error('No embedding generated from Gemini API')
 
-        const usageMetadata = (response as any).usageMetadata
+        const usageMetadata = (response as GeminiResponse).usageMetadata
         const inputTokens = usageMetadata?.promptTokenCount || 0
         const outputTokens = 0
         const modelUsed = GEMINI_EMBED_MODEL
@@ -296,7 +325,7 @@ Return clean, readable plain text only.`
 
   async summarizeContent(
     rawText: string,
-    metadata?: any
+    metadata?: ContentMetadata
   ): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
     this.ensureInit()
 
@@ -350,7 +379,7 @@ Return clean, readable plain text only.
 Raw Content: ${rawText}
 `
 
-    let lastError: any
+    let lastError: Error | GeminiError | undefined
     const originalModelIndex = this.currentModelIndex
 
     while (this.currentModelIndex < this.availableModels.length) {
@@ -365,7 +394,7 @@ Raw Content: ${rawText}
         )
         if (!res.text) throw new Error('No summary generated from Gemini API')
 
-        const usageMetadata = (res as any).usageMetadata
+        const usageMetadata = (res as GeminiResponse).usageMetadata
         const inputTokens = usageMetadata?.promptTokenCount || 0
         const outputTokens = usageMetadata?.candidatesTokenCount || 0
         const modelUsed = this.getCurrentModel()
@@ -396,7 +425,7 @@ Raw Content: ${rawText}
 
   async extractContentMetadata(
     rawText: string,
-    metadata?: any
+    metadata?: ContentMetadata
   ): Promise<{
     metadata: {
       topics: string[]
@@ -531,7 +560,7 @@ Return ONLY the JSON object:`
         const validSentiments = ['educational', 'technical', 'neutral', 'analytical']
         const sentiment = validSentiments.includes(data.sentiment) ? data.sentiment : 'neutral'
 
-        const usageMetadata = (res as any).usageMetadata
+        const usageMetadata = (res as GeminiResponse).usageMetadata
         const inputTokens = usageMetadata?.promptTokenCount || 0
         const outputTokens = usageMetadata?.candidatesTokenCount || 0
         const modelUsed = this.getCurrentModel()

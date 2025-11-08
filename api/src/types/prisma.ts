@@ -78,5 +78,5 @@ export interface PageMetadata {
     searchableTerms: string[]
     contextRelevance: string[]
   }
-  [key: string]: any
+  [key: string]: unknown
 }

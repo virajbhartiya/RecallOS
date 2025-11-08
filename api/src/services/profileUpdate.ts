@@ -2,13 +2,14 @@ import { prisma } from '../lib/prisma'
 import { profileExtractionService, ProfileExtractionResult } from './profileExtraction'
 import { getRedisClient } from '../lib/redis'
 import { logger } from '../utils/logger'
+import { Prisma } from '@prisma/client'
 
 export interface UserProfile {
   id: string
   user_id: string
-  static_profile_json: any
+  static_profile_json: Prisma.JsonValue
   static_profile_text: string | null
-  dynamic_profile_json: any
+  dynamic_profile_json: Prisma.JsonValue
   dynamic_profile_text: string | null
   last_updated: Date
   last_memory_analyzed: Date | null
@@ -58,7 +59,7 @@ export class ProfileUpdateService {
           created_at: true,
           page_metadata: true,
         },
-        orderBy: { created_at: 'desc' } as any,
+        orderBy: { created_at: 'desc' },
         take: 200,
       }),
     ])
@@ -114,27 +115,27 @@ export class ProfileUpdateService {
         ? allMemories[0]
         : await prisma.memory.findFirst({
             where: { user_id: userId },
-            orderBy: { created_at: 'desc' } as any,
+            orderBy: { created_at: 'desc' },
           })
 
     const profile = await prisma.userProfile.upsert({
       where: { user_id: userId },
       create: {
         user_id: userId,
-        static_profile_json: extractionResult.static_profile_json as any,
+        static_profile_json: extractionResult.static_profile_json as Prisma.JsonValue,
         static_profile_text: extractionResult.static_profile_text,
-        dynamic_profile_json: extractionResult.dynamic_profile_json as any,
+        dynamic_profile_json: extractionResult.dynamic_profile_json as Prisma.JsonValue,
         dynamic_profile_text: extractionResult.dynamic_profile_text,
         last_memory_analyzed: latestMemory?.created_at || null,
         version: 1,
       },
       update: {
-        static_profile_json: extractionResult.static_profile_json as any,
+        static_profile_json: extractionResult.static_profile_json as Prisma.JsonValue,
         static_profile_text: extractionResult.static_profile_text,
-        dynamic_profile_json: extractionResult.dynamic_profile_json as any,
+        dynamic_profile_json: extractionResult.dynamic_profile_json as Prisma.JsonValue,
         dynamic_profile_text: extractionResult.dynamic_profile_text,
         last_memory_analyzed: latestMemory?.created_at || null,
-        version: { increment: 1 } as any,
+        version: { increment: 1 },
       },
     })
 
@@ -145,7 +146,7 @@ export class ProfileUpdateService {
   }
 
   private mergeProfiles(
-    existing: any,
+    existing: { static_profile_json?: Prisma.JsonValue; dynamic_profile_json?: Prisma.JsonValue },
     newExtraction: ProfileExtractionResult
   ): ProfileExtractionResult {
     const existingStatic = existing.static_profile_json || {}

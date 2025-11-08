@@ -46,7 +46,7 @@ export const submitContent = async (
     const canonicalHash = hashCanonical(canonicalText)
 
     const existingByCanonical = await prisma.memory.findFirst({
-      where: { user_id, canonical_hash: canonicalHash } as any,
+      where: { user_id, canonical_hash: canonicalHash },
       select: {
         id: true,
         title: true,
@@ -59,15 +59,13 @@ export const submitContent = async (
         page_metadata: true,
         canonical_text: true,
         canonical_hash: true,
-      } as any,
+      },
     })
 
     if (existingByCanonical) {
       const serializedExisting = {
         ...existingByCanonical,
-        timestamp: (existingByCanonical as any).timestamp
-          ? (existingByCanonical as any).timestamp.toString()
-          : null,
+        timestamp: existingByCanonical.timestamp ? existingByCanonical.timestamp.toString() : null,
       }
       return res.status(200).json({
         status: 'success',
@@ -89,8 +87,8 @@ export const submitContent = async (
       const recentMemories = await prisma.memory.findMany({
         where: {
           user_id,
-          created_at: { gte: oneHourAgo } as any,
-        } as any,
+          created_at: { gte: oneHourAgo },
+        },
         select: {
           id: true,
           title: true,
@@ -103,27 +101,25 @@ export const submitContent = async (
           page_metadata: true,
           canonical_text: true,
           canonical_hash: true,
-        } as any,
-        orderBy: { created_at: 'desc' } as any,
+        },
+        orderBy: { created_at: 'desc' },
         take: 50,
       })
 
       for (const existingMemory of recentMemories) {
-        const existingUrl = (existingMemory as any).url
+        const existingUrl = existingMemory.url
         if (
           existingUrl &&
           typeof existingUrl === 'string' &&
           normalizeUrl(existingUrl) === normalizedUrl
         ) {
-          const existingCanonical = normalizeText((existingMemory as any).content || '')
+          const existingCanonical = normalizeText(existingMemory.content || '')
           const similarity = calculateSimilarity(canonicalText, existingCanonical)
 
           if (similarity > 0.9) {
             const serializedExisting = {
               ...existingMemory,
-              timestamp: (existingMemory as any).timestamp
-                ? (existingMemory as any).timestamp.toString()
-                : null,
+              timestamp: existingMemory.timestamp ? existingMemory.timestamp.toString() : null,
             }
             logger.log('[Content API] URL duplicate detected, skipping queue', {
               existingMemoryId: existingMemory.id,
@@ -240,7 +236,7 @@ export const getSummarizedContent = async (
     res.status(200).json({
       status: 'success',
       data: {
-        content: memories.map((memory: any) => ({
+        content: memories.map(memory => ({
           id: memory.id,
           summary: memory.summary,
           created_at: memory.created_at,

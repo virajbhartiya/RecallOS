@@ -1,9 +1,11 @@
+import { Request, Response } from 'express'
+
 interface IError extends Error {
   statusCode?: number
   status?: string
 }
 
-const sendErrorDev = (err: IError, req: { originalUrl: string }, res: any) => {
+const sendErrorDev = (err: IError, req: Request, res: Response) => {
   if (req.originalUrl) {
     return res.status(err.statusCode || 500).json({
       status: err.status || 'error',
@@ -16,7 +18,7 @@ const sendErrorDev = (err: IError, req: { originalUrl: string }, res: any) => {
   throw err.message
 }
 
-export default (err: IError, req: any, res: any) => {
+export default (err: IError, req: Request, res: Response) => {
   err.statusCode = err.statusCode || 500
   err.status = err.status || 'error'
   sendErrorDev(err, req, res)

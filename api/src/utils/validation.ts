@@ -14,7 +14,7 @@ export const validateRequestSize = (maxSizeBytes: number = 1000000) => {
 }
 
 export const validateQueryParams = (validators: {
-  [key: string]: (value: any) => boolean | string
+  [key: string]: (value: unknown) => boolean | string
 }) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const errors: string[] = []
@@ -39,7 +39,9 @@ export const validateQueryParams = (validators: {
   }
 }
 
-export const validateBody = (validators: { [key: string]: (value: any) => boolean | string }) => {
+export const validateBody = (validators: {
+  [key: string]: (value: unknown) => boolean | string
+}) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const errors: string[] = []
 
@@ -64,19 +66,20 @@ export const validateBody = (validators: { [key: string]: (value: any) => boolea
 }
 
 export const validators = {
-  isString: (value: any): boolean => typeof value === 'string',
-  isNumber: (value: any): boolean => typeof value === 'number' || !isNaN(Number(value)),
-  isPositiveInteger: (value: any): boolean => {
+  isString: (value: unknown): boolean => typeof value === 'string',
+  isNumber: (value: unknown): boolean => typeof value === 'number' || !isNaN(Number(value)),
+  isPositiveInteger: (value: unknown): boolean => {
     const num = Number(value)
     return Number.isInteger(num) && num > 0
   },
-  isNonEmptyString: (value: any): boolean => typeof value === 'string' && value.trim().length > 0,
+  isNonEmptyString: (value: unknown): boolean =>
+    typeof value === 'string' && value.trim().length > 0,
   isInRange:
     (min: number, max: number) =>
-    (value: any): boolean => {
+    (value: unknown): boolean => {
       const num = Number(value)
       return num >= min && num <= max
     },
-  isArray: (value: any): boolean => Array.isArray(value),
-  isNonEmptyArray: (value: any): boolean => Array.isArray(value) && value.length > 0,
+  isArray: (value: unknown): boolean => Array.isArray(value),
+  isNonEmptyArray: (value: unknown): boolean => Array.isArray(value) && value.length > 0,
 }

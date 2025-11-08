@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma'
+import { Prisma } from '@prisma/client'
 
 export class MemoryQueryService {
   static async getUserById(userId: string) {
@@ -13,13 +14,13 @@ export class MemoryQueryService {
       limit?: number
       skip?: number
       orderBy?: 'asc' | 'desc'
-      select?: any
+      select?: Prisma.MemorySelect
     }
   ) {
     const { limit, skip, orderBy = 'desc', select } = options || {}
 
-    const where = { user_id: userId }
-    const queryOptions: any = {
+    const where: Prisma.MemoryWhereInput = { user_id: userId }
+    const queryOptions: Prisma.MemoryFindManyArgs = {
       where,
       orderBy: { created_at: orderBy },
     }
@@ -44,7 +45,7 @@ export class MemoryQueryService {
   }
 
   static async getMemoryById(memoryId: string, userId?: string) {
-    const where: any = { id: memoryId }
+    const where: Prisma.MemoryWhereInput = { id: memoryId }
     if (userId) {
       where.user_id = userId
     }
@@ -59,7 +60,7 @@ export class MemoryQueryService {
 
   static async findDuplicateByCanonicalHash(userId: string, canonicalHash: string) {
     return prisma.memory.findFirst({
-      where: { user_id: userId, canonical_hash: canonicalHash } as any,
+      where: { user_id: userId, canonical_hash: canonicalHash },
     })
   }
 }

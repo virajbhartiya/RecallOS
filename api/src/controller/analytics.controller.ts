@@ -1,8 +1,32 @@
 import { Response } from 'express'
+import { Prisma } from '@prisma/client'
 import { AuthenticatedRequest } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
 import { tokenTracking } from '../services/tokenTracking'
 import { logger } from '../utils/logger'
+
+type MemoryWithMetadata = Prisma.MemoryGetPayload<{
+  select: {
+    id: true
+    url: true
+    source: true
+    content: true
+    created_at: true
+    page_metadata: true
+  }
+}>
+
+type TokenUsageRecord = {
+  created_at: Date
+  input_tokens: number
+  output_tokens: number
+  operation_type: string
+}
+
+type QueryEvent = {
+  id: string
+  created_at: Date
+}
 
 function extractDomain(url: string | null | undefined): string | null {
   if (!url || url === 'unknown') return null
@@ -75,7 +99,7 @@ export class AnalyticsController {
       let totalContentLength = 0
       const memoriesByDate: Record<string, number> = {}
 
-      memories.forEach((memory: any) => {
+      memories.forEach((memory: MemoryWithMetadata) => {
         const domain = extractDomain(memory.url)
         if (domain) {
           domainCounts[domain] = (domainCounts[domain] || 0) + 1
@@ -88,18 +112,22 @@ export class AnalyticsController {
 
         totalContentLength += memory.content?.length || 0
 
-        const metadata = memory.page_metadata as any
-        if (metadata?.categories) {
-          metadata.categories.forEach((cat: string) => {
-            categoryCounts[cat] = (categoryCounts[cat] || 0) + 1
+        const metadata = memory.page_metadata as Record<string, unknown> | null
+        if (metadata?.categories && Array.isArray(metadata.categories)) {
+          metadata.categories.forEach((cat: unknown) => {
+            if (typeof cat === 'string') {
+              categoryCounts[cat] = (categoryCounts[cat] || 0) + 1
+            }
           })
         }
-        if (metadata?.topics) {
-          metadata.topics.forEach((topic: string) => {
-            topicCounts[topic] = (topicCounts[topic] || 0) + 1
+        if (metadata?.topics && Array.isArray(metadata.topics)) {
+          metadata.topics.forEach((topic: unknown) => {
+            if (typeof topic === 'string') {
+              topicCounts[topic] = (topicCounts[topic] || 0) + 1
+            }
           })
         }
-        if (metadata?.sentiment) {
+        if (metadata?.sentiment && typeof metadata.sentiment === 'string') {
           sentimentCounts[metadata.sentiment] = (sentimentCounts[metadata.sentiment] || 0) + 1
         }
       })
@@ -122,7 +150,7 @@ export class AnalyticsController {
       const tokenUsageAggregated = await tokenTracking.getTokenUsageAggregated(userId)
 
       const tokenUsageByDate: Record<string, { input: number; output: number; total: number }> = {}
-      tokenUsageRecords.forEach((record: any) => {
+      tokenUsageRecords.forEach((record: TokenUsageRecord) => {
         const dateKey = record.created_at.toISOString().split('T')[0]
         if (!tokenUsageByDate[dateKey]) {
           tokenUsageByDate[dateKey] = { input: 0, output: 0, total: 0 }
@@ -136,7 +164,7 @@ export class AnalyticsController {
         string,
         { input: number; output: number; total: number; count: number }
       > = {}
-      tokenUsageRecords.forEach((record: any) => {
+      tokenUsageRecords.forEach((record: TokenUsageRecord) => {
         const op = record.operation_type
         if (!tokenUsageByOperation[op]) {
           tokenUsageByOperation[op] = { input: 0, output: 0, total: 0, count: 0 }
@@ -156,7 +184,7 @@ export class AnalyticsController {
         memories.length > 0 ? tokenUsageAggregated.total / memories.length : 0
 
       const searchesByDate: Record<string, number> = {}
-      queryEvents.forEach((event: any) => {
+      queryEvents.forEach((event: QueryEvent) => {
         const dateKey = event.created_at.toISOString().split('T')[0]
         searchesByDate[dateKey] = (searchesByDate[dateKey] || 0) + 1
       })
@@ -168,13 +196,13 @@ export class AnalyticsController {
       const now = new Date()
       const firstMemory =
         memories.length > 0
-          ? memories.reduce((earliest: any, m: any) =>
+          ? memories.reduce((earliest: MemoryWithMetadata, m: MemoryWithMetadata) =>
               m.created_at < earliest.created_at ? m : earliest
             )
           : null
       const lastMemory =
         memories.length > 0
-          ? memories.reduce((latest: any, m: any) =>
+          ? memories.reduce((latest: MemoryWithMetadata, m: MemoryWithMetadata) =>
               m.created_at > latest.created_at ? m : latest
             )
           : null
@@ -190,7 +218,7 @@ export class AnalyticsController {
 
       const memoriesByHour: Record<number, number> = {}
       const memoriesByDayOfWeek: Record<number, number> = {}
-      memories.forEach((memory: any) => {
+      memories.forEach((memory: MemoryWithMetadata) => {
         const date = new Date(memory.created_at)
         const hour = date.getHours()
         const dayOfWeek = date.getDay()
@@ -216,25 +244,25 @@ export class AnalyticsController {
       const uniqueTopics = Object.keys(topicCounts).length
 
       const contentLengths = memories
-        .map((m: any) => m.content?.length || 0)
+        .map((m: MemoryWithMetadata) => m.content?.length || 0)
         .sort((a: number, b: number) => a - b)
       const medianContentLength =
         contentLengths.length > 0 ? contentLengths[Math.floor(contentLengths.length / 2)] : 0
       const minContentLength = contentLengths[0] || 0
       const maxContentLength = contentLengths[contentLengths.length - 1] || 0
 
-      const recentMemories = memories.filter((m: any) => {
+      const recentMemories = memories.filter((m: MemoryWithMetadata) => {
         const daysSince = (now.getTime() - m.created_at.getTime()) / (1000 * 60 * 60 * 24)
         return daysSince <= 7
       }).length
 
-      const recentMemories30 = memories.filter((m: any) => {
+      const recentMemories30 = memories.filter((m: MemoryWithMetadata) => {
         const daysSince = (now.getTime() - m.created_at.getTime()) / (1000 * 60 * 60 * 24)
         return daysSince <= 30
       }).length
 
       const tokenUsageByWeek: Record<string, number> = {}
-      tokenUsageRecords.forEach((record: any) => {
+      tokenUsageRecords.forEach((record: TokenUsageRecord) => {
         const date = new Date(record.created_at)
         const weekStart = new Date(date)
         weekStart.setDate(date.getDate() - date.getDay())
@@ -295,9 +323,9 @@ export class AnalyticsController {
             totalRelations: memoryRelations.length,
             averageConnectionsPerMemory: Math.round(averageConnectionsPerMemory * 100) / 100,
             strongestRelations: memoryRelations
-              .sort((a: any, b: any) => b.similarity_score - a.similarity_score)
+              .sort((a, b) => b.similarity_score - a.similarity_score)
               .slice(0, 10)
-              .map((r: any) => ({ similarity: r.similarity_score })),
+              .map(r => ({ similarity: r.similarity_score })),
           },
           snapshotAnalytics: {
             totalSnapshots: memorySnapshots.length,

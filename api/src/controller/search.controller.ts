@@ -98,10 +98,11 @@ ${bullets}`
             aiProvider.generateContent(ansPrompt, true),
             180000
           ) // 3 minutes for async, true = search request (high priority)
+          type AnswerResult = string | { text?: string }
           const generatedAnswer =
             typeof answerResult === 'string'
               ? answerResult
-              : (answerResult as any).text || answerResult
+              : (answerResult as AnswerResult).text || answerResult
           logger.log('[search/controller] async answer generated', {
             ts: new Date().toISOString(),
             jobId: job.id,
@@ -168,7 +169,28 @@ ${bullets}`
     }
 
     // Return response with appropriate fields
-    const response: any = {
+    type SearchResponse = {
+      query: string
+      results: Array<{
+        memory_id: string
+        title: string | null
+        summary: string | null
+        url: string | null
+        timestamp: number
+        related_memories: string[]
+        score: number
+      }>
+      answer?: string
+      context?: string
+      citations?: Array<{
+        label: number
+        memory_id: string
+        title: string | null
+        url: string | null
+      }>
+      status?: string
+    }
+    const response: SearchResponse = {
       query: data.query,
       results: data.results,
       answer: data.answer,

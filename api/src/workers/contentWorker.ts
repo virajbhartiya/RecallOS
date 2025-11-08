@@ -9,6 +9,18 @@ import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../uti
 import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text'
 import { logger } from '../utils/logger'
 
+type PrismaError = {
+  code?: string
+  message?: string
+  status?: number
+}
+
+type RetryableError = {
+  message?: string
+  status?: number
+  code?: number | string
+}
+
 export const startContentWorker = () => {
   return new Worker<ContentJobData>(
     'process-content',
@@ -34,7 +46,7 @@ export const startContentWorker = () => {
           const canonicalHash = hashCanonical(canonicalText)
 
           const existingByCanonical = await prisma.memory.findFirst({
-            where: { user_id: user.id, canonical_hash: canonicalHash } as any,
+            where: { user_id: user.id, canonical_hash: canonicalHash },
           })
 
           if (existingByCanonical) {
@@ -59,20 +71,20 @@ export const startContentWorker = () => {
             const recentMemories = await prisma.memory.findMany({
               where: {
                 user_id,
-                created_at: { gte: oneHourAgo } as any,
-              } as any,
-              orderBy: { created_at: 'desc' } as any,
+                created_at: { gte: oneHourAgo },
+              },
+              orderBy: { created_at: 'desc' },
               take: 50,
             })
 
             for (const existingMemory of recentMemories) {
-              const existingUrl = (existingMemory as any).url
+              const existingUrl = existingMemory.url
               if (
                 existingUrl &&
                 typeof existingUrl === 'string' &&
                 normalizeUrl(existingUrl) === normalizedUrl
               ) {
-                const existingCanonical = normalizeText((existingMemory as any).content || '')
+                const existingCanonical = normalizeText(existingMemory.content || '')
                 const similarity = calculateSimilarity(canonicalText, existingCanonical)
 
                 if (similarity > 0.9) {
@@ -97,9 +109,10 @@ export const startContentWorker = () => {
         }
       }
 
-      const isRetryableError = (err: any): boolean => {
-        const msg = String(err?.message || '').toLowerCase()
-        const status = Number((err?.status ?? err?.code) || 0)
+      const isRetryableError = (err: unknown): boolean => {
+        const error = err as RetryableError
+        const msg = String(error?.message || '').toLowerCase()
+        const status = Number((error?.status ?? error?.code) || 0)
         return (
           status === 429 ||
           status === 500 ||
@@ -131,10 +144,12 @@ export const startContentWorker = () => {
             })
           }
           const summaryResult = await aiProvider.summarizeContent(raw_text, metadata)
-          summary =
-            typeof summaryResult === 'string'
-              ? summaryResult
-              : (summaryResult as any).text || summaryResult
+          if (typeof summaryResult === 'string') {
+            summary = summaryResult
+          } else {
+            const result = summaryResult as { text?: string }
+            summary = result.text || summaryResult
+          }
           if (attempt > 1) {
             logger.log(`[Redis Worker] Job retry successful`, {
               jobId: job.id,
@@ -144,7 +159,7 @@ export const startContentWorker = () => {
             })
           }
           break
-        } catch (err: any) {
+        } catch (err) {
           if (!isRetryableError(err) || attempt === maxAttempts) {
             logger.error(`[Redis Worker] Job failed permanently`, {
               jobId: job.id,
@@ -258,12 +273,13 @@ export const startContentWorker = () => {
                 timestamp: BigInt(timestamp),
                 full_content: raw_text,
                 page_metadata: metadata || {},
-              } as any,
+              },
             })
-          } catch (createError: any) {
-            if (createError.code === 'P2002') {
+          } catch (createError) {
+            const error = createError as PrismaError
+            if (error.code === 'P2002') {
               const existingByCanonical = await prisma.memory.findFirst({
-                where: { user_id, canonical_hash: canonicalHash } as any,
+                where: { user_id, canonical_hash: canonicalHash },
               })
 
               if (existingByCanonical) {

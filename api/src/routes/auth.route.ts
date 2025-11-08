@@ -33,24 +33,24 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'email and password are required' })
     }
 
-    const existing = await prisma.user.findFirst({ where: { email } as any })
+    const existing = await prisma.user.findFirst({ where: { email } })
     if (existing) {
       return res.status(409).json({ message: 'User already exists' })
     }
 
     const password_hash = await hashPassword(password)
-    const user = await prisma.user.create({ data: { email, password_hash } as any })
+    const user = await prisma.user.create({ data: { email, password_hash } })
 
     const token = generateToken({
-      userId: (user as any).id,
-      email: (user as any).email || undefined,
-      externalId: (user as any).external_id || undefined,
+      userId: user.id,
+      email: user.email || undefined,
+      externalId: user.external_id || undefined,
     })
     setAuthCookie(res, token)
     return res.status(201).json({
       message: 'Registered',
       token,
-      user: { id: (user as any).id, email: (user as any).email },
+      user: { id: user.id, email: user.email },
     })
   } catch (error) {
     logger.error('Register error:', error)
@@ -66,26 +66,29 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'email and password are required' })
     }
 
-    const user = await prisma.user.findFirst({ where: { email } as any })
-    if (!user || !(user as any).password_hash) {
+    const user = await prisma.user.findFirst({
+      where: { email },
+      select: { id: true, email: true, external_id: true, password_hash: true },
+    })
+    if (!user || !user.password_hash) {
       return res.status(401).json({ message: 'Invalid credentials' })
     }
 
-    const ok = await comparePassword(password, (user as any).password_hash as any)
+    const ok = await comparePassword(password, user.password_hash)
     if (!ok) {
       return res.status(401).json({ message: 'Invalid credentials' })
     }
 
     const token = generateToken({
-      userId: (user as any).id,
-      email: (user as any).email || undefined,
-      externalId: (user as any).external_id || undefined,
+      userId: user.id,
+      email: user.email || undefined,
+      externalId: user.external_id || undefined,
     })
     setAuthCookie(res, token)
     return res.status(200).json({
       message: 'Logged in',
       token,
-      user: { id: (user as any).id, email: (user as any).email },
+      user: { id: user.id, email: user.email },
     })
   } catch (error) {
     logger.error('Login error:', error)

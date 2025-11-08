@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
+import { Prisma } from '@prisma/client'
 
 export type OperationType =
   | 'summarize'
@@ -27,7 +28,7 @@ export const tokenTracking = {
           input_tokens: record.inputTokens,
           output_tokens: record.outputTokens,
           model_used: record.modelUsed || null,
-        } as any,
+        },
       })
     } catch (error) {
       logger.error('Error recording token usage:', error)
@@ -35,7 +36,7 @@ export const tokenTracking = {
   },
 
   async getTokenUsageByUser(userId: string, startDate?: Date, endDate?: Date) {
-    const where: any = { user_id: userId }
+    const where: Prisma.TokenUsageWhereInput = { user_id: userId }
 
     if (startDate || endDate) {
       where.created_at = {}
@@ -54,7 +55,7 @@ export const tokenTracking = {
   },
 
   async getTokenUsageAggregated(userId: string, startDate?: Date, endDate?: Date) {
-    const where: any = { user_id: userId }
+    const where: Prisma.TokenUsageWhereInput = { user_id: userId }
 
     if (startDate || endDate) {
       where.created_at = {}

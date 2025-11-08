@@ -4,6 +4,30 @@ import { prisma } from '../lib/prisma'
 import { memoryMeshService } from '../services/memoryMesh'
 import { searchMemories } from '../services/memorySearch'
 import { logger } from '../utils/logger'
+import { Prisma } from '@prisma/client'
+
+type MemoryWithMetadata = {
+  memory: {
+    id: string
+    title: string | null
+    url: string | null
+    content: string
+    summary: string | null
+    timestamp: bigint
+    page_metadata: Prisma.JsonValue
+  }
+  similarity: number
+  similarity_score: number
+}
+
+type MemoryRecord = {
+  id: string
+  title: string | null
+  url: string | null
+  content: string
+  summary: string | null
+  page_metadata: Prisma.JsonValue
+}
 
 export class MemorySearchController {
   static async searchMemories(req: AuthenticatedRequest, res: Response) {
@@ -109,7 +133,7 @@ export class MemorySearchController {
         })
       }
 
-      const whereConditions: any = {
+      const whereConditions: Prisma.MemoryWhereInput = {
         user_id: user.id,
       }
 
@@ -154,14 +178,14 @@ export class MemorySearchController {
       let filteredResults = searchResults
 
       if (category || topic || sentiment) {
-        filteredResults = searchResults.filter((result: any) => {
-          const metadata = result.page_metadata as any
+        filteredResults = searchResults.filter((result: MemoryWithMetadata) => {
+          const metadata = result.memory.page_metadata as Record<string, unknown> | null
 
-          if (category && metadata?.categories && !metadata.categories.includes(category)) {
+          if (category && metadata?.categories && Array.isArray(metadata.categories) && !metadata.categories.includes(category)) {
             return false
           }
 
-          if (topic && metadata?.topics && !metadata.topics.includes(topic)) {
+          if (topic && metadata?.topics && Array.isArray(metadata.topics) && !metadata.topics.includes(topic)) {
             return false
           }
 
@@ -177,7 +201,7 @@ export class MemorySearchController {
 
       const paginatedResults = filteredResults.slice(skip, skip + Number(limit))
 
-      const serializedResults = paginatedResults.map((result: any) => ({
+      const serializedResults = paginatedResults.map((result: MemoryWithMetadata) => ({
         ...result,
         memory: {
           ...result.memory,
@@ -243,7 +267,7 @@ export class MemorySearchController {
         })
       }
 
-      const whereConditions: any = {
+      const whereConditions: Prisma.MemoryWhereInput = {
         user_id: user.id,
       }
 
@@ -318,14 +342,14 @@ export class MemorySearchController {
       let filteredKeywordResults = keywordResults
 
       if (category || topic || sentiment) {
-        filteredKeywordResults = keywordResults.filter((memory: any) => {
-          const metadata = memory.page_metadata as any
+        filteredKeywordResults = keywordResults.filter((memory: MemoryRecord) => {
+          const metadata = memory.page_metadata as Record<string, unknown> | null
 
-          if (category && metadata?.categories && !metadata.categories.includes(category)) {
+          if (category && metadata?.categories && Array.isArray(metadata.categories) && !metadata.categories.includes(category)) {
             return false
           }
 
-          if (topic && metadata?.topics && !metadata.topics.includes(topic)) {
+          if (topic && metadata?.topics && Array.isArray(metadata.topics) && !metadata.topics.includes(topic)) {
             return false
           }
 
@@ -337,9 +361,16 @@ export class MemorySearchController {
         })
       }
 
-      const resultMap = new Map<string, any>()
+      type SearchResult = MemoryRecord & {
+        keyword_score: number
+        semantic_score: number
+        search_type: string
+        blended_score?: number
+      }
 
-      filteredKeywordResults.forEach((memory: any) => {
+      const resultMap = new Map<string, SearchResult>()
+
+      filteredKeywordResults.forEach((memory: MemoryRecord) => {
         const keywordScore = this.calculateKeywordRelevance(memory, query as string)
 
         resultMap.set(memory.id, {
@@ -350,16 +381,17 @@ export class MemorySearchController {
         })
       })
 
-      semanticResults.forEach((memory: any) => {
-        const existing = resultMap.get(memory.id)
+      semanticResults.forEach((memory: MemoryWithMetadata) => {
+        const memoryId = memory.memory.id
+        const existing = resultMap.get(memoryId)
 
         if (existing) {
           existing.semantic_score = memory.similarity_score || 0
           existing.search_type = 'hybrid'
           existing.blended_score = existing.keyword_score * 0.4 + existing.semantic_score * 0.6
         } else {
-          resultMap.set(memory.id, {
-            ...memory,
+          resultMap.set(memoryId, {
+            ...memory.memory,
             keyword_score: 0,
             semantic_score: memory.similarity_score || 0,
             search_type: 'semantic',
@@ -382,12 +414,9 @@ export class MemorySearchController {
 
       const paginatedResults = blendedResults.slice(skip, skip + Number(limit))
 
-      const serializedResults = paginatedResults.map((result: any) => ({
+      const serializedResults = paginatedResults.map((result: SearchResult) => ({
         ...result,
-        memory: {
-          ...result.memory,
-          timestamp: result.memory.timestamp.toString(),
-        },
+        timestamp: 'timestamp' in result && result.timestamp ? result.timestamp.toString() : null,
       }))
 
       res.status(200).json({
@@ -422,7 +451,7 @@ export class MemorySearchController {
     }
   }
 
-  private static calculateKeywordRelevance(memory: any, query: string): number {
+  private static calculateKeywordRelevance(memory: MemoryRecord, query: string): number {
     const queryLower = query.toLowerCase()
 
     const queryTokens = queryLower

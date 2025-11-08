@@ -10,7 +10,12 @@ const QDRANT_API_KEY = process.env.QDRANT_API_KEY
 const EMBEDDING_DIMENSION = Number(process.env.EMBEDDING_DIMENSION || 768)
 const COLLECTION_NAME = 'memory_embeddings'
 
-const qdrantOptions: any = { url: QDRANT_URL }
+interface QdrantClientOptions {
+  url: string
+  apiKey?: string
+}
+
+const qdrantOptions: QdrantClientOptions = { url: QDRANT_URL }
 if (QDRANT_URL.startsWith('https://') && QDRANT_API_KEY) {
   qdrantOptions.apiKey = QDRANT_API_KEY
 }

@@ -6,6 +6,28 @@ import { aiProvider } from '../services/aiProvider'
 import { memoryMeshService } from '../services/memoryMesh'
 import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text'
 import { logger } from '../utils/logger'
+import { Prisma } from '@prisma/client'
+
+type MemorySelect = Prisma.MemoryGetPayload<{
+  select: {
+    id: true
+    title: true
+    url: true
+    timestamp: true
+    created_at: true
+    summary: true
+    content: true
+    source: true
+    page_metadata: true
+    canonical_text?: true
+    canonical_hash?: true
+  }
+}>
+
+type PrismaError = {
+  code?: string
+  message?: string
+}
 
 function hashUrl(url: string): string {
   return createHash('sha256').update(url).digest('hex')
@@ -45,7 +67,7 @@ export class MemoryController {
       const canonicalHash = hashCanonical(canonicalText)
 
       const existingByCanonical = await prisma.memory.findFirst({
-        where: { user_id: userId, canonical_hash: canonicalHash } as any,
+        where: { user_id: userId, canonical_hash: canonicalHash },
         select: {
           id: true,
           title: true,
@@ -58,14 +80,14 @@ export class MemoryController {
           page_metadata: true,
           canonical_text: true,
           canonical_hash: true,
-        } as any,
+        },
       })
 
       if (existingByCanonical) {
         const serializedExisting = {
           ...existingByCanonical,
-          timestamp: (existingByCanonical as any).timestamp
-            ? (existingByCanonical as any).timestamp.toString()
+          timestamp: existingByCanonical.timestamp
+            ? existingByCanonical.timestamp.toString()
             : null,
         }
         return res.status(200).json({
@@ -87,8 +109,8 @@ export class MemoryController {
         const recentMemories = await prisma.memory.findMany({
           where: {
             user_id: userId,
-            created_at: { gte: oneHourAgo } as any,
-          } as any,
+            created_at: { gte: oneHourAgo },
+          },
           select: {
             id: true,
             title: true,
@@ -101,26 +123,26 @@ export class MemoryController {
             page_metadata: true,
             canonical_text: true,
             canonical_hash: true,
-          } as any,
-          orderBy: { created_at: 'desc' } as any,
+          },
+          orderBy: { created_at: 'desc' },
           take: 50,
         })
 
         for (const existingMemory of recentMemories) {
-          const existingUrl = (existingMemory as any).url
+          const existingUrl = existingMemory.url
           if (
             existingUrl &&
             typeof existingUrl === 'string' &&
             normalizeUrl(existingUrl) === normalizedUrl
           ) {
-            const existingCanonical = normalizeText((existingMemory as any).content || '')
+            const existingCanonical = normalizeText(existingMemory.content || '')
             const similarity = calculateSimilarity(canonicalText, existingCanonical)
 
             if (similarity > 0.9) {
               const serializedExisting = {
                 ...existingMemory,
-                timestamp: (existingMemory as any).timestamp
-                  ? (existingMemory as any).timestamp.toString()
+                timestamp: existingMemory.timestamp
+                  ? existingMemory.timestamp.toString()
                   : null,
               }
               logger.log('[memory/process] url_duplicate_detected', {
@@ -151,14 +173,33 @@ export class MemoryController {
         aiProvider.summarizeContent(content, metadata, userId),
         aiProvider.extractContentMetadata(content, metadata, userId),
       ])
-      const summary =
-        typeof summaryResult === 'string'
-          ? summaryResult
-          : (summaryResult as any).text || summaryResult
-      const extractedMetadata =
-        typeof extractedMetadataResult === 'object' && 'topics' in extractedMetadataResult
-          ? extractedMetadataResult
-          : (extractedMetadataResult as any).metadata || extractedMetadataResult
+      type SummaryResult = string | { text?: string }
+      type MetadataResult = {
+        topics?: string[]
+        categories?: string[]
+        keyPoints?: string[]
+        sentiment?: string
+        importance?: number
+        usefulness?: number
+        searchableTerms?: string[]
+        contextRelevance?: string[]
+      } | { metadata?: MetadataResult }
+
+      if (typeof summaryResult === 'string') {
+        summary = summaryResult
+      } else {
+        const result = summaryResult as { text?: string }
+        summary = result.text || summaryResult
+      }
+      
+      let extractedMetadata: MetadataResult
+      if (typeof extractedMetadataResult === 'object' && extractedMetadataResult !== null && 'topics' in extractedMetadataResult) {
+        extractedMetadata = extractedMetadataResult as MetadataResult
+      } else if (typeof extractedMetadataResult === 'object' && extractedMetadataResult !== null && 'metadata' in extractedMetadataResult) {
+        extractedMetadata = (extractedMetadataResult as { metadata?: MetadataResult }).metadata || extractedMetadataResult as MetadataResult
+      } else {
+        extractedMetadata = extractedMetadataResult as MetadataResult
+      }
       logger.log('[memory/process] ai_done', {
         ms: Date.now() - aiStart,
         hasSummary: !!summary,
@@ -196,17 +237,18 @@ export class MemoryController {
               importance: extractedMetadata.importance,
               searchable_terms: extractedMetadata.searchableTerms,
             },
-          } as any,
+          },
         })
         logger.log('[memory/process] db_memory_created', {
           ms: Date.now() - dbCreateStart,
           memoryId: memory.id,
           userId: userId,
         })
-      } catch (createError: any) {
-        if (createError.code === 'P2002') {
+      } catch (createError) {
+        const error = createError as PrismaError
+        if (error.code === 'P2002') {
           const existingMemory = await prisma.memory.findFirst({
-            where: { user_id: userId, canonical_hash: canonicalHash } as any,
+            where: { user_id: userId, canonical_hash: canonicalHash },
             select: {
               id: true,
               title: true,
@@ -219,14 +261,14 @@ export class MemoryController {
               page_metadata: true,
               canonical_text: true,
               canonical_hash: true,
-            } as any,
+            },
           })
 
           if (existingMemory) {
             const serializedExisting = {
               ...existingMemory,
-              timestamp: (existingMemory as any).timestamp
-                ? (existingMemory as any).timestamp.toString()
+              timestamp: existingMemory.timestamp
+                ? existingMemory.timestamp.toString()
                 : null,
             }
             logger.log('[memory/process] duplicate_detected_on_create', {
@@ -327,13 +369,13 @@ export class MemoryController {
           content: true,
           source: true,
           page_metadata: true,
-        } as any,
+        },
         orderBy: { created_at: 'desc' },
         take: limit,
       })
 
       // Convert BigInt values to strings for JSON serialization
-      const serializedMemories = memories.map((memory: any) => ({
+      const serializedMemories = memories.map((memory: MemorySelect) => ({
         ...memory,
         timestamp: memory.timestamp ? memory.timestamp.toString() : null,
       }))
@@ -421,27 +463,31 @@ export class MemoryController {
       let importanceCount = 0
 
       memories.forEach(memory => {
-        const metadata = memory.page_metadata as any
+        const metadata = memory.page_metadata as Record<string, unknown> | null
 
-        if (metadata?.topics) {
-          metadata.topics.forEach((topic: string) => {
-            topicCounts[topic] = (topicCounts[topic] || 0) + 1
+        if (metadata?.topics && Array.isArray(metadata.topics)) {
+          metadata.topics.forEach((topic: unknown) => {
+            if (typeof topic === 'string') {
+              topicCounts[topic] = (topicCounts[topic] || 0) + 1
+            }
           })
         }
 
-        if (metadata?.categories) {
-          metadata.categories.forEach((category: string) => {
-            categoryCounts[category] = (categoryCounts[category] || 0) + 1
+        if (metadata?.categories && Array.isArray(metadata.categories)) {
+          metadata.categories.forEach((category: unknown) => {
+            if (typeof category === 'string') {
+              categoryCounts[category] = (categoryCounts[category] || 0) + 1
+            }
           })
         }
 
-        if (metadata?.sentiment) {
+        if (metadata?.sentiment && typeof metadata.sentiment === 'string') {
           sentimentCounts[metadata.sentiment] = (sentimentCounts[metadata.sentiment] || 0) + 1
         }
 
         sourceCounts[memory.source] = (sourceCounts[memory.source] || 0) + 1
 
-        if (metadata?.importance) {
+        if (metadata?.importance && typeof metadata.importance === 'number') {
           totalImportance += metadata.importance
           importanceCount++
         }
