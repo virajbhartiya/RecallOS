@@ -130,6 +130,9 @@ export const runtime = {
 
 export const tabs = {
   query: (queryInfo: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]> => {
+    if (!browserAPI.tabs) {
+      return Promise.reject(new Error('Tabs API not available'));
+    }
     if (isFirefox) {
       return browserAPI.tabs.query(queryInfo) as Promise<chrome.tabs.Tab[]>;
     }
@@ -144,6 +147,9 @@ export const tabs = {
     });
   },
   sendMessage: (tabId: number, message: any, responseCallback?: (response: any) => void): void => {
+    if (!browserAPI.tabs) {
+      return;
+    }
     if (isFirefox) {
       if (responseCallback) {
         browserAPI.tabs.sendMessage(tabId, message).then(responseCallback).catch(() => {});
@@ -151,15 +157,31 @@ export const tabs = {
         browserAPI.tabs.sendMessage(tabId, message).catch(() => {});
       }
     } else {
-      if (responseCallback) {
-        browserAPI.tabs.sendMessage(tabId, message, responseCallback);
-      } else {
-        browserAPI.tabs.sendMessage(tabId, message);
+      try {
+        if (responseCallback) {
+          browserAPI.tabs.sendMessage(tabId, message, (response) => {
+            if (browserAPI.runtime.lastError) {
+              return;
+            }
+            responseCallback(response);
+          });
+        } else {
+          browserAPI.tabs.sendMessage(tabId, message, () => {
+            if (browserAPI.runtime.lastError) {
+              return;
+            }
+          });
+        }
+      } catch (error) {
       }
     }
   },
-  onActivated: browserAPI.tabs.onActivated,
-  onUpdated: browserAPI.tabs.onUpdated,
+  get onActivated() {
+    return browserAPI.tabs?.onActivated;
+  },
+  get onUpdated() {
+    return browserAPI.tabs?.onUpdated;
+  },
 };
 
 export const cookies = {
