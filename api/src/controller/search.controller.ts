@@ -98,11 +98,13 @@ ${bullets}`
             aiProvider.generateContent(ansPrompt, true),
             180000
           ) // 3 minutes for async, true = search request (high priority)
-          type AnswerResult = string | { text?: string }
-          const generatedAnswer =
-            typeof answerResult === 'string'
-              ? answerResult
-              : (answerResult as AnswerResult).text || answerResult
+          let generatedAnswer: string
+          if (typeof answerResult === 'string') {
+            generatedAnswer = answerResult
+          } else {
+            const result = answerResult as { text?: string }
+            generatedAnswer = result.text || answerResult
+          }
           logger.log('[search/controller] async answer generated', {
             ts: new Date().toISOString(),
             jobId: job.id,
@@ -189,6 +191,7 @@ ${bullets}`
         url: string | null
       }>
       status?: string
+      job_id?: string
     }
     const response: SearchResponse = {
       query: data.query,

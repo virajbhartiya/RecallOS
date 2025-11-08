@@ -141,9 +141,7 @@ export class MemoryController {
             if (similarity > 0.9) {
               const serializedExisting = {
                 ...existingMemory,
-                timestamp: existingMemory.timestamp
-                  ? existingMemory.timestamp.toString()
-                  : null,
+                timestamp: existingMemory.timestamp ? existingMemory.timestamp.toString() : null,
               }
               logger.log('[memory/process] url_duplicate_detected', {
                 existingMemoryId: existingMemory.id,
@@ -173,30 +171,42 @@ export class MemoryController {
         aiProvider.summarizeContent(content, metadata, userId),
         aiProvider.extractContentMetadata(content, metadata, userId),
       ])
-      type SummaryResult = string | { text?: string }
-      type MetadataResult = {
-        topics?: string[]
-        categories?: string[]
-        keyPoints?: string[]
-        sentiment?: string
-        importance?: number
-        usefulness?: number
-        searchableTerms?: string[]
-        contextRelevance?: string[]
-      } | { metadata?: MetadataResult }
+      type MetadataResult =
+        | {
+            topics?: string[]
+            categories?: string[]
+            keyPoints?: string[]
+            sentiment?: string
+            importance?: number
+            usefulness?: number
+            searchableTerms?: string[]
+            contextRelevance?: string[]
+          }
+        | { metadata?: MetadataResult }
 
+      let summary: string
       if (typeof summaryResult === 'string') {
         summary = summaryResult
       } else {
         const result = summaryResult as { text?: string }
         summary = result.text || summaryResult
       }
-      
+
       let extractedMetadata: MetadataResult
-      if (typeof extractedMetadataResult === 'object' && extractedMetadataResult !== null && 'topics' in extractedMetadataResult) {
+      if (
+        typeof extractedMetadataResult === 'object' &&
+        extractedMetadataResult !== null &&
+        'topics' in extractedMetadataResult
+      ) {
         extractedMetadata = extractedMetadataResult as MetadataResult
-      } else if (typeof extractedMetadataResult === 'object' && extractedMetadataResult !== null && 'metadata' in extractedMetadataResult) {
-        extractedMetadata = (extractedMetadataResult as { metadata?: MetadataResult }).metadata || extractedMetadataResult as MetadataResult
+      } else if (
+        typeof extractedMetadataResult === 'object' &&
+        extractedMetadataResult !== null &&
+        'metadata' in extractedMetadataResult
+      ) {
+        extractedMetadata =
+          (extractedMetadataResult as { metadata?: MetadataResult }).metadata ||
+          (extractedMetadataResult as MetadataResult)
       } else {
         extractedMetadata = extractedMetadataResult as MetadataResult
       }
@@ -230,12 +240,18 @@ export class MemoryController {
             page_metadata: {
               ...metadata,
               extracted_metadata: extractedMetadata,
-              topics: extractedMetadata.topics,
-              categories: extractedMetadata.categories,
-              key_points: extractedMetadata.keyPoints,
-              sentiment: extractedMetadata.sentiment,
-              importance: extractedMetadata.importance,
-              searchable_terms: extractedMetadata.searchableTerms,
+              topics: 'topics' in extractedMetadata ? extractedMetadata.topics : undefined,
+              categories:
+                'categories' in extractedMetadata ? extractedMetadata.categories : undefined,
+              key_points:
+                'keyPoints' in extractedMetadata ? extractedMetadata.keyPoints : undefined,
+              sentiment: 'sentiment' in extractedMetadata ? extractedMetadata.sentiment : undefined,
+              importance:
+                'importance' in extractedMetadata ? extractedMetadata.importance : undefined,
+              searchable_terms:
+                'searchableTerms' in extractedMetadata
+                  ? extractedMetadata.searchableTerms
+                  : undefined,
             },
           },
         })
@@ -267,9 +283,7 @@ export class MemoryController {
           if (existingMemory) {
             const serializedExisting = {
               ...existingMemory,
-              timestamp: existingMemory.timestamp
-                ? existingMemory.timestamp.toString()
-                : null,
+              timestamp: existingMemory.timestamp ? existingMemory.timestamp.toString() : null,
             }
             logger.log('[memory/process] duplicate_detected_on_create', {
               existingMemoryId: existingMemory.id,

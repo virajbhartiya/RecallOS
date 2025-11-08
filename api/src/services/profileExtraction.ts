@@ -131,8 +131,12 @@ export class ProfileExtractionService {
         const metadata = m.page_metadata as Record<string, unknown> | null
         const daysAgo = Math.floor((now.getTime() - m.created_at.getTime()) / (1000 * 60 * 60 * 24))
         const isRecent = m.created_at >= thirtyDaysAgo
-        const topics = Array.isArray(metadata?.topics) ? metadata.topics.filter((t): t is string => typeof t === 'string').join(', ') : 'N/A'
-        const categories = Array.isArray(metadata?.categories) ? metadata.categories.filter((c): c is string => typeof c === 'string').join(', ') : 'N/A'
+        const topics = Array.isArray(metadata?.topics)
+          ? metadata.topics.filter((t): t is string => typeof t === 'string').join(', ')
+          : 'N/A'
+        const categories = Array.isArray(metadata?.categories)
+          ? metadata.categories.filter((c): c is string => typeof c === 'string').join(', ')
+          : 'N/A'
 
         return `Memory ${idx + 1} (${daysAgo} days ago${isRecent ? ', RECENT' : ''}):
 Title: ${m.title || 'Untitled'}

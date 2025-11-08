@@ -165,7 +165,11 @@ export class MemoryMeshService {
     }
   }
 
-  async findRelatedMemories(memoryId: string, userId: string, limit: number = 5): Promise<MemoryRelation[]> {
+  async findRelatedMemories(
+    memoryId: string,
+    userId: string,
+    limit: number = 5
+  ): Promise<MemoryRelation[]> {
     try {
       await ensureCollection()
 
@@ -281,7 +285,9 @@ export class MemoryMeshService {
       const baseIsGoogleMeet = /(^|\.)meet\.google\.com$/i.test(baseHost)
       const baseIsGitHub = /^github\.com$/i.test(baseHost)
       const baseMetadata = baseMemory?.page_metadata as Record<string, unknown> | null
-      const baseTopics: string[] = (Array.isArray(baseMetadata?.topics) ? baseMetadata.topics : []) as string[]
+      const baseTopics: string[] = (
+        Array.isArray(baseMetadata?.topics) ? baseMetadata.topics : []
+      ) as string[]
 
       const similarities = searchResult
         .map(result => {
@@ -301,7 +307,9 @@ export class MemoryMeshService {
           const candidateIsGoogleMeet = /(^|\.)meet\.google\.com$/i.test(candidateHost)
           const candidateIsGitHub = /^github\.com$/i.test(candidateHost)
           const metadata = memory.page_metadata as Record<string, unknown> | null
-          const candidateTopics: string[] = (Array.isArray(metadata?.topics) ? metadata.topics : []) as string[]
+          const candidateTopics: string[] = (
+            Array.isArray(metadata?.topics) ? metadata.topics : []
+          ) as string[]
 
           if ((baseIsGoogleMeet && candidateIsGitHub) || (baseIsGitHub && candidateIsGoogleMeet)) {
             similarity = Math.max(0, similarity - 0.4)
@@ -326,7 +334,10 @@ export class MemoryMeshService {
 
           return { memory: memory as MemoryWithMetadata, similarity, similarity_score: similarity }
         })
-        .filter((item): item is MemoryRelation & { similarity_score: number } => item !== null && item.memory !== undefined && item.similarity_score !== undefined)
+        .filter(
+          (item): item is MemoryRelation & { similarity_score: number } =>
+            item !== null && item.memory !== undefined && item.similarity_score !== undefined
+        )
 
       return similarities
         .filter(item => item.similarity >= 0.3)
@@ -516,9 +527,13 @@ export class MemoryMeshService {
       const metadata = memory.page_metadata as Record<string, unknown> | null
 
       const topics = (Array.isArray(metadata?.topics) ? metadata.topics : []) as string[]
-      const categories = (Array.isArray(metadata?.categories) ? metadata.categories : []) as string[]
+      const categories = (
+        Array.isArray(metadata?.categories) ? metadata.categories : []
+      ) as string[]
       const keyPoints = (Array.isArray(metadata?.keyPoints) ? metadata.keyPoints : []) as string[]
-      const searchableTerms = (Array.isArray(metadata?.searchableTerms) ? metadata.searchableTerms : []) as string[]
+      const searchableTerms = (
+        Array.isArray(metadata?.searchableTerms) ? metadata.searchableTerms : []
+      ) as string[]
 
       if (topics.length === 0 && categories.length === 0) {
         return []
@@ -553,13 +568,21 @@ export class MemoryMeshService {
         take: limit * 3,
       })
 
-      const topicalSimilarities = relatedMemories.map((relatedMemory) => {
+      const topicalSimilarities = relatedMemories.map(relatedMemory => {
         const relatedMetadata = relatedMemory.page_metadata as Record<string, unknown> | null
 
-        const relatedTopics = (Array.isArray(relatedMetadata?.topics) ? relatedMetadata.topics : []) as string[]
-        const relatedCategories = (Array.isArray(relatedMetadata?.categories) ? relatedMetadata.categories : []) as string[]
-        const relatedKeyPoints = (Array.isArray(relatedMetadata?.keyPoints) ? relatedMetadata.keyPoints : []) as string[]
-        const relatedSearchableTerms = (Array.isArray(relatedMetadata?.searchableTerms) ? relatedMetadata.searchableTerms : []) as string[]
+        const relatedTopics = (
+          Array.isArray(relatedMetadata?.topics) ? relatedMetadata.topics : []
+        ) as string[]
+        const relatedCategories = (
+          Array.isArray(relatedMetadata?.categories) ? relatedMetadata.categories : []
+        ) as string[]
+        const relatedKeyPoints = (
+          Array.isArray(relatedMetadata?.keyPoints) ? relatedMetadata.keyPoints : []
+        ) as string[]
+        const relatedSearchableTerms = (
+          Array.isArray(relatedMetadata?.searchableTerms) ? relatedMetadata.searchableTerms : []
+        ) as string[]
 
         // Calculate multiple types of topical overlap
         const topicOverlap = this.calculateSetOverlap(topics, relatedTopics)
@@ -664,7 +687,7 @@ export class MemoryMeshService {
         take: limit * 3,
       })
 
-      const temporalSimilarities = temporalMemories.map((relatedMemory) => {
+      const temporalSimilarities = temporalMemories.map(relatedMemory => {
         const timeDiff = Math.abs(relatedMemory.created_at.getTime() - memoryCreatedAt.getTime())
 
         let similarity = 0
@@ -762,7 +785,10 @@ export class MemoryMeshService {
 
     return (typeHierarchy[newType] || 0) > (typeHierarchy[existingType] || 0)
   }
-  private async filterRelationsWithAI(memory: MemoryWithMetadata, relations: MemoryRelation[]): Promise<MemoryRelation[]> {
+  private async filterRelationsWithAI(
+    memory: MemoryWithMetadata,
+    relations: MemoryRelation[]
+  ): Promise<MemoryRelation[]> {
     try {
       // Much more efficient approach: Only use AI for edge cases and high-value decisions
 
@@ -803,14 +829,25 @@ export class MemoryMeshService {
     }
   }
 
-  private applySmartHeuristics(memory: MemoryWithMetadata, relations: MemoryRelation[]): MemoryRelation[] {
+  private applySmartHeuristics(
+    memory: MemoryWithMetadata,
+    relations: MemoryRelation[]
+  ): MemoryRelation[] {
     return relations.filter(relation => {
       const memoryMetadata = memory.page_metadata as Record<string, unknown> | null
       const relationMetadata = relation.memory.page_metadata as Record<string, unknown> | null
-      const memoryTopics = (Array.isArray(memoryMetadata?.topics) ? memoryMetadata.topics : []) as string[]
-      const memoryCategories = (Array.isArray(memoryMetadata?.categories) ? memoryMetadata.categories : []) as string[]
-      const relationTopics = (Array.isArray(relationMetadata?.topics) ? relationMetadata.topics : []) as string[]
-      const relationCategories = (Array.isArray(relationMetadata?.categories) ? relationMetadata.categories : []) as string[]
+      const memoryTopics = (
+        Array.isArray(memoryMetadata?.topics) ? memoryMetadata.topics : []
+      ) as string[]
+      const memoryCategories = (
+        Array.isArray(memoryMetadata?.categories) ? memoryMetadata.categories : []
+      ) as string[]
+      const relationTopics = (
+        Array.isArray(relationMetadata?.topics) ? relationMetadata.topics : []
+      ) as string[]
+      const relationCategories = (
+        Array.isArray(relationMetadata?.categories) ? relationMetadata.categories : []
+      ) as string[]
 
       // Strong topic overlap
       const topicOverlap = memoryTopics.filter((topic: string) =>
@@ -852,8 +889,12 @@ export class MemoryMeshService {
 
     const memoryMetadata = memory.page_metadata as Record<string, unknown> | null
     const relationMetadata = relation.memory.page_metadata as Record<string, unknown> | null
-    const memoryTopics = (Array.isArray(memoryMetadata?.topics) ? memoryMetadata.topics : []) as string[]
-    const relationTopics = (Array.isArray(relationMetadata?.topics) ? relationMetadata.topics : []) as string[]
+    const memoryTopics = (
+      Array.isArray(memoryMetadata?.topics) ? memoryMetadata.topics : []
+    ) as string[]
+    const relationTopics = (
+      Array.isArray(relationMetadata?.topics) ? relationMetadata.topics : []
+    ) as string[]
     const hasTopicOverlap = memoryTopics.some((topic: string) => relationTopics.includes(topic))
 
     const timeDiff = Math.abs(
@@ -864,7 +905,10 @@ export class MemoryMeshService {
     return hasTopicOverlap && isRecentPair && memoryTopics.length >= 3 && relationTopics.length >= 3
   }
 
-  private async batchEvaluateWithAI(memory: MemoryWithMetadata, candidates: MemoryRelation[]): Promise<MemoryRelation[]> {
+  private async batchEvaluateWithAI(
+    memory: MemoryWithMetadata,
+    candidates: MemoryRelation[]
+  ): Promise<MemoryRelation[]> {
     try {
       // Batch evaluation to reduce API calls
       const memoryMetadata = memory.page_metadata as Record<string, unknown> | null
@@ -872,7 +916,9 @@ export class MemoryMeshService {
         title: memory.title || '',
         summary: memory.summary || '',
         topics: (Array.isArray(memoryMetadata?.topics) ? memoryMetadata.topics : []) as string[],
-        categories: (Array.isArray(memoryMetadata?.categories) ? memoryMetadata.categories : []) as string[],
+        categories: (Array.isArray(memoryMetadata?.categories)
+          ? memoryMetadata.categories
+          : []) as string[],
       }
 
       const batchData = candidates.map(candidate => {
@@ -882,8 +928,12 @@ export class MemoryMeshService {
             id: candidate.memory.id,
             title: candidate.memory.title || '',
             summary: candidate.memory.summary || '',
-            topics: (Array.isArray(candidateMetadata?.topics) ? candidateMetadata.topics : []) as string[],
-            categories: (Array.isArray(candidateMetadata?.categories) ? candidateMetadata.categories : []) as string[],
+            topics: (Array.isArray(candidateMetadata?.topics)
+              ? candidateMetadata.topics
+              : []) as string[],
+            categories: (Array.isArray(candidateMetadata?.categories)
+              ? candidateMetadata.categories
+              : []) as string[],
           },
         }
       })
@@ -913,7 +963,10 @@ export class MemoryMeshService {
     }
   }
 
-  private async batchEvaluateRelationships(memoryA: { title: string; summary: string; topics?: string[]; categories?: string[] }, batchData: BatchData[]): Promise<RelationshipEvaluation[]> {
+  private async batchEvaluateRelationships(
+    memoryA: { title: string; summary: string; topics?: string[]; categories?: string[] },
+    batchData: BatchData[]
+  ): Promise<RelationshipEvaluation[]> {
     if (!aiProvider.isInitialized) {
       return batchData.map(() => ({
         isRelevant: false,
@@ -984,7 +1037,10 @@ export class MemoryMeshService {
     return `${memoryAId}:${candidateId}:${memoryATopics}:${candidateTopics}`
   }
 
-  private async callAIForBatch(memoryA: { title: string; summary: string; topics?: string[]; categories?: string[] }, batchData: BatchData[]): Promise<RelationshipEvaluation[]> {
+  private async callAIForBatch(
+    memoryA: { title: string; summary: string; topics?: string[]; categories?: string[] },
+    batchData: BatchData[]
+  ): Promise<RelationshipEvaluation[]> {
     try {
       const prompt = `Evaluate relationships between a source memory and multiple candidate memories. Return a JSON array with evaluation results.
 
@@ -1025,7 +1081,9 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       const response =
         typeof responseResult === 'string'
           ? responseResult
-          : (typeof responseResult === 'object' && 'text' in responseResult ? (responseResult as { text: string }).text : String(responseResult))
+          : typeof responseResult === 'object' && 'text' in responseResult
+            ? (responseResult as { text: string }).text
+            : String(responseResult)
 
       if (!response) {
         throw new Error('No batch evaluation generated from Gemini API')
@@ -1069,7 +1127,11 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     })
   }
 
-  private pruneEdgesMutualKNN(edges: MemoryEdge[], k: number, similarityThreshold: number): MemoryEdge[] {
+  private pruneEdgesMutualKNN(
+    edges: MemoryEdge[],
+    k: number,
+    similarityThreshold: number
+  ): MemoryEdge[] {
     // Build adjacency lists with weighted scores
     type WeightedEdge = MemoryEdge & { weighted: number }
     const bySource = new Map<string, WeightedEdge[]>()
@@ -1155,7 +1217,10 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     return offsets[source] || offsets.default
   }
 
-  private applyForceDirectedLayout(nodes: Array<{ id: string; x: number; y: number; z?: number }>, edges: MemoryEdge[]): Array<{ id: string; x: number; y: number; z?: number }> {
+  private applyForceDirectedLayout(
+    nodes: Array<{ id: string; x: number; y: number; z?: number }>,
+    edges: MemoryEdge[]
+  ): Array<{ id: string; x: number; y: number; z?: number }> {
     // Improved force-directed layout with non-circular constraints
     const iterations = 150
     const k = 400 // Spring constant
@@ -1352,7 +1417,10 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     userId?: string,
     limit: number = 50,
     similarityThreshold: number = 0.4
-  ): Promise<{ nodes: Array<{ id: string; x: number; y: number; z?: number; title?: string; url?: string }>; edges: MemoryEdge[] }> {
+  ): Promise<{
+    nodes: Array<{ id: string; x: number; y: number; z?: number; title?: string; url?: string }>
+    edges: MemoryEdge[]
+  }> {
     try {
       const memories = await prisma.memory.findMany({
         where: userId ? { user_id: userId } : {},
@@ -1585,7 +1653,9 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       edges = finalEdges
 
       // Ensure minimum degree by adding closest edges if needed
-      const idToNeighbors = new Map<string, MemoryEdge[]>(nodes.map((n): [string, MemoryEdge[]] => [n.id, []]))
+      const idToNeighbors = new Map<string, MemoryEdge[]>(
+        nodes.map((n): [string, MemoryEdge[]] => [n.id, []])
+      )
       edges.forEach(e => {
         idToNeighbors.get(e.source)!.push(e)
         idToNeighbors.get(e.target)!.push({ ...e, source: e.target, target: e.source })
@@ -1802,7 +1872,12 @@ Be strict about relevance - only mark as relevant if there's substantial concept
               similarity_score: finalScore,
             }
           })
-          .filter((result): result is MemoryRelation & { similarity_score: number } => result !== null && result.memory !== undefined && result.similarity_score !== undefined)
+          .filter(
+            (result): result is MemoryRelation & { similarity_score: number } =>
+              result !== null &&
+              result.memory !== undefined &&
+              result.similarity_score !== undefined
+          )
           .filter(result => result.similarity_score >= 0.15)
           .sort((a, b) => b.similarity_score - a.similarity_score)
           .slice(0, limit)
@@ -1842,7 +1917,9 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     }
   }
 
-  async getMemoryWithRelations(memoryId: string): Promise<{ memory: MemoryWithMetadata; relations: MemoryRelation[] } | null> {
+  async getMemoryWithRelations(
+    memoryId: string
+  ): Promise<{ memory: MemoryWithMetadata; relations: MemoryRelation[] } | null> {
     try {
       await ensureCollection()
 
@@ -1913,7 +1990,11 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     }
   }
 
-  async getMemoryCluster(userId: string, centerMemoryId: string, depth: number = 2): Promise<{ memories: MemoryWithMetadata[]; relations: MemoryEdge[] }> {
+  async getMemoryCluster(
+    userId: string,
+    centerMemoryId: string,
+    depth: number = 2
+  ): Promise<{ memories: MemoryWithMetadata[]; relations: MemoryEdge[] }> {
     try {
       const visited = new Set()
 
@@ -1964,7 +2045,9 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
       await processMemory(centerMemoryId, 0)
 
-      const memories: MemoryWithMetadata[] = Array.from(cluster.values()).map(m => m as MemoryWithMetadata)
+      const memories: MemoryWithMetadata[] = Array.from(cluster.values()).map(
+        m => m as MemoryWithMetadata
+      )
       const relations: MemoryEdge[] = []
 
       for (const memory of cluster.values()) {

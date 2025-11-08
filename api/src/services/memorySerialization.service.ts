@@ -31,14 +31,20 @@ export class MemorySerializationService {
   }
 
   static serializeSearchResults(results: SearchResultWithMemory[]): SerializedSearchResult[] {
-    return results.map((result: SearchResultWithMemory) => ({
-      ...result,
-      memory: result.memory
-        ? {
-            ...result.memory,
-            timestamp: result.memory.timestamp ? result.memory.timestamp.toString() : null,
-          }
-        : result.memory,
-    }))
+    return results.map((result: SearchResultWithMemory) => {
+      const serialized: SerializedSearchResult = {}
+      Object.keys(result).forEach(key => {
+        if (key !== 'memory') {
+          serialized[key] = result[key]
+        }
+      })
+      if (result.memory) {
+        serialized.memory = {
+          ...result.memory,
+          timestamp: result.memory.timestamp ? String(result.memory.timestamp) : null,
+        }
+      }
+      return serialized
+    })
   }
 }

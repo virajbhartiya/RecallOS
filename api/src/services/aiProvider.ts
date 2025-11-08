@@ -95,7 +95,7 @@ export const aiProvider = {
     }
 
     type EmbeddingResponse = { embedding?: number[]; embeddings?: number[] }
-    const data = await res.json() as EmbeddingResponse
+    const data = (await res.json()) as EmbeddingResponse
     const vec: number[] = data?.embedding || data?.embeddings || []
 
     if (!Array.isArray(vec) || vec.length === 0) {
@@ -301,7 +301,7 @@ export const aiProvider = {
       })
       if (!res.ok) throw new Error(`Ollama generate failed: ${res.status}`)
       type OllamaResponse = { response?: string; text?: string }
-      const data = await res.json() as OllamaResponse
+      const data = (await res.json()) as OllamaResponse
       result = data?.response || data?.text || ''
       if (!result) throw new Error('No content from Ollama')
       modelUsed = OLLAMA_GEN_MODEL
@@ -322,7 +322,11 @@ export const aiProvider = {
     return result
   },
 
-  async summarizeContent(rawText: string, metadata?: Record<string, unknown>, userId?: string): Promise<string> {
+  async summarizeContent(
+    rawText: string,
+    metadata?: Record<string, unknown>,
+    userId?: string
+  ): Promise<string> {
     let result: string
     let modelUsed: string | undefined
 
@@ -498,7 +502,8 @@ JSON ONLY:`
     contextRelevance: string[]
   } {
     const title = typeof metadata?.title === 'string' ? metadata.title : ''
-    const contentType = typeof metadata?.content_type === 'string' ? metadata.content_type : 'web_page'
+    const contentType =
+      typeof metadata?.content_type === 'string' ? metadata.content_type : 'web_page'
     const text = (title + ' ' + rawText).toLowerCase()
 
     // Extract topics based on common keywords

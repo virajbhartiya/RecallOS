@@ -182,11 +182,15 @@ export async function searchMemories(params: {
       queryLength: normalized.length,
     })
     const embeddingResult = await withTimeout(aiProvider.generateEmbedding(normalized), 30000) // 30 seconds
-    type EmbeddingResult = number[] | { embedding: number[] }
-    embedding =
-      typeof embeddingResult === 'object' && 'embedding' in embeddingResult
-        ? (embeddingResult as EmbeddingResult).embedding
-        : (embeddingResult as number[])
+    if (
+      typeof embeddingResult === 'object' &&
+      embeddingResult !== null &&
+      'embedding' in embeddingResult
+    ) {
+      embedding = (embeddingResult as { embedding: number[] }).embedding
+    } else {
+      embedding = embeddingResult as number[]
+    }
     logger.log('[search] embedding generated', {
       ts: new Date().toISOString(),
       userId,
@@ -471,9 +475,12 @@ ${bullets}`
         memoryCount: filteredRows.length,
       })
       const answerResult = await withTimeout(aiProvider.generateContent(ansPrompt, true), 300000) // 5 minutes (accounts for queue delays + Gemini 2 min timeout), true = search request (high priority)
-      type AnswerResult = string | { text?: string }
-      answer =
-        typeof answerResult === 'string' ? answerResult : (answerResult as AnswerResult).text || answerResult
+      if (typeof answerResult === 'string') {
+        answer = answerResult
+      } else {
+        const result = answerResult as { text?: string }
+        answer = result.text || answerResult
+      }
       logger.log('[search] answer generated', {
         ts: new Date().toISOString(),
         userId,

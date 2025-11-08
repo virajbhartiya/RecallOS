@@ -122,17 +122,17 @@ export class ProfileUpdateService {
       where: { user_id: userId },
       create: {
         user_id: userId,
-        static_profile_json: extractionResult.static_profile_json as Prisma.JsonValue,
+        static_profile_json: extractionResult.static_profile_json as unknown as Prisma.JsonValue,
         static_profile_text: extractionResult.static_profile_text,
-        dynamic_profile_json: extractionResult.dynamic_profile_json as Prisma.JsonValue,
+        dynamic_profile_json: extractionResult.dynamic_profile_json as unknown as Prisma.JsonValue,
         dynamic_profile_text: extractionResult.dynamic_profile_text,
         last_memory_analyzed: latestMemory?.created_at || null,
         version: 1,
       },
       update: {
-        static_profile_json: extractionResult.static_profile_json as Prisma.JsonValue,
+        static_profile_json: extractionResult.static_profile_json as unknown as Prisma.JsonValue,
         static_profile_text: extractionResult.static_profile_text,
-        dynamic_profile_json: extractionResult.dynamic_profile_json as Prisma.JsonValue,
+        dynamic_profile_json: extractionResult.dynamic_profile_json as unknown as Prisma.JsonValue,
         dynamic_profile_text: extractionResult.dynamic_profile_text,
         last_memory_analyzed: latestMemory?.created_at || null,
         version: { increment: 1 },
@@ -146,96 +146,188 @@ export class ProfileUpdateService {
   }
 
   private mergeProfiles(
-    existing: { static_profile_json?: Prisma.JsonValue; dynamic_profile_json?: Prisma.JsonValue },
+    existing: {
+      static_profile_json?: Prisma.JsonValue
+      dynamic_profile_json?: Prisma.JsonValue
+      static_profile_text?: string | null
+      dynamic_profile_text?: string | null
+    },
     newExtraction: ProfileExtractionResult
   ): ProfileExtractionResult {
-    const existingStatic = existing.static_profile_json || {}
-    const existingDynamic = existing.dynamic_profile_json || {}
+    const existingStatic =
+      existing.static_profile_json &&
+      typeof existing.static_profile_json === 'object' &&
+      existing.static_profile_json !== null &&
+      !Array.isArray(existing.static_profile_json)
+        ? (existing.static_profile_json as Record<string, unknown>)
+        : {}
+    const existingDynamic =
+      existing.dynamic_profile_json &&
+      typeof existing.dynamic_profile_json === 'object' &&
+      existing.dynamic_profile_json !== null &&
+      !Array.isArray(existing.dynamic_profile_json)
+        ? (existing.dynamic_profile_json as Record<string, unknown>)
+        : {}
+
+    const existingInterests = Array.isArray(existingStatic.interests)
+      ? (existingStatic.interests as string[])
+      : []
+    const existingSkills = Array.isArray(existingStatic.skills)
+      ? (existingStatic.skills as string[])
+      : []
+    const existingLongTermPatterns = Array.isArray(existingStatic.long_term_patterns)
+      ? (existingStatic.long_term_patterns as string[])
+      : []
+    const existingDomains = Array.isArray(existingStatic.domains)
+      ? (existingStatic.domains as string[])
+      : []
+    const existingExpertiseAreas = Array.isArray(existingStatic.expertise_areas)
+      ? (existingStatic.expertise_areas as string[])
+      : []
+    const existingPersonalityTraits = Array.isArray(existingStatic.personality_traits)
+      ? (existingStatic.personality_traits as string[])
+      : []
+    const existingValuesAndPriorities = Array.isArray(existingStatic.values_and_priorities)
+      ? (existingStatic.values_and_priorities as string[])
+      : []
+    const existingDemographics =
+      existingStatic.demographics &&
+      typeof existingStatic.demographics === 'object' &&
+      existingStatic.demographics !== null &&
+      !Array.isArray(existingStatic.demographics)
+        ? (existingStatic.demographics as Record<string, unknown>)
+        : {}
 
     const mergedStatic = {
       interests: this.mergeArrays(
-        existingStatic.interests || [],
+        existingInterests,
         newExtraction.static_profile_json.interests || []
       ),
-      skills: this.mergeArrays(
-        existingStatic.skills || [],
-        newExtraction.static_profile_json.skills || []
-      ),
-      profession: newExtraction.static_profile_json.profession || existingStatic.profession,
+      skills: this.mergeArrays(existingSkills, newExtraction.static_profile_json.skills || []),
+      profession:
+        newExtraction.static_profile_json.profession ||
+        (typeof existingStatic.profession === 'string' ? existingStatic.profession : undefined),
       demographics: {
-        ...existingStatic.demographics,
+        ...existingDemographics,
         ...newExtraction.static_profile_json.demographics,
       },
       long_term_patterns: this.mergeArrays(
-        existingStatic.long_term_patterns || [],
+        existingLongTermPatterns,
         newExtraction.static_profile_json.long_term_patterns || []
       ),
-      domains: this.mergeArrays(
-        existingStatic.domains || [],
-        newExtraction.static_profile_json.domains || []
-      ),
+      domains: this.mergeArrays(existingDomains, newExtraction.static_profile_json.domains || []),
       expertise_areas: this.mergeArrays(
-        existingStatic.expertise_areas || [],
+        existingExpertiseAreas,
         newExtraction.static_profile_json.expertise_areas || []
       ),
       personality_traits: this.mergeArrays(
-        existingStatic.personality_traits || [],
+        existingPersonalityTraits,
         newExtraction.static_profile_json.personality_traits || []
       ),
       work_style: {
-        ...existingStatic.work_style,
+        ...(existingStatic.work_style &&
+        typeof existingStatic.work_style === 'object' &&
+        existingStatic.work_style !== null &&
+        !Array.isArray(existingStatic.work_style)
+          ? (existingStatic.work_style as Record<string, unknown>)
+          : {}),
         ...newExtraction.static_profile_json.work_style,
       },
       communication_style: {
-        ...existingStatic.communication_style,
+        ...(existingStatic.communication_style &&
+        typeof existingStatic.communication_style === 'object' &&
+        existingStatic.communication_style !== null &&
+        !Array.isArray(existingStatic.communication_style)
+          ? (existingStatic.communication_style as Record<string, unknown>)
+          : {}),
         ...newExtraction.static_profile_json.communication_style,
       },
       learning_preferences: {
-        ...existingStatic.learning_preferences,
+        ...(existingStatic.learning_preferences &&
+        typeof existingStatic.learning_preferences === 'object' &&
+        existingStatic.learning_preferences !== null &&
+        !Array.isArray(existingStatic.learning_preferences)
+          ? (existingStatic.learning_preferences as Record<string, unknown>)
+          : {}),
         ...newExtraction.static_profile_json.learning_preferences,
       },
       values_and_priorities: this.mergeArrays(
-        existingStatic.values_and_priorities || [],
+        existingValuesAndPriorities,
         newExtraction.static_profile_json.values_and_priorities || []
       ),
       technology_preferences: {
-        ...existingStatic.technology_preferences,
+        ...(existingStatic.technology_preferences &&
+        typeof existingStatic.technology_preferences === 'object' &&
+        existingStatic.technology_preferences !== null &&
+        !Array.isArray(existingStatic.technology_preferences)
+          ? (existingStatic.technology_preferences as Record<string, unknown>)
+          : {}),
         ...newExtraction.static_profile_json.technology_preferences,
       },
       lifestyle_patterns: {
-        ...existingStatic.lifestyle_patterns,
+        ...(existingStatic.lifestyle_patterns &&
+        typeof existingStatic.lifestyle_patterns === 'object' &&
+        existingStatic.lifestyle_patterns !== null &&
+        !Array.isArray(existingStatic.lifestyle_patterns)
+          ? (existingStatic.lifestyle_patterns as Record<string, unknown>)
+          : {}),
         ...newExtraction.static_profile_json.lifestyle_patterns,
       },
       cognitive_style: {
-        ...existingStatic.cognitive_style,
+        ...(existingStatic.cognitive_style &&
+        typeof existingStatic.cognitive_style === 'object' &&
+        existingStatic.cognitive_style !== null &&
+        !Array.isArray(existingStatic.cognitive_style)
+          ? (existingStatic.cognitive_style as Record<string, unknown>)
+          : {}),
         ...newExtraction.static_profile_json.cognitive_style,
       },
     }
 
+    const existingCurrentProjects = Array.isArray(existingDynamic.current_projects)
+      ? (existingDynamic.current_projects as string[])
+      : []
+    const existingRecentChanges = Array.isArray(existingDynamic.recent_changes)
+      ? (existingDynamic.recent_changes as string[])
+      : []
+    const existingActiveGoals = Array.isArray(existingDynamic.active_goals)
+      ? (existingDynamic.active_goals as string[])
+      : []
+    const existingRecentAchievements = Array.isArray(existingDynamic.recent_achievements)
+      ? (existingDynamic.recent_achievements as string[])
+      : []
+    const existingEmotionalState =
+      existingDynamic.emotional_state &&
+      typeof existingDynamic.emotional_state === 'object' &&
+      existingDynamic.emotional_state !== null &&
+      !Array.isArray(existingDynamic.emotional_state)
+        ? (existingDynamic.emotional_state as Record<string, unknown>)
+        : {}
+
     const mergedDynamic = {
       recent_activities: newExtraction.dynamic_profile_json.recent_activities || [],
       current_projects: this.mergeArrays(
-        existingDynamic.current_projects || [],
+        existingCurrentProjects,
         newExtraction.dynamic_profile_json.current_projects || []
       ),
       temporary_interests: newExtraction.dynamic_profile_json.temporary_interests || [],
       recent_changes: this.mergeArrays(
-        existingDynamic.recent_changes || [],
+        existingRecentChanges,
         newExtraction.dynamic_profile_json.recent_changes || []
       ),
       current_context: newExtraction.dynamic_profile_json.current_context || [],
       active_goals: this.mergeArrays(
-        existingDynamic.active_goals || [],
+        existingActiveGoals,
         newExtraction.dynamic_profile_json.active_goals || []
       ),
       current_challenges: newExtraction.dynamic_profile_json.current_challenges || [],
       recent_achievements: this.mergeArrays(
-        existingDynamic.recent_achievements || [],
+        existingRecentAchievements,
         newExtraction.dynamic_profile_json.recent_achievements || []
       ),
       current_focus_areas: newExtraction.dynamic_profile_json.current_focus_areas || [],
       emotional_state: {
-        ...existingDynamic.emotional_state,
+        ...existingEmotionalState,
         ...newExtraction.dynamic_profile_json.emotional_state,
       },
       active_research_topics: newExtraction.dynamic_profile_json.active_research_topics || [],

@@ -17,7 +17,7 @@ type MemoryWithMetadata = {
     page_metadata: Prisma.JsonValue
   }
   similarity: number
-  similarity_score: number
+  similarity_score?: number
 }
 
 type MemoryRecord = {
@@ -137,7 +137,7 @@ export class MemorySearchController {
         user_id: user.id,
       }
 
-      if (source) {
+      if (source && typeof source === 'string') {
         whereConditions.source = source
       }
 
@@ -181,11 +181,21 @@ export class MemorySearchController {
         filteredResults = searchResults.filter((result: MemoryWithMetadata) => {
           const metadata = result.memory.page_metadata as Record<string, unknown> | null
 
-          if (category && metadata?.categories && Array.isArray(metadata.categories) && !metadata.categories.includes(category)) {
+          if (
+            category &&
+            metadata?.categories &&
+            Array.isArray(metadata.categories) &&
+            !metadata.categories.includes(category)
+          ) {
             return false
           }
 
-          if (topic && metadata?.topics && Array.isArray(metadata.topics) && !metadata.topics.includes(topic)) {
+          if (
+            topic &&
+            metadata?.topics &&
+            Array.isArray(metadata.topics) &&
+            !metadata.topics.includes(topic)
+          ) {
             return false
           }
 
@@ -271,7 +281,7 @@ export class MemorySearchController {
         user_id: user.id,
       }
 
-      if (source) {
+      if (source && typeof source === 'string') {
         whereConditions.source = source
       }
 
@@ -345,11 +355,21 @@ export class MemorySearchController {
         filteredKeywordResults = keywordResults.filter((memory: MemoryRecord) => {
           const metadata = memory.page_metadata as Record<string, unknown> | null
 
-          if (category && metadata?.categories && Array.isArray(metadata.categories) && !metadata.categories.includes(category)) {
+          if (
+            category &&
+            metadata?.categories &&
+            Array.isArray(metadata.categories) &&
+            !metadata.categories.includes(category)
+          ) {
             return false
           }
 
-          if (topic && metadata?.topics && Array.isArray(metadata.topics) && !metadata.topics.includes(topic)) {
+          if (
+            topic &&
+            metadata?.topics &&
+            Array.isArray(metadata.topics) &&
+            !metadata.topics.includes(topic)
+          ) {
             return false
           }
 
