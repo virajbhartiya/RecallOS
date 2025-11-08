@@ -32,12 +32,38 @@ export const startProfileWorker = async (daysSinceLastUpdate: number = 7) => {
           userId,
         });
 
-        await profileUpdateService.updateUserProfile(userId);
+        let profile;
+        try {
+          profile = await profileUpdateService.updateUserProfile(userId, true);
+        } catch (error) {
+          logger.error('[Profile Worker] Error updating profile, retrying once', {
+            ts: new Date().toISOString(),
+            userId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          
+          try {
+            profile = await profileUpdateService.updateUserProfile(userId, true);
+            logger.log('[Profile Worker] Profile updated successfully on retry', {
+              ts: new Date().toISOString(),
+              userId,
+            });
+          } catch (retryError) {
+            logger.error('[Profile Worker] Error updating profile on retry', {
+              ts: new Date().toISOString(),
+              userId,
+              error: retryError instanceof Error ? retryError.message : String(retryError),
+            });
+            throw retryError;
+          }
+        }
+
         updated++;
 
         logger.log('[Profile Worker] Profile updated successfully', {
           ts: new Date().toISOString(),
           userId,
+          version: profile.version,
         });
       } catch (error) {
         failed++;
