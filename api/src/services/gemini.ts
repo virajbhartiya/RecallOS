@@ -16,7 +16,7 @@ let nextAvailableAt = 0
 const taskQueue: QueuedTask[] = []
 
 // Default gap between requests; tuned for free-tier limits (~10 rpm). Adjust via Retry-After hints when returned
-let minIntervalMs = 2000 // Further reduced to 2000ms for faster processing
+const minIntervalMs = 2000 // Further reduced to 2000ms for faster processing
 
 async function processQueue() {
   if (isProcessingQueue) return
@@ -128,7 +128,7 @@ export class GeminiService {
     }
     try {
       this.ai = new GoogleGenAI({ apiKey })
-    } catch (error) {
+    } catch {
       // Failed to initialize Gemini service
       this.ai = null as any
     }
@@ -169,8 +169,7 @@ export class GeminiService {
 
   async generateContent(
     prompt: string,
-    isSearchRequest: boolean = false,
-    userId?: string
+    isSearchRequest: boolean = false
   ): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
     this.ensureInit()
 
@@ -239,8 +238,7 @@ Return clean, readable plain text only.`
   }
 
   async generateEmbedding(
-    text: string,
-    userId?: string
+    text: string
   ): Promise<{
     embedding: number[]
     modelUsed?: string
@@ -298,8 +296,7 @@ Return clean, readable plain text only.`
 
   async summarizeContent(
     rawText: string,
-    metadata?: any,
-    userId?: string
+    metadata?: any
   ): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
     this.ensureInit()
 
@@ -399,8 +396,7 @@ Raw Content: ${rawText}
 
   async extractContentMetadata(
     rawText: string,
-    metadata?: any,
-    userId?: string
+    metadata?: any
   ): Promise<{
     metadata: {
       topics: string[]
@@ -455,7 +451,6 @@ Text: ${rawText.substring(0, 4000)}
 
 Return ONLY the JSON object:`
 
-    let lastError: any
     const originalModelIndex = this.currentModelIndex
 
     while (this.currentModelIndex < this.availableModels.length) {
@@ -494,7 +489,7 @@ Return ONLY the JSON object:`
         let data
         try {
           data = JSON.parse(jsonMatch[0])
-        } catch (parseError) {
+        } catch {
           // JSON parse error
 
           // Try to fix common JSON issues
@@ -509,7 +504,7 @@ Return ONLY the JSON object:`
           // Try parsing again
           try {
             data = JSON.parse(fixedJson)
-          } catch (secondError) {
+          } catch {
             // Second JSON parse error
 
             // Return default metadata if all parsing fails
@@ -563,7 +558,6 @@ Return ONLY the JSON object:`
           outputTokens,
         }
       } catch (err) {
-        lastError = err
         // Metadata extraction error
 
         if (this.isRateLimitError(err)) {
@@ -654,7 +648,6 @@ Criteria:
 Be strict. Avoid weak or surface matches.
 `
 
-    let lastError: any
     const originalModelIndex = this.currentModelIndex
 
     while (this.currentModelIndex < this.availableModels.length) {
@@ -693,7 +686,7 @@ Be strict. Avoid weak or surface matches.
         let data
         try {
           data = JSON.parse(jsonMatch[0])
-        } catch (parseError) {
+        } catch {
           // JSON parse error in relationship eval
 
           // Try to fix common JSON issues
@@ -703,7 +696,7 @@ Be strict. Avoid weak or surface matches.
 
           try {
             data = JSON.parse(fixedJson)
-          } catch (secondError) {
+          } catch {
             // Second JSON parse error in relationship eval
             // Return default relationship data
             this.resetToFirstModel()
@@ -725,7 +718,6 @@ Be strict. Avoid weak or surface matches.
           reasoning: data.reasoning || 'No reasoning provided',
         }
       } catch (err) {
-        lastError = err
         // Relationship eval error
 
         if (this.isRateLimitError(err)) {

@@ -210,7 +210,7 @@ export class MemoryMeshService {
       const baseHost = (() => {
         try {
           return baseMemory?.url ? new URL(baseMemory.url).hostname : ''
-        } catch (e) {
+        } catch {
           return ''
         }
       })()
@@ -229,7 +229,7 @@ export class MemoryMeshService {
           const candidateHost = (() => {
             try {
               return memory.url ? new URL(memory.url).hostname : ''
-            } catch (e) {
+            } catch {
               return ''
             }
           })()
@@ -524,7 +524,7 @@ export class MemoryMeshService {
             if (memoryDomain === relatedDomain) {
               urlBoost = 0.1
             }
-          } catch (e) {
+          } catch {
             // Invalid URLs, no boost
           }
         }
@@ -560,7 +560,6 @@ export class MemoryMeshService {
         return []
       }
 
-      const memoryTime = Number(memory.timestamp)
       const memoryCreatedAt = new Date(memory.created_at)
 
       // Define time windows for different temporal relationships
@@ -764,7 +763,7 @@ export class MemoryMeshService {
           if (memoryDomain === relationDomain) {
             domainBoost = 0.1
           }
-        } catch (e) {
+        } catch {
           // Invalid URLs, no boost
         }
       }
@@ -1423,7 +1422,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       const maxDistance = allDistances[percentile95] || Math.max(...allDistances, 1)
 
       // Second pass: calculate similarity scores
-      nodes.forEach((node, i) => {
+      nodes.forEach((node) => {
         if (!latentCoords.has(node.id)) return
 
         const distances = nodeDistancesMap.get(node.id)!
@@ -1637,7 +1636,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           typeof embeddingResult === 'object' && 'embedding' in embeddingResult
             ? (embeddingResult as any).embedding
             : (embeddingResult as number[])
-      } catch (e) {
+      } catch {
         logger.warn('Embedding generation unavailable, falling back to metadata-based search')
       }
 
@@ -1774,7 +1773,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     }
   }
 
-  async getMemoryWithRelations(memoryId: string, userId: string): Promise<any> {
+  async getMemoryWithRelations(memoryId: string): Promise<any> {
     try {
       await ensureCollection()
 

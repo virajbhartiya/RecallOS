@@ -1,4 +1,4 @@
-import { Request, Response } from 'express'
+import { Response } from 'express'
 import { AuthenticatedRequest } from '../middleware/auth'
 import { prisma } from '../lib/prisma'
 import { tokenTracking } from '../services/tokenTracking'

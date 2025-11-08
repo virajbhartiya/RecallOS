@@ -1,4 +1,4 @@
-import { Request, Response } from 'express'
+import { Response } from 'express'
 import { AuthenticatedRequest } from '../middleware/auth'
 import { profileUpdateService } from '../services/profileUpdate'
 import { logger } from '../utils/logger'

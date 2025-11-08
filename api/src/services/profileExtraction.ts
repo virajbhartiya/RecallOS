@@ -1,5 +1,4 @@
 import { aiProvider } from './aiProvider'
-import { prisma } from '../lib/prisma'
 import { logger } from '../utils/logger'
 
 export interface StaticProfile {
@@ -266,11 +265,11 @@ Return ONLY the JSON object:`
 
     try {
       data = JSON.parse(jsonStr)
-    } catch (parseError) {
+    } catch {
       try {
         jsonStr = this.fixJson(jsonStr)
         data = JSON.parse(jsonStr)
-      } catch (secondError) {
+      } catch {
         try {
           jsonStr = this.fixJsonAdvanced(jsonStr)
           data = JSON.parse(jsonStr)
@@ -299,7 +298,7 @@ Return ONLY the JSON object:`
   }
 
   private extractJsonString(response: string): string | null {
-    let jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/)
+    const jsonMatch = response.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/)
     if (jsonMatch && jsonMatch[1]) {
       return jsonMatch[1]
     }
@@ -413,7 +412,6 @@ Return ONLY the JSON object:`
     let result = ''
     let inString = false
     let escapeNext = false
-    let stringStart = -1
 
     for (let i = 0; i < jsonStr.length; i++) {
       const char = jsonStr[i]
@@ -433,7 +431,6 @@ Return ONLY the JSON object:`
       if (char === '"') {
         if (!inString) {
           inString = true
-          stringStart = i
           result += char
         } else {
           const nextChar = i + 1 < jsonStr.length ? jsonStr[i + 1] : ''

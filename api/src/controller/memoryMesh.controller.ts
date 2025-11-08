@@ -60,7 +60,7 @@ export class MemoryMeshController {
         })
       }
 
-      const memoryWithRelations = await memoryMeshService.getMemoryWithRelations(memoryId, user.id)
+      const memoryWithRelations = await memoryMeshService.getMemoryWithRelations(memoryId)
 
       res.status(200).json({
         success: true,

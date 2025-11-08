@@ -24,10 +24,6 @@ const formatMessage = (args: any[], color: string, label: string): any[] => {
 
 const shouldUseColors = process.stdout.isTTY && process.env.NO_COLOR !== '1'
 
-const applyColors = (text: string, color: string): string => {
-  return shouldUseColors ? `${color}${text}${colors.reset}` : text
-}
-
 export const logger = {
   log: (...args: any[]) => {
     const formatted = shouldUseColors

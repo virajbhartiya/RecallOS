@@ -191,15 +191,15 @@ export async function searchMemories(params: {
       userId,
       embeddingLength: embedding.length,
     })
-  } catch (error) {
+  } catch {
     try {
       embedding = aiProvider.generateFallbackEmbedding(normalized)
-    } catch (fallbackError) {
+    } catch {
       try {
         if (jobId) {
           await setSearchJobResult(jobId, { status: 'failed' })
         }
-      } catch (jobError) {
+      } catch {
         // Error updating search job status
       }
       return { query: normalized, results: [], answer: undefined }
@@ -297,7 +297,6 @@ export async function searchMemories(params: {
     const title = (row.title || '').toLowerCase()
     const summary = (row.summary || '').toLowerCase()
     const content = (row.content || '').toLowerCase()
-    const fullText = `${title} ${summary} ${content}`
 
     // Calculate keyword match score using token-based matching
     let keywordScore = 0
@@ -378,7 +377,9 @@ export async function searchMemories(params: {
           embedding_hash: embeddingHash,
         } as any,
       })
-    } catch {}
+    } catch {
+      // Ignore database errors
+    }
     return { query: normalized, results: [], answer: undefined, context: undefined }
   }
 

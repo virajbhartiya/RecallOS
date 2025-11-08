@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from 'express'
+import { Response, NextFunction } from 'express'
 import { AuthenticatedRequest } from '../middleware/auth'
 
 import { addContentJob, ContentJobData, contentQueue } from '../lib/queue'

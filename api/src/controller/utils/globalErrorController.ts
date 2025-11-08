@@ -4,7 +4,7 @@ interface IError extends Error {
 }
 
 const sendErrorDev = (err: IError, req: { originalUrl: string }, res: any) => {
-  if (!!req.originalUrl) {
+  if (req.originalUrl) {
     return res.status(err.statusCode || 500).json({
       status: err.status || 'error',
       error: err,

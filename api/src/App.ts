@@ -42,7 +42,7 @@ if (process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true'
       cert: fs.readFileSync(certPath),
     }
     server = https.createServer(httpsOptions, app)
-  } catch (_e) {
+  } catch {
     server = http.createServer(app)
   }
 } else {
@@ -102,7 +102,7 @@ const getStatusColor = (status: number): string => {
   return colors.reset
 }
 
-const coloredMorganFormat = (tokens: any, req: any, res: any): string => {
+const coloredMorganFormat = (tokens: morgan.TokenIndexer, req: Request, res: Response): string => {
   const method = tokens.method(req, res)
   const status = tokens.status(req, res)
   const url = tokens.url(req, res)

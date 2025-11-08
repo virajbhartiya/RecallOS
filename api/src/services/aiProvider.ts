@@ -28,7 +28,7 @@ export const aiProvider = {
     let modelUsed: string | undefined
 
     if (provider === 'gemini') {
-      const response = await geminiService.generateEmbedding(text, userId)
+      const response = await geminiService.generateEmbedding(text)
       result = response.embedding
       modelUsed = response.modelUsed
     } else if (provider === 'hybrid') {
@@ -116,7 +116,6 @@ export const aiProvider = {
     // Create word-based features with semantic clustering
     const wordHashes = words.map(word => this.simpleHash(word))
     const textHash = this.simpleHash(text)
-    const length = text.length
 
     // Define semantic clusters for better similarity
     const semanticClusters = this.getSemanticClusters(text)
@@ -285,7 +284,7 @@ export const aiProvider = {
     let modelUsed: string | undefined
 
     if (provider === 'gemini') {
-      const response = await geminiService.generateContent(prompt, isSearchRequest, userId)
+      const response = await geminiService.generateContent(prompt, isSearchRequest)
       result = response.text
       modelUsed = response.modelUsed
     } else {
@@ -326,7 +325,7 @@ export const aiProvider = {
     let modelUsed: string | undefined
 
     if (provider === 'gemini') {
-      const response = await geminiService.summarizeContent(rawText, metadata, userId)
+      const response = await geminiService.summarizeContent(rawText, metadata)
       result = response.text
       modelUsed = response.modelUsed
     } else {
@@ -399,7 +398,7 @@ ${rawText}`
     let modelUsed: string | undefined
 
     if (provider === 'gemini') {
-      const response = await geminiService.extractContentMetadata(rawText, metadata, userId)
+      const response = await geminiService.extractContentMetadata(rawText, metadata)
       result = response.metadata
       modelUsed = response.modelUsed
     } else {

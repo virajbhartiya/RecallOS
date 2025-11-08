@@ -8,7 +8,7 @@ import { logger } from '../utils/logger'
 export class MemorySearchController {
   static async searchMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      const { query, category, topic, importance, sentiment, limit = 20 } = req.query
+      const { query, limit = 20 } = req.query
 
       if (!query) {
         return res.status(400).json({
@@ -132,7 +132,9 @@ export class MemorySearchController {
               whereConditions.created_at.lte = new Date(dateRangeObj.end)
             }
           }
-        } catch (error) {}
+        } catch {
+          // Ignore date range parsing errors
+        }
       }
 
       const preFilteredMemories = await prisma.memory.findMany({
@@ -264,7 +266,9 @@ export class MemorySearchController {
               whereConditions.created_at.lte = new Date(dateRangeObj.end)
             }
           }
-        } catch (error) {}
+        } catch {
+          // Ignore date range parsing errors
+        }
       }
 
       const preFilteredMemories = await prisma.memory.findMany({
