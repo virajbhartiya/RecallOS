@@ -1,4 +1,5 @@
 import { getUserId, requireAuthToken } from '@/lib/userId'
+import { runtime, storage } from '@/lib/browser'
 
 interface ContextData {
   source: string;
@@ -780,7 +781,7 @@ function isLocalhost(): boolean {
 
 async function sendContextToBackground() {
   try {
-    if (!chrome.runtime?.id) {
+    if (!runtime.id) {
       return;
     }
     
@@ -824,12 +825,10 @@ async function sendContextToBackground() {
       type: privacyExtensionType,
       compatibility_mode: privacyExtensionDetected,
     };
-    chrome.runtime.sendMessage(
+    runtime.sendMessage(
       { type: 'CAPTURE_CONTEXT', data: contextData },
       response => {
-        if (chrome.runtime.lastError) {
-          return;
-        }
+        // Response handled by abstraction
       }
     );
     lastCaptureTime = now;
@@ -860,8 +859,8 @@ window.addEventListener('focus', () => {
   hasUserActivity = true;
   lastActivityTime = Date.now();
 });
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (!chrome.runtime?.id) {
+runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!runtime.id) {
     return false;
   }
   if (message.type === 'CAPTURE_CONTEXT_NOW') {
@@ -995,7 +994,7 @@ function startContinuousMonitoring() {
   updateActivityLevel();
   const interval = getMonitoringInterval();
   captureInterval = setInterval(() => {
-    if (!chrome.runtime?.id) {
+    if (!runtime.id) {
       stopContinuousMonitoring();
       return;
     }
@@ -1117,7 +1116,7 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
     // Derive API base from extension settings
     let apiBase = 'http://localhost:3000/api';
     try {
-      const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+      const cfg = await storage.sync.get(['apiEndpoint']);
       const endpoint = cfg?.apiEndpoint as string | undefined;
       if (endpoint) {
         const u = new URL(endpoint);
@@ -1173,7 +1172,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
     // Derive API base from extension settings
     let apiBase = 'http://localhost:3000/api';
     try {
-      const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+      const cfg = await storage.sync.get(['apiEndpoint']);
       const endpoint = cfg?.apiEndpoint as string | undefined;
       if (endpoint) {
         const u = new URL(endpoint);
@@ -1294,7 +1293,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
 
 async function getApiEndpointForMemory(): Promise<string> {
   try {
-    const result = await chrome.storage.sync.get(['apiEndpoint']);
+    const result = await storage.sync.get(['apiEndpoint']);
     return result.apiEndpoint || 'http://localhost:3000/api/memory/process';
   } catch (error) {
     console.error('RecallOS: Error getting API endpoint:', error);
@@ -1525,10 +1524,14 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
 
 async function checkExtensionEnabled(): Promise<boolean> {
   try {
-    const response = await chrome.runtime.sendMessage({
-      type: 'GET_EXTENSION_ENABLED',
+    return new Promise((resolve) => {
+      runtime.sendMessage(
+        { type: 'GET_EXTENSION_ENABLED' },
+        (response: any) => {
+          resolve(response?.success ? response.enabled : true);
+        }
+      );
     });
-    return response.success ? response.enabled : true; // Default to enabled on error
   } catch (error) {
     console.error('RecallOS: Error checking extension enabled state:', error);
     return true; // Default to enabled on error
@@ -1537,11 +1540,14 @@ async function checkExtensionEnabled(): Promise<boolean> {
 
 async function checkWebsiteBlocked(url: string): Promise<boolean> {
   try {
-    const response = await chrome.runtime.sendMessage({
-      type: 'CHECK_WEBSITE_BLOCKED',
-      url: url,
+    return new Promise((resolve) => {
+      runtime.sendMessage(
+        { type: 'CHECK_WEBSITE_BLOCKED', url: url },
+        (response: any) => {
+          resolve(response?.success ? response.blocked : false);
+        }
+      );
     });
-    return response.success ? response.blocked : false;
   } catch (error) {
     return false;
   }

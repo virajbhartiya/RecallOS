@@ -1,5 +1,5 @@
 import { getUserId, requireAuthToken, clearAuthToken } from '@/lib/userId'
-/// <reference types="chrome" />
+import { storage, runtime, tabs } from '@/lib/browser'
 
 interface ContextData {
   source: string;
@@ -15,7 +15,7 @@ interface ContextData {
 
 async function getApiEndpoint(): Promise<string> {
   try {
-    const result = await chrome.storage.sync.get(['apiEndpoint']);
+    const result = await storage.sync.get(['apiEndpoint']);
     return result.apiEndpoint || 'http://localhost:3000/api/memory/process';
   } catch (error) {
     return 'http://localhost:3000/api/memory/process';
@@ -72,7 +72,7 @@ async function checkApiHealth(): Promise<boolean> {
 
 async function isExtensionEnabled(): Promise<boolean> {
   try {
-    const result = await chrome.storage.sync.get(['extensionEnabled']);
+    const result = await storage.sync.get(['extensionEnabled']);
     return result.extensionEnabled !== false;
   } catch (error) {
     return true;
@@ -81,10 +81,7 @@ async function isExtensionEnabled(): Promise<boolean> {
 
 async function setExtensionEnabled(enabled: boolean): Promise<void> {
   try {
-    await chrome.storage.sync.set({ extensionEnabled: enabled });
-    if (chrome.runtime.lastError) {
-      throw new Error(chrome.runtime.lastError.message);
-    }
+    await storage.sync.set({ extensionEnabled: enabled });
   } catch (error) {
     if (error instanceof Error) {
       throw error;
@@ -95,7 +92,7 @@ async function setExtensionEnabled(enabled: boolean): Promise<void> {
 
 async function getBlockedWebsites(): Promise<string[]> {
   try {
-    const result = await chrome.storage.sync.get(['blockedWebsites']);
+    const result = await storage.sync.get(['blockedWebsites']);
     return result.blockedWebsites || [];
   } catch (error) {
     return [];
@@ -104,7 +101,7 @@ async function getBlockedWebsites(): Promise<string[]> {
 
 async function setBlockedWebsites(websites: string[]): Promise<void> {
   try {
-    await chrome.storage.sync.set({ blockedWebsites: websites });
+    await storage.sync.set({ blockedWebsites: websites });
   } catch (error) {
     // Ignore errors
   }
@@ -241,7 +238,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
     if (response && !response.ok) {
       // Handle 401 - clear invalid token
       if (response.status === 401) {
-        await chrome.storage?.local?.remove?.('auth_token');
+        await storage.local.remove('auth_token');
         clearAuthToken();
       }
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -253,22 +250,22 @@ async function sendToBackend(data: ContextData): Promise<void> {
   }
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+runtime.onInstalled.addListener(() => {
 });
 
-chrome.tabs.onActivated.addListener(async activeInfo => {
+tabs.onActivated.addListener(async activeInfo => {
   try {
-    await chrome.tabs.sendMessage(activeInfo.tabId, {
+    tabs.sendMessage(activeInfo.tabId, {
       type: 'CAPTURE_CONTEXT_NOW',
     });
   } catch (error) {
   }
 });
 
-chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete' && tab.url) {
     try {
-      await chrome.tabs.sendMessage(tabId, { type: 'CAPTURE_CONTEXT_NOW' });
+      tabs.sendMessage(tabId, { type: 'CAPTURE_CONTEXT_NOW' });
     } catch (error) {
     }
   }
@@ -276,14 +273,14 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
 
 async function setApiEndpoint(endpoint: string): Promise<void> {
   try {
-    await chrome.storage.sync.set({ apiEndpoint: endpoint });
+    await storage.sync.set({ apiEndpoint: endpoint });
   } catch (error) {
     console.error('RecallOS: Error setting API endpoint:', error);
   }
 }
 
 
-chrome.runtime.onMessage.addListener(
+runtime.onMessage.addListener(
   (
     message: {
       type?: string;
@@ -323,7 +320,7 @@ chrome.runtime.onMessage.addListener(
         try {
           const token = (message as any).token;
           if (token) {
-            await chrome.storage.local.set({ auth_token: token });
+            await storage.local.set({ auth_token: token });
           }
         } catch (error) {
           // Ignore errors

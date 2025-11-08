@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { getAuthToken, requireAuthToken } from '@/lib/userId';
+import { runtime, storage, tabs } from '@/lib/browser';
 
 const Popup: React.FC = () => {
   const [extensionEnabled, setExtensionEnabled] = useState(true);
@@ -21,15 +22,15 @@ const Popup: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const extensionResponse = await chrome.runtime.sendMessage({
-        type: 'GET_EXTENSION_ENABLED',
+      const extensionResponse = await new Promise<any>((resolve) => {
+        runtime.sendMessage({ type: 'GET_EXTENSION_ENABLED' }, resolve);
       });
       if (extensionResponse && extensionResponse.success) {
         setExtensionEnabled(extensionResponse.enabled);
       }
 
-      const blockedResponse = await chrome.runtime.sendMessage({
-        type: 'GET_BLOCKED_WEBSITES',
+      const blockedResponse = await new Promise<any>((resolve) => {
+        runtime.sendMessage({ type: 'GET_BLOCKED_WEBSITES' }, resolve);
       });
       if (blockedResponse && blockedResponse.success) {
         setBlockedWebsites(blockedResponse.websites || []);
@@ -43,8 +44,8 @@ const Popup: React.FC = () => {
     setIsCheckingHealth(true);
     try {
       // Check API health
-      const healthResponse = await chrome.runtime.sendMessage({
-        type: 'CHECK_API_HEALTH',
+      const healthResponse = await new Promise<any>((resolve) => {
+        runtime.sendMessage({ type: 'CHECK_API_HEALTH' }, resolve);
       });
       if (healthResponse && healthResponse.success) {
         setIsConnected(healthResponse.healthy);
@@ -55,8 +56,8 @@ const Popup: React.FC = () => {
       // Check auth status - try multiple sources like requireAuthToken does
       let isAuth = false;
       try {
-        // First check chrome.storage.local (works in popup)
-        const stored = await chrome.storage?.local?.get?.(['auth_token']);
+        // First check storage.local (works in popup)
+        const stored = await storage.local.get(['auth_token']);
         if (stored && stored.auth_token) {
           isAuth = true;
         } else {
@@ -91,20 +92,12 @@ const Popup: React.FC = () => {
     try {
       const newState = !extensionEnabled;
       
-      if (chrome.runtime.lastError) {
-        setIsLoading(false);
-        return;
-      }
-      
-      const response = await chrome.runtime.sendMessage({
-        type: 'SET_EXTENSION_ENABLED',
-        enabled: newState,
+      const response = await new Promise<any>((resolve) => {
+        runtime.sendMessage(
+          { type: 'SET_EXTENSION_ENABLED', enabled: newState },
+          resolve
+        );
       });
-      
-      if (chrome.runtime.lastError) {
-        setIsLoading(false);
-        return;
-      }
       
       if (response && response.success) {
         setExtensionEnabled(newState);
@@ -124,9 +117,11 @@ const Popup: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'ADD_BLOCKED_WEBSITE',
-        website: websiteToAdd,
+      const response = await new Promise<any>((resolve) => {
+        runtime.sendMessage(
+          { type: 'ADD_BLOCKED_WEBSITE', website: websiteToAdd },
+          resolve
+        );
       });
       if (response && response.success) {
         setNewBlockedWebsite('');
@@ -143,12 +138,12 @@ const Popup: React.FC = () => {
     setIsLoading(true);
     try {
       // Get the current active tab
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tabs.length === 0 || !tabs[0].url) {
+      const activeTabs = await tabs.query({ active: true, currentWindow: true });
+      if (activeTabs.length === 0 || !activeTabs[0].url) {
         return;
       }
 
-      const url = tabs[0].url;
+      const url = activeTabs[0].url;
       try {
         const urlObj = new URL(url);
         const domain = urlObj.hostname.replace(/^www\./, '');
@@ -169,9 +164,11 @@ const Popup: React.FC = () => {
   const removeBlockedWebsite = async (website: string) => {
     setIsLoading(true);
     try {
-      const response = await chrome.runtime.sendMessage({
-        type: 'REMOVE_BLOCKED_WEBSITE',
-        website: website,
+      const response = await new Promise<any>((resolve) => {
+        runtime.sendMessage(
+          { type: 'REMOVE_BLOCKED_WEBSITE', website: website },
+          resolve
+        );
       });
       if (response && response.success) {
         await loadSettings();

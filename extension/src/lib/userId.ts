@@ -1,3 +1,5 @@
+import { storage, cookies } from './browser';
+
 export function getAuthenticatedUserId(): string | null {
   try {
     const token = getAuthToken();
@@ -32,9 +34,9 @@ export async function getUserId(): Promise<string> {
   try {
     const token = await getTokenFromCookie();
     if (token) {
-      // Sync to chrome.storage (works in service worker)
+      // Sync to storage (works in service worker)
       try {
-        await chrome.storage?.local?.set?.({ auth_token: token });
+        await storage.local.set({ auth_token: token });
       } catch (e) {
         // Ignore errors
       }
@@ -105,7 +107,7 @@ async function getTokenFromCookie(): Promise<string | null> {
     for (const cookieName of cookieNames) {
       for (const url of urlsToTry) {
         try {
-          const cookie = await chrome.cookies?.get({
+          const cookie = await cookies.get({
             url: url,
             name: cookieName,
           });
@@ -130,7 +132,7 @@ async function getTokenFromCookie(): Promise<string | null> {
     
     for (const domainToTry of domainsToTry) {
       try {
-        const allCookies = await chrome.cookies?.getAll({
+        const allCookies = await cookies.getAll({
           domain: domainToTry,
         });
         
@@ -151,7 +153,7 @@ async function getTokenFromCookie(): Promise<string | null> {
     // Try with domain pattern (for subdomain cookies like .localhost)
     try {
       const domainPattern = domain.startsWith('.') ? domain : `.${domain}`;
-      const allCookies = await chrome.cookies?.getAll({
+      const allCookies = await cookies.getAll({
         domain: domainPattern,
       });
       
@@ -170,7 +172,7 @@ async function getTokenFromCookie(): Promise<string | null> {
     
     // Get all cookies to see what we have
     try {
-      const allCookies = await chrome.cookies?.getAll({});
+      const allCookies = await cookies.getAll({});
       if (allCookies) {
         // Try each cookie name
         for (const cookieName of cookieNames) {
@@ -192,7 +194,7 @@ async function getTokenFromCookie(): Promise<string | null> {
 
 async function getApiBaseUrl(): Promise<string | null> {
   try {
-    const cfg = await chrome.storage?.sync?.get?.(['apiEndpoint']);
+    const cfg = await storage.sync.get(['apiEndpoint']);
     const endpoint = cfg?.apiEndpoint as string | undefined;
     if (endpoint) {
       const u = new URL(endpoint);
@@ -206,10 +208,10 @@ async function getApiBaseUrl(): Promise<string | null> {
 
 export async function requireAuthToken(): Promise<string> {
   try {
-    // Try chrome.storage.local first (works in service worker)
+    // Try storage.local first (works in service worker)
     let token: string | null = null;
     try {
-      const stored = await chrome.storage?.local?.get?.(['auth_token']);
+      const stored = await storage.local.get(['auth_token']);
       if (stored && stored.auth_token) {
         token = stored.auth_token as string;
       }
@@ -226,7 +228,7 @@ export async function requireAuthToken(): Promise<string> {
       // If we found a token in cookie, sync it to storage
       if (token) {
         try {
-          await chrome.storage?.local?.set?.({ auth_token: token });
+          await storage.local.set({ auth_token: token });
         } catch {}
         try {
           setAuthToken(token);
@@ -244,7 +246,7 @@ export async function requireAuthToken(): Promise<string> {
       const exp = payload.exp * 1000;
       if (exp <= Date.now()) {
         // Token expired
-        await chrome.storage?.local?.remove?.('auth_token');
+        await storage.local.remove('auth_token');
         clearAuthToken();
         throw new Error('Authentication token expired. Please log in again.');
       }
@@ -254,7 +256,7 @@ export async function requireAuthToken(): Promise<string> {
         throw e;
       }
       // Invalid token format
-      await chrome.storage?.local?.remove?.('auth_token');
+      await storage.local.remove('auth_token');
       clearAuthToken();
       throw new Error('Invalid authentication token. Please log in again.');
     }
@@ -284,12 +286,10 @@ export function setAuthToken(token: string): void {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('auth_token', token);
     }
-    // Also store in chrome.storage if available (works everywhere)
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      chrome.storage.local.set({ auth_token: token }).catch(() => {
-        // Ignore errors
-      });
-    }
+    // Also store in storage if available (works everywhere)
+    storage.local.set({ auth_token: token }).catch(() => {
+      // Ignore errors
+    });
   } catch (error) {
     // localStorage/storage not available, that's fine
   }
@@ -301,12 +301,10 @@ export function clearAuthToken(): void {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('auth_token');
     }
-    // Clear chrome.storage if available (works everywhere)
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      chrome.storage.local.remove('auth_token').catch(() => {
-        // Ignore errors
-      });
-    }
+    // Clear storage if available (works everywhere)
+    storage.local.remove('auth_token').catch(() => {
+      // Ignore errors
+    });
   } catch (error) {
     // localStorage/storage not available, that's fine
   }
