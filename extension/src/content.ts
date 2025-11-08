@@ -1432,6 +1432,25 @@ function handleTyping(): void {
   }, 1500); 
 }
 
+function calculateIconPosition(): string {
+  if (chatSendButton && chatInput) {
+    try {
+      const container = (chatInput as HTMLElement).closest('div');
+      if (container) {
+        const containerRect = container.getBoundingClientRect();
+        const buttonRect = chatSendButton.getBoundingClientRect();
+        const buttonRightFromContainer = containerRect.right - buttonRect.right;
+        const buttonWidth = buttonRect.width || 40;
+        const spacing = 12;
+        const rightPosition = buttonRightFromContainer + buttonWidth + spacing;
+        return `${Math.max(rightPosition, 60)}px`;
+      }
+    } catch (error) {
+    }
+  }
+  return '60px';
+}
+
 async function createRecallOSIcon(): Promise<HTMLElement> {
   const icon = document.createElement('div');
   icon.id = 'recallos-extension-icon';
@@ -1443,15 +1462,16 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
     </svg>
   `;
   
-  // Check if extension is enabled to set initial state
   const enabled = await checkExtensionEnabled();
   const baseColor = enabled ? '#10a37f' : '#8e8ea0';
   const bgColor = enabled ? 'rgba(16, 163, 127, 0.1)' : 'rgba(142, 142, 160, 0.1)';
   const borderColor = enabled ? 'rgba(16, 163, 127, 0.2)' : 'rgba(142, 142, 160, 0.2)';
   
+  const rightPosition = calculateIconPosition();
+  
   icon.style.cssText = `
     position: absolute !important;
-    right: 12px !important;
+    right: ${rightPosition} !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
     width: 32px !important;
@@ -1463,7 +1483,7 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
     cursor: pointer !important;
     border-radius: 8px !important;
     transition: all 0.2s ease !important;
-    z-index: 99999 !important;
+    z-index: 1 !important;
     background: ${bgColor} !important;
     border: 1px solid ${borderColor} !important;
     padding: 0 !important;
@@ -1769,6 +1789,12 @@ function setupAIChatIntegration(): void {
       createRecallOSIcon().then(icon => {
         recallOSIcon = icon;
         inputContainer.appendChild(recallOSIcon);
+        setTimeout(() => {
+          if (recallOSIcon && chatSendButton) {
+            const newRightPosition = calculateIconPosition();
+            recallOSIcon.style.right = newRightPosition;
+          }
+        }, 100);
       });
       
       const ensureIconVisible = () => {
@@ -1810,6 +1836,12 @@ function setupAIChatIntegration(): void {
               createRecallOSIcon().then(icon => {
                 recallOSIcon = icon;
                 newContainer.appendChild(recallOSIcon);
+                setTimeout(() => {
+                  if (recallOSIcon && chatSendButton) {
+                    const newRightPosition = calculateIconPosition();
+                    recallOSIcon.style.right = newRightPosition;
+                  }
+                }, 100);
               });
             }
           }
