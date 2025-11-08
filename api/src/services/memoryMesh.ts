@@ -474,10 +474,7 @@ export class MemoryMeshService {
             const shouldUpdate =
               similarityScore > existingRelation.similarity_score + 0.05 ||
               (similarityScore > existingRelation.similarity_score &&
-                this.isMoreSpecificRelationType(
-                  relationType,
-                  existingRelation.relation_type
-                ))
+                this.isMoreSpecificRelationType(relationType, existingRelation.relation_type))
 
             if (shouldUpdate) {
               await prisma.memoryRelation.update({
