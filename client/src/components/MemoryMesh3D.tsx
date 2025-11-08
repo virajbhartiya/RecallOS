@@ -1,11 +1,19 @@
-import React, { useMemo, useState, useEffect, useCallback, useRef, memo } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, Line } from '@react-three/drei'
-import { MemoryService } from '../services/memoryService'
-import { requireAuthToken } from '../utils/userId'
-import { LoadingSpinner, ErrorMessage } from './ui/loading-spinner'
-import type { MemoryMesh, MemoryMeshEdge } from '../types/memory'
-import * as THREE from 'three'
+import React, {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
+import { Line, OrbitControls } from "@react-three/drei"
+import { Canvas, useFrame, useThree } from "@react-three/fiber"
+import * as THREE from "three"
+
+import { MemoryService } from "../services/memoryService"
+import type { MemoryMesh, MemoryMeshEdge } from "../types/memory"
+import { requireAuthToken } from "../utils/userId"
+import { ErrorMessage, LoadingSpinner } from "./ui/loading-spinner"
 
 interface MemoryMesh3DProps {
   className?: string
@@ -19,32 +27,35 @@ interface MemoryMesh3DProps {
 }
 
 const nodeColors = {
-  manual: '#22c55e',
-  browser: '#3b82f6',
-  extension: '#3b82f6',
-  reasoning: '#a855f7',
-  ai: '#a855f7'
+  manual: "#22c55e",
+  browser: "#3b82f6",
+  extension: "#3b82f6",
+  reasoning: "#a855f7",
+  ai: "#a855f7",
 } as Record<string, string>
 
 const resolveNodeColor = (rawType?: string, url?: string): string => {
-  const key = (rawType || '').toLowerCase()
-  const href = (url || '').toLowerCase()
-  
+  const key = (rawType || "").toLowerCase()
+  const href = (url || "").toLowerCase()
+
   // First check if source has a specific color (source takes precedence)
   if (key && nodeColors[key]) {
     return nodeColors[key]
   }
-  
+
   // Then check URL patterns for sources without specific colors
   if (href) {
-    if (/github\.com|gitlab\.com|bitbucket\.org/.test(href)) return '#3b82f6'
-    if (/npmjs\.com|pypi\.org|crates\.io|rubygems\.org/.test(href)) return '#22c55e'
-    if (/docs\.|developer\.|readthedocs|mdn\.|dev\.docs|learn\./.test(href)) return '#22c55e'
-    if (/youtube\.com|youtu\.be|vimeo\.com/.test(href)) return '#3b82f6'
-    if (/mail\.google\.com|gmail\.com|outlook\.live\.com/.test(href)) return '#22c55e'
+    if (/github\.com|gitlab\.com|bitbucket\.org/.test(href)) return "#3b82f6"
+    if (/npmjs\.com|pypi\.org|crates\.io|rubygems\.org/.test(href))
+      return "#22c55e"
+    if (/docs\.|developer\.|readthedocs|mdn\.|dev\.docs|learn\./.test(href))
+      return "#22c55e"
+    if (/youtube\.com|youtu\.be|vimeo\.com/.test(href)) return "#3b82f6"
+    if (/mail\.google\.com|gmail\.com|outlook\.live\.com/.test(href))
+      return "#22c55e"
   }
-  
-  return nodeColors[key] || '#6b7280'
+
+  return nodeColors[key] || "#6b7280"
 }
 
 interface MemoryNodeProps {
@@ -66,27 +77,32 @@ const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
   isHighlighted,
   importance = 0.5,
   inLatentSpace = true,
-  onClick
+  onClick,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null)
   const { camera } = useThree()
   const [hovered, setHovered] = useState(false)
-  
+
   // Supermemory-like tiny nodes
-  const baseSize = 0.0035 + (importance * 0.0015)
+  const baseSize = 0.0035 + importance * 0.0015
   const size = baseSize
   const opacity = inLatentSpace ? 0.95 : 0.75
-  
+
   useFrame(() => {
     if (!meshRef.current) return
     // Distance-based scaling to keep apparent size consistent while zooming
     const nodePosition = meshRef.current.position
     const distance = camera.position.distanceTo(nodePosition)
     // Convert camera fov to radians for approximate world-space pixel scaling
-    const fovRad = (camera as any).fov ? ((camera as any).fov * Math.PI) / 180 : (60 * Math.PI) / 180
+    const fovRad = (camera as any).fov
+      ? ((camera as any).fov * Math.PI) / 180
+      : (60 * Math.PI) / 180
     const worldPerceivedScale = Math.tan(fovRad / 2) * 2
     // Tune multiplier to get roughly dot-like size; clamp to avoid extremes
-    const dynamicScale = Math.min(6, Math.max(0.25, distance * worldPerceivedScale * 0.06))
+    const dynamicScale = Math.min(
+      6,
+      Math.max(0.25, distance * worldPerceivedScale * 0.06)
+    )
     const emphasis = isSelected ? 1.8 : isHighlighted ? 1.3 : 1.0
     const hoverBoost = hovered ? 1.15 : 1.0
     meshRef.current.scale.setScalar(dynamicScale * emphasis * hoverBoost)
@@ -121,21 +137,25 @@ interface MemoryEdgeProps {
   relationType?: string
 }
 
-const MemoryEdgeComponent: React.FC<MemoryEdgeProps> = ({ start, end, similarity }) => {
-  const points = useMemo(() => [
-    new THREE.Vector3(...start),
-    new THREE.Vector3(...end)
-  ], [start, end])
+const MemoryEdgeComponent: React.FC<MemoryEdgeProps> = ({
+  start,
+  end,
+  similarity,
+}) => {
+  const points = useMemo(
+    () => [new THREE.Vector3(...start), new THREE.Vector3(...end)],
+    [start, end]
+  )
 
   const getLineColor = (similarity: number) => {
-    if (similarity > 0.85) return '#3b82f6'
-    if (similarity > 0.75) return '#38bdf8'
-    return '#9ca3af'
+    if (similarity > 0.85) return "#3b82f6"
+    if (similarity > 0.75) return "#38bdf8"
+    return "#9ca3af"
   }
 
   const color = getLineColor(similarity)
-  const opacity = similarity > 0.75 ? 0.6 : (similarity > 0.5 ? 0.4 : 0.3)
-  const lineWidth = similarity > 0.85 ? 0.4 : (similarity > 0.75 ? 0.3 : 0.2)
+  const opacity = similarity > 0.75 ? 0.6 : similarity > 0.5 ? 0.4 : 0.3
+  const lineWidth = similarity > 0.85 ? 0.4 : similarity > 0.75 ? 0.3 : 0.2
 
   return (
     <Line
@@ -171,10 +191,10 @@ const SceneComponent: React.FC<SceneProps> = ({
   memorySources,
   memoryUrls,
   onNodeClick,
-  isCompactView = false
+  isCompactView = false,
 }) => {
   const { camera } = useThree()
-  
+
   useEffect(() => {
     if (isCompactView) {
       camera.position.set(1.0, 1.0, 1.0)
@@ -188,14 +208,30 @@ const SceneComponent: React.FC<SceneProps> = ({
     if (!meshData?.nodes?.length) return []
 
     // Normalize backend XYZ coordinates into a compact cube around the origin
-    const finiteNodes = meshData.nodes.filter((nn) => Number.isFinite(nn.x) && Number.isFinite(nn.y))
-    const minX = finiteNodes.length ? Math.min(...finiteNodes.map((nn) => nn.x)) : 0
-    const maxX = finiteNodes.length ? Math.max(...finiteNodes.map((nn) => nn.x)) : 1
-    const minY = finiteNodes.length ? Math.min(...finiteNodes.map((nn) => nn.y)) : 0
-    const maxY = finiteNodes.length ? Math.max(...finiteNodes.map((nn) => nn.y)) : 1
-    const finiteZ = meshData.nodes.filter((nn: any) => Number.isFinite((nn as any).z)) as Array<any>
-    const minZ = finiteZ.length ? Math.min(...finiteZ.map((nn: any) => (nn as any).z)) : 0
-    const maxZ = finiteZ.length ? Math.max(...finiteZ.map((nn: any) => (nn as any).z)) : 1
+    const finiteNodes = meshData.nodes.filter(
+      (nn) => Number.isFinite(nn.x) && Number.isFinite(nn.y)
+    )
+    const minX = finiteNodes.length
+      ? Math.min(...finiteNodes.map((nn) => nn.x))
+      : 0
+    const maxX = finiteNodes.length
+      ? Math.max(...finiteNodes.map((nn) => nn.x))
+      : 1
+    const minY = finiteNodes.length
+      ? Math.min(...finiteNodes.map((nn) => nn.y))
+      : 0
+    const maxY = finiteNodes.length
+      ? Math.max(...finiteNodes.map((nn) => nn.y))
+      : 1
+    const finiteZ = meshData.nodes.filter((nn: any) =>
+      Number.isFinite((nn as any).z)
+    ) as Array<any>
+    const minZ = finiteZ.length
+      ? Math.min(...finiteZ.map((nn: any) => (nn as any).z))
+      : 0
+    const maxZ = finiteZ.length
+      ? Math.max(...finiteZ.map((nn: any) => (nn as any).z))
+      : 1
     const cx = (minX + maxX) / 2
     const cy = (minY + maxY) / 2
     const cz = (minZ + maxZ) / 2
@@ -219,58 +255,74 @@ const SceneComponent: React.FC<SceneProps> = ({
         }
         position = [nx, ny, iz]
       } else {
-        const rr = (isCompactView ? radius * 0.4 : radius * 0.55) + (i * 0.008)
+        const rr = (isCompactView ? radius * 0.4 : radius * 0.55) + i * 0.008
         const theta = (i / Math.max(1, meshData.nodes.length)) * Math.PI * 2
         const phi = Math.acos(2 * Math.random() - 1)
         position = [
           rr * Math.sin(phi) * Math.cos(theta),
           rr * Math.sin(phi) * Math.sin(theta),
-          rr * Math.cos(phi)
+          rr * Math.cos(phi),
         ]
       }
       return position
     })
 
     // Calculate center of mass and subtract it to ensure true centering at (0,0,0)
-    const centerX = normalizedPositions.reduce((sum, p) => sum + p[0], 0) / normalizedPositions.length
-    const centerY = normalizedPositions.reduce((sum, p) => sum + p[1], 0) / normalizedPositions.length
-    const centerZ = normalizedPositions.reduce((sum, p) => sum + p[2], 0) / normalizedPositions.length
+    const centerX =
+      normalizedPositions.reduce((sum, p) => sum + p[0], 0) /
+      normalizedPositions.length
+    const centerY =
+      normalizedPositions.reduce((sum, p) => sum + p[1], 0) /
+      normalizedPositions.length
+    const centerZ =
+      normalizedPositions.reduce((sum, p) => sum + p[2], 0) /
+      normalizedPositions.length
 
     return meshData.nodes.map((n, i) => {
-      const sourceType = memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
-      const url = memoryUrls && n.memory_id ? memoryUrls[n.memory_id] : undefined
+      const sourceType =
+        memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
+      const url =
+        memoryUrls && n.memory_id ? memoryUrls[n.memory_id] : undefined
       const color = resolveNodeColor(String(sourceType || n.type), url)
       const isSelected = selectedMemoryId === n.memory_id
-      const isHighlighted = highlightedMemoryIds.includes(n.memory_id || '')
+      const isHighlighted = highlightedMemoryIds.includes(n.memory_id || "")
       const inLatentSpace = n.hasEmbedding === true
-      
+
       // Center the position by subtracting the center of mass
       const position: [number, number, number] = [
         normalizedPositions[i][0] - centerX,
         normalizedPositions[i][1] - centerY,
-        normalizedPositions[i][2] - centerZ
+        normalizedPositions[i][2] - centerZ,
       ]
-      
+
       return {
         id: n.id,
-        memoryId: n.memory_id || '',
+        memoryId: n.memory_id || "",
         position,
         color,
         isSelected,
         isHighlighted,
         importance: n.importance_score,
-        inLatentSpace
+        inLatentSpace,
       }
     })
-  }, [meshData, selectedMemoryId, highlightedMemoryIds, memorySources, memoryUrls, isCompactView])
+  }, [
+    meshData,
+    selectedMemoryId,
+    highlightedMemoryIds,
+    memorySources,
+    memoryUrls,
+    isCompactView,
+  ])
 
   const edges = useMemo(() => {
     if (!meshData?.edges?.length) return []
-    
+
     const groups = new Map<string, MemoryMeshEdge[]>()
     meshData.edges.forEach((e: MemoryMeshEdge) => {
       if (e.source === e.target) return
-      const [a, b] = e.source < e.target ? [e.source, e.target] : [e.target, e.source]
+      const [a, b] =
+        e.source < e.target ? [e.source, e.target] : [e.target, e.source]
       const key = `${a}__${b}`
       const list = groups.get(key) || []
       list.push(e)
@@ -283,24 +335,33 @@ const SceneComponent: React.FC<SceneProps> = ({
       similarity: number
       relationType?: string
     }> = []
-    
-    groups.forEach((edgesForPair: MemoryMeshEdge[]) => {
-      const best = edgesForPair.reduce<MemoryMeshEdge | undefined>((prev, curr) => {
-        if (prev == null) return curr
-        const ps = typeof prev.similarity_score === 'number' ? prev.similarity_score : -Infinity
-        const cs = typeof curr.similarity_score === 'number' ? curr.similarity_score : -Infinity
-        return cs > ps ? curr : prev
-      }, edgesForPair[0]) as MemoryMeshEdge
 
-      const sourceNode = nodes.find(n => n.id === best.source)
-      const targetNode = nodes.find(n => n.id === best.target)
-      
+    groups.forEach((edgesForPair: MemoryMeshEdge[]) => {
+      const best = edgesForPair.reduce<MemoryMeshEdge | undefined>(
+        (prev, curr) => {
+          if (prev == null) return curr
+          const ps =
+            typeof prev.similarity_score === "number"
+              ? prev.similarity_score
+              : -Infinity
+          const cs =
+            typeof curr.similarity_score === "number"
+              ? curr.similarity_score
+              : -Infinity
+          return cs > ps ? curr : prev
+        },
+        edgesForPair[0]
+      ) as MemoryMeshEdge
+
+      const sourceNode = nodes.find((n) => n.id === best.source)
+      const targetNode = nodes.find((n) => n.id === best.target)
+
       if (sourceNode && targetNode) {
         result.push({
           start: sourceNode.position,
           end: targetNode.position,
           similarity: best.similarity_score || 0.5,
-          relationType: best.relation_type
+          relationType: best.relation_type,
         })
       }
     })
@@ -313,7 +374,7 @@ const SceneComponent: React.FC<SceneProps> = ({
       <ambientLight intensity={0.3} />
       <directionalLight position={[8, 8, 6]} intensity={0.4} />
       <pointLight position={[0, 0, 0]} intensity={0.2} color="#ffffff" />
-      
+
       {nodes.map((node) => (
         <MemoryNode
           key={node.id}
@@ -327,10 +388,10 @@ const SceneComponent: React.FC<SceneProps> = ({
           onClick={onNodeClick}
         />
       ))}
-      
+
       {edges.map((edge, index) => (
         <MemoryEdge
-          key={`edge-${index}-${edge.start.join(',')}-${edge.end.join(',')}`}
+          key={`edge-${index}-${edge.start.join(",")}-${edge.end.join(",")}`}
           start={edge.start}
           end={edge.end}
           similarity={edge.similarity}
@@ -343,7 +404,9 @@ const SceneComponent: React.FC<SceneProps> = ({
 
 const Scene = memo(SceneComponent)
 
-const ControlsUpdater: React.FC<{ controlsRef: React.RefObject<any> }> = ({ controlsRef }) => {
+const ControlsUpdater: React.FC<{ controlsRef: React.RefObject<any> }> = ({
+  controlsRef,
+}) => {
   useFrame(() => {
     if (controlsRef.current) {
       controlsRef.current.update()
@@ -352,15 +415,15 @@ const ControlsUpdater: React.FC<{ controlsRef: React.RefObject<any> }> = ({ cont
   return null
 }
 
-const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({ 
-  className = '', 
-  onNodeClick, 
+const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
+  className = "",
+  onNodeClick,
   similarityThreshold = 0.4,
   selectedMemoryId,
   highlightedMemoryIds = [],
   onMeshLoad,
   memorySources,
-  memoryUrls
+  memoryUrls,
 }) => {
   const [meshData, setMeshData] = useState<MemoryMesh | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -383,14 +446,17 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
         setError(null)
         const totalCount = await MemoryService.getUserMemoryCount()
         const limit = totalCount > 0 ? totalCount : 10000
-        const data = await MemoryService.getMemoryMesh(limit, similarityThreshold)
+        const data = await MemoryService.getMemoryMesh(
+          limit,
+          similarityThreshold
+        )
         setMeshData(data)
-        if (typeof onMeshLoad === 'function') {
+        if (typeof onMeshLoad === "function") {
           onMeshLoad(data)
         }
       } catch (err) {
-        setError('Failed to load memory mesh')
-        console.error('Error fetching mesh data:', err)
+        setError("Failed to load memory mesh")
+        console.error("Error fetching mesh data:", err)
       } finally {
         setIsLoading(false)
       }
@@ -398,23 +464,25 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
     fetchMeshData()
   }, [similarityThreshold, onMeshLoad])
 
-
-  const handleNodeClick = useCallback((memoryId: string) => {
-    if (onNodeClick) {
-      onNodeClick(memoryId)
-    }
-  }, [onNodeClick])
+  const handleNodeClick = useCallback(
+    (memoryId: string) => {
+      if (onNodeClick) {
+        onNodeClick(memoryId)
+      }
+    },
+    [onNodeClick]
+  )
 
   // Keyboard shortcut for toggling compact view
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
-      if (event.key === 'c' || event.key === 'C') {
-        setIsCompactView(prev => !prev)
+      if (event.key === "c" || event.key === "C") {
+        setIsCompactView((prev) => !prev)
       }
     }
-    
-    window.addEventListener('keydown', handleKeyPress)
-    return () => window.removeEventListener('keydown', handleKeyPress)
+
+    window.addEventListener("keydown", handleKeyPress)
+    return () => window.removeEventListener("keydown", handleKeyPress)
   }, [])
 
   if (isLoading) {
@@ -437,7 +505,6 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
     )
   }
 
-
   if (!meshData) {
     return (
       <div className={`w-full h-full ${className}`}>
@@ -452,13 +519,13 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
     <div className={`w-full h-full ${className}`}>
       <div className="w-full h-full overflow-hidden relative bg-transparent">
         <Canvas
-          camera={{ 
-            position: isCompactView ? [1.0, 1.0, 1.0] : [1.4, 1.4, 1.4], 
+          camera={{
+            position: isCompactView ? [1.0, 1.0, 1.0] : [1.4, 1.4, 1.4],
             fov: isCompactView ? 75 : 60,
             near: 0.0001,
-            far: 1000000000
+            far: 1000000000,
           }}
-          style={{ background: 'transparent' }}
+          style={{ background: "transparent" }}
           dpr={[1, 1.75]} // keep crisp but not noisy
         >
           <Scene
@@ -487,7 +554,6 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
           />
           <ControlsUpdater controlsRef={controlsRef} />
         </Canvas>
-
       </div>
     </div>
   )

@@ -1,13 +1,19 @@
-import React, { memo, useState } from 'react'
-import { Trash2 } from 'lucide-react'
-import type { Memory, MemorySearchResponse } from '../types/memory'
+import React, { memo, useState } from "react"
+import { Trash2 } from "lucide-react"
+
+import type { Memory, MemorySearchResponse } from "../types/memory"
 
 interface MemoryDetailsProps {
   selectedMemory: Memory | null
   searchQuery: string
   searchResults: MemorySearchResponse | null
   searchAnswer: string | null
-  searchCitations: Array<{ label: number; memory_id: string; title: string | null; url: string | null }> | null
+  searchCitations: Array<{
+    label: number
+    memory_id: string
+    title: string | null
+    url: string | null
+  }> | null
   onSelectMemory: (memoryId: string) => void
   onDeleteMemory: (memoryId: string) => void
 }
@@ -22,7 +28,11 @@ const MemoryDetailContent: React.FC<{
     <div>
       <div className="flex items-center justify-between mb-2">
         <div className="text-xs font-mono text-gray-500 flex items-center gap-2">
-          <span>{memory.created_at ? new Date(memory.created_at).toLocaleDateString() : 'NO DATE'}</span>
+          <span>
+            {memory.created_at
+              ? new Date(memory.created_at).toLocaleDateString()
+              : "NO DATE"}
+          </span>
           {memory.source && (
             <span className="inline-flex items-center gap-1 uppercase bg-gray-100 px-2 py-0.5 border border-gray-200 text-gray-700">
               {memory.source}
@@ -38,21 +48,27 @@ const MemoryDetailContent: React.FC<{
         </button>
       </div>
       <h3 className="text-xl font-medium text-gray-900 leading-snug break-words mb-4">
-        {memory.title || 'Untitled Memory'}
+        {memory.title || "Untitled Memory"}
       </h3>
     </div>
 
     {memory.summary ? (
       <div>
-        <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">Summary</div>
+        <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
+          Summary
+        </div>
         <p className="text-sm text-gray-800 leading-relaxed break-words">
           {memory.summary}
         </p>
       </div>
     ) : memory.content ? (
       <div>
-        <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">Content</div>
-        <p className={`text-sm text-gray-800 leading-relaxed break-words ${expandedContent ? '' : 'line-clamp-10'}`}>
+        <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
+          Content
+        </div>
+        <p
+          className={`text-sm text-gray-800 leading-relaxed break-words ${expandedContent ? "" : "line-clamp-10"}`}
+        >
           {memory.content}
         </p>
         {memory.content && memory.content.length > 500 && (
@@ -60,15 +76,17 @@ const MemoryDetailContent: React.FC<{
             onClick={onToggleExpand}
             className="mt-2 text-xs font-medium text-gray-700 hover:text-black px-2 py-1 border border-gray-300 hover:border-black hover:bg-black hover:text-white transition-all rounded-none"
           >
-            {expandedContent ? 'Collapse' : 'Expand'}
+            {expandedContent ? "Collapse" : "Expand"}
           </button>
         )}
       </div>
     ) : null}
 
-    {memory.url && memory.url !== 'unknown' && (
+    {memory.url && memory.url !== "unknown" && (
       <div>
-        <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">Source</div>
+        <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
+          Source
+        </div>
         <a
           href={memory.url}
           target="_blank"
@@ -82,11 +100,16 @@ const MemoryDetailContent: React.FC<{
   </div>
 ))
 
-MemoryDetailContent.displayName = 'MemoryDetailContent'
+MemoryDetailContent.displayName = "MemoryDetailContent"
 
 const SearchResultsSection: React.FC<{
   answer: string | null
-  citations: Array<{ label: number; memory_id: string; title: string | null; url: string | null }> | null
+  citations: Array<{
+    label: number
+    memory_id: string
+    title: string | null
+    url: string | null
+  }> | null
   onSelectMemory: (memoryId: string) => void
 }> = memo(({ answer, citations, onSelectMemory }) => {
   if (!answer && (!citations || citations.length === 0)) return null
@@ -95,7 +118,9 @@ const SearchResultsSection: React.FC<{
     <div className="space-y-4 mb-6">
       {answer && (
         <div className="bg-gray-50 border border-gray-200 p-4">
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">Answer</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">
+            Answer
+          </div>
           <p className="text-sm text-gray-900 leading-relaxed break-words whitespace-pre-wrap">
             {answer}
           </p>
@@ -103,15 +128,23 @@ const SearchResultsSection: React.FC<{
       )}
       {citations && citations.length > 0 && (
         <div className="bg-gray-50 border border-gray-200 p-4">
-          <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">Citations</div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">
+            Citations
+          </div>
           <div className="space-y-2">
             {citations.map((citation, idx) => {
-              const title = citation.title || 'Untitled Memory'
-              const url = citation.url && citation.url !== 'unknown' ? citation.url : null
+              const title = citation.title || "Untitled Memory"
+              const url =
+                citation.url && citation.url !== "unknown" ? citation.url : null
               return (
-                <div key={idx} className="flex items-center justify-between gap-3 text-xs">
+                <div
+                  key={idx}
+                  className="flex items-center justify-between gap-3 text-xs"
+                >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-gray-500">[{citation.label ?? idx + 1}]</span>
+                    <span className="text-gray-500">
+                      [{citation.label ?? idx + 1}]
+                    </span>
                     {url ? (
                       <a
                         href={url}
@@ -148,7 +181,7 @@ const SearchResultsSection: React.FC<{
   )
 })
 
-SearchResultsSection.displayName = 'SearchResultsSection'
+SearchResultsSection.displayName = "SearchResultsSection"
 
 const MemoryDetailsComponent: React.FC<MemoryDetailsProps> = ({
   selectedMemory,
@@ -177,11 +210,14 @@ const MemoryDetailsComponent: React.FC<MemoryDetailsProps> = ({
           onToggleExpand={() => setExpandedContent(!expandedContent)}
           onDelete={() => onDeleteMemory(selectedMemory.id)}
         />
-      ) : searchQuery.trim() && searchResults && (searchAnswer || (searchCitations && searchCitations.length > 0)) ? (
-        null
-      ) : (
+      ) : searchQuery.trim() &&
+        searchResults &&
+        (searchAnswer ||
+          (searchCitations && searchCitations.length > 0)) ? null : (
         <div className="flex items-center justify-center h-full text-sm text-gray-500">
-          {searchQuery.trim() ? 'Select a memory from search results' : 'Select a memory from the list'}
+          {searchQuery.trim()
+            ? "Select a memory from search results"
+            : "Select a memory from the list"}
         </div>
       )}
     </div>
@@ -189,6 +225,5 @@ const MemoryDetailsComponent: React.FC<MemoryDetailsProps> = ({
 }
 
 const MemoryDetails = memo(MemoryDetailsComponent)
-MemoryDetails.displayName = 'MemoryDetails'
+MemoryDetails.displayName = "MemoryDetails"
 export { MemoryDetails }
-

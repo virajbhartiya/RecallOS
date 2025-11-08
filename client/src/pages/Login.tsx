@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import axiosInstance from '../utility/axiosInterceptor'
-import { ConsoleButton } from '@/components/sections/ConsoleButton'
-import { LoadingSpinner } from '@/components/ui/loading-spinner'
-import { cn } from '@/lib/utils'
+import React, { useEffect, useState } from "react"
+import { useNavigate } from "react-router-dom"
+
+import { cn } from "@/lib/utils"
+import { LoadingSpinner } from "@/components/ui/loading-spinner"
+import { ConsoleButton } from "@/components/sections/ConsoleButton"
+
+import axiosInstance from "../utility/axiosInterceptor"
 
 interface User {
   id: string
@@ -12,10 +14,10 @@ interface User {
 }
 
 export const Login = () => {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState("")
   const [isRegister, setIsRegister] = useState(false)
   const [user, setUser] = useState<User | null>(null)
   const [showPassword, setShowPassword] = useState(false)
@@ -24,38 +26,41 @@ export const Login = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email.trim() || !password.trim()) {
-      setError('Please enter email and password')
+      setError("Please enter email and password")
       return
     }
 
     if (isRegister && password.length < 8) {
-      setError('Password must be at least 8 characters long')
+      setError("Password must be at least 8 characters long")
       return
     }
 
     setIsLoading(true)
-    setError('')
+    setError("")
 
     try {
-      const endpoint = isRegister ? '/auth/register' : '/auth/login'
-      const response = await axiosInstance.post(endpoint, { 
-        email: email.trim(), 
-        password: password.trim() 
+      const endpoint = isRegister ? "/auth/register" : "/auth/login"
+      const response = await axiosInstance.post(endpoint, {
+        email: email.trim(),
+        password: password.trim(),
       })
-      
+
       setUser(response.data.user)
       if (response.data?.token) {
-        try { 
-          localStorage.setItem('auth_token', response.data.token)
+        try {
+          localStorage.setItem("auth_token", response.data.token)
         } catch {}
       }
-      
+
       setTimeout(() => {
-        navigate('/memories')
+        navigate("/memories")
       }, 1000)
     } catch (err: any) {
-      console.error('Auth error:', err)
-      setError(err.response?.data?.message || `Failed to ${isRegister ? 'register' : 'login'}. Please try again.`)
+      console.error("Auth error:", err)
+      setError(
+        err.response?.data?.message ||
+          `Failed to ${isRegister ? "register" : "login"}. Please try again.`
+      )
     } finally {
       setIsLoading(false)
     }
@@ -63,36 +68,36 @@ export const Login = () => {
 
   const handleLogout = async () => {
     try {
-      await axiosInstance.post('/auth/logout')
+      await axiosInstance.post("/auth/logout")
       setUser(null)
-      try { 
-        localStorage.removeItem('auth_token')
+      try {
+        localStorage.removeItem("auth_token")
       } catch {}
-      setEmail('')
-      setPassword('')
-      setError('')
-      navigate('/login')
+      setEmail("")
+      setPassword("")
+      setError("")
+      navigate("/login")
     } catch (err) {
-      console.error('Logout error:', err)
+      console.error("Logout error:", err)
       setUser(null)
-      try { 
-        localStorage.removeItem('auth_token')
+      try {
+        localStorage.removeItem("auth_token")
       } catch {}
-      navigate('/login')
+      navigate("/login")
     }
   }
 
   const checkCurrentUser = async () => {
     try {
-      const response = await axiosInstance.get('/auth/me')
+      const response = await axiosInstance.get("/auth/me")
       if (response.data?.user) {
         setUser(response.data.user)
       }
     } catch (err) {
       setUser(null)
       try {
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('user_id')
+        localStorage.removeItem("auth_token")
+        localStorage.removeItem("user_id")
       } catch {}
     }
   }
@@ -103,11 +108,11 @@ export const Login = () => {
 
   if (user) {
     return (
-      <div 
+      <div
         className="min-h-screen text-black relative font-primary"
         style={{
-          backgroundImage: 'linear-gradient(135deg, #f9fafb, #ffffff, #f3f4f6)',
-          color: '#000000'
+          backgroundImage: "linear-gradient(135deg, #f9fafb, #ffffff, #f3f4f6)",
+          color: "#000000",
         }}
       >
         <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8">
@@ -122,16 +127,21 @@ export const Login = () => {
                     Welcome back!
                   </h1>
                   <p className="text-sm text-gray-600">
-                    You're signed in as <span className="font-medium text-gray-900">{user.email}</span>
+                    You're signed in as{" "}
+                    <span className="font-medium text-gray-900">
+                      {user.email}
+                    </span>
                   </p>
                 </div>
                 <div className="space-y-3 pt-4">
                   <ConsoleButton
                     variant="console_key"
                     className="w-full group relative overflow-hidden rounded-none px-4 py-2 transition-all duration-200 hover:shadow-md"
-                    onClick={() => navigate('/memories')}
+                    onClick={() => navigate("/memories")}
                   >
-                    <span className="relative z-10 text-sm font-medium">Continue to Dashboard</span>
+                    <span className="relative z-10 text-sm font-medium">
+                      Continue to Dashboard
+                    </span>
                     <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
                   </ConsoleButton>
                   <button
@@ -150,29 +160,44 @@ export const Login = () => {
   }
 
   return (
-    <div 
+    <div
       className="min-h-screen text-black relative font-primary overflow-hidden"
       style={{
-        backgroundImage: 'linear-gradient(135deg, #f9fafb, #ffffff, #f3f4f6)',
-        color: '#000000'
+        backgroundImage: "linear-gradient(135deg, #f9fafb, #ffffff, #f3f4f6)",
+        color: "#000000",
       }}
     >
       {/* Animated background grid */}
       <div className="fixed inset-0 pointer-events-none opacity-20">
-        <div className="w-full h-full" style={{
-          backgroundImage: `
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage: `
             linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
             linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)
           `,
-          backgroundSize: '24px 24px',
-        }} />
+            backgroundSize: "24px 24px",
+          }}
+        />
       </div>
 
       {/* Gradient blur overlays */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
         {[
-          { className: 'absolute -top-28 -left-24 w-[28rem] h-[28rem]', from: '#a5b4fc', via: '#fbcfe8', to: '#fde68a', opacity: 0.35 },
-          { className: 'absolute -bottom-28 right-0 w-[28rem] h-[28rem]', from: '#99f6e4', via: '#6ee7b7', to: '#a7f3d0', opacity: 0.30 }
+          {
+            className: "absolute -top-28 -left-24 w-[28rem] h-[28rem]",
+            from: "#a5b4fc",
+            via: "#fbcfe8",
+            to: "#fde68a",
+            opacity: 0.35,
+          },
+          {
+            className: "absolute -bottom-28 right-0 w-[28rem] h-[28rem]",
+            from: "#99f6e4",
+            via: "#6ee7b7",
+            to: "#a7f3d0",
+            opacity: 0.3,
+          },
         ].map((b, i) => (
           <div
             key={i}
@@ -180,7 +205,7 @@ export const Login = () => {
             style={{
               backgroundImage: `linear-gradient(135deg, ${b.from}, ${b.via}, ${b.to})`,
               opacity: b.opacity as number,
-              filter: 'blur(64px)'
+              filter: "blur(64px)",
             }}
           />
         ))}
@@ -195,8 +220,12 @@ export const Login = () => {
                 R
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-bold text-italics font-editorial text-black">RecallOS</span>
-                <span className="text-xs text-gray-600 font-mono -mt-1">Remember what the web showed you</span>
+                <span className="text-xl font-bold text-italics font-editorial text-black">
+                  RecallOS
+                </span>
+                <span className="text-xs text-gray-600 font-mono -mt-1">
+                  Remember what the web showed you
+                </span>
               </div>
             </div>
           </div>
@@ -205,19 +234,23 @@ export const Login = () => {
             <div className="space-y-6">
               <div>
                 <h2 className="text-3xl font-light font-editorial text-gray-900 mb-2">
-                  {isRegister ? 'Create your account' : 'Sign in to your account'}
+                  {isRegister
+                    ? "Create your account"
+                    : "Sign in to your account"}
                 </h2>
                 <p className="text-sm text-gray-600">
-                  {isRegister 
-                    ? 'Get started with RecallOS today'
-                    : 'Enter your credentials to continue'
-                  }
+                  {isRegister
+                    ? "Get started with RecallOS today"
+                    : "Enter your credentials to continue"}
                 </p>
               </div>
 
               <form className="space-y-5" onSubmit={handleSubmit}>
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="email"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Email address
                   </label>
                   <input
@@ -230,40 +263,49 @@ export const Login = () => {
                       "block w-full px-4 py-3 border rounded-none transition-all duration-200",
                       "focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent",
                       "placeholder:text-gray-400 text-gray-900 text-sm",
-                      error ? "border-red-300 focus:ring-red-500" : "border-gray-300"
+                      error
+                        ? "border-red-300 focus:ring-red-500"
+                        : "border-gray-300"
                     )}
                     placeholder="name@company.com"
                     value={email}
                     onChange={(e) => {
                       setEmail(e.target.value)
-                      setError('')
+                      setError("")
                     }}
                     disabled={isLoading}
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="password"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Password
                   </label>
                   <div className="relative">
                     <input
                       id="password"
                       name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete={isRegister ? 'new-password' : 'current-password'}
+                      type={showPassword ? "text" : "password"}
+                      autoComplete={
+                        isRegister ? "new-password" : "current-password"
+                      }
                       required
                       className={cn(
                         "block w-full px-4 py-3 pr-11 border rounded-none transition-all duration-200",
                         "focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent",
                         "placeholder:text-gray-400 text-gray-900 text-sm",
-                        error ? "border-red-300 focus:ring-red-500" : "border-gray-300"
+                        error
+                          ? "border-red-300 focus:ring-red-500"
+                          : "border-gray-300"
                       )}
                       placeholder="Enter your password"
                       value={password}
                       onChange={(e) => {
                         setPassword(e.target.value)
-                        setError('')
+                        setError("")
                       }}
                       disabled={isLoading}
                     />
@@ -274,13 +316,38 @@ export const Login = () => {
                       tabIndex={-1}
                     >
                       {showPassword ? (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.29 3.29m0 0A9.97 9.97 0 015.12 5.12m3.29 3.29L12 12m-3.59-3.59L3 3m9.59 9.59L21 21" />
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.29 3.29m0 0A9.97 9.97 0 015.12 5.12m3.29 3.29L12 12m-3.59-3.59L3 3m9.59 9.59L21 21"
+                          />
                         </svg>
                       ) : (
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        <svg
+                          className="w-5 h-5"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                          />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                          />
                         </svg>
                       )}
                     </button>
@@ -295,11 +362,23 @@ export const Login = () => {
                 {error && (
                   <div className="bg-red-50 border border-red-200 p-4 rounded-none">
                     <div className="flex">
-                      <svg className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <svg
+                        className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
                       </svg>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-red-800">{error}</p>
+                        <p className="text-sm font-medium text-red-800">
+                          {error}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -314,11 +393,11 @@ export const Login = () => {
                     {isLoading ? (
                       <span className="flex items-center justify-center">
                         <LoadingSpinner size="sm" className="mr-2" />
-                        {isRegister ? 'Creating account...' : 'Signing in...'}
+                        {isRegister ? "Creating account..." : "Signing in..."}
                       </span>
                     ) : (
                       <span className="relative z-10 text-sm font-medium">
-                        {isRegister ? 'Create account' : 'Sign in'}
+                        {isRegister ? "Create account" : "Sign in"}
                       </span>
                     )}
                     <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
@@ -332,7 +411,9 @@ export const Login = () => {
                 </div>
                 <div className="relative flex justify-center text-sm">
                   <span className="px-4 bg-white/80 text-gray-500">
-                    {isRegister ? 'Already have an account?' : "Don't have an account?"}
+                    {isRegister
+                      ? "Already have an account?"
+                      : "Don't have an account?"}
                   </span>
                 </div>
               </div>
@@ -342,14 +423,14 @@ export const Login = () => {
                   type="button"
                   onClick={() => {
                     setIsRegister(!isRegister)
-                    setError('')
-                    setEmail('')
-                    setPassword('')
+                    setError("")
+                    setEmail("")
+                    setPassword("")
                   }}
                   disabled={isLoading}
                   className="text-sm font-medium text-black hover:text-gray-700 transition-colors duration-200"
                 >
-                  {isRegister ? 'Sign in instead' : 'Create an account'}
+                  {isRegister ? "Sign in instead" : "Create an account"}
                 </button>
               </div>
             </div>
@@ -358,11 +439,21 @@ export const Login = () => {
           <div className="mt-6 text-center">
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => navigate("/")}
               className="text-sm text-gray-500 hover:text-gray-900 transition-colors duration-200 inline-flex items-center"
             >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              <svg
+                className="w-4 h-4 mr-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                />
               </svg>
               Back to Home
             </button>

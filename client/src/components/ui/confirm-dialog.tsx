@@ -1,5 +1,5 @@
-import React, { useEffect, useCallback, useRef, memo } from 'react'
-import { X } from 'lucide-react'
+import React, { memo, useCallback, useEffect, useRef } from "react"
+import { X } from "lucide-react"
 
 interface ConfirmDialogProps {
   isOpen: boolean
@@ -15,36 +15,48 @@ const ConfirmDialogComponent: React.FC<ConfirmDialogProps> = ({
   isOpen,
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
   onConfirm,
   onCancel,
 }) => {
   const confirmButtonRef = useRef<HTMLButtonElement>(null)
 
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!isOpen) return
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!isOpen) return
 
-    const target = e.target as HTMLElement
-    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      const target = e.target as HTMLElement
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
 
-    if (e.key === 'Escape') {
-      e.preventDefault()
-      e.stopPropagation()
-      onCancel()
-    } else if (e.key === 'Enter' && !isInput && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      e.preventDefault()
-      e.stopPropagation()
-      onConfirm()
-    }
-  }, [isOpen, onConfirm, onCancel])
+      if (e.key === "Escape") {
+        e.preventDefault()
+        e.stopPropagation()
+        onCancel()
+      } else if (
+        e.key === "Enter" &&
+        !isInput &&
+        !e.shiftKey &&
+        !e.ctrlKey &&
+        !e.metaKey
+      ) {
+        e.preventDefault()
+        e.stopPropagation()
+        onConfirm()
+      }
+    },
+    [isOpen, onConfirm, onCancel]
+  )
 
   useEffect(() => {
     if (!isOpen) return
 
-    document.addEventListener('keydown', handleKeyDown, true)
+    document.addEventListener("keydown", handleKeyDown, true)
     return () => {
-      document.removeEventListener('keydown', handleKeyDown, true)
+      document.removeEventListener("keydown", handleKeyDown, true)
     }
   }, [isOpen, handleKeyDown])
 
@@ -59,11 +71,11 @@ const ConfirmDialogComponent: React.FC<ConfirmDialogProps> = ({
   if (!isOpen) return null
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
       onClick={onCancel}
     >
-      <div 
+      <div
         className="bg-white border border-gray-200 shadow-xl w-full max-w-md"
         onClick={(e) => e.stopPropagation()}
       >
@@ -100,5 +112,5 @@ const ConfirmDialogComponent: React.FC<ConfirmDialogProps> = ({
 }
 
 const ConfirmDialog = memo(ConfirmDialogComponent)
-ConfirmDialog.displayName = 'ConfirmDialog'
+ConfirmDialog.displayName = "ConfirmDialog"
 export { ConfirmDialog }

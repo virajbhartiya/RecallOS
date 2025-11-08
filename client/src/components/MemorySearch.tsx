@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
-import type { SearchFilters } from '../types/memory'
-import { LoadingSpinner } from './ui/loading-spinner'
+import React, { useState } from "react"
+
+import type { SearchFilters } from "../types/memory"
+import { LoadingSpinner } from "./ui/loading-spinner"
 
 interface MemorySearchProps {
   onSearch: (query: string, filters: SearchFilters) => void
@@ -17,11 +18,11 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
   onClearFilters,
   isLoading = false,
   resultCount,
-  className = '',
+  className = "",
   compact = false,
-  profileContext = ''
+  profileContext = "",
 }) => {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState("")
   const [filters, setFilters] = useState<SearchFilters>({})
 
   const handleSearch = () => {
@@ -31,29 +32,42 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       handleSearch()
     }
   }
 
-  const handleFilterChange = (key: keyof SearchFilters, value: string | number | { min: number; max: number } | { start?: string; end?: string } | undefined) => {
-    setFilters(prev => ({
+  const handleFilterChange = (
+    key: keyof SearchFilters,
+    value:
+      | string
+      | number
+      | { min: number; max: number }
+      | { start?: string; end?: string }
+      | undefined
+  ) => {
+    setFilters((prev) => ({
       ...prev,
-      [key]: value
+      [key]: value,
     }))
   }
 
   const clearFilters = () => {
     setFilters({})
-    setQuery('')
+    setQuery("")
     onClearFilters()
   }
 
-  const hasActiveFilters = Object.keys(filters).length > 0 || query.trim() !== ''
+  const hasActiveFilters =
+    Object.keys(filters).length > 0 || query.trim() !== ""
 
   return (
-    <div className={`bg-white border border-gray-200 ${compact ? 'p-3' : 'p-4'} ${className}`}>
-      <div className={`font-mono text-gray-600 ${compact ? 'text-xs mb-2' : 'text-xs mb-3'} uppercase tracking-wide`}>
+    <div
+      className={`bg-white border border-gray-200 ${compact ? "p-3" : "p-4"} ${className}`}
+    >
+      <div
+        className={`font-mono text-gray-600 ${compact ? "text-xs mb-2" : "text-xs mb-3"} uppercase tracking-wide`}
+      >
         [SEARCH & FILTER]
       </div>
 
@@ -70,17 +84,25 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
       )}
 
       {/* Search Input */}
-      <div className={compact ? 'mb-2' : 'mb-3'}>
+      <div className={compact ? "mb-2" : "mb-3"}>
         <div className="flex flex-col space-y-2 mb-2">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={profileContext ? "Search memories (profile context will be used)..." : "Search memories..."}
+            placeholder={
+              profileContext
+                ? "Search memories (profile context will be used)..."
+                : "Search memories..."
+            }
             className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
             disabled={isLoading}
-            title={profileContext ? `Profile context: ${profileContext.substring(0, 200)}...` : undefined}
+            title={
+              profileContext
+                ? `Profile context: ${profileContext.substring(0, 200)}...`
+                : undefined
+            }
           />
           <button
             onClick={handleSearch}
@@ -100,15 +122,17 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
       </div>
 
       {/* Filters */}
-      <div className={`grid grid-cols-1 gap-2 ${compact ? 'mb-2' : 'mb-3'}`}>
+      <div className={`grid grid-cols-1 gap-2 ${compact ? "mb-2" : "mb-3"}`}>
         {/* Category Filter */}
         <div>
           <label className="block text-xs font-mono text-gray-600 uppercase tracking-wide mb-1">
             CATEGORY
           </label>
           <select
-            value={filters.category || ''}
-            onChange={(e) => handleFilterChange('category', e.target.value || undefined)}
+            value={filters.category || ""}
+            onChange={(e) =>
+              handleFilterChange("category", e.target.value || undefined)
+            }
             className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           >
             <option value="">All Categories</option>
@@ -127,8 +151,10 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
             SENTIMENT
           </label>
           <select
-            value={filters.sentiment || ''}
-            onChange={(e) => handleFilterChange('sentiment', e.target.value || undefined)}
+            value={filters.sentiment || ""}
+            onChange={(e) =>
+              handleFilterChange("sentiment", e.target.value || undefined)
+            }
             className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           >
             <option value="">All Sentiments</option>
@@ -146,8 +172,10 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
             SOURCE
           </label>
           <select
-            value={filters.source || ''}
-            onChange={(e) => handleFilterChange('source', e.target.value || undefined)}
+            value={filters.source || ""}
+            onChange={(e) =>
+              handleFilterChange("source", e.target.value || undefined)
+            }
             className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           >
             <option value="">All Sources</option>
@@ -160,18 +188,20 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
       </div>
 
       {/* Date Range Filter */}
-      <div className={`grid grid-cols-1 gap-2 ${compact ? 'mb-2' : 'mb-3'}`}>
+      <div className={`grid grid-cols-1 gap-2 ${compact ? "mb-2" : "mb-3"}`}>
         <div>
           <label className="block text-xs font-mono text-gray-600 uppercase tracking-wide mb-1">
             START DATE
           </label>
           <input
             type="date"
-            value={filters.dateRange?.start || ''}
-            onChange={(e) => handleFilterChange('dateRange', {
-              ...filters.dateRange,
-              start: e.target.value
-            })}
+            value={filters.dateRange?.start || ""}
+            onChange={(e) =>
+              handleFilterChange("dateRange", {
+                ...filters.dateRange,
+                start: e.target.value,
+              })
+            }
             className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           />
         </div>
@@ -181,11 +211,13 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
           </label>
           <input
             type="date"
-            value={filters.dateRange?.end || ''}
-            onChange={(e) => handleFilterChange('dateRange', {
-              ...filters.dateRange,
-              end: e.target.value
-            })}
+            value={filters.dateRange?.end || ""}
+            onChange={(e) =>
+              handleFilterChange("dateRange", {
+                ...filters.dateRange,
+                end: e.target.value,
+              })
+            }
             className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
           />
         </div>
@@ -196,11 +228,11 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
         <div className="text-sm font-mono text-gray-600">
           {resultCount !== undefined && (
             <span>
-              {resultCount} {resultCount === 1 ? 'RESULT' : 'RESULTS'}
+              {resultCount} {resultCount === 1 ? "RESULT" : "RESULTS"}
             </span>
           )}
         </div>
-        
+
         {hasActiveFilters && (
           <button
             onClick={clearFilters}

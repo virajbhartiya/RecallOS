@@ -1,10 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@200;300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap');
-@import url('https://db.onlinewebfonts.com/c/23ed6ab5114b3c4b57abae46cf8a5029?family=PP+Editorial+New+Ultralight');
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@200;300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700&display=swap");
+@import url("https://db.onlinewebfonts.com/c/23ed6ab5114b3c4b57abae46cf8a5029?family=PP+Editorial+New+Ultralight");
 @import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
-
 
 @layer base {
   :root {
@@ -67,7 +66,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-weight: 300;
   }
 }
@@ -78,16 +77,16 @@ html {
 
 /* Custom font classes for design system */
 .font-primary {
-  font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-weight: 300;
 }
 
 .font-mono {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: "IBM Plex Mono", monospace;
 }
 
 .font-editorial {
-  font-family: 'PP Editorial New Ultralight', serif;
+  font-family: "PP Editorial New Ultralight", serif;
   font-weight: normal;
 }
 
@@ -109,41 +108,51 @@ html {
 }
 
 .gradient {
-  @apply bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text
+  @apply bg-gradient-to-r from-[#F596D3] to-[#D247BF] text-transparent bg-clip-text;
 }
 
 /* Latent Space Animations */
 @keyframes float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
 @keyframes glow-pulse {
-  0%, 100% { 
+  0%,
+  100% {
     opacity: 0.8;
     filter: brightness(1);
   }
-  50% { 
+  50% {
     opacity: 1;
     filter: brightness(1.2);
   }
 }
 
 @keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
 }
 
 @keyframes pulse {
-  0% { 
+  0% {
     transform: translate(-50%, -50%) scale(1);
     box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
   }
-  50% { 
+  50% {
     transform: translate(-50%, -50%) scale(1.1);
     box-shadow: 0 0 0 8px rgba(59, 130, 246, 0.1);
   }
-  100% { 
+  100% {
     transform: translate(-50%, -50%) scale(1);
     box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
   }
@@ -167,4 +176,3 @@ html {
 ::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
-

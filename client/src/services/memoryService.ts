@@ -1,8 +1,8 @@
-import * as MemoryApi from './memory/memoryApi'
-import * as MemorySearch from './memory/memorySearch'
-import * as MemoryMesh from './memory/memoryMesh'
-import * as MemoryInsights from './memory/memoryInsights'
-import * as MemoryJobs from './memory/memoryJobs'
+import * as MemoryApi from "./memory/memoryApi"
+import * as MemoryInsights from "./memory/memoryInsights"
+import * as MemoryJobs from "./memory/memoryJobs"
+import * as MemoryMesh from "./memory/memoryMesh"
+import * as MemorySearch from "./memory/memorySearch"
 
 export class MemoryService {
   static async getMemoriesWithTransactionDetails(limit?: number) {
