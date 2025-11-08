@@ -1,14 +1,21 @@
 import { profileUpdateService } from '../services/profileUpdate'
 import { logger } from '../utils/logger'
 
-export const startProfileWorker = async (daysSinceLastUpdate: number = 7) => {
+export const startProfileWorker = async (
+  daysSinceLastUpdate: number = 7,
+  hoursSinceLastUpdate?: number
+) => {
   logger.log('[Profile Worker] Starting batch profile update', {
     ts: new Date().toISOString(),
     daysSinceLastUpdate,
+    hoursSinceLastUpdate,
   })
 
   try {
-    const userIds = await profileUpdateService.getUsersNeedingUpdate(daysSinceLastUpdate)
+    const userIds =
+      hoursSinceLastUpdate !== undefined
+        ? await profileUpdateService.getUsersNeedingUpdateByHours(hoursSinceLastUpdate)
+        : await profileUpdateService.getUsersNeedingUpdate(daysSinceLastUpdate)
 
     logger.log('[Profile Worker] Found users needing update', {
       ts: new Date().toISOString(),
@@ -104,11 +111,16 @@ export const startCyclicProfileWorker = () => {
   const intervalMs = intervalHours * 60 * 60 * 1000
   const daysSinceLastUpdate = Number(process.env.PROFILE_UPDATE_INTERVAL_DAYS || 7)
 
+  const useHoursBasedUpdate = intervalHours < 24
+  const hoursSinceLastUpdate = useHoursBasedUpdate ? intervalHours : undefined
+
   logger.log('[Profile Worker] Starting cyclic profile update worker', {
     ts: new Date().toISOString(),
     intervalHours,
     intervalMs,
     daysSinceLastUpdate,
+    useHoursBasedUpdate,
+    hoursSinceLastUpdate,
   })
 
   const runUpdate = async () => {
@@ -116,7 +128,7 @@ export const startCyclicProfileWorker = () => {
       logger.log('[Profile Worker] Cyclic update cycle started', {
         ts: new Date().toISOString(),
       })
-      await startProfileWorker(daysSinceLastUpdate)
+      await startProfileWorker(daysSinceLastUpdate, hoursSinceLastUpdate)
       logger.log('[Profile Worker] Cyclic update cycle completed', {
         ts: new Date().toISOString(),
       })

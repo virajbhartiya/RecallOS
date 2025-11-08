@@ -478,6 +478,37 @@ export class ProfileUpdateService {
 
     return usersNeedingUpdate
   }
+
+  async getUsersNeedingUpdateByHours(hoursSinceLastUpdate: number): Promise<string[]> {
+    const cutoffDate = new Date(Date.now() - hoursSinceLastUpdate * 60 * 60 * 1000)
+
+    const allUsers = await prisma.user.findMany({
+      select: { id: true },
+    })
+
+    const usersNeedingUpdate: string[] = []
+
+    for (const user of allUsers) {
+      const profile = await prisma.userProfile.findUnique({
+        where: { user_id: user.id },
+        select: { last_updated: true },
+      })
+
+      if (!profile) {
+        usersNeedingUpdate.push(user.id)
+        continue
+      }
+
+      const lastUpdated =
+        profile.last_updated instanceof Date ? profile.last_updated : new Date(profile.last_updated)
+
+      if (lastUpdated < cutoffDate) {
+        usersNeedingUpdate.push(user.id)
+      }
+    }
+
+    return usersNeedingUpdate
+  }
 }
 
 export const profileUpdateService = new ProfileUpdateService()

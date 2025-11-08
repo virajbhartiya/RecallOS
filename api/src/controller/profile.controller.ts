@@ -11,6 +11,10 @@ export class ProfileController {
       const profile = await profileUpdateService.getUserProfile(userId)
 
       if (!profile) {
+        if (res.headersSent) {
+          logger.warn('Response already sent, skipping profile get response')
+          return
+        }
         return res.status(200).json({
           success: true,
           data: {
@@ -18,6 +22,11 @@ export class ProfileController {
             message: 'Profile not yet created. Process some content to generate a profile.',
           },
         })
+      }
+
+      if (res.headersSent) {
+        logger.warn('Response already sent, skipping profile get response')
+        return
       }
 
       res.status(200).json({
@@ -42,10 +51,14 @@ export class ProfileController {
       })
     } catch (error) {
       logger.error('Error getting profile:', error)
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get profile',
-      })
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to get profile',
+        })
+      } else {
+        logger.warn('Response already sent, cannot send error response')
+      }
     }
   }
 
@@ -78,6 +91,11 @@ export class ProfileController {
         version: profile.version,
       })
 
+      if (res.headersSent) {
+        logger.warn('Response already sent, skipping profile refresh response')
+        return
+      }
+
       res.status(200).json({
         success: true,
         message: 'Profile refreshed successfully',
@@ -101,10 +119,14 @@ export class ProfileController {
       })
     } catch (error) {
       logger.error('Error refreshing profile:', error)
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to refresh profile',
-      })
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to refresh profile',
+        })
+      } else {
+        logger.warn('Response already sent, cannot send error response')
+      }
     }
   }
 
@@ -114,6 +136,11 @@ export class ProfileController {
 
       const context = await profileUpdateService.getProfileContext(userId)
 
+      if (res.headersSent) {
+        logger.warn('Response already sent, skipping profile context response')
+        return
+      }
+
       res.status(200).json({
         success: true,
         data: {
@@ -122,10 +149,14 @@ export class ProfileController {
       })
     } catch (error) {
       logger.error('Error getting profile context:', error)
-      res.status(500).json({
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get profile context',
-      })
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to get profile context',
+        })
+      } else {
+        logger.warn('Response already sent, cannot send error response')
+      }
     }
   }
 }

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express'
+import { logger } from '../../utils/logger'
 
 interface IError extends Error {
   statusCode?: number
@@ -6,6 +7,14 @@ interface IError extends Error {
 }
 
 const sendErrorDev = (err: IError, req: Request, res: Response) => {
+  if (res.headersSent) {
+    logger.warn('Response already sent, cannot send error response', {
+      error: err.message,
+      url: req.originalUrl,
+    })
+    return
+  }
+
   if (req.originalUrl) {
     return res.status(err.statusCode || 500).json({
       status: err.status || 'error',
