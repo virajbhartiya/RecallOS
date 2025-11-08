@@ -1,4 +1,4 @@
-import React from 'react'
+import React from "react"
 
 interface InfoCardProps {
   children: React.ReactNode
@@ -6,15 +6,19 @@ interface InfoCardProps {
   hover?: boolean
 }
 
-export const InfoCard: React.FC<InfoCardProps> = ({ 
-  children, 
-  className = '', 
-  hover = true 
+export const InfoCard: React.FC<InfoCardProps> = ({
+  children,
+  className = "",
+  hover = true,
 }) => {
-  const hoverClasses = hover ? 'hover:border-black transition-all duration-300' : ''
-  
+  const hoverClasses = hover
+    ? "hover:border-black transition-all duration-300"
+    : ""
+
   return (
-    <div className={`bg-white border border-gray-200 p-6 ${hoverClasses} ${className}`}>
+    <div
+      className={`bg-white border border-gray-200 p-6 ${hoverClasses} ${className}`}
+    >
       {children}
     </div>
   )
@@ -29,13 +33,13 @@ interface InfoCardWithIconProps {
   hover?: boolean
 }
 
-export const InfoCardWithIcon: React.FC<InfoCardWithIconProps> = ({ 
-  icon, 
-  title, 
-  description, 
+export const InfoCardWithIcon: React.FC<InfoCardWithIconProps> = ({
+  icon,
+  title,
+  description,
   features = [],
-  className = '',
-  hover = true 
+  className = "",
+  hover = true,
 }) => {
   return (
     <InfoCard className={className} hover={hover}>
@@ -47,9 +51,7 @@ export const InfoCardWithIcon: React.FC<InfoCardWithIconProps> = ({
       {features.length > 0 && (
         <div className="space-y-2 text-xs font-mono text-gray-500">
           {features.map((feature, index) => (
-            <div key={index}>
-              {feature}
-            </div>
+            <div key={index}>{feature}</div>
           ))}
         </div>
       )}

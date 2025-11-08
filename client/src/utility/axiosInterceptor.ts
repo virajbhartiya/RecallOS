@@ -1,8 +1,8 @@
-import axios from 'axios'
+import axios from "axios"
 
 const baseURL = import.meta.env.DEV
-  ? '/api'
-  : `${import.meta.env.VITE_SERVER_URL || ''}/api`
+  ? "/api"
+  : `${import.meta.env.VITE_SERVER_URL || ""}/api`
 
 const axiosInstance = axios.create({
   baseURL: baseURL,
@@ -13,7 +13,7 @@ const axiosInstance = axios.create({
 // Add auth token to requests
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token')
+    const token = localStorage.getItem("auth_token")
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -32,10 +32,10 @@ axiosInstance.interceptors.response.use(
     // Handle 401 unauthorized - clear token and redirect to login
     if (error.response?.status === 401) {
       try {
-        localStorage.removeItem('auth_token')
+        localStorage.removeItem("auth_token")
         // Only redirect if we're not already on login page
-        if (window.location.pathname !== '/login') {
-          window.location.href = '/login'
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login"
         }
       } catch (e) {
         // Ignore localStorage errors

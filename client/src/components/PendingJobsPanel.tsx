@@ -1,9 +1,24 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { MemoryService } from '@/services/memoryService'
-import { requireAuthToken } from '@/utils/userId'
-import { Clock, RefreshCw, AlertCircle, Loader, X, Trash2, Search, CheckSquare, Square } from 'lucide-react'
-import { LoadingCard, ErrorMessage, EmptyState } from '@/components/ui/loading-spinner'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import React, { useCallback, useEffect, useMemo, useState } from "react"
+import { MemoryService } from "@/services/memoryService"
+import { requireAuthToken } from "@/utils/userId"
+import {
+  AlertCircle,
+  CheckSquare,
+  Clock,
+  Loader,
+  RefreshCw,
+  Search,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react"
+
+import { ConfirmDialog } from "@/components/ui/confirm-dialog"
+import {
+  EmptyState,
+  ErrorMessage,
+  LoadingCard,
+} from "@/components/ui/loading-spinner"
 
 interface PendingJob {
   id: string
@@ -11,7 +26,7 @@ interface PendingJob {
   raw_text: string
   full_text_length: number
   metadata: Record<string, unknown>
-  status: 'waiting' | 'active' | 'delayed'
+  status: "waiting" | "active" | "delayed"
   created_at: string
   processed_on: string | null
   finished_on: string | null
@@ -24,15 +39,27 @@ interface PendingJobsPanelProps {
   onClose: () => void
 }
 
-export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onClose }) => {
+export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
+  isOpen,
+  onClose,
+}) => {
   const [jobs, setJobs] = useState<PendingJob[]>([])
-  const [counts, setCounts] = useState({ total: 0, waiting: 0, active: 0, delayed: 0 })
+  const [counts, setCounts] = useState({
+    total: 0,
+    waiting: 0,
+    active: 0,
+    delayed: 0,
+  })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState("")
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set())
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; jobId: string | null; jobIds?: string[] }>({
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean
+    jobId: string | null
+    jobIds?: string[]
+  }>({
     isOpen: false,
     jobId: null,
   })
@@ -46,9 +73,10 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
       const result = await MemoryService.getPendingJobs()
       setJobs(result.jobs)
       setCounts(result.counts)
-    } catch (err: any) {
-      console.error('Error fetching pending jobs:', err)
-      setError(err.message || 'Failed to fetch pending jobs')
+    } catch (err) {
+      const error = err as { message?: string }
+      console.error("Error fetching pending jobs:", err)
+      setError(error.message || "Failed to fetch pending jobs")
     } finally {
       setIsLoading(false)
     }
@@ -60,7 +88,11 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
 
   const handleBatchDeleteClick = useCallback(() => {
     if (selectedJobs.size === 0) return
-    setDeleteConfirm({ isOpen: true, jobId: null, jobIds: Array.from(selectedJobs) })
+    setDeleteConfirm({
+      isOpen: true,
+      jobId: null,
+      jobIds: Array.from(selectedJobs),
+    })
   }, [selectedJobs])
 
   const handleDeleteJobConfirm = useCallback(async () => {
@@ -70,20 +102,23 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
 
     try {
       requireAuthToken()
-      
+
       if (jobIds && jobIds.length > 0) {
         // Batch delete multiple jobs
-        await Promise.all(jobIds.map(id => MemoryService.deletePendingJob(id)))
+        await Promise.all(
+          jobIds.map((id) => MemoryService.deletePendingJob(id))
+        )
         setSelectedJobs(new Set())
       } else if (jobId) {
         // Single job delete
         await MemoryService.deletePendingJob(jobId)
       }
-      
+
       await fetchPendingJobs()
-    } catch (err: any) {
-      console.error('Error deleting job(s):', err)
-      setError(err.message || 'Failed to delete job(s)')
+    } catch (err) {
+      const error = err as { message?: string }
+      console.error("Error deleting job(s):", err)
+      setError(error.message || "Failed to delete job(s)")
     }
   }, [deleteConfirm.jobId, deleteConfirm.jobIds, fetchPendingJobs])
 
@@ -95,30 +130,36 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
     return jobs.filter((job) => {
       // Search in job ID
       if (job.id.toLowerCase().includes(query)) return true
-      
+
       // Search in user ID
       if (job.user_id.toLowerCase().includes(query)) return true
-      
+
       // Search in status
       if (job.status.toLowerCase().includes(query)) return true
-      
+
       // Search in raw text
       if (job.raw_text.toLowerCase().includes(query)) return true
-      
+
       // Search in metadata title
       const title = job.metadata?.title
-      if (title && typeof title === 'string' && title.toLowerCase().includes(query)) return true
-      
+      if (
+        title &&
+        typeof title === "string" &&
+        title.toLowerCase().includes(query)
+      )
+        return true
+
       // Search in metadata URL
       const url = job.metadata?.url
-      if (url && typeof url === 'string' && url.toLowerCase().includes(query)) return true
-      
+      if (url && typeof url === "string" && url.toLowerCase().includes(query))
+        return true
+
       return false
     })
   }, [jobs, searchQuery])
 
   const handleSelectJob = useCallback((jobId: string) => {
-    setSelectedJobs(prev => {
+    setSelectedJobs((prev) => {
       const next = new Set(prev)
       if (next.has(jobId)) {
         next.delete(jobId)
@@ -135,13 +176,13 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
       setSelectedJobs(new Set())
     } else {
       // Select all filtered jobs
-      setSelectedJobs(new Set(filteredJobs.map(job => job.id)))
+      setSelectedJobs(new Set(filteredJobs.map((job) => job.id)))
     }
   }, [selectedJobs.size, filteredJobs])
 
   useEffect(() => {
     if (!isOpen) return
-    
+
     fetchPendingJobs()
 
     let interval: NodeJS.Timeout | null = null
@@ -155,23 +196,23 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
   }, [isOpen, fetchPendingJobs, autoRefresh])
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
+    return new Date(dateString).toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     })
   }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'waiting':
+      case "waiting":
         return <Clock className="w-4 h-4 text-yellow-600" />
-      case 'active':
+      case "active":
         return <Loader className="w-4 h-4 text-blue-600 animate-spin" />
-      case 'delayed':
+      case "delayed":
         return <AlertCircle className="w-4 h-4 text-orange-600" />
       default:
         return null
@@ -179,31 +220,62 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
   }
 
   const getStatusBadge = (status: string) => {
-    const baseClasses = 'text-xs font-mono px-2 py-1 border uppercase'
+    const baseClasses = "text-xs font-mono px-2 py-1 border uppercase"
     switch (status) {
-      case 'waiting':
-        return <span className={`${baseClasses} bg-yellow-50 text-yellow-800 border-yellow-200`}>WAITING</span>
-      case 'active':
-        return <span className={`${baseClasses} bg-blue-50 text-blue-800 border-blue-200`}>ACTIVE</span>
-      case 'delayed':
-        return <span className={`${baseClasses} bg-orange-50 text-orange-800 border-orange-200`}>DELAYED</span>
+      case "waiting":
+        return (
+          <span
+            className={`${baseClasses} bg-yellow-50 text-yellow-800 border-yellow-200`}
+          >
+            WAITING
+          </span>
+        )
+      case "active":
+        return (
+          <span
+            className={`${baseClasses} bg-blue-50 text-blue-800 border-blue-200`}
+          >
+            ACTIVE
+          </span>
+        )
+      case "delayed":
+        return (
+          <span
+            className={`${baseClasses} bg-orange-50 text-orange-800 border-orange-200`}
+          >
+            DELAYED
+          </span>
+        )
       default:
-        return <span className={`${baseClasses} bg-gray-50 text-gray-800 border-gray-200`}>{status}</span>
+        return (
+          <span
+            className={`${baseClasses} bg-gray-50 text-gray-800 border-gray-200`}
+          >
+            {status}
+          </span>
+        )
     }
   }
 
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-hidden" onClick={onClose}>
-      <div 
-        className="bg-white border border-gray-200 shadow-xl w-[90vw] max-w-6xl h-[90vh] max-h-[90vh] flex flex-col overflow-hidden" 
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm overflow-hidden"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white border border-gray-200 shadow-xl w-[90vw] max-w-6xl h-[90vh] max-h-[90vh] flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-white flex-shrink-0">
           <div className="min-w-0 flex-1">
-            <h2 className="text-lg font-mono font-semibold text-gray-900 truncate">Pending Memory Jobs</h2>
-            <p className="text-xs text-gray-600 mt-1">View all memories currently in the Redis processing queue</p>
+            <h2 className="text-lg font-mono font-semibold text-gray-900 truncate">
+              Pending Memory Jobs
+            </h2>
+            <p className="text-xs text-gray-600 mt-1">
+              View all memories currently in the Redis processing queue
+            </p>
           </div>
           <button
             onClick={onClose}
@@ -240,12 +312,16 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
                   onClick={() => setAutoRefresh(!autoRefresh)}
                   className={`px-4 py-2 text-sm font-mono border flex items-center space-x-2 ${
                     autoRefresh
-                      ? 'bg-green-50 text-green-800 border-green-200'
-                      : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                      ? "bg-green-50 text-green-800 border-green-200"
+                      : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
                   }`}
                 >
-                  <RefreshCw className={`w-4 h-4 ${autoRefresh ? 'animate-spin' : ''}`} />
-                  <span>{autoRefresh ? 'Auto-refresh ON' : 'Auto-refresh OFF'}</span>
+                  <RefreshCw
+                    className={`w-4 h-4 ${autoRefresh ? "animate-spin" : ""}`}
+                  />
+                  <span>
+                    {autoRefresh ? "Auto-refresh ON" : "Auto-refresh OFF"}
+                  </span>
                 </button>
                 <button
                   onClick={fetchPendingJobs}
@@ -259,29 +335,39 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div className="bg-white border border-gray-200 p-4">
-                <div className="text-xs font-mono text-gray-500 uppercase mb-1">Total</div>
-                <div className="text-2xl font-mono font-bold text-gray-900">{counts.total}</div>
+                <div className="text-xs font-mono text-gray-500 uppercase mb-1">
+                  Total
+                </div>
+                <div className="text-2xl font-mono font-bold text-gray-900">
+                  {counts.total}
+                </div>
               </div>
               <div className="bg-white border border-gray-200 p-4">
                 <div className="text-xs font-mono text-gray-500 uppercase mb-1 flex items-center space-x-2">
                   <Clock className="w-3 h-3 text-yellow-600" />
                   <span>Waiting</span>
                 </div>
-                <div className="text-2xl font-mono font-bold text-yellow-600">{counts.waiting}</div>
+                <div className="text-2xl font-mono font-bold text-yellow-600">
+                  {counts.waiting}
+                </div>
               </div>
               <div className="bg-white border border-gray-200 p-4">
                 <div className="text-xs font-mono text-gray-500 uppercase mb-1 flex items-center space-x-2">
                   <Loader className="w-3 h-3 text-blue-600" />
                   <span>Active</span>
                 </div>
-                <div className="text-2xl font-mono font-bold text-blue-600">{counts.active}</div>
+                <div className="text-2xl font-mono font-bold text-blue-600">
+                  {counts.active}
+                </div>
               </div>
               <div className="bg-white border border-gray-200 p-4">
                 <div className="text-xs font-mono text-gray-500 uppercase mb-1 flex items-center space-x-2">
                   <AlertCircle className="w-3 h-3 text-orange-600" />
                   <span>Delayed</span>
                 </div>
-                <div className="text-2xl font-mono font-bold text-orange-600">{counts.delayed}</div>
+                <div className="text-2xl font-mono font-bold text-orange-600">
+                  {counts.delayed}
+                </div>
               </div>
             </div>
           </div>
@@ -291,7 +377,13 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
           {isLoading && jobs.length === 0 ? (
             <LoadingCard />
           ) : filteredJobs.length === 0 ? (
-            <EmptyState title={searchQuery ? `No jobs found matching "${searchQuery}"` : "No pending jobs found in the queue"} />
+            <EmptyState
+              title={
+                searchQuery
+                  ? `No jobs found matching "${searchQuery}"`
+                  : "No pending jobs found in the queue"
+              }
+            />
           ) : (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-2">
@@ -320,14 +412,19 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
                 )}
               </div>
               {filteredJobs.map((job) => (
-                <div key={job.id} className={`bg-white border p-6 overflow-hidden ${selectedJobs.has(job.id) ? 'border-black bg-gray-50' : 'border-gray-200'}`}>
+                <div
+                  key={job.id}
+                  className={`bg-white border p-6 overflow-hidden ${selectedJobs.has(job.id) ? "border-black bg-gray-50" : "border-gray-200"}`}
+                >
                   <div className="mb-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-3 flex-wrap gap-2">
                         <button
                           onClick={() => handleSelectJob(job.id)}
                           className="text-gray-600 hover:text-black transition-colors"
-                          title={selectedJobs.has(job.id) ? 'Deselect' : 'Select'}
+                          title={
+                            selectedJobs.has(job.id) ? "Deselect" : "Select"
+                          }
                         >
                           {selectedJobs.has(job.id) ? (
                             <CheckSquare className="w-5 h-5" />
@@ -337,7 +434,9 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
                         </button>
                         {getStatusIcon(job.status)}
                         {getStatusBadge(job.status)}
-                        <span className="text-xs font-mono text-gray-500 break-all">ID: {job.id}</span>
+                        <span className="text-xs font-mono text-gray-500 break-all">
+                          ID: {job.id}
+                        </span>
                       </div>
                       <button
                         onClick={() => handleDeleteJobClick(job.id)}
@@ -351,19 +450,19 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
                       User: {job.user_id}
                     </div>
                     {(() => {
-                      const title = job.metadata?.title;
-                      if (title && typeof title === 'string') {
+                      const title = job.metadata?.title
+                      if (title && typeof title === "string") {
                         return (
                           <h3 className="text-lg font-mono font-semibold text-gray-900 mb-2 break-words">
                             {title}
                           </h3>
-                        );
+                        )
                       }
-                      return null;
+                      return null
                     })()}
                     {(() => {
-                      const url = job.metadata?.url;
-                      if (url && typeof url === 'string') {
+                      const url = job.metadata?.url
+                      if (url && typeof url === "string") {
                         return (
                           <a
                             href={url}
@@ -373,9 +472,9 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
                           >
                             {url}
                           </a>
-                        );
+                        )
                       }
-                      return null;
+                      return null
                     })()}
                     <div className="text-sm text-gray-700 mb-3 bg-gray-50 p-3 border border-gray-200 font-mono break-words whitespace-pre-wrap">
                       {job.raw_text}
@@ -384,29 +483,49 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                     <div className="min-w-0">
-                      <div className="text-xs font-mono text-gray-500 uppercase mb-1">Created</div>
-                      <div className="text-xs font-mono text-gray-900 break-words">{formatDate(job.created_at)}</div>
+                      <div className="text-xs font-mono text-gray-500 uppercase mb-1">
+                        Created
+                      </div>
+                      <div className="text-xs font-mono text-gray-900 break-words">
+                        {formatDate(job.created_at)}
+                      </div>
                     </div>
                     {job.processed_on && (
                       <div className="min-w-0">
-                        <div className="text-xs font-mono text-gray-500 uppercase mb-1">Processed</div>
-                        <div className="text-xs font-mono text-gray-900 break-words">{formatDate(job.processed_on)}</div>
+                        <div className="text-xs font-mono text-gray-500 uppercase mb-1">
+                          Processed
+                        </div>
+                        <div className="text-xs font-mono text-gray-900 break-words">
+                          {formatDate(job.processed_on)}
+                        </div>
                       </div>
                     )}
                     <div className="min-w-0">
-                      <div className="text-xs font-mono text-gray-500 uppercase mb-1">Length</div>
-                      <div className="text-xs font-mono text-gray-900">{job.full_text_length.toLocaleString()} chars</div>
+                      <div className="text-xs font-mono text-gray-500 uppercase mb-1">
+                        Length
+                      </div>
+                      <div className="text-xs font-mono text-gray-900">
+                        {job.full_text_length.toLocaleString()} chars
+                      </div>
                     </div>
                     <div className="min-w-0">
-                      <div className="text-xs font-mono text-gray-500 uppercase mb-1">Attempts</div>
-                      <div className="text-xs font-mono text-gray-900">{job.attempts}</div>
+                      <div className="text-xs font-mono text-gray-500 uppercase mb-1">
+                        Attempts
+                      </div>
+                      <div className="text-xs font-mono text-gray-900">
+                        {job.attempts}
+                      </div>
                     </div>
                   </div>
 
                   {job.failed_reason && (
                     <div className="mt-4 p-3 bg-red-50 border border-red-200 overflow-hidden">
-                      <div className="text-xs font-mono text-red-800 uppercase mb-1">Failed Reason</div>
-                      <div className="text-sm font-mono text-red-900 break-words">{job.failed_reason}</div>
+                      <div className="text-xs font-mono text-red-800 uppercase mb-1">
+                        Failed Reason
+                      </div>
+                      <div className="text-sm font-mono text-red-900 break-words">
+                        {job.failed_reason}
+                      </div>
                     </div>
                   )}
 
@@ -430,10 +549,16 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({ isOpen, onCl
 
         <ConfirmDialog
           isOpen={deleteConfirm.isOpen}
-          title={deleteConfirm.jobIds ? `Delete ${deleteConfirm.jobIds.length} Jobs` : "Delete Job"}
-          message={deleteConfirm.jobIds 
-            ? `Are you sure you want to delete ${deleteConfirm.jobIds.length} selected job(s) from the queue?`
-            : "Are you sure you want to delete this job from the queue?"}
+          title={
+            deleteConfirm.jobIds
+              ? `Delete ${deleteConfirm.jobIds.length} Jobs`
+              : "Delete Job"
+          }
+          message={
+            deleteConfirm.jobIds
+              ? `Are you sure you want to delete ${deleteConfirm.jobIds.length} selected job(s) from the queue?`
+              : "Are you sure you want to delete this job from the queue?"
+          }
           confirmLabel="Delete"
           cancelLabel="Cancel"
           onConfirm={handleDeleteJobConfirm}

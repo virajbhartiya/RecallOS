@@ -1,5 +1,5 @@
-import { getRequest } from '../../utility/generalServices'
-import { requireAuthToken } from '../../utils/userId'
+import { getRequest } from "../../utility/generalServices"
+import { requireAuthToken } from "../../utils/userId"
 
 export async function getPendingJobs(): Promise<{
   jobs: Array<{
@@ -8,7 +8,7 @@ export async function getPendingJobs(): Promise<{
     raw_text: string
     full_text_length: number
     metadata: Record<string, unknown>
-    status: 'waiting' | 'active' | 'delayed'
+    status: "waiting" | "active" | "delayed"
     created_at: string
     processed_on: string | null
     finished_on: string | null
@@ -24,21 +24,32 @@ export async function getPendingJobs(): Promise<{
 }> {
   requireAuthToken()
   const response = await getRequest(`/content/pending`)
-  return response.data?.data || { jobs: [], counts: { total: 0, waiting: 0, active: 0, delayed: 0 } }
+  return (
+    response.data?.data || {
+      jobs: [],
+      counts: { total: 0, waiting: 0, active: 0, delayed: 0 },
+    }
+  )
 }
 
 export async function deletePendingJob(jobId: string): Promise<void> {
   requireAuthToken()
-  const { deleteRequest } = await import('../../utility/generalServices')
+  const { deleteRequest } = await import("../../utility/generalServices")
   await deleteRequest(`/content/pending/${jobId}`)
 }
 
 export async function getMemorySnapshots(
   page: number = 1,
   limit: number = 20
-): Promise<{ snapshots: unknown[]; total: number; page: number; limit: number }> {
+): Promise<{
+  snapshots: unknown[]
+  total: number
+  page: number
+  limit: number
+}> {
   requireAuthToken()
-  const response = await getRequest(`/memory/snapshots?page=${page}&limit=${limit}`)
+  const response = await getRequest(
+    `/memory/snapshots?page=${page}&limit=${limit}`
+  )
   return response.data?.data || { snapshots: [], total: 0, page, limit }
 }
-

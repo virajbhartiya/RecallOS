@@ -1,30 +1,40 @@
-import React, { useState, useCallback, useEffect } from 'react'
-import { MemorySearch } from '../components/MemorySearch'
-import { MemoryService } from '../services/memoryService'
-import { MemorySearchResultCard } from '../components/MemorySearchResultCard'
-import { LoadingCard, ErrorMessage, EmptyState } from '../components/ui/loading-spinner'
-import type { Memory, SearchFilters, MemorySearchResponse } from '../types/memory'
-import { requireAuthToken } from '@/utils/userId'
-import { useNavigate } from 'react-router-dom'
-import { getProfileContext } from '../services/profile'
+import React, { useCallback, useEffect, useState } from "react"
+import { requireAuthToken } from "@/utils/userId"
+import { useNavigate } from "react-router-dom"
+
+import { MemorySearch } from "../components/MemorySearch"
+import { MemorySearchResultCard } from "../components/MemorySearchResultCard"
+import {
+  EmptyState,
+  ErrorMessage,
+  LoadingCard,
+} from "../components/ui/loading-spinner"
+import { MemoryService } from "../services/memoryService"
+import { getProfileContext } from "../services/profile"
+import type {
+  Memory,
+  MemorySearchResponse,
+  SearchFilters,
+} from "../types/memory"
 
 export const Search: React.FC = () => {
   const navigate = useNavigate()
-  const [searchResults, setSearchResults] = useState<MemorySearchResponse | null>(null)
+  const [searchResults, setSearchResults] =
+    useState<MemorySearchResponse | null>(null)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isPopupOpen, setIsPopupOpen] = useState(false)
   const [showOnlyCited, setShowOnlyCited] = useState(true)
-  const [profileContext, setProfileContext] = useState<string>('')
+  const [profileContext, setProfileContext] = useState<string>("")
 
   useEffect(() => {
     try {
       requireAuthToken()
       setIsAuthenticated(true)
     } catch (error) {
-      navigate('/login')
+      navigate("/login")
     }
   }, [navigate])
 
@@ -36,40 +46,40 @@ export const Search: React.FC = () => {
         const context = await getProfileContext()
         setProfileContext(context)
       } catch (error) {
-        console.error('Error fetching profile context:', error)
+        console.error("Error fetching profile context:", error)
       }
     }
 
     fetchProfileContext()
   }, [isAuthenticated])
 
-  const handleSearch = useCallback(async (
-    query: string, 
-    filters: SearchFilters
-  ) => {
-    setIsLoading(true)
-    setError(null)
-    setSearchResults(null)
+  const handleSearch = useCallback(
+    async (query: string, filters: SearchFilters) => {
+      setIsLoading(true)
+      setError(null)
+      setSearchResults(null)
 
-    try {
-      // Require authentication
-      requireAuthToken()
+      try {
+        // Require authentication
+        requireAuthToken()
 
-      const response = await MemoryService.searchMemories(
-        query,
-        filters,
-        1,
-        20
-      )
+        const response = await MemoryService.searchMemories(
+          query,
+          filters,
+          1,
+          20
+        )
 
-      setSearchResults(response)
-    } catch (err) {
-      setError('Failed to search memories')
-      console.error('Error searching memories:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
+        setSearchResults(response)
+      } catch (err) {
+        setError("Failed to search memories")
+        console.error("Error searching memories:", err)
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    []
+  )
 
   const handleClearFilters = useCallback(() => {
     setSearchResults(null)
@@ -91,9 +101,12 @@ export const Search: React.FC = () => {
       if (!isPopupOpen) return
 
       const target = e.target as HTMLElement
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
 
-      if (e.key === 'Escape' && !isInput) {
+      if (e.key === "Escape" && !isInput) {
         e.preventDefault()
         e.stopPropagation()
         handleClosePopup()
@@ -101,9 +114,9 @@ export const Search: React.FC = () => {
     }
 
     if (isPopupOpen) {
-      document.addEventListener('keydown', handleKeyDown, true)
+      document.addEventListener("keydown", handleKeyDown, true)
       return () => {
-        document.removeEventListener('keydown', handleKeyDown, true)
+        document.removeEventListener("keydown", handleKeyDown, true)
       }
     }
   }, [isPopupOpen, handleClosePopup])
@@ -111,16 +124,18 @@ export const Search: React.FC = () => {
   // Filter results to show only cited memories
   const getFilteredResults = () => {
     if (!searchResults) return []
-    
+
     if (!showOnlyCited || !searchResults.citations) {
       return searchResults.results
     }
-    
+
     // Get memory IDs from citations
-    const citedMemoryIds = searchResults.citations.map(citation => citation.memory_id)
-    
+    const citedMemoryIds = searchResults.citations.map(
+      (citation) => citation.memory_id
+    )
+
     // Filter results to only include cited memories
-    return searchResults.results.filter(result => 
+    return searchResults.results.filter((result) =>
       citedMemoryIds.includes(result.memory.id)
     )
   }
@@ -164,28 +179,31 @@ export const Search: React.FC = () => {
             className="mb-6"
             profileContext={profileContext}
           />
-          
+
           {/* Show Only Cited Memories Toggle */}
-          {searchResults && searchResults.citations && searchResults.citations.length > 0 && (
-            <div className="bg-white border border-gray-200 p-4 mb-6">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-mono text-gray-600">
-                  [DISPLAY OPTIONS]
+          {searchResults &&
+            searchResults.citations &&
+            searchResults.citations.length > 0 && (
+              <div className="bg-white border border-gray-200 p-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-mono text-gray-600">
+                    [DISPLAY OPTIONS]
+                  </div>
+                  <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showOnlyCited}
+                      onChange={(e) => setShowOnlyCited(e.target.checked)}
+                      className="border-gray-300"
+                    />
+                    <span className="text-sm font-mono text-gray-700">
+                      Show only cited memories ({searchResults.citations.length}{" "}
+                      cited)
+                    </span>
+                  </label>
                 </div>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showOnlyCited}
-                    onChange={(e) => setShowOnlyCited(e.target.checked)}
-                    className="border-gray-300"
-                  />
-                  <span className="text-sm font-mono text-gray-700">
-                    Show only cited memories ({searchResults.citations.length} cited)
-                  </span>
-                </label>
               </div>
-            </div>
-          )}
+            )}
         </div>
 
         {/* Search Results */}
@@ -199,10 +217,7 @@ export const Search: React.FC = () => {
           )}
 
           {error && (
-            <ErrorMessage 
-              message={error}
-              onRetry={() => setError(null)}
-            />
+            <ErrorMessage message={error} onRetry={() => setError(null)} />
           )}
 
           {searchResults && searchResults.results.length === 0 && (
@@ -211,7 +226,7 @@ export const Search: React.FC = () => {
               description="Try adjusting your search query or filters"
               action={{
                 label: "Clear Filters",
-                onClick: handleClearFilters
+                onClick: handleClearFilters,
               }}
             />
           )}
@@ -227,24 +242,26 @@ export const Search: React.FC = () => {
                   <div className="text-sm text-gray-800 mb-3">
                     {searchResults.answer}
                   </div>
-                  {searchResults.citations && searchResults.citations.length > 0 && (
-                    <div className="text-xs text-gray-600">
-                      <span className="font-mono">Citations:</span>{' '}
-                      {searchResults.citations.map((citation, index) => (
-                        <span key={citation.memory_id}>
-                          <a 
-                            href={citation.url || '#'} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 underline"
-                          >
-                            [{citation.label}] {citation.title}
-                          </a>
-                          {index < searchResults.citations!.length - 1 && ', '}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {searchResults.citations &&
+                    searchResults.citations.length > 0 && (
+                      <div className="text-xs text-gray-600">
+                        <span className="font-mono">Citations:</span>{" "}
+                        {searchResults.citations.map((citation, index) => (
+                          <span key={citation.memory_id}>
+                            <a
+                              href={citation.url || "#"}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 underline"
+                            >
+                              [{citation.label}] {citation.title}
+                            </a>
+                            {index < searchResults.citations!.length - 1 &&
+                              ", "}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                 </div>
               )}
 
@@ -258,20 +275,25 @@ export const Search: React.FC = () => {
                     {showOnlyCited ? (
                       <>
                         Showing {getFilteredResults().length} cited memories
-                        {getFilteredResults().length !== searchResults.total && ` (of ${searchResults.total} total results)`}
+                        {getFilteredResults().length !== searchResults.total &&
+                          ` (of ${searchResults.total} total results)`}
                       </>
                     ) : (
                       <>
-                        Showing all {searchResults.total} {searchResults.total === 1 ? 'result' : 'results'}
-                        {searchResults.page > 1 && ` (page ${searchResults.page})`}
+                        Showing all {searchResults.total}{" "}
+                        {searchResults.total === 1 ? "result" : "results"}
+                        {searchResults.page > 1 &&
+                          ` (page ${searchResults.page})`}
                       </>
                     )}
                   </div>
-                  {searchResults.filters && Object.keys(searchResults.filters).length > 0 && (
-                    <div className="text-xs font-mono text-gray-500">
-                      Filters applied: {Object.keys(searchResults.filters).length}
-                    </div>
-                  )}
+                  {searchResults.filters &&
+                    Object.keys(searchResults.filters).length > 0 && (
+                      <div className="text-xs font-mono text-gray-500">
+                        Filters applied:{" "}
+                        {Object.keys(searchResults.filters).length}
+                      </div>
+                    )}
                 </div>
               </div>
 
@@ -292,11 +314,11 @@ export const Search: React.FC = () => {
 
       {/* Memory Detail Popup */}
       {isPopupOpen && selectedMemory && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
           onClick={handleClosePopup}
         >
-          <div 
+          <div
             className="bg-white max-w-4xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
@@ -320,7 +342,7 @@ export const Search: React.FC = () => {
                     [TITLE]
                   </h3>
                   <p className="text-lg font-mono text-gray-900">
-                    {selectedMemory.title || 'Untitled Memory'}
+                    {selectedMemory.title || "Untitled Memory"}
                   </p>
                 </div>
 
@@ -359,7 +381,9 @@ export const Search: React.FC = () => {
                     <div className="space-y-2 text-sm font-mono">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Source:</span>
-                        <span className="text-gray-900 uppercase">{selectedMemory.source}</span>
+                        <span className="text-gray-900 uppercase">
+                          {selectedMemory.source}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Created:</span>
@@ -370,7 +394,7 @@ export const Search: React.FC = () => {
                     </div>
                   </div>
 
-                  {selectedMemory.url && selectedMemory.url !== 'unknown' && (
+                  {selectedMemory.url && selectedMemory.url !== "unknown" && (
                     <div>
                       <h3 className="text-sm font-mono text-gray-600 uppercase tracking-wide mb-2">
                         [URL]

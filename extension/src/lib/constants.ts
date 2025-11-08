@@ -1,11 +1,11 @@
-export const DEFAULT_API_ENDPOINT = 'http://localhost:3000/api/memory/process';
-export const DEFAULT_API_BASE = 'http://localhost:3000';
-export const MIN_CAPTURE_INTERVAL = 10000;
-export const ACTIVITY_TIMEOUT = 30000;
-export const CONTENT_CHANGE_THRESHOLD = 0.1;
-export const MIN_CONTENT_LENGTH = 50;
-export const MEMORY_INJECTION_DELAY = 1500;
-export const MEMORY_INJECTION_MIN_LENGTH = 3;
+export const DEFAULT_API_ENDPOINT = 'http://localhost:3000/api/memory/process'
+export const DEFAULT_API_BASE = 'http://localhost:3000'
+export const MIN_CAPTURE_INTERVAL = 10000
+export const ACTIVITY_TIMEOUT = 30000
+export const CONTENT_CHANGE_THRESHOLD = 0.1
+export const MIN_CONTENT_LENGTH = 50
+export const MEMORY_INJECTION_DELAY = 1500
+export const MEMORY_INJECTION_MIN_LENGTH = 3
 
 export const MESSAGE_TYPES = {
   CAPTURE_CONTEXT: 'CAPTURE_CONTEXT',
@@ -24,7 +24,7 @@ export const MESSAGE_TYPES = {
   CHECK_API_HEALTH: 'CHECK_API_HEALTH',
   SYNC_AUTH_TOKEN: 'SYNC_AUTH_TOKEN',
   PING: 'PING',
-} as const;
+} as const
 
 export const STORAGE_KEYS = {
   API_ENDPOINT: 'apiEndpoint',
@@ -32,5 +32,4 @@ export const STORAGE_KEYS = {
   MEMORY_INJECTION_ENABLED: 'memoryInjectionEnabled',
   BLOCKED_WEBSITES: 'blockedWebsites',
   AUTH_TOKEN: 'auth_token',
-} as const;
-
+} as const

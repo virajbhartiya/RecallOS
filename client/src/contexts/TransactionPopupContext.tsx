@@ -1,17 +1,21 @@
-import React, { createContext, useContext, ReactNode } from 'react'
+import React, { createContext, ReactNode, useContext } from "react"
 
 interface TransactionPopupContextType {
-  openPopup: (options: { chainId: string; address?: string }) => void
+  openPopup: () => void
 }
 
-const TransactionPopupContext = createContext<TransactionPopupContextType | undefined>(undefined)
+const TransactionPopupContext = createContext<
+  TransactionPopupContextType | undefined
+>(undefined)
 
 interface TransactionPopupProviderProps {
   children: ReactNode
 }
 
-export const TransactionPopupProvider: React.FC<TransactionPopupProviderProps> = ({ children }) => {
-  const openPopup = (_opts: { chainId: string; address?: string }) => {
+export const TransactionPopupProvider: React.FC<
+  TransactionPopupProviderProps
+> = ({ children }) => {
+  const openPopup = () => {
     return
   }
 
@@ -22,10 +26,13 @@ export const TransactionPopupProvider: React.FC<TransactionPopupProviderProps> =
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useTransactionPopup = () => {
   const context = useContext(TransactionPopupContext)
   if (context === undefined) {
-    throw new Error('useTransactionPopup must be used within a TransactionPopupProvider')
+    throw new Error(
+      "useTransactionPopup must be used within a TransactionPopupProvider"
+    )
   }
   return context
 }

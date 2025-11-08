@@ -47,7 +47,7 @@ export interface MemoryInsights {
 
 export interface MemoryMeshNode {
   id: string
-  type: 'manual' | 'browser' | 'extension' | 'reasoning'
+  type: "manual" | "browser" | "extension" | "reasoning"
   label: string
   x: number
   y: number
@@ -98,7 +98,7 @@ export interface SearchFilters {
     min: number
     max: number
   }
-  sentiment?: 'positive' | 'negative' | 'neutral'
+  sentiment?: "positive" | "negative" | "neutral"
   dateRange?: {
     start: string
     end: string
@@ -113,7 +113,7 @@ export interface SearchResult {
   keyword_score?: number
   semantic_score?: number
   blended_score?: number
-  search_type?: 'keyword' | 'semantic' | 'hybrid'
+  search_type?: "keyword" | "semantic" | "hybrid"
 }
 
 export interface MemorySearchResponse {
@@ -123,7 +123,12 @@ export interface MemorySearchResponse {
   limit: number
   filters: SearchFilters
   answer?: string
-  citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>
+  citations?: Array<{
+    label: number
+    memory_id: string
+    title: string | null
+    url: string | null
+  }>
   job_id?: string
 }
 

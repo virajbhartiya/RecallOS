@@ -1,9 +1,9 @@
-import { getRequest, postRequest } from '../../utility/generalServices'
-import { requireAuthToken } from '../../utils/userId'
-import { transformApiSearchResult } from '../../utils/memoryTransform'
-import type { MemorySearchResponse, SearchFilters } from '../../types/memory'
+import type { MemorySearchResponse, SearchFilters } from "../../types/memory"
+import { getRequest, postRequest } from "../../utility/generalServices"
+import { transformApiSearchResult } from "../../utils/memoryTransform"
+import { requireAuthToken } from "../../utils/userId"
 
-const baseUrl = '/memory'
+const baseUrl = "/memory"
 
 export async function searchMemories(
   query: string,
@@ -14,25 +14,32 @@ export async function searchMemories(
 ): Promise<MemorySearchResponse> {
   try {
     requireAuthToken()
-    
-    const response = await postRequest('/search', {
-      query,
-      limit,
-      contextOnly: false
-    }, undefined, signal)
-    
+
+    const response = await postRequest(
+      "/search",
+      {
+        query,
+        limit,
+        contextOnly: false,
+      },
+      undefined,
+      signal
+    )
+
     if (!response) {
-      throw new Error('No response received from server')
+      throw new Error("No response received from server")
     }
-    
+
     if (response.status >= 400) {
       throw new Error(`Server error: ${response.status} ${response.statusText}`)
     }
-    
+
     const responseData = response?.data
     if (responseData) {
-      const transformedResults = (responseData.results || []).map(transformApiSearchResult)
-      
+      const transformedResults = (responseData.results || []).map(
+        transformApiSearchResult
+      )
+
       return {
         results: transformedResults,
         total: responseData.results?.length || 0,
@@ -41,7 +48,7 @@ export async function searchMemories(
         filters,
         answer: responseData.answer,
         citations: responseData.citations,
-        job_id: responseData.job_id
+        job_id: responseData.job_id,
       }
     }
     return { results: [], total: 0, page, limit, filters }
@@ -61,12 +68,12 @@ export async function searchMemoriesHybrid(
     const params = new URLSearchParams({
       query,
       page: page.toString(),
-      limit: limit.toString()
+      limit: limit.toString(),
     })
 
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        if (typeof value === 'object') {
+        if (typeof value === "object") {
           params.append(key, JSON.stringify(value))
         } else {
           params.append(key, value.toString())
@@ -74,16 +81,18 @@ export async function searchMemoriesHybrid(
       }
     })
 
-    const response = await getRequest(`${baseUrl}/search-hybrid?${params.toString()}`)
-    
+    const response = await getRequest(
+      `${baseUrl}/search-hybrid?${params.toString()}`
+    )
+
     if (!response) {
-      throw new Error('No response received from server')
+      throw new Error("No response received from server")
     }
-    
+
     if (response.status >= 400) {
       throw new Error(`Server error: ${response.status} ${response.statusText}`)
     }
-    
+
     const responseData = response?.data
     if (responseData && responseData.data) {
       return {
@@ -91,7 +100,7 @@ export async function searchMemoriesHybrid(
         total: responseData.data.total || 0,
         page,
         limit,
-        filters
+        filters,
       }
     }
     return { results: [], total: 0, page, limit, filters }
@@ -99,4 +108,3 @@ export async function searchMemoriesHybrid(
     return { results: [], total: 0, page, limit, filters }
   }
 }
-

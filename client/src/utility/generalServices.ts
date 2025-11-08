@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import axiosInstance from './axiosInterceptor'
-import { AxiosResponse } from 'axios'
+import { AxiosResponse } from "axios"
+
+import axiosInstance from "./axiosInterceptor"
 
 export const getRequest = async (
   route: string,
@@ -8,9 +9,9 @@ export const getRequest = async (
   signal?: AbortSignal
 ) => {
   try {
-    const res = await axiosInstance.get(route, { 
+    const res = await axiosInstance.get(route, {
       signal,
-      timeout: signal ? 0 : 30000 // Disable timeout if AbortSignal is provided
+      timeout: signal ? 0 : 30000, // Disable timeout if AbortSignal is provided
     })
     if (callback) callback(res)
     return res
@@ -28,9 +29,9 @@ export const postRequest = async (
   timeout?: number
 ) => {
   try {
-    const res = await axiosInstance.post(route, data, { 
+    const res = await axiosInstance.post(route, data, {
       signal,
-      timeout: timeout !== undefined ? timeout : (signal ? 0 : 30000) // Use provided timeout, or disable if AbortSignal is provided, or default to 30s
+      timeout: timeout !== undefined ? timeout : signal ? 0 : 30000, // Use provided timeout, or disable if AbortSignal is provided, or default to 30s
     })
     if (callback) callback(res)
     return res

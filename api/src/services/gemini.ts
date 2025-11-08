@@ -1,169 +1,208 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI } from '@google/genai'
 
-export const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'text-embedding-004';
+export const GEMINI_EMBED_MODEL = process.env.GEMINI_EMBED_MODEL || 'text-embedding-004'
+
+type UsageMetadata = {
+  promptTokenCount?: number
+  candidatesTokenCount?: number
+}
+
+type GeminiResponse = {
+  text: string
+  usageMetadata?: UsageMetadata
+}
+
+type GeminiError = {
+  status?: number
+  message?: string
+  details?: Array<{
+    retryDelay?: string
+    [key: string]: unknown
+  }>
+}
+
+type ContentMetadata = {
+  content_type?: string
+  title?: string
+  url?: string
+  content_summary?: string
+  key_topics?: string[]
+}
 
 // In-process rate limiter queue to avoid Gemini 429 (quota) errors
-type QueueTask<T> = () => Promise<T>;
-type QueuedTask = { 
-  run: QueueTask<any>; 
-  resolve: (v: any) => void; 
-  reject: (e: any) => void;
-  priority: number; // Higher number = higher priority (search requests use 10, processing uses 0)
-};
+type QueueTask<T> = () => Promise<T>
+type QueuedTask<T = unknown> = {
+  run: QueueTask<T>
+  resolve: (v: T) => void
+  reject: (e: Error | GeminiError) => void
+  priority: number // Higher number = higher priority (search requests use 10, processing uses 0)
+}
 
-let isProcessingQueue = false;
-let nextAvailableAt = 0;
-const taskQueue: QueuedTask[] = [];
+let isProcessingQueue = false
+let nextAvailableAt = 0
+const taskQueue: QueuedTask[] = []
 
 // Default gap between requests; tuned for free-tier limits (~10 rpm). Adjust via Retry-After hints when returned
-let minIntervalMs = 2000; // Further reduced to 2000ms for faster processing
+const minIntervalMs = 2000 // Further reduced to 2000ms for faster processing
 
 async function processQueue() {
-  if (isProcessingQueue) return;
-  isProcessingQueue = true;
+  if (isProcessingQueue) return
+  isProcessingQueue = true
   try {
     while (taskQueue.length > 0) {
       // Sort by priority (highest first) and take the highest priority task
-      taskQueue.sort((a, b) => b.priority - a.priority);
-      
-      const now = Date.now();
-      const waitMs = Math.max(0, nextAvailableAt - now);
+      taskQueue.sort((a, b) => b.priority - a.priority)
+
+      const now = Date.now()
+      const waitMs = Math.max(0, nextAvailableAt - now)
       if (waitMs > 0) {
-        await new Promise(r => setTimeout(r, waitMs));
+        await new Promise(r => setTimeout(r, waitMs))
       }
 
-      const { run, resolve, reject } = taskQueue.shift()!;
+      const { run, resolve, reject } = taskQueue.shift()!
       try {
-        const result = await run();
-        resolve(result);
-        nextAvailableAt = Date.now() + minIntervalMs;
-      } catch (err: any) {
-        const retryDelayMs = extractRetryDelayMs(err) ?? minIntervalMs;
-        nextAvailableAt = Date.now() + retryDelayMs;
-        reject(err);
+        const result = await run()
+        resolve(result)
+        nextAvailableAt = Date.now() + minIntervalMs
+      } catch (err) {
+        const error = err as Error | GeminiError
+        const retryDelayMs = extractRetryDelayMs(error) ?? minIntervalMs
+        nextAvailableAt = Date.now() + retryDelayMs
+        reject(error)
       }
     }
   } finally {
-    isProcessingQueue = false;
+    isProcessingQueue = false
   }
 }
 
-function extractRetryDelayMs(err: any): number | null {
-  const details = err?.details;
+function extractRetryDelayMs(err: Error | GeminiError): number | null {
+  const error = err as GeminiError
+  const details = error?.details
   if (Array.isArray(details)) {
     for (const d of details) {
       if (typeof d?.retryDelay === 'string') {
-        const m = d.retryDelay.match(/^(\d+)(?:\.(\d+))?s$/);
+        const m = d.retryDelay.match(/^(\d+)(?:\.(\d+))?s$/)
         if (m) {
-          const seconds = Number(m[1]);
-          const frac = m[2] ? Number(`0.${m[2]}`) : 0;
-          return Math.max(Math.floor((seconds + frac) * 1000), 1000);
+          const seconds = Number(m[1])
+          const frac = m[2] ? Number(`0.${m[2]}`) : 0
+          return Math.max(Math.floor((seconds + frac) * 1000), 1000)
         }
       }
     }
   }
-  const msg: string | undefined = err?.message;
+  const msg: string | undefined = error?.message
   if (msg) {
-    const m = msg.match(/retry in\s+([0-9]+(?:\.[0-9]+)?)s/i);
-    if (m) return Math.max(Math.floor(parseFloat(m[1]) * 1000), 1000);
+    const m = msg.match(/retry in\s+([0-9]+(?:\.[0-9]+)?)s/i)
+    if (m) return Math.max(Math.floor(parseFloat(m[1]) * 1000), 1000)
   }
-  if (err?.status === 429) return 8000;
-  return null;
+  if (error?.status === 429) return 8000
+  return null
 }
 
-function runWithRateLimit<T>(task: QueueTask<T>, timeoutMs: number = 60000, bypassRateLimit: boolean = false, priority: number = 0): Promise<T> {
+function runWithRateLimit<T>(
+  task: QueueTask<T>,
+  timeoutMs: number = 60000,
+  bypassRateLimit: boolean = false,
+  priority: number = 0
+): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeoutId = setTimeout(() => {
-      reject(new Error(`Operation timed out after ${timeoutMs}ms`));
-    }, timeoutMs);
-    
+      reject(new Error(`Operation timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
+
     const executeTask = async () => {
       try {
-        const result = await task();
-        clearTimeout(timeoutId);
-        return result;
+        const result = await task()
+        clearTimeout(timeoutId)
+        return result
       } catch (error) {
-        clearTimeout(timeoutId);
-        throw error;
+        clearTimeout(timeoutId)
+        throw error
       }
-    };
-    
+    }
+
     if (bypassRateLimit) {
       // Execute immediately without rate limiting for critical operations
-      executeTask().then(resolve).catch(reject);
+      executeTask().then(resolve).catch(reject)
     } else {
-      taskQueue.push({ 
-        run: executeTask, 
-        resolve, 
+      taskQueue.push({
+        run: executeTask,
+        resolve,
         reject,
-        priority
-      });
-      processQueue();
+        priority,
+      })
+      processQueue()
     }
-  });
+  })
 }
 
 export class GeminiService {
-  private ai: GoogleGenAI;
+  private ai: GoogleGenAI
   private availableModels: string[] = [
     'gemini-2.5-flash',
     'gemini-2.5-pro',
     'gemini-2.0-flash',
     'gemini-2.0-flash-lite',
-    'gemini-2.5-flash-lite'
-  ];
-  private currentModelIndex: number = 0;
+    'gemini-2.5-flash-lite',
+  ]
+  private currentModelIndex: number = 0
 
   constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
       // GEMINI_API_KEY not set. Gemini service disabled.
-      this.ai = null as any;
-      return;
+      this.ai = null
+      return
     }
     try {
-      this.ai = new GoogleGenAI({ apiKey });
-    } catch (error) {
+      this.ai = new GoogleGenAI({ apiKey })
+    } catch {
       // Failed to initialize Gemini service
-      this.ai = null as any;
+      this.ai = null
     }
   }
 
   private ensureInit() {
-    if (!this.ai)
-      throw new Error('Gemini service not initialized. Set GEMINI_API_KEY.');
+    if (!this.ai) throw new Error('Gemini service not initialized. Set GEMINI_API_KEY.')
   }
 
   get isInitialized(): boolean {
-    return !!this.ai;
+    return !!this.ai
   }
 
   private getCurrentModel(): string {
-    return this.availableModels[this.currentModelIndex];
+    return this.availableModels[this.currentModelIndex]
   }
 
   private switchToNextModel(): boolean {
     if (this.currentModelIndex < this.availableModels.length - 1) {
-      this.currentModelIndex++;
-      return true;
+      this.currentModelIndex++
+      return true
     }
-    return false;
+    return false
   }
 
   private resetToFirstModel(): void {
-    this.currentModelIndex = 0;
+    this.currentModelIndex = 0
   }
 
-  private isRateLimitError(err: any): boolean {
-    return err?.status === 429 || 
-           err?.message?.toLowerCase().includes('quota') ||
-           err?.message?.toLowerCase().includes('rate limit') ||
-           err?.message?.toLowerCase().includes('too many requests');
+  private isRateLimitError(err: Error | GeminiError): boolean {
+    const error = err as GeminiError
+    return (
+      error?.status === 429 ||
+      error?.message?.toLowerCase().includes('quota') ||
+      error?.message?.toLowerCase().includes('rate limit') ||
+      error?.message?.toLowerCase().includes('too many requests')
+    )
   }
 
-  async generateContent(prompt: string, isSearchRequest: boolean = false, userId?: string): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
-    this.ensureInit();
-    
+  async generateContent(
+    prompt: string,
+    isSearchRequest: boolean = false
+  ): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
+    this.ensureInit()
+
     const enhancedPrompt = `${prompt}
 
 CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
@@ -176,119 +215,132 @@ CRITICAL: Return ONLY plain text content. Do not use any markdown formatting inc
 - No bullet points with dashes or asterisks
 - No numbered lists with special formatting
 
-Return clean, readable plain text only.`;
+Return clean, readable plain text only.`
 
-    let lastError: any;
-    const originalModelIndex = this.currentModelIndex;
+    let lastError: Error | GeminiError | undefined
+    const originalModelIndex = this.currentModelIndex
     // Search requests get high priority (10), processing tasks get normal priority (0)
-    const priority = isSearchRequest ? 10 : 0;
+    const priority = isSearchRequest ? 10 : 0
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
         // Use longer timeout for search requests (5 minutes) vs processing (2 minutes)
-        const timeoutMs = isSearchRequest ? 300000 : 120000;
-        const response = await runWithRateLimit(() =>
-          this.ai.models.generateContent({
-            model: this.getCurrentModel(),
-            contents: enhancedPrompt,
-          }), timeoutMs,
+        const timeoutMs = isSearchRequest ? 300000 : 120000
+        const response = await runWithRateLimit(
+          () =>
+            this.ai.models.generateContent({
+              model: this.getCurrentModel(),
+              contents: enhancedPrompt,
+            }),
+          timeoutMs,
           false, // don't bypass rate limit
           priority // use priority for search requests
-        );
-        if (!response.text) throw new Error('No content generated from Gemini API');
-        
-        const usageMetadata = (response as any).usageMetadata;
-        const inputTokens = usageMetadata?.promptTokenCount || 0;
-        const outputTokens = usageMetadata?.candidatesTokenCount || 0;
-        const modelUsed = this.getCurrentModel();
-        
+        )
+        if (!response.text) throw new Error('No content generated from Gemini API')
+
+        const usageMetadata = (response as GeminiResponse).usageMetadata
+        const inputTokens = usageMetadata?.promptTokenCount || 0
+        const outputTokens = usageMetadata?.candidatesTokenCount || 0
+        const modelUsed = this.getCurrentModel()
+
         // Reset to first model on success
-        this.resetToFirstModel();
-        return { text: response.text, modelUsed, inputTokens, outputTokens };
+        this.resetToFirstModel()
+        return { text: response.text, modelUsed, inputTokens, outputTokens }
       } catch (err) {
-        lastError = err;
+        const error = err as Error | GeminiError
+        lastError = error
         // Content generation error
-        
-        if (this.isRateLimitError(err)) {
+
+        if (this.isRateLimitError(error)) {
           if (!this.switchToNextModel()) {
             // No more models to try
-            break;
+            break
           }
         } else {
           // Non-rate-limit error, don't try other models
-          break;
+          break
         }
       }
     }
 
     // Reset to original model if all models failed
-    this.currentModelIndex = originalModelIndex;
-    throw lastError;
+    this.currentModelIndex = originalModelIndex
+    throw lastError
   }
 
-  async generateEmbedding(text: string, userId?: string): Promise<{ embedding: number[]; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
-    this.ensureInit();
-    
-    
-    let lastError: any;
-    const originalModelIndex = this.currentModelIndex;
+  async generateEmbedding(text: string): Promise<{
+    embedding: number[]
+    modelUsed?: string
+    inputTokens?: number
+    outputTokens?: number
+  }> {
+    this.ensureInit()
+
+    let lastError: Error | GeminiError | undefined
+    const originalModelIndex = this.currentModelIndex
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
-        const response = await runWithRateLimit(() =>
-          this.ai.models.embedContent({
-            model: GEMINI_EMBED_MODEL,
-            contents: text,
-          }), 180000, true // 3 minutes timeout for embeddings, bypass rate limit for critical operations
-        );
-        const values = response.embeddings?.[0]?.values;
-        if (!values) throw new Error('No embedding generated from Gemini API');
-        
-        const usageMetadata = (response as any).usageMetadata;
-        const inputTokens = usageMetadata?.promptTokenCount || 0;
-        const outputTokens = 0;
-        const modelUsed = GEMINI_EMBED_MODEL;
-        
+        const response = await runWithRateLimit(
+          () =>
+            this.ai.models.embedContent({
+              model: GEMINI_EMBED_MODEL,
+              contents: text,
+            }),
+          180000,
+          true // 3 minutes timeout for embeddings, bypass rate limit for critical operations
+        )
+        const values = response.embeddings?.[0]?.values
+        if (!values) throw new Error('No embedding generated from Gemini API')
+
+        const usageMetadata = (response as GeminiResponse).usageMetadata
+        const inputTokens = usageMetadata?.promptTokenCount || 0
+        const outputTokens = 0
+        const modelUsed = GEMINI_EMBED_MODEL
+
         // Reset to first model on success
-        this.resetToFirstModel();
-        return { embedding: values, modelUsed, inputTokens, outputTokens };
+        this.resetToFirstModel()
+        return { embedding: values, modelUsed, inputTokens, outputTokens }
       } catch (err) {
-        lastError = err;
+        lastError = err
         // Embedding error
-        
+
         if (this.isRateLimitError(err)) {
           if (!this.switchToNextModel()) {
             // No more models to try
-            break;
+            break
           }
         } else {
           // Non-rate-limit error, don't try other models
-          break;
+          break
         }
       }
     }
 
     // Reset to original model if all models failed
-    this.currentModelIndex = originalModelIndex;
+    this.currentModelIndex = originalModelIndex
     // All embedding generation attempts failed
-    throw lastError;
+    throw lastError
   }
 
-  async summarizeContent(rawText: string, metadata?: any, userId?: string): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
-    this.ensureInit();
+  async summarizeContent(
+    rawText: string,
+    metadata?: ContentMetadata
+  ): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
+    this.ensureInit()
 
-    const contentType = metadata?.content_type || 'web_page';
-    const title = metadata?.title || '';
-    const url = metadata?.url || '';
-    const contextSummary = metadata?.content_summary || '';
-    const keyTopics = metadata?.key_topics || [];
+    const contentType = metadata?.content_type || 'web_page'
+    const title = metadata?.title || ''
+    const url = metadata?.url || ''
+    const contextSummary = metadata?.content_summary || ''
+    const keyTopics = metadata?.key_topics || []
 
     const baseContext = `
     RecallOS Memory Context:
     - This system captures, anchors, and reasons over user knowledge.
     - Each summary must preserve conceptual and factual signals that aid downstream embedding and memory linkage.
     - Focus on what this content teaches, why it matters, and how it connects to user knowledge evolution.
-    `;
+    `
 
     const prompts: Record<string, string> = {
       blog_post: `Summarize this blog post for RecallOS memory storage. Extract conceptual essence, useful principles, and any links to AI reasoning or systems thinking. Limit to 200 words.`,
@@ -301,7 +353,7 @@ Return clean, readable plain text only.`;
       video_content: `Summarize this video for conceptual retention. Capture teaching points, narrative logic, and actionable outcomes. 200 words.`,
       social_media: `Summarize this post as an idea capsule. Focus on expressed insight, argument, and why it may shape user reasoning. 150 words.`,
       default: `Summarize this content for RecallOS memory graph. Capture topic, insights, implications, and long-term relevance. 200 words.`,
-    };
+    }
 
     const prompt = `
 ${baseContext}
@@ -325,60 +377,75 @@ CRITICAL: Return ONLY plain text content. Do not use any markdown formatting inc
 Return clean, readable plain text only.
 
 Raw Content: ${rawText}
-`;
+`
 
-    let lastError: any;
-    const originalModelIndex = this.currentModelIndex;
+    let lastError: Error | GeminiError | undefined
+    const originalModelIndex = this.currentModelIndex
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
-        const res = await runWithRateLimit(() =>
-          this.ai.models.generateContent({
-            model: this.getCurrentModel(),
-            contents: prompt,
-          }), 120000 // 2 minutes timeout
-        );
-        if (!res.text) throw new Error('No summary generated from Gemini API');
-        
-        const usageMetadata = (res as any).usageMetadata;
-        const inputTokens = usageMetadata?.promptTokenCount || 0;
-        const outputTokens = usageMetadata?.candidatesTokenCount || 0;
-        const modelUsed = this.getCurrentModel();
-        
+        const res = await runWithRateLimit(
+          () =>
+            this.ai.models.generateContent({
+              model: this.getCurrentModel(),
+              contents: prompt,
+            }),
+          120000 // 2 minutes timeout
+        )
+        if (!res.text) throw new Error('No summary generated from Gemini API')
+
+        const usageMetadata = (res as GeminiResponse).usageMetadata
+        const inputTokens = usageMetadata?.promptTokenCount || 0
+        const outputTokens = usageMetadata?.candidatesTokenCount || 0
+        const modelUsed = this.getCurrentModel()
+
         // Reset to first model on success
-        this.resetToFirstModel();
-        return { text: res.text.trim(), modelUsed, inputTokens, outputTokens };
+        this.resetToFirstModel()
+        return { text: res.text.trim(), modelUsed, inputTokens, outputTokens }
       } catch (err) {
-        lastError = err;
+        lastError = err
         // Summarization error
-        
+
         if (this.isRateLimitError(err)) {
           if (!this.switchToNextModel()) {
             // No more models to try
-            break;
+            break
           }
         } else {
           // Non-rate-limit error, don't try other models
-          break;
+          break
         }
       }
     }
 
     // Reset to original model if all models failed
-    this.currentModelIndex = originalModelIndex;
-    throw lastError;
+    this.currentModelIndex = originalModelIndex
+    throw lastError
   }
 
   async extractContentMetadata(
     rawText: string,
-    metadata?: any,
-    userId?: string
-  ): Promise<{ metadata: { topics: string[]; categories: string[]; keyPoints: string[]; sentiment: string; importance: number; usefulness: number; searchableTerms: string[]; contextRelevance: string[] }; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
-    this.ensureInit();
+    metadata?: ContentMetadata
+  ): Promise<{
+    metadata: {
+      topics: string[]
+      categories: string[]
+      keyPoints: string[]
+      sentiment: string
+      importance: number
+      usefulness: number
+      searchableTerms: string[]
+      contextRelevance: string[]
+    }
+    modelUsed?: string
+    inputTokens?: number
+    outputTokens?: number
+  }> {
+    this.ensureInit()
 
-    const title = metadata?.title || '';
-    const url = metadata?.url || '';
-    const contentType = metadata?.content_type || 'web_page';
+    const title = metadata?.title || ''
+    const url = metadata?.url || ''
+    const contentType = metadata?.content_type || 'web_page'
 
     const prompt = `
 RecallOS Context:
@@ -411,65 +478,66 @@ URL: ${url}
 Content Type: ${contentType}
 Text: ${rawText.substring(0, 4000)}
 
-Return ONLY the JSON object:`;
+Return ONLY the JSON object:`
 
-    let lastError: any;
-    const originalModelIndex = this.currentModelIndex;
+    const originalModelIndex = this.currentModelIndex
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
-        const res = await runWithRateLimit(() =>
-          this.ai.models.generateContent({
-            model: this.getCurrentModel(),
-            contents: prompt,
-          }), 120000 // 2 minutes timeout
-        );
-        if (!res.text) throw new Error('No metadata response from Gemini API');
+        const res = await runWithRateLimit(
+          () =>
+            this.ai.models.generateContent({
+              model: this.getCurrentModel(),
+              contents: prompt,
+            }),
+          120000 // 2 minutes timeout
+        )
+        if (!res.text) throw new Error('No metadata response from Gemini API')
 
         // Try multiple patterns to extract JSON
-        let jsonMatch = res.text.match(/\{[\s\S]*\}/);
-        
+        let jsonMatch = res.text.match(/\{[\s\S]*\}/)
+
         // If no match, try to find JSON between code blocks
         if (!jsonMatch) {
-          jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+          jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/)
           if (jsonMatch) {
-            jsonMatch[0] = jsonMatch[1]; // Use the captured group
+            jsonMatch[0] = jsonMatch[1] // Use the captured group
           }
         }
-        
+
         // If still no match, try to find any JSON-like structure
         if (!jsonMatch) {
-          jsonMatch = res.text.match(/\{[\s\S]*?\}/);
+          jsonMatch = res.text.match(/\{[\s\S]*?\}/)
         }
-        
+
         if (!jsonMatch) {
           // No JSON found in response
-          throw new Error('Invalid JSON in Gemini response');
+          throw new Error('Invalid JSON in Gemini response')
         }
-        
-        let data;
+
+        let data
         try {
-          data = JSON.parse(jsonMatch[0]);
-        } catch (parseError) {
+          data = JSON.parse(jsonMatch[0])
+        } catch {
           // JSON parse error
-          
+
           // Try to fix common JSON issues
-          let fixedJson = jsonMatch[0];
-          
+          let fixedJson = jsonMatch[0]
+
           // Fix trailing commas
-          fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
-          
+          fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1')
+
           // Fix missing quotes around keys
-          fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
-          
+          fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+
           // Try parsing again
           try {
-            data = JSON.parse(fixedJson);
-          } catch (secondError) {
+            data = JSON.parse(fixedJson)
+          } catch {
             // Second JSON parse error
-            
+
             // Return default metadata if all parsing fails
-            this.resetToFirstModel();
+            this.resetToFirstModel()
             return {
               metadata: {
                 topics: [],
@@ -479,26 +547,26 @@ Return ONLY the JSON object:`;
                 importance: 5,
                 usefulness: 5,
                 searchableTerms: [],
-                contextRelevance: []
+                contextRelevance: [],
               },
               modelUsed: undefined,
               inputTokens: 0,
               outputTokens: 0,
-            };
+            }
           }
         }
 
         // Validate and sanitize the data
-        const validSentiments = ['educational', 'technical', 'neutral', 'analytical'];
-        const sentiment = validSentiments.includes(data.sentiment) ? data.sentiment : 'neutral';
-        
-        const usageMetadata = (res as any).usageMetadata;
-        const inputTokens = usageMetadata?.promptTokenCount || 0;
-        const outputTokens = usageMetadata?.candidatesTokenCount || 0;
-        const modelUsed = this.getCurrentModel();
-        
+        const validSentiments = ['educational', 'technical', 'neutral', 'analytical']
+        const sentiment = validSentiments.includes(data.sentiment) ? data.sentiment : 'neutral'
+
+        const usageMetadata = (res as GeminiResponse).usageMetadata
+        const inputTokens = usageMetadata?.promptTokenCount || 0
+        const outputTokens = usageMetadata?.candidatesTokenCount || 0
+        const modelUsed = this.getCurrentModel()
+
         // Reset to first model on success
-        this.resetToFirstModel();
+        this.resetToFirstModel()
         return {
           metadata: {
             topics: Array.isArray(data.topics) ? data.topics.slice(0, 10) : [],
@@ -507,31 +575,34 @@ Return ONLY the JSON object:`;
             sentiment: sentiment,
             importance: Math.max(1, Math.min(10, parseInt(data.importance) || 5)),
             usefulness: Math.max(1, Math.min(10, parseInt(data.usefulness) || 5)),
-            searchableTerms: Array.isArray(data.searchableTerms) ? data.searchableTerms.slice(0, 15) : [],
-            contextRelevance: Array.isArray(data.contextRelevance) ? data.contextRelevance.slice(0, 5) : [],
+            searchableTerms: Array.isArray(data.searchableTerms)
+              ? data.searchableTerms.slice(0, 15)
+              : [],
+            contextRelevance: Array.isArray(data.contextRelevance)
+              ? data.contextRelevance.slice(0, 5)
+              : [],
           },
           modelUsed,
           inputTokens,
           outputTokens,
-        };
+        }
       } catch (err) {
-        lastError = err;
         // Metadata extraction error
-        
+
         if (this.isRateLimitError(err)) {
           if (!this.switchToNextModel()) {
             // No more models to try
-            break;
+            break
           }
         } else {
           // Non-rate-limit error, don't try other models
-          break;
+          break
         }
       }
     }
 
     // Reset to original model if all models failed
-    this.currentModelIndex = originalModelIndex;
+    this.currentModelIndex = originalModelIndex
     return {
       metadata: {
         topics: metadata?.key_topics?.slice(0, 5) || [],
@@ -546,19 +617,19 @@ Return ONLY the JSON object:`;
       modelUsed: undefined,
       inputTokens: 0,
       outputTokens: 0,
-    };
+    }
   }
 
   async evaluateMemoryRelationship(
     memoryA: { title?: string; summary?: string; topics?: string[]; categories?: string[] },
     memoryB: { title?: string; summary?: string; topics?: string[]; categories?: string[] }
   ): Promise<{
-    isRelevant: boolean;
-    relevanceScore: number;
-    relationshipType: string;
-    reasoning: string;
+    isRelevant: boolean
+    relevanceScore: number
+    relationshipType: string
+    reasoning: string
   }> {
-    this.ensureInit();
+    this.ensureInit()
 
     const prompt = `
 RecallOS Memory Relationship Evaluation
@@ -604,106 +675,108 @@ Criteria:
 - Temporal: Sequential evolution of user’s knowledge
 - Causal: One leads to insight in another
 Be strict. Avoid weak or surface matches.
-`;
+`
 
-    let lastError: any;
-    const originalModelIndex = this.currentModelIndex;
+    const originalModelIndex = this.currentModelIndex
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
-        const res = await runWithRateLimit(() =>
-          this.ai.models.generateContent({
-            model: this.getCurrentModel(),
-            contents: prompt,
-          }), 120000 // 2 minutes timeout
-        );
-        if (!res.text) throw new Error('No relationship data from Gemini');
+        const res = await runWithRateLimit(
+          () =>
+            this.ai.models.generateContent({
+              model: this.getCurrentModel(),
+              contents: prompt,
+            }),
+          120000 // 2 minutes timeout
+        )
+        if (!res.text) throw new Error('No relationship data from Gemini')
 
         // Try multiple patterns to extract JSON
-        let jsonMatch = res.text.match(/\{[\s\S]*\}/);
-        
+        let jsonMatch = res.text.match(/\{[\s\S]*\}/)
+
         // If no match, try to find JSON between code blocks
         if (!jsonMatch) {
-          jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+          jsonMatch = res.text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/)
           if (jsonMatch) {
-            jsonMatch[0] = jsonMatch[1]; // Use the captured group
+            jsonMatch[0] = jsonMatch[1] // Use the captured group
           }
         }
-        
+
         // If still no match, try to find any JSON-like structure
         if (!jsonMatch) {
-          jsonMatch = res.text.match(/\{[\s\S]*?\}/);
+          jsonMatch = res.text.match(/\{[\s\S]*?\}/)
         }
-        
+
         if (!jsonMatch) {
           // No JSON found in relationship response
-          throw new Error('Invalid JSON response from Gemini');
+          throw new Error('Invalid JSON response from Gemini')
         }
-        
-        let data;
+
+        let data
         try {
-          data = JSON.parse(jsonMatch[0]);
-        } catch (parseError) {
+          data = JSON.parse(jsonMatch[0])
+        } catch {
           // JSON parse error in relationship eval
-          
+
           // Try to fix common JSON issues
-          let fixedJson = jsonMatch[0];
-          fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1');
-          fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
-          
+          let fixedJson = jsonMatch[0]
+          fixedJson = fixedJson.replace(/,(\s*[}\]])/g, '$1')
+          fixedJson = fixedJson.replace(/([{,]\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":')
+
           try {
-            data = JSON.parse(fixedJson);
-          } catch (secondError) {
+            data = JSON.parse(fixedJson)
+          } catch {
             // Second JSON parse error in relationship eval
             // Return default relationship data
-            this.resetToFirstModel();
+            this.resetToFirstModel()
             return {
               isRelevant: false,
               relevanceScore: 0,
               relationshipType: 'none',
-              reasoning: 'JSON parsing failed, defaulting to no relationship'
-            };
+              reasoning: 'JSON parsing failed, defaulting to no relationship',
+            }
           }
         }
 
         // Reset to first model on success
-        this.resetToFirstModel();
+        this.resetToFirstModel()
         return {
           isRelevant: !!data.isRelevant,
           relevanceScore: Math.max(0, Math.min(1, data.relevanceScore || 0)),
           relationshipType: data.relationshipType || 'none',
           reasoning: data.reasoning || 'No reasoning provided',
-        };
+        }
       } catch (err) {
-        lastError = err;
         // Relationship eval error
-        
+
         if (this.isRateLimitError(err)) {
           if (!this.switchToNextModel()) {
             // No more models to try
-            break;
+            break
           }
         } else {
           // Non-rate-limit error, don't try other models
-          break;
+          break
         }
       }
     }
 
     // Reset to original model if all models failed
-    this.currentModelIndex = originalModelIndex;
-    const topicOverlap =
-      memoryA.topics?.some(t => memoryB.topics?.includes(t)) || false;
-    const categoryOverlap =
-      memoryA.categories?.some(c => memoryB.categories?.includes(c)) || false;
-    const score = topicOverlap && categoryOverlap ? 0.9 : topicOverlap ? 0.6 : categoryOverlap ? 0.4 : 0;
+    this.currentModelIndex = originalModelIndex
+    const topicOverlap = memoryA.topics?.some(t => memoryB.topics?.includes(t)) || false
+    const categoryOverlap = memoryA.categories?.some(c => memoryB.categories?.includes(c)) || false
+    const score =
+      topicOverlap && categoryOverlap ? 0.9 : topicOverlap ? 0.6 : categoryOverlap ? 0.4 : 0
     return {
       isRelevant: score > 0,
       relevanceScore: score,
       relationshipType: topicOverlap ? 'topical' : categoryOverlap ? 'categorical' : 'none',
-      reasoning: score > 0 ? 'Topic/category overlap detected (fallback logic).' : 'No meaningful connection.',
-    };
+      reasoning:
+        score > 0
+          ? 'Topic/category overlap detected (fallback logic).'
+          : 'No meaningful connection.',
+    }
   }
 }
 
-export const geminiService = new GeminiService();
+export const geminiService = new GeminiService()

@@ -7,7 +7,7 @@ A browser extension that automatically captures and processes your web browsing 
 - **Automatic Content Capture**: Monitors web pages and extracts meaningful content
 - **AI Processing**: Generates summaries and embeddings using Gemini or Ollama
 - **Memory Mesh**: Creates connections between related content and ideas
- 
+
 - **AI Integration**: Works with ChatGPT and other AI tools for context-aware responses
 - **Privacy-First**: Never captures private or local content
 
@@ -92,7 +92,6 @@ The extension requires the following permissions:
 - **Local Processing**: Content is processed locally when possible
 - **No Private Data**: Never captures localhost, private networks, or sensitive information
 - **User Control**: You control what gets captured and stored
- 
 
 ## Troubleshooting
 

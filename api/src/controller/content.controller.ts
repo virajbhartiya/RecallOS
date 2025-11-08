@@ -1,13 +1,13 @@
-import { Request, Response, NextFunction } from 'express';
-import { AuthenticatedRequest } from '../middleware/auth';
+import { Response, NextFunction } from 'express'
+import { AuthenticatedRequest } from '../middleware/auth'
 
-import { addContentJob, ContentJobData, contentQueue } from '../lib/queue';
+import { addContentJob, ContentJobData, contentQueue } from '../lib/queue'
 
-import { prisma } from '../lib/prisma';
+import { prisma } from '../lib/prisma'
 
-import AppError from '../utils/appError';
-import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text';
-import { logger } from '../utils/logger';
+import AppError from '../utils/appError'
+import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text'
+import { logger } from '../utils/logger'
 
 export const submitContent = async (
   req: AuthenticatedRequest,
@@ -15,8 +15,11 @@ export const submitContent = async (
   next: NextFunction
 ) => {
   try {
-    const user_id = req.user!.id;
-    const raw_text = (req.body.raw_text || req.body.content || req.body.full_content || req.body.meaningful_content) as string | undefined;
+    const user_id = req.user!.id
+    const raw_text = (req.body.raw_text ||
+      req.body.content ||
+      req.body.full_content ||
+      req.body.meaningful_content) as string | undefined
     const metadata = {
       ...(req.body.metadata || {}),
       url: req.body.url || req.body.metadata?.url,
@@ -24,31 +27,26 @@ export const submitContent = async (
       source: req.body.source || req.body.metadata?.source,
       content_type: req.body.content_type || req.body.metadata?.content_type,
       content_summary: req.body.content_summary || req.body.metadata?.content_summary,
-    } as Record<string, unknown>;
+    } as Record<string, unknown>
 
     if (!user_id || !raw_text) {
-      return next(new AppError('user_id and raw_text are required', 400));
+      return next(new AppError('user_id and raw_text are required', 400))
     }
 
     if (!req.user || req.user.id !== user_id) {
-      return next(new AppError('User not authenticated', 401));
+      return next(new AppError('User not authenticated', 401))
     }
 
     if (raw_text.length > 100000) {
-      return next(
-        new AppError(
-          'Content too large. Maximum 100,000 characters allowed.',
-          400
-        )
-      );
+      return next(new AppError('Content too large. Maximum 100,000 characters allowed.', 400))
     }
 
     // Duplicate check before queueing to avoid unnecessary processing
-    const canonicalText = normalizeText(raw_text);
-    const canonicalHash = hashCanonical(canonicalText);
+    const canonicalText = normalizeText(raw_text)
+    const canonicalHash = hashCanonical(canonicalText)
 
     const existingByCanonical = await prisma.memory.findFirst({
-      where: { user_id, canonical_hash: canonicalHash } as any,
+      where: { user_id, canonical_hash: canonicalHash },
       select: {
         id: true,
         title: true,
@@ -61,16 +59,14 @@ export const submitContent = async (
         page_metadata: true,
         canonical_text: true,
         canonical_hash: true,
-      } as any,
-    });
+      },
+    })
 
     if (existingByCanonical) {
       const serializedExisting = {
         ...existingByCanonical,
-        timestamp: (existingByCanonical as any).timestamp
-          ? (existingByCanonical as any).timestamp.toString()
-          : null,
-      };
+        timestamp: existingByCanonical.timestamp ? existingByCanonical.timestamp.toString() : null,
+      }
       return res.status(200).json({
         status: 'success',
         message: 'Duplicate memory detected, returning existing record',
@@ -79,20 +75,20 @@ export const submitContent = async (
           memory: serializedExisting,
           isDuplicate: true,
         },
-      });
+      })
     }
 
     // Fallback: Check for URL-based duplicates within the last hour (for dynamic content)
-    const url = typeof metadata?.url === 'string' ? metadata.url : undefined;
+    const url = typeof metadata?.url === 'string' ? metadata.url : undefined
     if (url && url !== 'unknown') {
-      const normalizedUrl = normalizeUrl(url);
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      
+      const normalizedUrl = normalizeUrl(url)
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
+
       const recentMemories = await prisma.memory.findMany({
         where: {
           user_id,
-          created_at: { gte: oneHourAgo } as any,
-        } as any,
+          created_at: { gte: oneHourAgo },
+        },
         select: {
           id: true,
           title: true,
@@ -105,25 +101,31 @@ export const submitContent = async (
           page_metadata: true,
           canonical_text: true,
           canonical_hash: true,
-        } as any,
-        orderBy: { created_at: 'desc' } as any,
+        },
+        orderBy: { created_at: 'desc' },
         take: 50,
-      });
+      })
 
       for (const existingMemory of recentMemories) {
-        const existingUrl = (existingMemory as any).url;
-        if (existingUrl && typeof existingUrl === 'string' && normalizeUrl(existingUrl) === normalizedUrl) {
-          const existingCanonical = normalizeText((existingMemory as any).content || '');
-          const similarity = calculateSimilarity(canonicalText, existingCanonical);
-          
+        const existingUrl = existingMemory.url
+        if (
+          existingUrl &&
+          typeof existingUrl === 'string' &&
+          normalizeUrl(existingUrl) === normalizedUrl
+        ) {
+          const existingCanonical = normalizeText(existingMemory.content || '')
+          const similarity = calculateSimilarity(canonicalText, existingCanonical)
+
           if (similarity > 0.9) {
             const serializedExisting = {
               ...existingMemory,
-              timestamp: (existingMemory as any).timestamp
-                ? (existingMemory as any).timestamp.toString()
-                : null,
-            };
-            logger.log('[Content API] URL duplicate detected, skipping queue', { existingMemoryId: existingMemory.id, similarity, userId: user_id });
+              timestamp: existingMemory.timestamp ? existingMemory.timestamp.toString() : null,
+            }
+            logger.log('[Content API] URL duplicate detected, skipping queue', {
+              existingMemoryId: existingMemory.id,
+              similarity,
+              userId: user_id,
+            })
             return res.status(200).json({
               status: 'success',
               message: 'Duplicate memory detected by URL similarity, returning existing record',
@@ -132,7 +134,7 @@ export const submitContent = async (
                 memory: serializedExisting,
                 isDuplicate: true,
               },
-            });
+            })
           }
         }
       }
@@ -142,10 +144,10 @@ export const submitContent = async (
       user_id,
       raw_text,
       metadata: metadata || {},
-    };
+    }
 
-    const job = await addContentJob(jobData);
-    
+    const job = await addContentJob(jobData)
+
     if (job.isDuplicate) {
       logger.log(`[Content API] Duplicate job detected in queue, returning existing job`, {
         jobId: job.id,
@@ -154,8 +156,8 @@ export const submitContent = async (
         source: metadata?.source || 'unknown',
         url: metadata?.url || 'unknown',
         timestamp: new Date().toISOString(),
-      });
-      
+      })
+
       return res.status(200).json({
         status: 'success',
         message: 'Duplicate content detected in queue, returning existing job',
@@ -166,9 +168,9 @@ export const submitContent = async (
           content_length: raw_text.length,
           metadata: jobData.metadata,
         },
-      });
+      })
     }
-    
+
     logger.log(`[Content API] Content submitted and queued for processing`, {
       jobId: job.id,
       userId: user_id,
@@ -176,7 +178,7 @@ export const submitContent = async (
       source: metadata?.source || 'unknown',
       url: metadata?.url || 'unknown',
       timestamp: new Date().toISOString(),
-    });
+    })
 
     res.status(202).json({
       status: 'success',
@@ -187,12 +189,12 @@ export const submitContent = async (
         content_length: raw_text.length,
         metadata: jobData.metadata,
       },
-    });
+    })
   } catch (error) {
-    logger.error('Error submitting content:', error);
-    next(error);
+    logger.error('Error submitting content:', error)
+    next(error)
   }
-};
+}
 
 export const getSummarizedContent = async (
   req: AuthenticatedRequest,
@@ -200,16 +202,16 @@ export const getSummarizedContent = async (
   next: NextFunction
 ) => {
   try {
-    const { page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10 } = req.query
 
-    const limitNum = Math.min(Number(limit), 100);
-    const skip = (Number(page) - 1) * limitNum;
+    const limitNum = Math.min(Number(limit), 100)
+    const skip = (Number(page) - 1) * limitNum
 
     if (!req.user) {
-      return next(new AppError('User not authenticated', 401));
+      return next(new AppError('User not authenticated', 401))
     }
 
-    const userId = req.user.id;
+    const userId = req.user.id
 
     const [memories, total] = await Promise.all([
       prisma.memory.findMany({
@@ -229,12 +231,12 @@ export const getSummarizedContent = async (
       prisma.memory.count({
         where: { user_id: userId },
       }),
-    ]);
+    ])
 
     res.status(200).json({
       status: 'success',
       data: {
-        content: memories.map((memory: any) => ({
+        content: memories.map(memory => ({
           id: memory.id,
           summary: memory.summary,
           created_at: memory.created_at,
@@ -250,12 +252,12 @@ export const getSummarizedContent = async (
           pages: Math.ceil(total / limitNum),
         },
       },
-    });
+    })
   } catch (error) {
-    logger.error('Error fetching summarized content:', error);
-    next(error);
+    logger.error('Error fetching summarized content:', error)
+    next(error)
   }
-};
+}
 
 export const getPendingJobs = async (
   req: AuthenticatedRequest,
@@ -267,21 +269,23 @@ export const getPendingJobs = async (
       contentQueue.getWaiting(),
       contentQueue.getActive(),
       contentQueue.getDelayed(),
-    ]);
+    ])
 
-    const waitingJobs = waiting.map((job) => ({ job, status: 'waiting' as const }));
-    const activeJobs = active.map((job) => ({ job, status: 'active' as const }));
-    const delayedJobs = delayed.map((job) => ({ job, status: 'delayed' as const }));
+    const waitingJobs = waiting.map(job => ({ job, status: 'waiting' as const }))
+    const activeJobs = active.map(job => ({ job, status: 'active' as const }))
+    const delayedJobs = delayed.map(job => ({ job, status: 'delayed' as const }))
 
-    let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs];
+    let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs]
 
-    allJobs = allJobs.filter((item) => item.job.data.user_id === req.user!.id);
+    allJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)
 
     const jobs = allJobs
-      .map((item) => ({
+      .map(item => ({
         id: item.job.id,
         user_id: item.job.data.user_id,
-        raw_text: item.job.data.raw_text?.substring(0, 200) + (item.job.data.raw_text && item.job.data.raw_text.length > 200 ? '...' : ''),
+        raw_text:
+          item.job.data.raw_text?.substring(0, 200) +
+          (item.job.data.raw_text && item.job.data.raw_text.length > 200 ? '...' : ''),
         full_text_length: item.job.data.raw_text?.length || 0,
         metadata: item.job.data.metadata || {},
         status: item.status,
@@ -291,7 +295,7 @@ export const getPendingJobs = async (
         failed_reason: item.job.failedReason || null,
         attempts: item.job.attemptsMade,
       }))
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
     res.status(200).json({
       status: 'success',
@@ -304,12 +308,12 @@ export const getPendingJobs = async (
           delayed: delayed.length,
         },
       },
-    });
+    })
   } catch (error) {
-    logger.error('Error fetching pending jobs:', error);
-    next(error);
+    logger.error('Error fetching pending jobs:', error)
+    next(error)
   }
-};
+}
 
 export const deletePendingJob = async (
   req: AuthenticatedRequest,
@@ -317,23 +321,23 @@ export const deletePendingJob = async (
   next: NextFunction
 ) => {
   try {
-    const { jobId } = req.params;
+    const { jobId } = req.params
 
     if (!jobId) {
-      return next(new AppError('Job ID is required', 400));
+      return next(new AppError('Job ID is required', 400))
     }
 
-    const job = await contentQueue.getJob(jobId);
+    const job = await contentQueue.getJob(jobId)
 
     if (!job) {
-      return next(new AppError('Job not found', 404));
+      return next(new AppError('Job not found', 404))
     }
 
     if (job.data.user_id !== req.user!.id) {
-      return next(new AppError('You do not have permission to delete this job', 403));
+      return next(new AppError('You do not have permission to delete this job', 403))
     }
 
-    await job.remove();
+    await job.remove()
 
     res.status(200).json({
       status: 'success',
@@ -341,9 +345,9 @@ export const deletePendingJob = async (
       data: {
         jobId,
       },
-    });
+    })
   } catch (error) {
-    logger.error('Error deleting pending job:', error);
-    next(error);
+    logger.error('Error deleting pending job:', error)
+    next(error)
   }
-};
+}

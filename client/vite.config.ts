@@ -1,23 +1,30 @@
-import path from 'path'
-import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
-import fs from 'fs'
-import { VitePWA } from 'vite-plugin-pwa'
+import fs from "fs"
+import path from "path"
+import react from "@vitejs/plugin-react"
+import { defineConfig } from "vite"
+import { VitePWA } from "vite-plugin-pwa"
 
 export default defineConfig({
-  base: './',
+  base: "./",
   server: {
-    https: process.env.VITE_HTTPS_ENABLE === 'true'
-      ? {
-          key: fs.readFileSync(process.env.VITE_HTTPS_KEY_PATH || './certs/app.recallos.test+3-key.pem'),
-          cert: fs.readFileSync(process.env.VITE_HTTPS_CERT_PATH || './certs/app.recallos.test+3.pem'),
-        }
-      : undefined,
-    host: process.env.VITE_DEV_HOST || 'localhost',
+    https:
+      process.env.VITE_HTTPS_ENABLE === "true"
+        ? {
+            key: fs.readFileSync(
+              process.env.VITE_HTTPS_KEY_PATH ||
+                "./certs/app.recallos.test+3-key.pem"
+            ),
+            cert: fs.readFileSync(
+              process.env.VITE_HTTPS_CERT_PATH ||
+                "./certs/app.recallos.test+3.pem"
+            ),
+          }
+        : undefined,
+    host: process.env.VITE_DEV_HOST || "localhost",
     port: Number(process.env.VITE_DEV_PORT || 5173),
     proxy: {
-      '/api': {
-        target: 'http://localhost:3000',
+      "/api": {
+        target: "http://localhost:3000",
         changeOrigin: true,
         secure: false,
       },
@@ -29,61 +36,61 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      registerType: "prompt",
       includeAssets: [
-        'favicon.ico',
-        'apple-touch-icon.png',
-        'logo.svg',
-        'android-chrome-192x192.png',
-        'android-chrome-512x512.png',
-        'logo.png',
+        "favicon.ico",
+        "apple-touch-icon.png",
+        "logo.svg",
+        "android-chrome-192x192.png",
+        "android-chrome-512x512.png",
+        "logo.png",
       ],
       manifest: {
-        name: 'RecallOS',
-        short_name: 'RecallOS',
-        description: 'RecallOS - description',
+        name: "RecallOS",
+        short_name: "RecallOS",
+        description: "RecallOS - description",
         icons: [
           {
-            src: '/android-chrome-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
+            src: "/android-chrome-192x192.png",
+            sizes: "192x192",
+            type: "image/png",
           },
           {
-            src: '/android-chrome-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
+            src: "/android-chrome-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
           },
           {
-            src: '/android-chrome-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any',
+            src: "/android-chrome-512x512.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "any",
           },
           {
-            src: '/apple-touch-icon.png',
-            sizes: '180x180',
-            type: 'image/png',
-            purpose: 'apple touch icon',
+            src: "/apple-touch-icon.png",
+            sizes: "180x180",
+            type: "image/png",
+            purpose: "apple touch icon",
           },
           {
-            src: '/logo.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable',
+            src: "/logo.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
           },
         ],
-        theme_color: '#ffffff',
-        background_color: '#000000',
-        display: 'standalone',
-        scope: '/',
-        start_url: '/',
-        orientation: 'portrait',
+        theme_color: "#ffffff",
+        background_color: "#000000",
+        display: "standalone",
+        scope: "/",
+        start_url: "/",
+        orientation: "portrait",
       },
     }),
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      "@": path.resolve(__dirname, "./src"),
     },
   },
 })

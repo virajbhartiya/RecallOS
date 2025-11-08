@@ -8,7 +8,8 @@
     "watch": "NODE_ENV=development node build.mjs --watch",
     "clean": "rimraf dist",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "fix": "npm run format"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.0",

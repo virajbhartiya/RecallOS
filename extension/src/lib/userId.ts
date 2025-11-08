@@ -1,83 +1,79 @@
-import { storage, cookies } from './browser';
+import { storage, cookies } from './browser'
 
 export function getAuthenticatedUserId(): string | null {
   try {
-    const token = getAuthToken();
-    if (!token) return null;
-    
+    const token = getAuthToken()
+    if (!token) return null
+
     // Parse JWT token to get user ID
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payload = JSON.parse(atob(token.split('.')[1]))
       if (payload.userId) {
-        return payload.userId;
+        return payload.userId
       }
       if (payload.externalId) {
-        return payload.externalId;
+        return payload.externalId
       }
     } catch (e) {
       // Invalid token format
     }
-    return null;
+    return null
   } catch {
-    return null;
+    return null
   }
 }
 
 export async function getUserId(): Promise<string> {
-  let authUserId = getAuthenticatedUserId();
+  let authUserId = getAuthenticatedUserId()
   if (authUserId) {
-    return authUserId;
+    return authUserId
   }
-  
+
   try {
-    const token = await getTokenFromCookie();
+    const token = await getTokenFromCookie()
     if (token) {
       try {
-        await storage.local.set({ auth_token: token });
-      } catch (e) {
-      }
-      
+        await storage.local.set({ auth_token: token })
+      } catch (e) {}
+
       try {
         if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('auth_token', token);
+          localStorage.setItem('auth_token', token)
         }
-      } catch (e) {
-      }
-      
+      } catch (e) {}
+
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
+        const payload = JSON.parse(atob(token.split('.')[1]))
         if (payload.userId) {
-          return payload.userId;
+          return payload.userId
         }
         if (payload.externalId) {
-          return payload.externalId;
+          return payload.externalId
         }
-      } catch (e) {
-      }
+      } catch (e) {}
     }
-  } catch (e) {
-  }
-  
-  throw new Error('User not authenticated. Please log in through the web client first.');
+  } catch (e) {}
+
+  throw new Error('User not authenticated. Please log in through the web client first.')
 }
 
 async function getTokenFromCookie(): Promise<string | null> {
   try {
-    const cookieNames = ['recallos_session', 'recallos_session_dev'];
-    const apiUrl = await getApiBaseUrl();
-    
+    const cookieNames = ['recallos_session', 'recallos_session_dev']
+    const apiUrl = await getApiBaseUrl()
+
     if (!apiUrl) {
-      return null;
+      return null
     }
-    
-    const apiUrlObj = new URL(apiUrl);
-    const domain = apiUrlObj.hostname;
-    const protocol = apiUrlObj.protocol;
-    const port = apiUrlObj.port;
-    
-    const defaultPort = domain === 'localhost' || domain === '127.0.0.1' ? '3000' : (port || '');
-    const baseUrl = `${protocol}//${domain}${defaultPort ? `:${defaultPort}` : ''}`;
-    
+
+    const apiUrlObj = new URL(apiUrl)
+    const domain = apiUrlObj.hostname
+    const protocol = apiUrlObj.protocol
+    const port = apiUrlObj.port
+
+    const defaultPort = domain === 'localhost' || domain === '127.0.0.1' ? '3000' : port || ''
+    const baseUrl = `${protocol}//${domain}${defaultPort ? `:${defaultPort}` : ''}`
+
     const urlsToTry = [
       baseUrl,
       `${baseUrl}/api`,
@@ -89,186 +85,168 @@ async function getTokenFromCookie(): Promise<string | null> {
       `http://127.0.0.1:3000`,
       `http://127.0.0.1:3000/api`,
       `http://127.0.0.1:3000/`,
-    ];
-    
+    ]
+
     for (const cookieName of cookieNames) {
       for (const url of urlsToTry) {
         try {
           const cookie = await cookies.get({
             url: url,
             name: cookieName,
-          });
-          
+          })
+
           if (cookie?.value) {
-            return cookie.value;
+            return cookie.value
           }
-        } catch (e) {
-        }
+        } catch (e) {}
       }
     }
-    
-    const domainsToTry = [
-      domain,
-      `.${domain}`,
-      'localhost',
-      '.localhost',
-      '127.0.0.1',
-    ];
-    
+
+    const domainsToTry = [domain, `.${domain}`, 'localhost', '.localhost', '127.0.0.1']
+
     for (const domainToTry of domainsToTry) {
       try {
         const allCookies = await cookies.getAll({
           domain: domainToTry,
-        });
-        
+        })
+
         if (allCookies && allCookies.length > 0) {
           for (const cookieName of cookieNames) {
-            const sessionCookie = allCookies.find(c => c.name === cookieName);
+            const sessionCookie = allCookies.find(c => c.name === cookieName)
             if (sessionCookie?.value) {
-              return sessionCookie.value;
+              return sessionCookie.value
             }
           }
         }
-      } catch (e) {
-      }
+      } catch (e) {}
     }
-    
+
     try {
-      const domainPattern = domain.startsWith('.') ? domain : `.${domain}`;
+      const domainPattern = domain.startsWith('.') ? domain : `.${domain}`
       const allCookies = await cookies.getAll({
         domain: domainPattern,
-      });
-      
+      })
+
       if (allCookies && allCookies.length > 0) {
         for (const cookieName of cookieNames) {
-          const sessionCookie = allCookies.find(c => c.name === cookieName);
+          const sessionCookie = allCookies.find(c => c.name === cookieName)
           if (sessionCookie?.value) {
-            return sessionCookie.value;
+            return sessionCookie.value
           }
         }
       }
-    } catch (e) {
-    }
-    
+    } catch (e) {}
+
     try {
-      const allCookies = await cookies.getAll({});
+      const allCookies = await cookies.getAll({})
       if (allCookies) {
         for (const cookieName of cookieNames) {
-          const matchingCookies = allCookies.filter(c => c.name === cookieName);
+          const matchingCookies = allCookies.filter(c => c.name === cookieName)
           if (matchingCookies.length > 0) {
-            return matchingCookies[0].value;
+            return matchingCookies[0].value
           }
         }
       }
-    } catch (e) {
-    }
-    
-    return null;
+    } catch (e) {}
+
+    return null
   } catch (error) {
-    return null;
+    return null
   }
 }
 
 async function getApiBaseUrl(): Promise<string | null> {
   try {
-    const cfg = await storage.sync.get(['apiEndpoint']);
-    const endpoint = cfg?.apiEndpoint as string | undefined;
+    const cfg = await storage.sync.get(['apiEndpoint'])
+    const endpoint = cfg?.apiEndpoint as string | undefined
     if (endpoint) {
-      const u = new URL(endpoint);
-      return `${u.protocol}//${u.host}`;
+      const u = new URL(endpoint)
+      return `${u.protocol}//${u.host}`
     }
-    return 'http://localhost:3000';
+    return 'http://localhost:3000'
   } catch {
-    return 'http://localhost:3000';
+    return 'http://localhost:3000'
   }
 }
 
 export async function requireAuthToken(): Promise<string> {
   try {
-    let token: string | null = null;
+    let token: string | null = null
     try {
-      const stored = await storage.local.get(['auth_token']);
+      const stored = await storage.local.get(['auth_token'])
       if (stored && stored.auth_token) {
-        token = stored.auth_token as string;
+        token = stored.auth_token as string
       }
     } catch {}
 
     if (!token) {
-      token = getAuthToken();
+      token = getAuthToken()
     }
 
     if (!token) {
-      token = await getTokenFromCookie();
+      token = await getTokenFromCookie()
       if (token) {
         try {
-          await storage.local.set({ auth_token: token });
+          await storage.local.set({ auth_token: token })
         } catch {}
         try {
-          setAuthToken(token);
+          setAuthToken(token)
         } catch {}
       }
     }
 
     if (!token) {
-      throw new Error('Authentication required. Please log in through the web client first.');
+      throw new Error('Authentication required. Please log in through the web client first.')
     }
 
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const exp = payload.exp * 1000;
+      const payload = JSON.parse(atob(token.split('.')[1]))
+      const exp = payload.exp * 1000
       if (exp <= Date.now()) {
-        await storage.local.remove('auth_token');
-        clearAuthToken();
-        throw new Error('Authentication token expired. Please log in again.');
+        await storage.local.remove('auth_token')
+        clearAuthToken()
+        throw new Error('Authentication token expired. Please log in again.')
       }
-      return token;
+      return token
     } catch (e) {
       if (e instanceof Error && (e.message.includes('expired') || e.message.includes('required'))) {
-        throw e;
+        throw e
       }
-      await storage.local.remove('auth_token');
-      clearAuthToken();
-      throw new Error('Invalid authentication token. Please log in again.');
+      await storage.local.remove('auth_token')
+      clearAuthToken()
+      throw new Error('Invalid authentication token. Please log in again.')
     }
   } catch (error) {
     if (error instanceof Error) {
-      throw error;
+      throw error
     }
-    throw new Error('Authentication required. Please log in through the web client first.');
+    throw new Error('Authentication required. Please log in through the web client first.')
   }
 }
 
 export function getAuthToken(): string | null {
   try {
     if (typeof localStorage !== 'undefined') {
-      return localStorage.getItem('auth_token');
+      return localStorage.getItem('auth_token')
     }
-  } catch {
-  }
-  return null;
+  } catch {}
+  return null
 }
 
 export function setAuthToken(token: string): void {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('auth_token', token);
+      localStorage.setItem('auth_token', token)
     }
-    storage.local.set({ auth_token: token }).catch(() => {
-    });
-  } catch (error) {
-  }
+    storage.local.set({ auth_token: token }).catch(() => {})
+  } catch (error) {}
 }
 
 export function clearAuthToken(): void {
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_token')
     }
-    storage.local.remove('auth_token').catch(() => {
-    });
-  } catch (error) {
-  }
+    storage.local.remove('auth_token').catch(() => {})
+  } catch (error) {}
 }
-
-
-

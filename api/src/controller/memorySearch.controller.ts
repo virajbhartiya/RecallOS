@@ -1,38 +1,55 @@
-import { Response } from 'express';
-import { AuthenticatedRequest } from '../middleware/auth';
-import { prisma } from '../lib/prisma';
-import { memoryMeshService } from '../services/memoryMesh';
-import { searchMemories } from '../services/memorySearch';
-import { logger } from '../utils/logger';
+import { Response } from 'express'
+import { AuthenticatedRequest } from '../middleware/auth'
+import { prisma } from '../lib/prisma'
+import { memoryMeshService } from '../services/memoryMesh'
+import { searchMemories } from '../services/memorySearch'
+import { logger } from '../utils/logger'
+import { Prisma } from '@prisma/client'
+
+type MemoryWithMetadata = {
+  memory: {
+    id: string
+    title: string | null
+    url: string | null
+    content: string
+    summary: string | null
+    timestamp: bigint
+    page_metadata: Prisma.JsonValue
+  }
+  similarity: number
+  similarity_score?: number
+}
+
+type MemoryRecord = {
+  id: string
+  title: string | null
+  url: string | null
+  content: string
+  summary: string | null
+  page_metadata: Prisma.JsonValue
+}
 
 export class MemorySearchController {
   static async searchMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      const {
-        query,
-        category,
-        topic,
-        importance,
-        sentiment,
-        limit = 20,
-      } = req.query;
+      const { query, limit = 20 } = req.query
 
       if (!query) {
         return res.status(400).json({
           success: false,
           error: 'query is required',
-        });
+        })
       }
 
       const user = await prisma.user.findUnique({
         where: { id: req.user!.id },
-      });
+      })
 
       if (!user) {
         return res.status(404).json({
           success: false,
           error: 'User not found',
-        });
+        })
       }
 
       const searchResults = await searchMemories({
@@ -40,8 +57,8 @@ export class MemorySearchController {
         query: query as string,
         limit: parseInt(limit as string),
         enableReasoning: true,
-        contextOnly: false
-      });
+        contextOnly: false,
+      })
 
       const memories = searchResults.results.map(result => ({
         id: result.memory_id,
@@ -57,9 +74,9 @@ export class MemorySearchController {
           topics: [] as string[],
           categories: ['web_page'],
           sentiment: 'neutral',
-          importance: 5
-        }
-      }));
+          importance: 5,
+        },
+      }))
 
       res.status(200).json({
         success: true,
@@ -69,127 +86,138 @@ export class MemorySearchController {
             memory,
             search_type: 'semantic',
             semantic_score: searchResults.results.find(r => r.memory_id === memory.id)?.score || 0,
-            blended_score: searchResults.results.find(r => r.memory_id === memory.id)?.score || 0
+            blended_score: searchResults.results.find(r => r.memory_id === memory.id)?.score || 0,
           })),
           query: searchResults.query,
           answer: searchResults.answer,
-          citations: searchResults.citations
+          citations: searchResults.citations,
         },
-      });
+      })
     } catch (error) {
-      logger.error('Error searching memories:', error);
+      logger.error('Error searching memories:', error)
       res.status(500).json({
         success: false,
         error: 'Internal server error',
-      });
+      })
     }
   }
 
   static async searchMemoriesWithEmbeddings(req: AuthenticatedRequest, res: Response) {
     try {
-      const { 
-        query, 
+      const {
+        query,
         category,
         topic,
         sentiment,
         source,
         dateRange,
         page = 1,
-        limit = 10 
-      } = req.query;
+        limit = 10,
+      } = req.query
 
       if (!query) {
         return res.status(400).json({
           success: false,
           error: 'query is required',
-        });
+        })
       }
 
       const user = await prisma.user.findUnique({
         where: { id: req.user!.id },
-      });
+      })
 
       if (!user) {
         return res.status(404).json({
           success: false,
           error: 'User not found',
-        });
+        })
       }
 
-      const whereConditions: any = {
+      const whereConditions: Prisma.MemoryWhereInput = {
         user_id: user.id,
-      };
+      }
 
-      if (source) {
-        whereConditions.source = source;
+      if (source && typeof source === 'string') {
+        whereConditions.source = source
       }
 
       if (dateRange) {
         try {
-          const dateRangeObj = typeof dateRange === 'string' ? JSON.parse(dateRange) : dateRange;
+          const dateRangeObj = typeof dateRange === 'string' ? JSON.parse(dateRange) : dateRange
 
           if (dateRangeObj.start || dateRangeObj.end) {
-            whereConditions.created_at = {};
+            whereConditions.created_at = {}
 
             if (dateRangeObj.start) {
-              whereConditions.created_at.gte = new Date(dateRangeObj.start);
+              whereConditions.created_at.gte = new Date(dateRangeObj.start)
             }
-            
+
             if (dateRangeObj.end) {
-              whereConditions.created_at.lte = new Date(dateRangeObj.end);
+              whereConditions.created_at.lte = new Date(dateRangeObj.end)
             }
           }
-        } catch (error) {
+        } catch {
+          // Ignore date range parsing errors
         }
       }
 
       const preFilteredMemories = await prisma.memory.findMany({
         where: whereConditions,
         select: { id: true },
-      });
+      })
 
-      const preFilteredMemoryIds = preFilteredMemories.map(m => m.id);
+      const preFilteredMemoryIds = preFilteredMemories.map(m => m.id)
 
       const searchResults = await memoryMeshService.searchMemories(
         user.id,
         query as string,
         parseInt(limit as string),
         preFilteredMemoryIds
-      );
+      )
 
-      let filteredResults = searchResults;
+      let filteredResults = searchResults
 
       if (category || topic || sentiment) {
-        filteredResults = searchResults.filter((result: any) => {
-          const metadata = result.page_metadata as any;
-          
-          if (category && metadata?.categories && !metadata.categories.includes(category)) {
-            return false;
+        filteredResults = searchResults.filter((result: MemoryWithMetadata) => {
+          const metadata = result.memory.page_metadata as Record<string, unknown> | null
+
+          if (
+            category &&
+            metadata?.categories &&
+            Array.isArray(metadata.categories) &&
+            !metadata.categories.includes(category)
+          ) {
+            return false
           }
-          
-          if (topic && metadata?.topics && !metadata.topics.includes(topic)) {
-            return false;
+
+          if (
+            topic &&
+            metadata?.topics &&
+            Array.isArray(metadata.topics) &&
+            !metadata.topics.includes(topic)
+          ) {
+            return false
           }
-          
+
           if (sentiment && metadata?.sentiment !== sentiment) {
-            return false;
+            return false
           }
-          
-          return true;
-        });
+
+          return true
+        })
       }
 
-      const skip = (Number(page) - 1) * Number(limit);
-      
-      const paginatedResults = filteredResults.slice(skip, skip + Number(limit));
+      const skip = (Number(page) - 1) * Number(limit)
 
-      const serializedResults = paginatedResults.map((result: any) => ({
+      const paginatedResults = filteredResults.slice(skip, skip + Number(limit))
+
+      const serializedResults = paginatedResults.map((result: MemoryWithMetadata) => ({
         ...result,
         memory: {
           ...result.memory,
           timestamp: result.memory.timestamp.toString(),
-        }
-      }));
+        },
+      }))
 
       res.status(200).json({
         success: true,
@@ -205,107 +233,111 @@ export class MemorySearchController {
             topic,
             sentiment,
             source,
-            dateRange
-          }
+            dateRange,
+          },
         },
-      });
+      })
     } catch (error) {
-      logger.error('Error searching memories with embeddings:', error);
+      logger.error('Error searching memories with embeddings:', error)
       res.status(500).json({
         success: false,
         error: 'Internal server error',
-      });
+      })
     }
   }
 
   static async searchMemoriesHybrid(req: AuthenticatedRequest, res: Response) {
     try {
-      const { 
-        query, 
+      const {
+        query,
         category,
         topic,
         sentiment,
         source,
         dateRange,
         page = 1,
-        limit = 10 
-      } = req.query;
+        limit = 10,
+      } = req.query
 
       if (!query) {
         return res.status(400).json({
           success: false,
           error: 'query is required',
-        });
+        })
       }
 
       const user = await prisma.user.findUnique({
         where: { id: req.user!.id },
-      });
+      })
 
       if (!user) {
         return res.status(404).json({
           success: false,
           error: 'User not found',
-        });
+        })
       }
 
-      const whereConditions: any = {
+      const whereConditions: Prisma.MemoryWhereInput = {
         user_id: user.id,
-      };
+      }
 
-      if (source) {
-        whereConditions.source = source;
+      if (source && typeof source === 'string') {
+        whereConditions.source = source
       }
 
       if (dateRange) {
         try {
-          const dateRangeObj = typeof dateRange === 'string' ? JSON.parse(dateRange) : dateRange;
-          
+          const dateRangeObj = typeof dateRange === 'string' ? JSON.parse(dateRange) : dateRange
+
           if (dateRangeObj.start || dateRangeObj.end) {
-            whereConditions.created_at = {};
+            whereConditions.created_at = {}
 
             if (dateRangeObj.start) {
-              whereConditions.created_at.gte = new Date(dateRangeObj.start);
+              whereConditions.created_at.gte = new Date(dateRangeObj.start)
             }
 
             if (dateRangeObj.end) {
-              whereConditions.created_at.lte = new Date(dateRangeObj.end);
+              whereConditions.created_at.lte = new Date(dateRangeObj.end)
             }
           }
-        } catch (error) {
+        } catch {
+          // Ignore date range parsing errors
         }
       }
 
       const preFilteredMemories = await prisma.memory.findMany({
         where: whereConditions,
         select: { id: true },
-      });
+      })
 
-      const preFilteredMemoryIds = preFilteredMemories.map(m => m.id);
+      const preFilteredMemoryIds = preFilteredMemories.map(m => m.id)
 
       const queryTokens = (query as string)
         .toLowerCase()
         .replace(/[^\w\s]/g, ' ')
         .split(/\s+/)
-        .filter(token => token.length > 2);
-      
+        .filter(token => token.length > 2)
+
       const tokenConditions = queryTokens.flatMap(token => [
         { content: { contains: token, mode: 'insensitive' as const } },
         { summary: { contains: token, mode: 'insensitive' as const } },
         { title: { contains: token, mode: 'insensitive' as const } },
         { url: { contains: token, mode: 'insensitive' as const } },
-      ]);
+      ])
 
       const [keywordResults, semanticResults] = await Promise.all([
         prisma.memory.findMany({
           where: {
             ...whereConditions,
-            OR: tokenConditions.length > 0 ? tokenConditions : [
-              { content: { contains: query as string, mode: 'insensitive' } },
-              { summary: { contains: query as string, mode: 'insensitive' } },
-              { title: { contains: query as string, mode: 'insensitive' } },
-              { url: { contains: query as string, mode: 'insensitive' } },
-            ],
+            OR:
+              tokenConditions.length > 0
+                ? tokenConditions
+                : [
+                    { content: { contains: query as string, mode: 'insensitive' } },
+                    { summary: { contains: query as string, mode: 'insensitive' } },
+                    { title: { contains: query as string, mode: 'insensitive' } },
+                    { url: { contains: query as string, mode: 'insensitive' } },
+                  ],
           },
           take: parseInt(limit as string) * 2,
         }),
@@ -315,81 +347,97 @@ export class MemorySearchController {
           parseInt(limit as string) * 2,
           preFilteredMemoryIds
         ),
-      ]);
+      ])
 
-      let filteredKeywordResults = keywordResults;
-      
+      let filteredKeywordResults = keywordResults
+
       if (category || topic || sentiment) {
-        filteredKeywordResults = keywordResults.filter((memory: any) => {
-          const metadata = memory.page_metadata as any;
-          
-          if (category && metadata?.categories && !metadata.categories.includes(category)) {
-            return false;
+        filteredKeywordResults = keywordResults.filter((memory: MemoryRecord) => {
+          const metadata = memory.page_metadata as Record<string, unknown> | null
+
+          if (
+            category &&
+            metadata?.categories &&
+            Array.isArray(metadata.categories) &&
+            !metadata.categories.includes(category)
+          ) {
+            return false
           }
-          
-          if (topic && metadata?.topics && !metadata.topics.includes(topic)) {
-            return false;
+
+          if (
+            topic &&
+            metadata?.topics &&
+            Array.isArray(metadata.topics) &&
+            !metadata.topics.includes(topic)
+          ) {
+            return false
           }
-          
+
           if (sentiment && metadata?.sentiment !== sentiment) {
-            return false;
+            return false
           }
-          
-          return true;
-        });
+
+          return true
+        })
       }
 
-      const resultMap = new Map<string, any>();
+      type SearchResult = MemoryRecord & {
+        keyword_score: number
+        semantic_score: number
+        search_type: string
+        blended_score?: number
+      }
 
-      filteredKeywordResults.forEach((memory: any) => {
-        const keywordScore = this.calculateKeywordRelevance(memory, query as string);
+      const resultMap = new Map<string, SearchResult>()
+
+      filteredKeywordResults.forEach((memory: MemoryRecord) => {
+        const keywordScore = this.calculateKeywordRelevance(memory, query as string)
 
         resultMap.set(memory.id, {
           ...memory,
           keyword_score: keywordScore,
           semantic_score: 0,
           search_type: 'keyword',
-        });
-      });
+        })
+      })
 
-      semanticResults.forEach((memory: any) => {
-        const existing = resultMap.get(memory.id);
+      semanticResults.forEach((memory: MemoryWithMetadata) => {
+        const memoryId = memory.memory.id
+        const existing = resultMap.get(memoryId)
 
         if (existing) {
-          existing.semantic_score = memory.similarity_score || 0;
-          existing.search_type = 'hybrid';
-          existing.blended_score = (existing.keyword_score * 0.4) + (existing.semantic_score * 0.6);
+          existing.semantic_score = memory.similarity_score || 0
+          existing.search_type = 'hybrid'
+          existing.blended_score = existing.keyword_score * 0.4 + existing.semantic_score * 0.6
         } else {
-          resultMap.set(memory.id, {
-            ...memory,
+          resultMap.set(memoryId, {
+            ...memory.memory,
             keyword_score: 0,
             semantic_score: memory.similarity_score || 0,
             search_type: 'semantic',
             blended_score: memory.similarity_score || 0,
-          });
+          })
         }
-      });
+      })
 
-      resultMap.forEach((result) => {
+      resultMap.forEach(result => {
         if (result.search_type === 'keyword') {
-          result.blended_score = result.keyword_score * 0.4;
+          result.blended_score = result.keyword_score * 0.4
         }
-      });
+      })
 
-      const blendedResults = Array.from(resultMap.values())
-        .sort((a, b) => (b.blended_score || 0) - (a.blended_score || 0));
+      const blendedResults = Array.from(resultMap.values()).sort(
+        (a, b) => (b.blended_score || 0) - (a.blended_score || 0)
+      )
 
-      const skip = (Number(page) - 1) * Number(limit);
+      const skip = (Number(page) - 1) * Number(limit)
 
-      const paginatedResults = blendedResults.slice(skip, skip + Number(limit));
+      const paginatedResults = blendedResults.slice(skip, skip + Number(limit))
 
-      const serializedResults = paginatedResults.map((result: any) => ({
+      const serializedResults = paginatedResults.map((result: SearchResult) => ({
         ...result,
-        memory: {
-          ...result.memory,
-          timestamp: result.memory.timestamp.toString(),
-        }
-      }));
+        timestamp: 'timestamp' in result && result.timestamp ? result.timestamp.toString() : null,
+      }))
 
       res.status(200).json({
         success: true,
@@ -410,75 +458,74 @@ export class MemorySearchController {
             topic,
             sentiment,
             source,
-            dateRange
-          }
+            dateRange,
+          },
         },
-      });
+      })
     } catch (error) {
-      logger.error('Error in hybrid search:', error);
+      logger.error('Error in hybrid search:', error)
       res.status(500).json({
         success: false,
         error: 'Internal server error',
-      });
+      })
     }
   }
 
-  private static calculateKeywordRelevance(memory: any, query: string): number {
-    const queryLower = query.toLowerCase();
-    
+  private static calculateKeywordRelevance(memory: MemoryRecord, query: string): number {
+    const queryLower = query.toLowerCase()
+
     const queryTokens = queryLower
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
-      .filter(token => token.length > 2);
+      .filter(token => token.length > 2)
 
-    let score = 0;
-    let matchedTokens = 0;
-    
-    const title = (memory.title || '').toLowerCase();
-    const summary = (memory.summary || '').toLowerCase();
-    const content = (memory.content || '').toLowerCase();
+    let score = 0
+    let matchedTokens = 0
+
+    const title = (memory.title || '').toLowerCase()
+    const summary = (memory.summary || '').toLowerCase()
+    const content = (memory.content || '').toLowerCase()
 
     for (const token of queryTokens) {
-      const tokenRegex = new RegExp(`\\b${token}\\b`, 'gi');
-      
+      const tokenRegex = new RegExp(`\\b${token}\\b`, 'gi')
+
       if (tokenRegex.test(title)) {
-        score += 0.4;
-        matchedTokens++;
+        score += 0.4
+        matchedTokens++
       }
 
       if (tokenRegex.test(summary)) {
-        score += 0.3;
-        matchedTokens++;
+        score += 0.3
+        matchedTokens++
       }
 
       if (tokenRegex.test(content)) {
-        score += 0.2;
-        matchedTokens++;
+        score += 0.2
+        matchedTokens++
       }
     }
-    
-    if (queryTokens.length > 0) {
-      score = score / queryTokens.length;
-    }
-    
-    const exactPhraseRegex = new RegExp(`\\b${this.escapeRegex(queryLower)}\\b`, 'gi');
-    
-    if (exactPhraseRegex.test(title)) {
-      score += 0.2;
-    }
-    
-    if (exactPhraseRegex.test(summary)) {
-      score += 0.15;
-    }
-    
-    const coverageRatio = queryTokens.length > 0 ? matchedTokens / queryTokens.length : 0;
-    score = score * (1 + (coverageRatio * 0.3));
 
-    return Math.min(1, score);
+    if (queryTokens.length > 0) {
+      score = score / queryTokens.length
+    }
+
+    const exactPhraseRegex = new RegExp(`\\b${this.escapeRegex(queryLower)}\\b`, 'gi')
+
+    if (exactPhraseRegex.test(title)) {
+      score += 0.2
+    }
+
+    if (exactPhraseRegex.test(summary)) {
+      score += 0.15
+    }
+
+    const coverageRatio = queryTokens.length > 0 ? matchedTokens / queryTokens.length : 0
+    score = score * (1 + coverageRatio * 0.3)
+
+    return Math.min(1, score)
   }
-  
+
   private static escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
 }
-

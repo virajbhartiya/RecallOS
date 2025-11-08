@@ -1,7 +1,8 @@
-import React, { useEffect, useCallback, memo } from 'react'
-import { MemoryList } from './MemoryList'
-import { MemoryDetails } from './MemoryDetails'
-import type { Memory, MemorySearchResponse } from '../types/memory'
+import React, { memo, useCallback, useEffect } from "react"
+
+import type { Memory, MemorySearchResponse } from "../types/memory"
+import { MemoryDetails } from "./MemoryDetails"
+import { MemoryList } from "./MemoryList"
 
 interface MemoryDialogProps {
   isOpen: boolean
@@ -10,7 +11,12 @@ interface MemoryDialogProps {
   searchResults: MemorySearchResponse | null
   isSearching: boolean
   searchAnswer: string | null
-  searchCitations: Array<{ label: number; memory_id: string; title: string | null; url: string | null }> | null
+  searchCitations: Array<{
+    label: number
+    memory_id: string
+    title: string | null
+    url: string | null
+  }> | null
   selectedMemory: Memory | null
   onClose: () => void
   onSelectMemory: (memory: Memory) => void
@@ -34,25 +40,31 @@ const MemoryDialogComponent: React.FC<MemoryDialogProps> = ({
   onDeleteMemory,
   onSearchQueryChange,
 }) => {
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (!isOpen) return
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!isOpen) return
 
-    const target = e.target as HTMLElement
-    const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+      const target = e.target as HTMLElement
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
 
-    if (e.key === 'Escape' && !isInput) {
-      e.preventDefault()
-      e.stopPropagation()
-      onClose()
-    }
-  }, [isOpen, onClose])
+      if (e.key === "Escape" && !isInput) {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
+    },
+    [isOpen, onClose]
+  )
 
   useEffect(() => {
     if (!isOpen) return
 
-    document.addEventListener('keydown', handleKeyDown, true)
+    document.addEventListener("keydown", handleKeyDown, true)
     return () => {
-      document.removeEventListener('keydown', handleKeyDown, true)
+      document.removeEventListener("keydown", handleKeyDown, true)
     }
   }, [isOpen, handleKeyDown])
 
@@ -108,6 +120,5 @@ const MemoryDialogComponent: React.FC<MemoryDialogProps> = ({
 }
 
 const MemoryDialog = memo(MemoryDialogComponent)
-MemoryDialog.displayName = 'MemoryDialog'
+MemoryDialog.displayName = "MemoryDialog"
 export { MemoryDialog }
-

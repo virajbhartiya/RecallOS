@@ -1,17 +1,21 @@
-import React, { createContext, useContext, ReactNode } from 'react'
+import React, { createContext, ReactNode, useContext } from "react"
 
 interface NotificationContextType {
-  openTxToast: (chainId: string, txHash: string) => Promise<void>
+  openTxToast: () => Promise<void>
 }
 
-const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
+const NotificationContext = createContext<NotificationContextType | undefined>(
+  undefined
+)
 
 interface NotificationProviderProps {
   children: ReactNode
 }
 
-export const NotificationProvider: React.FC<NotificationProviderProps> = ({ children }) => {
-  const openTxToast = async (_chainId: string, _txHash: string) => {
+export const NotificationProvider: React.FC<NotificationProviderProps> = ({
+  children,
+}) => {
+  const openTxToast = async () => {
     return
   }
 
@@ -22,10 +26,13 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({ chil
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useNotification = () => {
   const context = useContext(NotificationContext)
   if (context === undefined) {
-    throw new Error('useNotification must be used within a NotificationProvider')
+    throw new Error(
+      "useNotification must be used within a NotificationProvider"
+    )
   }
   return context
 }

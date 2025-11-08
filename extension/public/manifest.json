@@ -32,7 +32,17 @@
     }
   ],
   "permissions": ["activeTab", "scripting", "tabs", "storage", "webNavigation", "cookies"],
-  "host_permissions": ["<all_urls>", "*://chatgpt.com/*", "*://*.chatgpt.com/*", "*://openai.com/*", "*://*.openai.com/*", "*://claude.ai/*", "*://*.claude.ai/*", "*://anthropic.com/*", "*://*.anthropic.com/*"],
+  "host_permissions": [
+    "<all_urls>",
+    "*://chatgpt.com/*",
+    "*://*.chatgpt.com/*",
+    "*://openai.com/*",
+    "*://*.openai.com/*",
+    "*://claude.ai/*",
+    "*://*.claude.ai/*",
+    "*://anthropic.com/*",
+    "*://*.anthropic.com/*"
+  ],
   "web_accessible_resources": [],
   "browser_specific_settings": {
     "gecko": {

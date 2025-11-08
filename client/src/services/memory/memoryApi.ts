@@ -1,7 +1,7 @@
-import { getRequest } from '../../utility/generalServices'
-import { requireAuthToken } from '../../utils/userId'
-import { transformApiMemoryResponse } from '../../utils/memoryTransform'
-import type { Memory } from '../../types/memory'
+import type { Memory } from "../../types/memory"
+import { getRequest } from "../../utility/generalServices"
+import { transformApiMemoryResponse } from "../../utils/memoryTransform"
+import { requireAuthToken } from "../../utils/userId"
 
 interface ApiMemoryResponse {
   id?: string
@@ -18,61 +18,70 @@ interface ApiMemoryResponse {
   last_accessed?: string
 }
 
-const baseUrl = '/memory'
+const baseUrl = "/memory"
 
-export async function getMemoriesWithTransactionDetails(limit?: number): Promise<Memory[]> {
+export async function getMemoriesWithTransactionDetails(
+  limit?: number
+): Promise<Memory[]> {
   requireAuthToken()
-  
+
   try {
-    const response = await getRequest(`${baseUrl}/user/recent?count=${limit || 10000}`)
-    
+    const response = await getRequest(
+      `${baseUrl}/user/recent?count=${limit || 10000}`
+    )
+
     if (response.data?.success === false) {
-      console.error('API error:', response.data?.error)
-      throw new Error(response.data?.error || 'API returned error')
+      console.error("API error:", response.data?.error)
+      throw new Error(response.data?.error || "API returned error")
     }
-    
+
     const data = response.data?.data
     const memories = data?.memories || []
-    
+
     if (Array.isArray(memories)) {
       if (memories.length === 0) {
-        console.log('No memories found')
+        console.log("No memories found")
         return []
       }
-      
-      return memories.map((mem: ApiMemoryResponse) => transformApiMemoryResponse(mem))
+
+      return memories.map((mem: ApiMemoryResponse) =>
+        transformApiMemoryResponse(mem)
+      )
     }
-    
-    console.log('No memories found in response:', response.data)
+
+    console.log("No memories found in response:", response.data)
   } catch (error) {
-    console.error('Error fetching memories:', error)
+    console.error("Error fetching memories:", error)
     throw error
   }
-  
+
   return []
 }
 
 export async function getRecentMemories(count: number = 10): Promise<Memory[]> {
   requireAuthToken()
-  
+
   try {
     const response = await getRequest(`${baseUrl}/user/recent?count=${count}`)
     const data = response.data?.data
-    
+
     if (Array.isArray(data?.memories) && data.memories.length > 0) {
       return data.memories.map((mem: ApiMemoryResponse) => {
         const transformed = transformApiMemoryResponse(mem)
         return {
           ...transformed,
           hash: mem.hash || transformed.hash,
-          summary: mem.summary || transformed.summary || `Memory stored at ${new Date((typeof mem.timestamp === 'string' ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`
+          summary:
+            mem.summary ||
+            transformed.summary ||
+            `Memory stored at ${new Date((typeof mem.timestamp === "string" ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
         }
       })
     }
   } catch (error) {
     // Error fetching recent memories from API
   }
-  
+
   return []
 }
 
@@ -81,7 +90,9 @@ export async function getUserMemories(
   limit: number = 20
 ): Promise<{ memories: Memory[]; total: number; page: number; limit: number }> {
   requireAuthToken()
-  const response = await getRequest(`${baseUrl}/user?page=${page}&limit=${limit}`)
+  const response = await getRequest(
+    `${baseUrl}/user?page=${page}&limit=${limit}`
+  )
   const data = response.data?.data
   return data || { memories: [], total: 0, page, limit }
 }
@@ -91,9 +102,9 @@ export async function getUserMemoryCount(): Promise<number> {
   try {
     const response = await getRequest(`${baseUrl}/user/count`)
     const count = response.data?.data?.memoryCount
-    return typeof count === 'number' ? count : parseInt(count) || 0
+    return typeof count === "number" ? count : parseInt(count) || 0
   } catch (error) {
-    console.error('Error fetching memory count:', error)
+    console.error("Error fetching memory count:", error)
     return 0
   }
 }
@@ -110,12 +121,19 @@ export async function isMemoryStored(hash: string): Promise<boolean> {
 
 export async function deleteMemory(memoryId: string): Promise<void> {
   requireAuthToken()
-  const { deleteRequest } = await import('../../utility/generalServices')
+  const { deleteRequest } = await import("../../utility/generalServices")
   await deleteRequest(`${baseUrl}/${memoryId}`)
 }
 
-export async function healthCheck(): Promise<{ status: string; timestamp: string }> {
+export async function healthCheck(): Promise<{
+  status: string
+  timestamp: string
+}> {
   const response = await getRequest(`${baseUrl}/health`)
-  return response.data?.data || { status: 'unknown', timestamp: new Date().toISOString() }
+  return (
+    response.data?.data || {
+      status: "unknown",
+      timestamp: new Date().toISOString(),
+    }
+  )
 }
-
