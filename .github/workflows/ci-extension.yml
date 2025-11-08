@@ -2,12 +2,12 @@ name: CI - Extension
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - 'extension/**'
       - '.github/workflows/ci-extension.yml'
   pull_request:
-    branches: [main, develop]
+    branches: [main]
     paths:
       - 'extension/**'
       - '.github/workflows/ci-extension.yml'
