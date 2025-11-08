@@ -7,12 +7,16 @@ import React, {
   useState,
 } from "react"
 import { Line, OrbitControls } from "@react-three/drei"
-import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 
 import { MemoryService } from "../services/memoryService"
-import type { MemoryMesh, MemoryMeshEdge, MemoryMeshNode } from "../types/memory"
+import type {
+  MemoryMesh,
+  MemoryMeshEdge,
+  MemoryMeshNode,
+} from "../types/memory"
 import { requireAuthToken } from "../utils/userId"
 import { ErrorMessage, LoadingSpinner } from "./ui/loading-spinner"
 
