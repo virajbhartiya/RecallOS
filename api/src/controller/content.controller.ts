@@ -146,6 +146,29 @@ export const submitContent = async (
 
     const job = await addContentJob(jobData);
     
+    if (job.isDuplicate) {
+      logger.log(`[Content API] Duplicate job detected in queue, returning existing job`, {
+        jobId: job.id,
+        userId: user_id,
+        contentLength: raw_text.length,
+        source: metadata?.source || 'unknown',
+        url: metadata?.url || 'unknown',
+        timestamp: new Date().toISOString(),
+      });
+      
+      return res.status(200).json({
+        status: 'success',
+        message: 'Duplicate content detected in queue, returning existing job',
+        jobId: job.id,
+        isDuplicate: true,
+        data: {
+          user_id,
+          content_length: raw_text.length,
+          metadata: jobData.metadata,
+        },
+      });
+    }
+    
     logger.log(`[Content API] Content submitted and queued for processing`, {
       jobId: job.id,
       userId: user_id,

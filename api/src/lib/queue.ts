@@ -2,6 +2,7 @@ import { Queue, QueueEvents, JobsOptions, QueueOptions } from 'bullmq';
 import crypto from 'crypto';
 import { getRedisConnection } from '../utils/env';
 import { logger } from '../utils/logger';
+import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text';
 
 export interface ContentJobData {
   user_id: string;
@@ -94,6 +95,56 @@ contentQueueEvents.on('delayed', ({ jobId, delay }) => {
 });
 
 export const addContentJob = async (data: ContentJobData) => {
+  const canonicalText = normalizeText(data.raw_text);
+  const canonicalHash = hashCanonical(canonicalText);
+  
+  const [waiting, active, delayed] = await Promise.all([
+    contentQueue.getWaiting(),
+    contentQueue.getActive(),
+    contentQueue.getDelayed(),
+  ]);
+  
+  const allJobs = [...waiting, ...active, ...delayed];
+  
+  for (const existingJob of allJobs) {
+    if (existingJob.data.user_id !== data.user_id) {
+      continue;
+    }
+    
+    const existingCanonicalText = normalizeText(existingJob.data.raw_text);
+    const existingCanonicalHash = hashCanonical(existingCanonicalText);
+    
+    if (existingCanonicalHash === canonicalHash) {
+      logger.log(`[Redis Queue] Duplicate job detected in queue, returning existing job`, {
+        existingJobId: existingJob.id,
+        userId: data.user_id,
+        canonicalHash,
+        timestamp: new Date().toISOString(),
+      });
+      return { id: existingJob.id, isDuplicate: true };
+    }
+    
+    if (data.metadata?.url && data.metadata.url !== 'unknown' && existingJob.data.metadata?.url && existingJob.data.metadata.url !== 'unknown') {
+      const normalizedUrl = normalizeUrl(data.metadata.url);
+      const existingNormalizedUrl = normalizeUrl(existingJob.data.metadata.url);
+      
+      if (normalizedUrl === existingNormalizedUrl) {
+        const similarity = calculateSimilarity(canonicalText, existingCanonicalText);
+        
+        if (similarity > 0.9) {
+          logger.log(`[Redis Queue] URL duplicate detected in queue, returning existing job`, {
+            existingJobId: existingJob.id,
+            userId: data.user_id,
+            url: normalizedUrl,
+            similarity,
+            timestamp: new Date().toISOString(),
+          });
+          return { id: existingJob.id, isDuplicate: true };
+        }
+      }
+    }
+  }
+  
   const jobId = crypto.randomUUID();
   const jobOptions: JobsOptions = {
     jobId,
