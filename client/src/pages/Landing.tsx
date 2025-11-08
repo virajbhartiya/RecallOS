@@ -14,8 +14,10 @@ export const Landing = () => {
     if (typeof window !== "undefined" && typeof history !== "undefined") {
       try {
         if ("scrollRestoration" in history) {
-          ;(history as { scrollRestoration?: string }).scrollRestoration =
-            "manual"
+          const historyWithScrollRestoration = history as {
+            scrollRestoration?: string
+          }
+          historyWithScrollRestoration.scrollRestoration = "manual"
         }
       } catch {
         // Ignore errors setting scroll restoration

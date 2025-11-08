@@ -439,11 +439,12 @@ export class MemoryMeshService {
       const relationPromises = filteredRelations.map(async relatedMemory => {
         try {
           // First try to find existing relation
+          const relatedMemoryId = relatedMemory.memory.id
           const existingRelation = await prisma.memoryRelation.findUnique({
             where: {
               memory_id_related_memory_id: {
                 memory_id: memoryId,
-                related_memory_id: relatedMemory.id,
+                related_memory_id: relatedMemoryId,
               },
             },
           })
@@ -454,9 +455,9 @@ export class MemoryMeshService {
               await prisma.memoryRelation.create({
                 data: {
                   memory_id: memoryId,
-                  related_memory_id: relatedMemory.id,
-                  similarity_score: relatedMemory.similarity_score,
-                  relation_type: relatedMemory.relation_type,
+                  related_memory_id: relatedMemoryId,
+                  similarity_score: relatedMemory.similarity_score || relatedMemory.similarity,
+                  relation_type: relatedMemory.relation_type || 'semantic',
                 },
               })
             } catch (createError) {
@@ -468,11 +469,13 @@ export class MemoryMeshService {
             }
           } else {
             // Update existing relation if conditions are met
+            const similarityScore = relatedMemory.similarity_score || relatedMemory.similarity
+            const relationType = relatedMemory.relation_type || 'semantic'
             const shouldUpdate =
-              relatedMemory.similarity_score > existingRelation.similarity_score + 0.05 ||
-              (relatedMemory.similarity_score > existingRelation.similarity_score &&
+              similarityScore > existingRelation.similarity_score + 0.05 ||
+              (similarityScore > existingRelation.similarity_score &&
                 this.isMoreSpecificRelationType(
-                  relatedMemory.relation_type,
+                  relationType,
                   existingRelation.relation_type
                 ))
 
@@ -480,8 +483,8 @@ export class MemoryMeshService {
               await prisma.memoryRelation.update({
                 where: { id: existingRelation.id },
                 data: {
-                  similarity_score: relatedMemory.similarity_score,
-                  relation_type: relatedMemory.relation_type,
+                  similarity_score: similarityScore,
+                  relation_type: relationType,
                 },
               })
             }
