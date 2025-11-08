@@ -378,11 +378,17 @@ ${bullets}`;
         if (!text) return [] as number[];
         const order: number[] = [];
         const seen = new Set<number>();
-        const re = /\[(\d+)\]/g;
+        const re = /\[([\d,\s]+)\]/g;
         let m: RegExpExecArray | null;
         while ((m = re.exec(text))) {
-          const n = Number(m[1]);
-          if (!seen.has(n)) { seen.add(n); order.push(n); }
+          const content = m[1];
+          const numbers = content.split(',').map(s => s.trim()).filter(s => s.length > 0).map(s => Number(s));
+          for (const n of numbers) {
+            if (!isNaN(n) && !seen.has(n)) {
+              seen.add(n);
+              order.push(n);
+            }
+          }
         }
         return order;
       };
@@ -401,13 +407,19 @@ ${bullets}`;
       answer = `Found ${filteredRows.length} relevant memories about "${normalized}". ${filteredRows.slice(0, 3).map((r, i) => `[${i + 1}] ${r.title || 'Untitled'}`).join(', ')}${filteredRows.length > 3 ? ' and more.' : '.'}`;
       // Ensure citations are populated even when using the fallback answer
       const allCitations = filteredRows.map((r, i) => ({ label: i + 1, memory_id: r.id, title: r.title, url: r.url }));
-      const re = /\[(\d+)\]/g;
+      const re = /\[([\d,\s]+)\]/g;
       const seen = new Set<number>();
       const order: number[] = [];
       let m: RegExpExecArray | null;
       while ((m = re.exec(answer))) {
-        const n = Number(m[1]);
-        if (!seen.has(n)) { seen.add(n); order.push(n); }
+        const content = m[1];
+        const numbers = content.split(',').map(s => s.trim()).filter(s => s.length > 0).map(s => Number(s));
+        for (const n of numbers) {
+          if (!isNaN(n) && !seen.has(n)) {
+            seen.add(n);
+            order.push(n);
+          }
+        }
       }
       citations = order.map(n => allCitations.find(c => c.label === n)).filter((c): c is { label: number; memory_id: string; title: string | null; url: string | null } => Boolean(c));
     }

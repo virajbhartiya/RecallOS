@@ -89,11 +89,17 @@ ${bullets}`;
             if (!text) return [] as number[];
             const order: number[] = [];
             const seen = new Set<number>();
-            const re = /\[(\d+)\]/g;
+            const re = /\[([\d,\s]+)\]/g;
             let m: RegExpExecArray | null;
             while ((m = re.exec(text))) {
-              const n = Number(m[1]);
-              if (!seen.has(n)) { seen.add(n); order.push(n); }
+              const content = m[1];
+              const numbers = content.split(',').map(s => s.trim()).filter(s => s.length > 0).map(s => Number(s));
+              for (const n of numbers) {
+                if (!isNaN(n) && !seen.has(n)) {
+                  seen.add(n);
+                  order.push(n);
+                }
+              }
             }
             return order;
           };
