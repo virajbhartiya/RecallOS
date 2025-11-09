@@ -168,5 +168,140 @@ export const addContentJob = async (data: ContentJobData) => {
   return { id: job.id }
 }
 
+export const cleanQueue = async (): Promise<{
+  waiting: number
+  active: number
+  delayed: number
+  completed: number
+  failed: number
+  total: number
+  removed: number
+  remaining: number
+}> => {
+  const [waiting, active, delayed, completed, failed] = await Promise.all([
+    contentQueue.getWaiting(),
+    contentQueue.getActive(),
+    contentQueue.getDelayed(),
+    contentQueue.getCompleted(),
+    contentQueue.getFailed(),
+  ])
+
+  const waitingCount = waiting.length
+  const activeCount = active.length
+  const delayedCount = delayed.length
+  const completedCount = completed.length
+  const failedCount = failed.length
+
+  const totalJobs = waitingCount + activeCount + delayedCount + completedCount + failedCount
+
+  let removedCount = 0
+
+  for (const job of waiting) {
+    try {
+      await job.remove()
+      removedCount++
+    } catch (error) {
+      logger.warn(`Failed to remove waiting job ${job.id}`, {
+        jobId: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  for (const job of active) {
+    try {
+      await job.remove()
+      removedCount++
+    } catch (error) {
+      logger.warn(`Failed to remove active job ${job.id}`, {
+        jobId: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  for (const job of delayed) {
+    try {
+      await job.remove()
+      removedCount++
+    } catch (error) {
+      logger.warn(`Failed to remove delayed job ${job.id}`, {
+        jobId: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  for (const job of completed) {
+    try {
+      await job.remove()
+      removedCount++
+    } catch (error) {
+      logger.warn(`Failed to remove completed job ${job.id}`, {
+        jobId: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  for (const job of failed) {
+    try {
+      await job.remove()
+      removedCount++
+    } catch (error) {
+      logger.warn(`Failed to remove failed job ${job.id}`, {
+        jobId: job.id,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
+  const [waitingAfter, activeAfter, delayedAfter, completedAfter, failedAfter] = await Promise.all([
+    contentQueue.getWaiting(),
+    contentQueue.getActive(),
+    contentQueue.getDelayed(),
+    contentQueue.getCompleted(),
+    contentQueue.getFailed(),
+  ])
+
+  const totalAfter =
+    waitingAfter.length +
+    activeAfter.length +
+    delayedAfter.length +
+    completedAfter.length +
+    failedAfter.length
+
+  logger.log('Queue cleaned', {
+    before: {
+      waiting: waitingCount,
+      active: activeCount,
+      delayed: delayedCount,
+      completed: completedCount,
+      failed: failedCount,
+      total: totalJobs,
+    },
+    after: {
+      waiting: waitingAfter.length,
+      active: activeAfter.length,
+      delayed: delayedAfter.length,
+      completed: completedAfter.length,
+      failed: failedAfter.length,
+      total: totalAfter,
+    },
+    removed: removedCount,
+  })
+
+  return {
+    waiting: waitingCount,
+    active: activeCount,
+    delayed: delayedCount,
+    completed: completedCount,
+    failed: failedCount,
+    total: totalJobs,
+    removed: removedCount,
+    remaining: totalAfter,
+  }
+}
+
 // Quiet queue event handlers to avoid noisy logs in production. Attach your own
 // listeners elsewhere if you need telemetry.
