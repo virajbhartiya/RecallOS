@@ -19,7 +19,8 @@ export class MemoryMeshController {
 
       const internalUserId: string | undefined = user.id
 
-      const limitValue = limit === 'all' || limit === 'Infinity' ? Infinity : parseInt(limit as string)
+      const limitValue =
+        limit === 'all' || limit === 'Infinity' ? Infinity : parseInt(limit as string)
 
       const mesh = await memoryMeshService.getMemoryMesh(
         internalUserId,

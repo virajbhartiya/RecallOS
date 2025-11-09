@@ -24,6 +24,7 @@ type MemoryWithMetadata = Prisma.MemoryGetPayload<{
     user_id: true
     timestamp: true
     source: true
+    importance_score: true
   }
 }>
 
@@ -1451,17 +1452,37 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     edges: MemoryEdge[]
   }> {
     try {
-      const queryOptions: any = {
+      const queryOptions: {
+        where: { user_id?: string } | {}
+        select: {
+          id: boolean
+          title: boolean
+          url: boolean
+          created_at: boolean
+          summary: boolean
+          source: boolean
+          timestamp: boolean
+          importance_score: boolean
+          user_id: boolean
+          content: boolean
+          page_metadata: boolean
+        }
+        orderBy: { created_at: 'desc' }
+        take?: number
+      } = {
         where: userId ? { user_id: userId } : {},
-                select: {
-                  id: true,
-                  title: true,
-                  url: true,
-                  created_at: true,
-                  summary: true,
-                  source: true,
-                  timestamp: true,
+        select: {
+          id: true,
+          title: true,
+          url: true,
+          created_at: true,
+          summary: true,
+          source: true,
+          timestamp: true,
           importance_score: true,
+          user_id: true,
+          content: true,
+          page_metadata: true,
         },
         orderBy: { created_at: 'desc' },
       }
@@ -1470,7 +1491,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         queryOptions.take = limit
       }
 
-      const memories = await prisma.memory.findMany(queryOptions)
+      const memories = await prisma.memory.findMany(queryOptions) as MemoryWithMetadata[]
 
       const latentCoords = await this.computeLatentSpaceProjection(memories)
 
@@ -1570,14 +1591,17 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
       const gridSize = Math.ceil(Math.sqrt(nodesWithCoords.length))
       const gridCellSize = 2000 / gridSize
-      const spatialGrid = new Map<string, Array<{ node: typeof nodes[0]; coord: { x: number; y: number; z: number } }>>()
+      const spatialGrid = new Map<
+        string,
+        Array<{ node: (typeof nodes)[0]; coord: { x: number; y: number; z: number } }>
+      >()
 
       nodesWithCoords.forEach(node => {
         const coord = latentCoords.get(node.id)!
         const gridX = Math.floor((coord.x + 1000) / gridCellSize)
         const gridY = Math.floor((coord.y + 1000) / gridCellSize)
         const gridKey = `${gridX},${gridY}`
-        
+
         if (!spatialGrid.has(gridKey)) {
           spatialGrid.set(gridKey, [])
         }
@@ -1606,10 +1630,10 @@ Be strict about relevance - only mark as relevant if there's substantial concept
               const dx = coord.x - otherCoord.x
               const dy = coord.y - otherCoord.y
               const dz = (coord.z ?? 0) - (otherCoord.z ?? 0)
-          const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
-          distances.push({ targetId: otherNode.id, distance })
-          allDistances.push(distance)
-        })
+              const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
+              distances.push({ targetId: otherNode.id, distance })
+              allDistances.push(distance)
+            })
           }
         }
 
@@ -1619,7 +1643,8 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
       allDistances.sort((a, b) => a - b)
       const percentile95 = Math.floor(allDistances.length * 0.95)
-      const maxDistance = allDistances[percentile95] || (allDistances.length > 0 ? Math.max(...allDistances) : 1)
+      const maxDistance =
+        allDistances[percentile95] || (allDistances.length > 0 ? Math.max(...allDistances) : 1)
 
       // Second pass: calculate similarity scores
       nodes.forEach(node => {
@@ -1656,7 +1681,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           }
 
           const similarityScore = Math.max(0, Math.min(1, baseSim + boost))
-          if (similarityScore < 0.02) return
+          if (similarityScore < similarityThreshold) return
 
           rawEdges.push({
             source: node.id,
@@ -1676,7 +1701,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         }
       })
 
-      let edges = Array.from(edgeMap.values()).filter(e => e.similarity_score >= 0.02)
+      let edges = Array.from(edgeMap.values()).filter(e => e.similarity_score >= similarityThreshold)
 
       // Sort by similarity to prioritize strong connections
       edges.sort((a, b) => b.similarity_score - a.similarity_score)
@@ -1740,7 +1765,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           })
           .sort((a, b) => a.distance - b.distance)
           .slice(0, minDegree - deg)
-          .filter(c => c.similarity_score > 0.02)
+          .filter(c => c.similarity_score > similarityThreshold)
         candidates.forEach(c => edges.push(c))
       })
 
@@ -1775,14 +1800,14 @@ Be strict about relevance - only mark as relevant if there's substantial concept
             cellNodes.forEach(({ node: otherNode, coord: otherCoord }) => {
               if (node.id === otherNode.id || visited.has(otherNode.id)) return
 
-          const dx = nodeCoord.x - otherCoord.x
-          const dy = nodeCoord.y - otherCoord.y
-          const distance = Math.sqrt(dx * dx + dy * dy)
+              const dx = nodeCoord.x - otherCoord.x
+              const dy = nodeCoord.y - otherCoord.y
+              const distance = Math.sqrt(dx * dx + dy * dy)
 
-          if (distance <= epsilon) {
-            neighbors.push(otherNode.id)
-          }
-        })
+              if (distance <= epsilon) {
+                neighbors.push(otherNode.id)
+              }
+            })
           }
         }
 

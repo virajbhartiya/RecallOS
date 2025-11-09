@@ -12,10 +12,7 @@ import * as THREE from "three"
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 
 import { MemoryService } from "../services/memory.service"
-import type {
-  MemoryMesh,
-  MemoryMeshEdge,
-} from "../types/memory.type"
+import type { MemoryMesh, MemoryMeshEdge } from "../types/memory.type"
 import { requireAuthToken } from "../utils/user-id.util"
 import { ErrorMessage, LoadingSpinner } from "./ui/loading-spinner"
 
@@ -117,9 +114,18 @@ const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
     <mesh
       ref={meshRef}
       position={position}
-      onDoubleClick={(e) => {
+      onClick={(e) => {
         e.stopPropagation()
+        if (e.nativeEvent) {
+          e.nativeEvent.stopPropagation()
+        }
         onClick(memoryId)
+      }}
+      onPointerDown={(e) => {
+        e.stopPropagation()
+        if (e.nativeEvent) {
+          e.nativeEvent.stopPropagation()
+        }
       }}
       onPointerOver={(e) => {
         e.stopPropagation()
@@ -234,8 +240,12 @@ const SceneComponent: React.FC<SceneProps> = ({
 
     const positions: [number, number, number][] = new Array(nodeCount)
     const highlightedSet = new Set(highlightedMemoryIds)
-    const memorySourcesMap = memorySources ? new Map(Object.entries(memorySources)) : null
-    const memoryUrlsMap = memoryUrls ? new Map(Object.entries(memoryUrls)) : null
+    const memorySourcesMap = memorySources
+      ? new Map(Object.entries(memorySources))
+      : null
+    const memoryUrlsMap = memoryUrls
+      ? new Map(Object.entries(memoryUrls))
+      : null
 
     for (let i = 0; i < nodeCount; i++) {
       const n = meshData.nodes[i]
@@ -244,9 +254,10 @@ const SceneComponent: React.FC<SceneProps> = ({
       if (Number.isFinite(n.x) && Number.isFinite(n.y)) {
         const x = n.x
         const y = n.y
-        const z = ("z" in n && typeof n.z === "number" && Number.isFinite(n.z)) 
-          ? n.z 
-          : ((n.importance_score ?? 0.5) - 0.5) * 2 * 1000
+        const z =
+          "z" in n && typeof n.z === "number" && Number.isFinite(n.z)
+            ? n.z
+            : ((n.importance_score ?? 0.5) - 0.5) * 2 * 1000
 
         minX = Math.min(minX, x)
         maxX = Math.max(maxX, x)
@@ -414,12 +425,16 @@ const SceneComponent: React.FC<SceneProps> = ({
     const priorityNodes = nodes.filter((n) => n.isSelected || n.isHighlighted)
     const otherNodes = nodes.filter((n) => !n.isSelected && !n.isHighlighted)
 
-    const visibleNodes = maxVisibleNodes === Infinity
-      ? nodes
-      : [
-          ...priorityNodes,
-          ...otherNodes.slice(0, Math.max(0, maxVisibleNodes - priorityNodes.length)),
-        ]
+    const visibleNodes =
+      maxVisibleNodes === Infinity
+        ? nodes
+        : [
+            ...priorityNodes,
+            ...otherNodes.slice(
+              0,
+              Math.max(0, maxVisibleNodes - priorityNodes.length)
+            ),
+          ]
 
     const visibleNodeIds = new Set(visibleNodes.map((n) => n.id))
     const nodePosMap = new Map<string, string>()
@@ -436,7 +451,10 @@ const SceneComponent: React.FC<SceneProps> = ({
         const endId = nodePosMap.get(endKey)
 
         return (
-          (startId && visibleNodeIds.has(startId) && endId && visibleNodeIds.has(endId)) ||
+          (startId &&
+            visibleNodeIds.has(startId) &&
+            endId &&
+            visibleNodeIds.has(endId)) ||
           edge.similarity >= 0.2
         )
       })
@@ -525,15 +543,15 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
           Infinity,
           similarityThreshold
         )
-          setMeshData(data)
-          if (typeof onMeshLoad === "function") {
-            onMeshLoad(data)
+        setMeshData(data)
+        if (typeof onMeshLoad === "function") {
+          onMeshLoad(data)
         }
       } catch (err) {
-          setError("Failed to load memory mesh")
-          console.error("Error fetching mesh data:", err)
+        setError("Failed to load memory mesh")
+        console.error("Error fetching mesh data:", err)
       } finally {
-          setIsLoading(false)
+        setIsLoading(false)
       }
     }
     fetchMeshData()
@@ -601,7 +619,8 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
             far: 1000000000,
           }}
           style={{ background: "transparent" }}
-          dpr={[1, 1.75]} // keep crisp but not noisy
+          dpr={[1, 1.75]}
+          onPointerMissed={() => {}}
         >
           <Scene
             meshData={meshData}
