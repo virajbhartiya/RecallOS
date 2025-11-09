@@ -105,6 +105,16 @@ export class ProfileUpdateService {
       }
     }
 
+    if (extractionResult.isFallback) {
+      logger.warn('Profile extraction used fallback, preserving existing profile')
+      if (existingProfile) {
+        return existingProfile as UserProfile
+      }
+      throw new Error(
+        'Failed to extract profile (fallback used) and no existing profile to preserve'
+      )
+    }
+
     if (existingProfile && !force && lastAnalyzedDate) {
       const merged = this.mergeProfiles(existingProfile, extractionResult)
       extractionResult = merged

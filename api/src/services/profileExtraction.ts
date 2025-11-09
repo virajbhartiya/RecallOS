@@ -73,6 +73,7 @@ export interface ProfileExtractionResult {
   static_profile_text: string
   dynamic_profile_json: DynamicProfile
   dynamic_profile_text: string
+  isFallback?: boolean
 }
 
 export class ProfileExtractionService {
@@ -97,7 +98,7 @@ export class ProfileExtractionService {
     try {
       const response = await aiProvider.generateContent(prompt, false, userId)
       const parsed = this.parseProfileResponse(response)
-      return parsed
+      return { ...parsed, isFallback: false }
     } catch (error) {
       logger.error('Error extracting profile from memories, retrying once:', error)
 
@@ -105,10 +106,11 @@ export class ProfileExtractionService {
         const retryResponse = await aiProvider.generateContent(prompt, false, userId)
         const retryParsed = this.parseProfileResponse(retryResponse)
         logger.log('Profile extraction succeeded on retry')
-        return retryParsed
+        return { ...retryParsed, isFallback: false }
       } catch (retryError) {
         logger.error('Error extracting profile from memories on retry, using fallback:', retryError)
-        return this.extractProfileFallback(memories)
+        const fallbackResult = this.extractProfileFallback(memories)
+        return { ...fallbackResult, isFallback: true }
       }
     }
   }
