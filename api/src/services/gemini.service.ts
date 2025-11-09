@@ -43,7 +43,7 @@ let nextAvailableAt = 0
 const taskQueue: QueuedTask[] = []
 
 // Default gap between requests; tuned for free-tier limits (~10 rpm). Adjust via Retry-After hints when returned
-const minIntervalMs = 2000 // Further reduced to 2000ms for faster processing
+const minIntervalMs = 6000 // 6 seconds = 10 requests per minute for Gemini free tier
 
 async function processQueue() {
   if (isProcessingQueue) return

@@ -5,7 +5,13 @@ import { memoryMeshService } from '../services/memory-mesh.service'
 import { profileUpdateService } from '../services/profile-update.service'
 import { prisma } from '../lib/prisma.lib'
 import { createHash } from 'crypto'
-import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../utils/env.util'
+import {
+  getQueueConcurrency,
+  getRedisConnection,
+  getQueueLimiter,
+  getQueueStalledInterval,
+  getQueueMaxStalledCount,
+} from '../utils/env.util'
 import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
 import { logger } from '../utils/logger.util'
 
@@ -365,6 +371,8 @@ export const startContentWorker = () => {
       connection: getRedisConnection(),
       concurrency: getQueueConcurrency(),
       limiter: getQueueLimiter(),
+      stalledInterval: getQueueStalledInterval(),
+      maxStalledCount: getQueueMaxStalledCount(),
     }
   )
 }

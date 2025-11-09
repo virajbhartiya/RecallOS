@@ -53,10 +53,18 @@ export function getRedisConnection() {
 
 export function getQueueLimiter() {
   const max = Number(process.env.QUEUE_RATE_MAX || 10)
-  const duration = Number(process.env.QUEUE_RATE_DURATION_MS || 1000)
+  const duration = Number(process.env.QUEUE_RATE_DURATION_MS || 60000)
   return { max, duration } as const
 }
 
 export function getQueueConcurrency() {
   return Number(process.env.QUEUE_CONCURRENCY || 1)
+}
+
+export function getQueueStalledInterval() {
+  return Number(process.env.QUEUE_STALLED_INTERVAL_MS || 300000)
+}
+
+export function getQueueMaxStalledCount() {
+  return Number(process.env.QUEUE_MAX_STALLED_COUNT || 10)
 }
