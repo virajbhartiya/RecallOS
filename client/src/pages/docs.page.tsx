@@ -164,10 +164,10 @@ export const Docs = () => {
               </h2>
               <div className="prose prose-gray max-w-none space-y-4">
                 <p className="text-gray-700 leading-relaxed">
-                  RecallOS is a decentralized personal memory system that
-                  captures, organizes, and retrieves your digital context. Think
-                  of it as your personal search engine for everything you've
-                  read and learned on the web.
+                  RecallOS is a personal memory system that captures, organizes,
+                  and retrieves your digital context. Think of it as your
+                  personal search engine for everything you've read and learned
+                  on the web.
                 </p>
                 <p className="text-gray-700 leading-relaxed">
                   Unlike traditional bookmarks or note-taking apps, RecallOS:
