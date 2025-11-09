@@ -208,10 +208,73 @@ export const startContentWorker = () => {
         timestamp: new Date().toISOString(),
       })
 
+      let extractedMetadata: {
+        topics?: string[]
+        categories?: string[]
+        keyPoints?: string[]
+        sentiment?: string
+        importance?: number
+        usefulness?: number
+        searchableTerms?: string[]
+        contextRelevance?: string[]
+      } = {}
+      try {
+        const extractedMetadataResult = await aiProvider.extractContentMetadata(
+          raw_text,
+          metadata,
+          user_id
+        )
+        if (
+          typeof extractedMetadataResult === 'object' &&
+          extractedMetadataResult !== null &&
+          'topics' in extractedMetadataResult
+        ) {
+          extractedMetadata = extractedMetadataResult
+        } else if (
+          typeof extractedMetadataResult === 'object' &&
+          extractedMetadataResult !== null &&
+          'metadata' in extractedMetadataResult
+        ) {
+          extractedMetadata =
+            (extractedMetadataResult as { metadata?: typeof extractedMetadata }).metadata ||
+            extractedMetadataResult
+        } else {
+          extractedMetadata = extractedMetadataResult as typeof extractedMetadata
+        }
+        logger.log(`[Redis Worker] Metadata extracted successfully`, {
+          jobId: job.id,
+          userId: user_id,
+          hasTopics: !!extractedMetadata.topics?.length,
+          hasCategories: !!extractedMetadata.categories?.length,
+          hasSentiment: !!extractedMetadata.sentiment,
+          timestamp: new Date().toISOString(),
+        })
+      } catch (metadataError) {
+        logger.warn(`[Redis Worker] Failed to extract metadata, continuing without it`, {
+          jobId: job.id,
+          userId: user_id,
+          error: metadataError?.message || String(metadataError),
+          timestamp: new Date().toISOString(),
+        })
+      }
+
       if (metadata?.memory_id) {
+        const pageMetadata = {
+          ...metadata,
+          extracted_metadata: extractedMetadata,
+          topics: extractedMetadata.topics,
+          categories: extractedMetadata.categories,
+          key_points: extractedMetadata.keyPoints,
+          sentiment: extractedMetadata.sentiment,
+          importance: extractedMetadata.importance,
+          searchable_terms: extractedMetadata.searchableTerms,
+        }
         await prisma.memory.update({
           where: { id: metadata.memory_id },
-          data: { summary: summary },
+          data: {
+            summary: summary,
+            page_metadata: pageMetadata,
+          },
         })
         await memoryMeshService.generateEmbeddingsForMemory(metadata.memory_id)
         await memoryMeshService.createMemoryRelations(metadata.memory_id, user_id)
@@ -266,6 +329,16 @@ export const startContentWorker = () => {
 
           let memory
           try {
+            const pageMetadata = {
+              ...metadata,
+              extracted_metadata: extractedMetadata,
+              topics: extractedMetadata.topics,
+              categories: extractedMetadata.categories,
+              key_points: extractedMetadata.keyPoints,
+              sentiment: extractedMetadata.sentiment,
+              importance: extractedMetadata.importance,
+              searchable_terms: extractedMetadata.searchableTerms,
+            }
             memory = await prisma.memory.create({
               data: {
                 user_id,
@@ -278,7 +351,7 @@ export const startContentWorker = () => {
                 canonical_hash: canonicalHash,
                 timestamp: BigInt(timestamp),
                 full_content: raw_text,
-                page_metadata: metadata || {},
+                page_metadata: pageMetadata,
               },
             })
           } catch (createError) {
