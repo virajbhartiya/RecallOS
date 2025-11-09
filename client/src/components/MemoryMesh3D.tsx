@@ -89,18 +89,17 @@ const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
   const size = baseSize
   const opacity = inLatentSpace ? 0.95 : 0.75
 
+  const groupRef = useRef<THREE.Group>(null)
+  
   useFrame(() => {
-    if (!meshRef.current) return
-    // Distance-based scaling to keep apparent size consistent while zooming
-    const nodePosition = meshRef.current.position
+    if (!meshRef.current || !groupRef.current) return
+    const nodePosition = groupRef.current.position
     const distance = camera.position.distanceTo(nodePosition)
-    // Convert camera fov to radians for approximate world-space pixel scaling
     const fovRad =
       camera instanceof THREE.PerspectiveCamera && camera.fov
         ? (camera.fov * Math.PI) / 180
         : (60 * Math.PI) / 180
     const worldPerceivedScale = Math.tan(fovRad / 2) * 2
-    // Tune multiplier to get roughly dot-like size; clamp to avoid extremes
     const dynamicScale = Math.min(
       6,
       Math.max(0.25, distance * worldPerceivedScale * 0.06)
@@ -111,40 +110,48 @@ const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
   })
 
   return (
-    <mesh
-      ref={meshRef}
-      position={position}
-      onClick={(e) => {
-        e.stopPropagation()
-        if (e.nativeEvent) {
-          e.nativeEvent.stopPropagation()
-        }
-        onClick(memoryId)
-      }}
-      onPointerDown={(e) => {
-        e.stopPropagation()
-        if (e.nativeEvent) {
-          e.nativeEvent.stopPropagation()
-        }
-      }}
-      onPointerOver={(e) => {
-        e.stopPropagation()
-        setHovered(true)
-      }}
-      onPointerOut={(e) => {
-        e.stopPropagation()
-        setHovered(false)
-      }}
-    >
-      <sphereGeometry args={[size, 6, 6]} />
-      <meshBasicMaterial
-        color={color}
-        transparent
-        opacity={isSelected ? 1.0 : opacity}
-        depthWrite={true}
-        toneMapped={false}
-      />
-    </mesh>
+    <group ref={groupRef} position={position}>
+      <mesh
+        ref={meshRef}
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick(memoryId)
+        }}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation()
+          setHovered(true)
+        }}
+        onPointerOut={(e) => {
+          e.stopPropagation()
+          setHovered(false)
+        }}
+      >
+        <sphereGeometry args={[size, 6, 6]} />
+        <meshBasicMaterial
+          color={color}
+          transparent
+          opacity={isSelected ? 1.0 : opacity}
+          depthWrite={true}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh
+        visible={false}
+        onClick={(e) => {
+          e.stopPropagation()
+          onClick(memoryId)
+        }}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+        }}
+      >
+        <sphereGeometry args={[size * 3, 8, 8]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+    </group>
   )
 }
 

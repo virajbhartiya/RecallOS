@@ -1453,7 +1453,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
   }> {
     try {
       const queryOptions: {
-        where: { user_id?: string } | {}
+        where: { user_id?: string } | Record<string, never>
         select: {
           id: boolean
           title: boolean
@@ -1491,7 +1491,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         queryOptions.take = limit
       }
 
-      const memories = await prisma.memory.findMany(queryOptions) as MemoryWithMetadata[]
+      const memories = (await prisma.memory.findMany(queryOptions)) as MemoryWithMetadata[]
 
       const latentCoords = await this.computeLatentSpaceProjection(memories)
 
@@ -1701,7 +1701,9 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         }
       })
 
-      let edges = Array.from(edgeMap.values()).filter(e => e.similarity_score >= similarityThreshold)
+      let edges = Array.from(edgeMap.values()).filter(
+        e => e.similarity_score >= similarityThreshold
+      )
 
       // Sort by similarity to prioritize strong connections
       edges.sort((a, b) => b.similarity_score - a.similarity_score)
