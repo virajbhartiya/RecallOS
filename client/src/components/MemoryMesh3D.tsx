@@ -90,7 +90,7 @@ const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
   const opacity = inLatentSpace ? 0.95 : 0.75
 
   const groupRef = useRef<THREE.Group>(null)
-  
+
   useFrame(() => {
     if (!meshRef.current || !groupRef.current) return
     const nodePosition = groupRef.current.position
