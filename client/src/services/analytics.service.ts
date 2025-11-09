@@ -1,5 +1,5 @@
-import { getRequest } from "../utility/generalServices"
-import { requireAuthToken } from "../utils/userId"
+import { getRequest } from "../utils/general-services.util"
+import { requireAuthToken } from "../utils/user-id.util"
 
 export interface AnalyticsData {
   overview: {

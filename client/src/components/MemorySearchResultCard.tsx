@@ -1,6 +1,6 @@
 import React, { memo } from "react"
 
-import type { Memory, SearchResult } from "../types/memory"
+import type { Memory, SearchResult } from "../types/memory.type"
 
 interface MemorySearchResultCardProps {
   result: SearchResult

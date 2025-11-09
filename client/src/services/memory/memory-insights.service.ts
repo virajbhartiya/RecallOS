@@ -1,7 +1,7 @@
-import type { MemoryInsights } from "../../types/memory"
-import { getRequest, postRequest } from "../../utility/generalServices"
-import { requireAuthToken } from "../../utils/userId"
-import { getUserMemoryCount } from "./memoryApi"
+import type { MemoryInsights } from "../../types/memory.type"
+import { getRequest, postRequest } from "../../utils/general-services.util"
+import { requireAuthToken } from "../../utils/user-id.util"
+import { getUserMemoryCount } from "./memory-api.service"
 
 const baseUrl = "/memory"
 

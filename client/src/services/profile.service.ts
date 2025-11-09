@@ -1,5 +1,5 @@
-import { getRequest, postRequest } from "../utility/generalServices"
-import { requireAuthToken } from "../utils/userId"
+import { getRequest, postRequest } from "../utils/general-services.util"
+import { requireAuthToken } from "../utils/user-id.util"
 
 export interface StaticProfile {
   interests: string[]

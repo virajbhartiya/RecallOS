@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { AxiosResponse } from "axios"
 
-import axiosInstance from "./axiosInterceptor"
+import axiosInstance from "./axios-interceptor.util"
 
 export const getRequest = async (
   route: string,

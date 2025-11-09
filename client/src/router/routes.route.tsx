@@ -2,25 +2,29 @@ import { lazy, Suspense } from "react"
 import { Route, Routes } from "react-router-dom"
 
 const Landing = lazy(() =>
-  import("@/pages/Landing").then((module) => ({ default: module.Landing }))
+  import("@/pages/landing.page").then((module) => ({ default: module.Landing }))
 )
 const Memories = lazy(() =>
-  import("@/pages/Memories").then((module) => ({ default: module.Memories }))
+  import("@/pages/memories.page").then((module) => ({
+    default: module.Memories,
+  }))
 )
 const Search = lazy(() =>
-  import("@/pages/Search").then((module) => ({ default: module.Search }))
+  import("@/pages/search.page").then((module) => ({ default: module.Search }))
 )
 const Docs = lazy(() =>
-  import("@/pages/Docs").then((module) => ({ default: module.Docs }))
+  import("@/pages/docs.page").then((module) => ({ default: module.Docs }))
 )
 const Login = lazy(() =>
-  import("@/pages/Login").then((module) => ({ default: module.Login }))
+  import("@/pages/login.page").then((module) => ({ default: module.Login }))
 )
 const Analytics = lazy(() =>
-  import("@/pages/Analytics").then((module) => ({ default: module.Analytics }))
+  import("@/pages/analytics.page").then((module) => ({
+    default: module.Analytics,
+  }))
 )
 const Profile = lazy(() =>
-  import("@/pages/Profile").then((module) => ({ default: module.Profile }))
+  import("@/pages/profile.page").then((module) => ({ default: module.Profile }))
 )
 
 const LoadingFallback = () => (

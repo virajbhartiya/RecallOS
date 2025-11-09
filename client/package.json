@@ -11,7 +11,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "fix": "npm run lint:fix && npm run format",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "npm run lint:fix && npm run format && npm run build"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.5",

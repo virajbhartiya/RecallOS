@@ -1,7 +1,7 @@
-import type { Memory } from "../../types/memory"
-import { getRequest } from "../../utility/generalServices"
-import { transformApiMemoryResponse } from "../../utils/memoryTransform"
-import { requireAuthToken } from "../../utils/userId"
+import type { Memory } from "../../types/memory.type"
+import { getRequest } from "../../utils/general-services.util"
+import { transformApiMemoryResponse } from "../../utils/memory-transform.util"
+import { requireAuthToken } from "../../utils/user-id.util"
 
 interface ApiMemoryResponse {
   id?: string
@@ -121,7 +121,7 @@ export async function isMemoryStored(hash: string): Promise<boolean> {
 
 export async function deleteMemory(memoryId: string): Promise<void> {
   requireAuthToken()
-  const { deleteRequest } = await import("../../utility/generalServices")
+  const { deleteRequest } = await import("../../utils/general-services.util")
   await deleteRequest(`${baseUrl}/${memoryId}`)
 }
 

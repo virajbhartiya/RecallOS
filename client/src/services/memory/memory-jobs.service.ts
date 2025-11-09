@@ -1,5 +1,5 @@
-import { getRequest } from "../../utility/generalServices"
-import { requireAuthToken } from "../../utils/userId"
+import { getRequest } from "../../utils/general-services.util"
+import { requireAuthToken } from "../../utils/user-id.util"
 
 export async function getPendingJobs(): Promise<{
   jobs: Array<{
@@ -34,7 +34,7 @@ export async function getPendingJobs(): Promise<{
 
 export async function deletePendingJob(jobId: string): Promise<void> {
   requireAuthToken()
-  const { deleteRequest } = await import("../../utility/generalServices")
+  const { deleteRequest } = await import("../../utils/general-services.util")
   await deleteRequest(`/content/pending/${jobId}`)
 }
 

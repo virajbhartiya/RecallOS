@@ -3,8 +3,8 @@ import {
   getProfile,
   refreshProfile,
   type UserProfile,
-} from "@/services/profile"
-import { requireAuthToken } from "@/utils/userId"
+} from "@/services/profile.service"
+import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
 
 import { EmptyState, ErrorMessage } from "../components/ui/loading-spinner"

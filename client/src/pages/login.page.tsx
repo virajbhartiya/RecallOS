@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
 
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils.lib"
 import { LoadingSpinner } from "@/components/ui/loading-spinner"
 import { ConsoleButton } from "@/components/sections/ConsoleButton"
 
-import axiosInstance from "../utility/axiosInterceptor"
+import axiosInstance from "../utils/axios-interceptor.util"
 
 interface User {
   id: string

@@ -1,6 +1,6 @@
 import React, { memo, useCallback, useEffect } from "react"
 
-import type { Memory, MemorySearchResponse } from "../types/memory"
+import type { Memory, MemorySearchResponse } from "../types/memory.type"
 import { MemoryDetails } from "./MemoryDetails"
 import { MemoryList } from "./MemoryList"
 

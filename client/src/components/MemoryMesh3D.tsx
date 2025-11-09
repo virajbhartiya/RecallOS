@@ -11,13 +11,13 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber"
 import * as THREE from "three"
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 
-import { MemoryService } from "../services/memoryService"
+import { MemoryService } from "../services/memory.service"
 import type {
   MemoryMesh,
   MemoryMeshEdge,
   MemoryMeshNode,
-} from "../types/memory"
-import { requireAuthToken } from "../utils/userId"
+} from "../types/memory.type"
+import { requireAuthToken } from "../utils/user-id.util"
 import { ErrorMessage, LoadingSpinner } from "./ui/loading-spinner"
 
 interface MemoryMesh3DProps {

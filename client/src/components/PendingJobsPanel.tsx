@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react"
-import { MemoryService } from "@/services/memoryService"
-import { requireAuthToken } from "@/utils/userId"
+import { MemoryService } from "@/services/memory.service"
+import { requireAuthToken } from "@/utils/user-id.util"
 import {
   AlertCircle,
   CheckSquare,

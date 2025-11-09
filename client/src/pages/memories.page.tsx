@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from "react"
-import { MemoryService } from "@/services/memoryService"
-import { SearchService } from "@/services/search"
-import { requireAuthToken } from "@/utils/userId"
+import { MemoryService } from "@/services/memory.service"
+import { SearchService } from "@/services/search.service"
+import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
 
 import type {
   Memory,
   MemorySearchResponse,
   SearchFilters,
-} from "@/types/memory"
+} from "@/types/memory.type"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { MemoryDialog } from "@/components/MemoryDialog"
 import { MemoryMesh3D } from "@/components/MemoryMesh3D"

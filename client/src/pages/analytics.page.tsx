@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react"
-import { getAnalytics, type AnalyticsData } from "@/services/analytics"
-import { requireAuthToken } from "@/utils/userId"
+import { getAnalytics, type AnalyticsData } from "@/services/analytics.service"
+import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
 
 export const Analytics: React.FC = () => {

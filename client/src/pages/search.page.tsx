@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react"
-import { requireAuthToken } from "@/utils/userId"
+import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
 
 import { MemorySearch } from "../components/MemorySearch"
@@ -9,13 +9,13 @@ import {
   ErrorMessage,
   LoadingCard,
 } from "../components/ui/loading-spinner"
-import { MemoryService } from "../services/memoryService"
-import { getProfileContext } from "../services/profile"
+import { MemoryService } from "../services/memory.service"
+import { getProfileContext } from "../services/profile.service"
 import type {
   Memory,
   MemorySearchResponse,
   SearchFilters,
-} from "../types/memory"
+} from "../types/memory.type"
 
 export const Search: React.FC = () => {
   const navigate = useNavigate()

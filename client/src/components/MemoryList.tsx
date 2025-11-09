@@ -1,7 +1,7 @@
 import React, { memo } from "react"
 import { Trash2 } from "lucide-react"
 
-import type { Memory, MemorySearchResponse } from "../types/memory"
+import type { Memory, MemorySearchResponse } from "../types/memory.type"
 
 interface MemoryListProps {
   memories: Memory[]

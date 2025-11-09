@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 
-import type { SearchFilters } from "../types/memory"
+import type { SearchFilters } from "../types/memory.type"
 import { LoadingSpinner } from "./ui/loading-spinner"
 
 interface MemorySearchProps {

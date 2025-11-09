@@ -1,7 +1,7 @@
 import React, { memo, useState } from "react"
 import { Trash2 } from "lucide-react"
 
-import type { Memory, MemorySearchResponse } from "../types/memory"
+import type { Memory, MemorySearchResponse } from "../types/memory.type"
 
 interface MemoryDetailsProps {
   selectedMemory: Memory | null

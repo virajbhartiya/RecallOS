@@ -3,10 +3,10 @@ import type {
   MemorySearchResponse,
   SearchFilters,
   SearchResult,
-} from "../types/memory"
-import axiosInstance from "../utility/axiosInterceptor"
-import { postRequest } from "../utility/generalServices"
-import { requireAuthToken } from "../utils/userId"
+} from "../types/memory.type"
+import axiosInstance from "../utils/axios-interceptor.util"
+import { postRequest } from "../utils/general-services.util"
+import { requireAuthToken } from "../utils/user-id.util"
 
 type ApiSearchResult = {
   memory_id: string
