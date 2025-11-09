@@ -1376,10 +1376,22 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       }
       const seededRandom = mulberry32(makeSeed(embeddingData.map(e => e.id)))
 
+      const datasetSize = embeddingMatrix.length
+      let nEpochs = 50
+      if (datasetSize > 2000) {
+        nEpochs = 30
+      } else if (datasetSize > 1000) {
+        nEpochs = 50
+      } else if (datasetSize > 500) {
+        nEpochs = 75
+      } else if (datasetSize > 200) {
+        nEpochs = 100
+      }
+
       const umap = new UMAP({
         nComponents: 3,
-        nEpochs: 400,
-        nNeighbors: Math.min(10, Math.max(3, Math.floor(embeddingMatrix.length / 3))),
+        nEpochs: nEpochs,
+        nNeighbors: Math.min(10, Math.max(3, Math.floor(Math.sqrt(datasetSize)))),
         minDist: 0.1,
         spread: 1.5,
         random: seededRandom,
@@ -1387,23 +1399,35 @@ Be strict about relevance - only mark as relevant if there's substantial concept
 
       const projection = umap.fit(embeddingMatrix)
 
-      const coords = projection.map(p => ({ x: p[0], y: p[1], z: p[2] ?? 0 }))
+      let xMin = Infinity
+      let xMax = -Infinity
+      let yMin = Infinity
+      let yMax = -Infinity
+      let zMin = Infinity
+      let zMax = -Infinity
 
-      const xCoords = coords.map(c => c.x)
-      const yCoords = coords.map(c => c.y)
-      const xMin = Math.min(...xCoords)
-      const xMax = Math.max(...xCoords)
-      const yMin = Math.min(...yCoords)
-      const yMax = Math.max(...yCoords)
-      const zCoords = coords.map(c => c.z)
-      const zMin = Math.min(...zCoords)
-      const zMax = Math.max(...zCoords)
+      const coords = projection.map(p => {
+        const x = p[0]
+        const y = p[1]
+        const z = p[2] ?? 0
+        xMin = Math.min(xMin, x)
+        xMax = Math.max(xMax, x)
+        yMin = Math.min(yMin, y)
+        yMax = Math.max(yMax, y)
+        zMin = Math.min(zMin, z)
+        zMax = Math.max(zMax, z)
+        return { x, y, z }
+      })
 
       const scale = 1200
+      const xSpan = xMax - xMin || 1
+      const ySpan = yMax - yMin || 1
+      const zSpan = zMax - zMin || 1
+
       const normalized = coords.map(c => ({
-        x: ((c.x - xMin) / (xMax - xMin || 1) - 0.5) * scale,
-        y: ((c.y - yMin) / (yMax - yMin || 1) - 0.5) * scale,
-        z: ((c.z - zMin) / (zMax - zMin || 1) - 0.5) * (scale * 0.6),
+        x: ((c.x - xMin) / xSpan - 0.5) * scale,
+        y: ((c.y - yMin) / ySpan - 0.5) * scale,
+        z: ((c.z - zMin) / zSpan - 0.5) * (scale * 0.6),
       }))
 
       const coordMap = new Map<string, { x: number; y: number; z: number }>()
@@ -1427,17 +1451,8 @@ Be strict about relevance - only mark as relevant if there's substantial concept
     edges: MemoryEdge[]
   }> {
     try {
-      const memories = await prisma.memory.findMany({
+      const queryOptions: any = {
         where: userId ? { user_id: userId } : {},
-        include: {
-          related_memories: {
-            where: {
-              similarity_score: {
-                gte: similarityThreshold,
-              },
-            },
-            include: {
-              related_memory: {
                 select: {
                   id: true,
                   title: true,
@@ -1446,16 +1461,16 @@ Be strict about relevance - only mark as relevant if there's substantial concept
                   summary: true,
                   source: true,
                   timestamp: true,
-                },
-              },
-            },
-            orderBy: { similarity_score: 'desc' },
-            take: 10,
-          },
+          importance_score: true,
         },
         orderBy: { created_at: 'desc' },
-        take: limit,
-      })
+      }
+
+      if (limit !== Infinity && Number.isFinite(limit)) {
+        queryOptions.take = limit
+      }
+
+      const memories = await prisma.memory.findMany(queryOptions)
 
       const latentCoords = await this.computeLatentSpaceProjection(memories)
 
@@ -1498,7 +1513,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           url: memory.url,
           source: memory.source || 'extension',
           timestamp: memory.timestamp,
-          importance_score: memory.importance_score || memory.related_memories.length / 10,
+          importance_score: memory.importance_score || 0.5,
           x,
           y,
           hasEmbedding: latentCoords.has(memory.id),
@@ -1507,7 +1522,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           layout: {
             isLatentSpace: latentCoords.has(memory.id),
             cluster: memory.source || 'extension',
-            centrality: memory.related_memories.length,
+            centrality: 0,
           },
         }
       })
@@ -1525,8 +1540,8 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       }
 
       const nodeCount = nodes.length
-      const k = Math.min(8, Math.max(3, Math.floor(Math.sqrt(Math.max(1, nodeCount)))))
-      const minDegree = Math.min(3, Math.max(1, Math.floor(k / 2)))
+      const k = Math.min(15, Math.max(5, Math.floor(Math.sqrt(Math.max(1, nodeCount)))))
+      const minDegree = Math.min(5, Math.max(2, Math.floor(k / 2)))
 
       const nodeIdToDomain = new Map<string, string | null>(
         nodes.map(n => [n.id, getDomain(n.url)])
@@ -1538,37 +1553,73 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         nodes.map(n => [n.id, n.timestamp ? Number(n.timestamp) : null])
       )
 
-      // First pass: collect all distances to calculate proper maxDistance
-      const allDistances: number[] = []
+      const nodesWithCoords = nodes.filter(n => latentCoords.has(n.id))
+      if (nodesWithCoords.length === 0) {
+        return {
+          nodes: nodes.map(n => ({
+            id: n.id,
+            x: n.x,
+            y: n.y,
+            z: n.z,
+            title: n.title,
+            url: n.url,
+          })),
+          edges: [],
+        }
+      }
+
+      const gridSize = Math.ceil(Math.sqrt(nodesWithCoords.length))
+      const gridCellSize = 2000 / gridSize
+      const spatialGrid = new Map<string, Array<{ node: typeof nodes[0]; coord: { x: number; y: number; z: number } }>>()
+
+      nodesWithCoords.forEach(node => {
+        const coord = latentCoords.get(node.id)!
+        const gridX = Math.floor((coord.x + 1000) / gridCellSize)
+        const gridY = Math.floor((coord.y + 1000) / gridCellSize)
+        const gridKey = `${gridX},${gridY}`
+        
+        if (!spatialGrid.has(gridKey)) {
+          spatialGrid.set(gridKey, [])
+        }
+        spatialGrid.get(gridKey)!.push({ node, coord })
+      })
+
       const nodeDistancesMap = new Map<string, Array<{ targetId: string; distance: number }>>()
+      const allDistances: number[] = []
+      const searchRadius = 2
 
-      nodes.forEach((node, i) => {
-        if (!latentCoords.has(node.id)) return
-
-        const nodeCoord = latentCoords.get(node.id)!
+      nodesWithCoords.forEach(node => {
+        const coord = latentCoords.get(node.id)!
+        const gridX = Math.floor((coord.x + 1000) / gridCellSize)
+        const gridY = Math.floor((coord.y + 1000) / gridCellSize)
         const distances: Array<{ targetId: string; distance: number }> = []
 
-        nodes.forEach((otherNode, j) => {
-          if (i === j) return
-          if (!latentCoords.has(otherNode.id)) return
+        for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+          for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+            const checkKey = `${gridX + dx},${gridY + dy}`
+            const cellNodes = spatialGrid.get(checkKey)
+            if (!cellNodes) continue
 
-          const otherCoord = latentCoords.get(otherNode.id)!
-          const dx = nodeCoord.x - otherCoord.x
-          const dy = nodeCoord.y - otherCoord.y
-          const dz = (nodeCoord.z ?? 0) - (otherCoord.z ?? 0)
+            cellNodes.forEach(({ node: otherNode, coord: otherCoord }) => {
+              if (node.id === otherNode.id) return
+
+              const dx = coord.x - otherCoord.x
+              const dy = coord.y - otherCoord.y
+              const dz = (coord.z ?? 0) - (otherCoord.z ?? 0)
           const distance = Math.sqrt(dx * dx + dy * dy + dz * dz)
           distances.push({ targetId: otherNode.id, distance })
           allDistances.push(distance)
         })
+          }
+        }
 
         distances.sort((a, b) => a.distance - b.distance)
         nodeDistancesMap.set(node.id, distances)
       })
 
-      // Calculate maxDistance from actual distances (use 95th percentile to avoid outliers)
       allDistances.sort((a, b) => a - b)
       const percentile95 = Math.floor(allDistances.length * 0.95)
-      const maxDistance = allDistances[percentile95] || Math.max(...allDistances, 1)
+      const maxDistance = allDistances[percentile95] || (allDistances.length > 0 ? Math.max(...allDistances) : 1)
 
       // Second pass: calculate similarity scores
       nodes.forEach(node => {
@@ -1605,7 +1656,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           }
 
           const similarityScore = Math.max(0, Math.min(1, baseSim + boost))
-          if (similarityScore < 0.05) return
+          if (similarityScore < 0.02) return
 
           rawEdges.push({
             source: node.id,
@@ -1625,7 +1676,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         }
       })
 
-      let edges = Array.from(edgeMap.values()).filter(e => e.similarity_score >= 0.05)
+      let edges = Array.from(edgeMap.values()).filter(e => e.similarity_score >= 0.02)
 
       // Sort by similarity to prioritize strong connections
       edges.sort((a, b) => b.similarity_score - a.similarity_score)
@@ -1634,7 +1685,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       const degreeMap = new Map<string, number>()
       const incrementDegree = (id: string) => degreeMap.set(id, (degreeMap.get(id) || 0) + 1)
 
-      const maxDegree = Math.min(12, Math.max(5, Math.floor(k * 2)))
+      const maxDegree = Math.min(20, Math.max(8, Math.floor(k * 2.5)))
 
       const finalEdges: MemoryEdge[] = []
       const addedEdges = new Set<string>()
@@ -1689,7 +1740,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           })
           .sort((a, b) => a.distance - b.distance)
           .slice(0, minDegree - deg)
-          .filter(c => c.similarity_score > 0.05)
+          .filter(c => c.similarity_score > 0.02)
         candidates.forEach(c => edges.push(c))
       })
 
@@ -1701,10 +1752,9 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       const clusterAssignments = new Map<string, number>()
       let nextClusterId = 0
 
-      // Group nodes by proximity in latent space
       const visited = new Set<string>()
-      const epsilon = 250 // Distance threshold for same cluster
-      const minPoints = 2 // Minimum points to form a cluster
+      const epsilon = 250
+      const minPoints = 2
 
       layoutNodes.forEach(node => {
         if (visited.has(node.id) || !latentCoords.has(node.id)) return
@@ -1712,12 +1762,19 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         visited.add(node.id)
         const nodeCoord = latentCoords.get(node.id)!
 
-        // Find all neighbors within epsilon
         const neighbors: string[] = []
-        layoutNodes.forEach(otherNode => {
-          if (node.id === otherNode.id || !latentCoords.has(otherNode.id)) return
+        const gridX = Math.floor((nodeCoord.x + 1000) / gridCellSize)
+        const gridY = Math.floor((nodeCoord.y + 1000) / gridCellSize)
 
-          const otherCoord = latentCoords.get(otherNode.id)!
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            const checkKey = `${gridX + dx},${gridY + dy}`
+            const cellNodes = spatialGrid.get(checkKey)
+            if (!cellNodes) continue
+
+            cellNodes.forEach(({ node: otherNode, coord: otherCoord }) => {
+              if (node.id === otherNode.id || visited.has(otherNode.id)) return
+
           const dx = nodeCoord.x - otherCoord.x
           const dy = nodeCoord.y - otherCoord.y
           const distance = Math.sqrt(dx * dx + dy * dy)
@@ -1726,8 +1783,9 @@ Be strict about relevance - only mark as relevant if there's substantial concept
             neighbors.push(otherNode.id)
           }
         })
+          }
+        }
 
-        // If we have enough neighbors, form a cluster
         if (neighbors.length >= minPoints) {
           const clusterId = nextClusterId++
           const clusterKey = `cluster_${clusterId}`
@@ -1751,11 +1809,20 @@ Be strict about relevance - only mark as relevant if there's substantial concept
       return {
         nodes: layoutNodes.map(n => ({
           id: n.id,
+          type: n.type,
+          label: n.label,
           x: n.x,
           y: n.y,
           z: n.z,
+          memory_id: n.memory_id,
           title: n.title,
           url: n.url,
+          source: n.source,
+          summary: n.summary,
+          importance_score: n.importance_score,
+          hasEmbedding: n.hasEmbedding,
+          clusterId: n.clusterId,
+          layout: n.layout,
         })),
         edges,
       }

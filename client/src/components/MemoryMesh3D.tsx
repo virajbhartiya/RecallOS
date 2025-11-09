@@ -15,7 +15,6 @@ import { MemoryService } from "../services/memory.service"
 import type {
   MemoryMesh,
   MemoryMeshEdge,
-  MemoryMeshNode,
 } from "../types/memory.type"
 import { requireAuthToken } from "../utils/user-id.util"
 import { ErrorMessage, LoadingSpinner } from "./ui/loading-spinner"
@@ -118,11 +117,20 @@ const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
     <mesh
       ref={meshRef}
       position={position}
-      onClick={() => onClick(memoryId)}
-      onPointerOver={() => setHovered(true)}
-      onPointerOut={() => setHovered(false)}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        onClick(memoryId)
+      }}
+      onPointerOver={(e) => {
+        e.stopPropagation()
+        setHovered(true)
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation()
+        setHovered(false)
+      }}
     >
-      <sphereGeometry args={[size, 8, 8]} />
+      <sphereGeometry args={[size, 6, 6]} />
       <meshBasicMaterial
         color={color}
         transparent
@@ -213,58 +221,44 @@ const SceneComponent: React.FC<SceneProps> = ({
   const nodes = useMemo(() => {
     if (!meshData?.nodes?.length) return []
 
-    // Normalize backend XYZ coordinates into a compact cube around the origin
-    const finiteNodes = meshData.nodes.filter(
-      (nn) => Number.isFinite(nn.x) && Number.isFinite(nn.y)
-    )
-    const minX = finiteNodes.length
-      ? Math.min(...finiteNodes.map((nn) => nn.x))
-      : 0
-    const maxX = finiteNodes.length
-      ? Math.max(...finiteNodes.map((nn) => nn.x))
-      : 1
-    const minY = finiteNodes.length
-      ? Math.min(...finiteNodes.map((nn) => nn.y))
-      : 0
-    const maxY = finiteNodes.length
-      ? Math.max(...finiteNodes.map((nn) => nn.y))
-      : 1
-    type NodeWithZ = MemoryMeshNode & { z?: number }
-    const finiteZ = meshData.nodes.filter(
-      (nn: MemoryMeshNode): nn is NodeWithZ =>
-        "z" in nn && typeof nn.z === "number" && Number.isFinite(nn.z)
-    )
-    const minZ = finiteZ.length
-      ? Math.min(...finiteZ.map((nn: NodeWithZ) => nn.z!))
-      : 0
-    const maxZ = finiteZ.length
-      ? Math.max(...finiteZ.map((nn: NodeWithZ) => nn.z!))
-      : 1
-    const cx = (minX + maxX) / 2
-    const cy = (minY + maxY) / 2
-    const cz = (minZ + maxZ) / 2
-    const spanX = Math.max(1e-6, maxX - minX)
-    const spanY = Math.max(1e-6, maxY - minY)
-    const spanZ = Math.max(1e-6, maxZ - minZ)
+    const nodeCount = meshData.nodes.length
     const radius = isCompactView ? 1.0 : 1.6
     const zRadius = radius * 0.8
 
-    // First pass: normalize all positions
-    const normalizedPositions = meshData.nodes.map((n, i) => {
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+    let minZ = Infinity
+    let maxZ = -Infinity
+
+    const positions: [number, number, number][] = new Array(nodeCount)
+    const highlightedSet = new Set(highlightedMemoryIds)
+    const memorySourcesMap = memorySources ? new Map(Object.entries(memorySources)) : null
+    const memoryUrlsMap = memoryUrls ? new Map(Object.entries(memoryUrls)) : null
+
+    for (let i = 0; i < nodeCount; i++) {
+      const n = meshData.nodes[i]
       let position: [number, number, number]
+
       if (Number.isFinite(n.x) && Number.isFinite(n.y)) {
-        const nx = ((n.x - cx) / spanX) * radius * 2
-        const ny = ((n.y - cy) / spanY) * radius * 2
-        let iz: number
-        if ("z" in n && typeof n.z === "number" && Number.isFinite(n.z)) {
-          iz = ((n.z - cz) / spanZ) * zRadius * 2
-        } else {
-          iz = ((n.importance_score ?? 0.5) - 0.5) * 2 * zRadius
-        }
-        position = [nx, ny, iz]
+        const x = n.x
+        const y = n.y
+        const z = ("z" in n && typeof n.z === "number" && Number.isFinite(n.z)) 
+          ? n.z 
+          : ((n.importance_score ?? 0.5) - 0.5) * 2 * 1000
+
+        minX = Math.min(minX, x)
+        maxX = Math.max(maxX, x)
+        minY = Math.min(minY, y)
+        maxY = Math.max(maxY, y)
+        minZ = Math.min(minZ, z)
+        maxZ = Math.max(maxZ, z)
+
+        position = [x, y, z]
       } else {
         const rr = (isCompactView ? radius * 0.4 : radius * 0.55) + i * 0.008
-        const theta = (i / Math.max(1, meshData.nodes.length)) * Math.PI * 2
+        const theta = (i / Math.max(1, nodeCount)) * Math.PI * 2
         const phi = Math.acos(2 * Math.random() - 1)
         position = [
           rr * Math.sin(phi) * Math.cos(theta),
@@ -272,48 +266,80 @@ const SceneComponent: React.FC<SceneProps> = ({
           rr * Math.cos(phi),
         ]
       }
-      return position
-    })
 
-    // Calculate center of mass and subtract it to ensure true centering at (0,0,0)
-    const centerX =
-      normalizedPositions.reduce((sum, p) => sum + p[0], 0) /
-      normalizedPositions.length
-    const centerY =
-      normalizedPositions.reduce((sum, p) => sum + p[1], 0) /
-      normalizedPositions.length
-    const centerZ =
-      normalizedPositions.reduce((sum, p) => sum + p[2], 0) /
-      normalizedPositions.length
+      positions[i] = position
+    }
 
-    return meshData.nodes.map((n, i) => {
-      const sourceType =
-        memorySources && n.memory_id ? memorySources[n.memory_id] : undefined
-      const url =
-        memoryUrls && n.memory_id ? memoryUrls[n.memory_id] : undefined
-      const color = resolveNodeColor(String(sourceType || n.type), url)
-      const isSelected = selectedMemoryId === n.memory_id
-      const isHighlighted = highlightedMemoryIds.includes(n.memory_id || "")
-      const inLatentSpace = n.hasEmbedding === true
+    const spanX = Math.max(1e-6, maxX - minX)
+    const spanY = Math.max(1e-6, maxY - minY)
+    const spanZ = Math.max(1e-6, maxZ - minZ)
+    const centerX = (minX + maxX) / 2
+    const centerY = (minY + maxY) / 2
+    const centerZ = (minZ + maxZ) / 2
 
-      // Center the position by subtracting the center of mass
-      const position: [number, number, number] = [
-        normalizedPositions[i][0] - centerX,
-        normalizedPositions[i][1] - centerY,
-        normalizedPositions[i][2] - centerZ,
+    const normalizedPositions: [number, number, number][] = new Array(nodeCount)
+    for (let i = 0; i < nodeCount; i++) {
+      const n = meshData.nodes[i]
+      const pos = positions[i]
+
+      if (Number.isFinite(n.x) && Number.isFinite(n.y)) {
+        const nx = ((pos[0] - centerX) / spanX) * radius * 2
+        const ny = ((pos[1] - centerY) / spanY) * radius * 2
+        const nz = ((pos[2] - centerZ) / spanZ) * zRadius * 2
+        normalizedPositions[i] = [nx, ny, nz]
+      } else {
+        normalizedPositions[i] = [pos[0], pos[1], pos[2]]
+      }
+    }
+
+    let sumX = 0
+    let sumY = 0
+    let sumZ = 0
+    for (let i = 0; i < nodeCount; i++) {
+      sumX += normalizedPositions[i][0]
+      sumY += normalizedPositions[i][1]
+      sumZ += normalizedPositions[i][2]
+    }
+    const finalCenterX = sumX / nodeCount
+    const finalCenterY = sumY / nodeCount
+    const finalCenterZ = sumZ / nodeCount
+
+    const result = new Array(nodeCount)
+    for (let i = 0; i < nodeCount; i++) {
+      const n = meshData.nodes[i]
+      const pos = normalizedPositions[i]
+      const finalPos: [number, number, number] = [
+        pos[0] - finalCenterX,
+        pos[1] - finalCenterY,
+        pos[2] - finalCenterZ,
       ]
 
-      return {
+      const sourceType = memorySourcesMap?.get(n.memory_id || "")
+      const url = memoryUrlsMap?.get(n.memory_id || "")
+      const color = resolveNodeColor(String(sourceType || n.type), url)
+
+      result[i] = {
         id: n.id,
         memoryId: n.memory_id || "",
-        position,
+        position: finalPos,
         color,
-        isSelected,
-        isHighlighted,
+        isSelected: selectedMemoryId === n.memory_id,
+        isHighlighted: highlightedSet.has(n.memory_id || ""),
         importance: n.importance_score,
-        inLatentSpace,
+        inLatentSpace: n.hasEmbedding === true,
       }
-    })
+    }
+
+    return result as Array<{
+      id: string
+      memoryId: string
+      position: [number, number, number]
+      color: string
+      isSelected: boolean
+      isHighlighted: boolean
+      importance?: number
+      inLatentSpace?: boolean
+    }>
   }, [
     meshData,
     selectedMemoryId,
@@ -325,6 +351,8 @@ const SceneComponent: React.FC<SceneProps> = ({
 
   const edges = useMemo(() => {
     if (!meshData?.edges?.length) return []
+
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]))
 
     const groups = new Map<string, MemoryMeshEdge[]>()
     meshData.edges.forEach((e: MemoryMeshEdge) => {
@@ -361,8 +389,8 @@ const SceneComponent: React.FC<SceneProps> = ({
         edgesForPair[0]
       ) as MemoryMeshEdge
 
-      const sourceNode = nodes.find((n) => n.id === best.source)
-      const targetNode = nodes.find((n) => n.id === best.target)
+      const sourceNode = nodeMap.get(best.source)
+      const targetNode = nodeMap.get(best.target)
 
       if (sourceNode && targetNode) {
         result.push({
@@ -377,13 +405,54 @@ const SceneComponent: React.FC<SceneProps> = ({
     return result
   }, [meshData, nodes])
 
+  const visibleData = useMemo(() => {
+    if (nodes.length === 0) return { nodes: [], edges: [] }
+
+    const maxVisibleNodes = Infinity
+    const maxVisibleEdges = Infinity
+
+    const priorityNodes = nodes.filter((n) => n.isSelected || n.isHighlighted)
+    const otherNodes = nodes.filter((n) => !n.isSelected && !n.isHighlighted)
+
+    const visibleNodes = maxVisibleNodes === Infinity
+      ? nodes
+      : [
+          ...priorityNodes,
+          ...otherNodes.slice(0, Math.max(0, maxVisibleNodes - priorityNodes.length)),
+        ]
+
+    const visibleNodeIds = new Set(visibleNodes.map((n) => n.id))
+    const nodePosMap = new Map<string, string>()
+    nodes.forEach((n) => {
+      const posKey = `${n.position[0].toFixed(3)},${n.position[1].toFixed(3)},${n.position[2].toFixed(3)}`
+      nodePosMap.set(posKey, n.id)
+    })
+
+    const filteredEdges = edges
+      .filter((edge) => {
+        const startKey = `${edge.start[0].toFixed(3)},${edge.start[1].toFixed(3)},${edge.start[2].toFixed(3)}`
+        const endKey = `${edge.end[0].toFixed(3)},${edge.end[1].toFixed(3)},${edge.end[2].toFixed(3)}`
+        const startId = nodePosMap.get(startKey)
+        const endId = nodePosMap.get(endKey)
+
+        return (
+          (startId && visibleNodeIds.has(startId) && endId && visibleNodeIds.has(endId)) ||
+          edge.similarity >= 0.2
+        )
+      })
+      .sort((a, b) => (b.similarity || 0) - (a.similarity || 0))
+      .slice(0, maxVisibleEdges === Infinity ? edges.length : maxVisibleEdges)
+
+    return { nodes: visibleNodes, edges: filteredEdges }
+  }, [nodes, edges])
+
   return (
     <>
       <ambientLight intensity={0.3} />
       <directionalLight position={[8, 8, 6]} intensity={0.4} />
       <pointLight position={[0, 0, 0]} intensity={0.2} color="#ffffff" />
 
-      {nodes.map((node) => (
+      {visibleData.nodes.map((node) => (
         <MemoryNode
           key={node.id}
           position={node.position}
@@ -397,7 +466,7 @@ const SceneComponent: React.FC<SceneProps> = ({
         />
       ))}
 
-      {edges.map((edge, index) => (
+      {visibleData.edges.map((edge, index) => (
         <MemoryEdge
           key={`edge-${index}-${edge.start.join(",")}-${edge.end.join(",")}`}
           start={edge.start}
@@ -452,21 +521,19 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
         requireAuthToken()
         setIsLoading(true)
         setError(null)
-        const totalCount = await MemoryService.getUserMemoryCount()
-        const limit = totalCount > 0 ? totalCount : 10000
         const data = await MemoryService.getMemoryMesh(
-          limit,
+          Infinity,
           similarityThreshold
         )
-        setMeshData(data)
-        if (typeof onMeshLoad === "function") {
-          onMeshLoad(data)
+          setMeshData(data)
+          if (typeof onMeshLoad === "function") {
+            onMeshLoad(data)
         }
       } catch (err) {
-        setError("Failed to load memory mesh")
-        console.error("Error fetching mesh data:", err)
+          setError("Failed to load memory mesh")
+          console.error("Error fetching mesh data:", err)
       } finally {
-        setIsLoading(false)
+          setIsLoading(false)
       }
     }
     fetchMeshData()
@@ -559,6 +626,11 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
             target={[0, 0, 0]}
             enableDamping={true}
             dampingFactor={0.05}
+            mouseButtons={{
+              LEFT: THREE.MOUSE.ROTATE,
+              MIDDLE: THREE.MOUSE.DOLLY,
+              RIGHT: THREE.MOUSE.PAN,
+            }}
           />
           <ControlsUpdater controlsRef={controlsRef} />
         </Canvas>

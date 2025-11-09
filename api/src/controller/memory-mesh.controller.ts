@@ -7,7 +7,7 @@ import { logger } from '../utils/logger.util'
 export class MemoryMeshController {
   static async getMemoryMesh(req: AuthenticatedRequest, res: Response) {
     try {
-      const { limit = 50, threshold = 0.3 } = req.query
+      const { limit = 'all', threshold = 0.3 } = req.query
 
       const user = await prisma.user.findUnique({
         where: { id: req.user!.id },
@@ -19,9 +19,11 @@ export class MemoryMeshController {
 
       const internalUserId: string | undefined = user.id
 
+      const limitValue = limit === 'all' || limit === 'Infinity' ? Infinity : parseInt(limit as string)
+
       const mesh = await memoryMeshService.getMemoryMesh(
         internalUserId,
-        parseInt(limit as string),
+        limitValue,
         parseFloat(threshold as string)
       )
 

@@ -9,12 +9,13 @@ import { requireAuthToken } from "../../utils/user-id.util"
 const baseUrl = "/memory"
 
 export async function getMemoryMesh(
-  limit: number = 50,
+  limit: number = Infinity,
   threshold: number = 0.3
 ): Promise<MemoryMesh> {
   requireAuthToken()
+  const limitParam = limit === Infinity ? "all" : limit.toString()
   const response = await getRequest(
-    `${baseUrl}/mesh?limit=${limit}&threshold=${threshold}`
+    `${baseUrl}/mesh?limit=${limitParam}&threshold=${threshold}`
   )
   return response.data?.data || { nodes: [], edges: [], clusters: {} }
 }
