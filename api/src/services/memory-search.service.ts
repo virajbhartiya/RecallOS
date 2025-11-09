@@ -36,6 +36,190 @@ function tokenizeQuery(query: string): string[] {
     .filter(token => !STOP_WORDS.has(token))
 }
 
+type QueryAnalysis = {
+  queryType: 'specific' | 'general' | 'temporal' | 'exploratory'
+  specificity: number // 0-1, higher = more specific
+  temporalIndicators: boolean
+  keywordDensity: number // 0-1, higher = more keywords
+  estimatedMemoryAge: 'recent' | 'medium' | 'old' | 'any'
+  requiresDeepSearch: boolean
+}
+
+function analyzeQuery(query: string, userMemoryCount: number): QueryAnalysis {
+  const normalized = query.toLowerCase()
+  const tokens = tokenizeQuery(query)
+  const queryLength = query.length
+  const tokenCount = tokens.length
+
+  // Detect temporal indicators
+  const temporalKeywords = [
+    'yesterday',
+    'today',
+    'last week',
+    'last month',
+    'last year',
+    'years ago',
+    'recent',
+    'old',
+    'ancient',
+    'when',
+    'ago',
+  ]
+  const hasTemporalIndicators = temporalKeywords.some(keyword => normalized.includes(keyword))
+
+  // Detect specific vs general queries
+  const specificIndicators = [
+    'what',
+    'who',
+    'where',
+    'when',
+    'how',
+    'why',
+    'which',
+    'name',
+    'list',
+    'show',
+  ]
+  const hasSpecificIndicators = specificIndicators.some(indicator => normalized.includes(indicator))
+
+  // Calculate specificity based on query characteristics
+  const specificity = Math.min(
+    1,
+    (hasSpecificIndicators ? 0.3 : 0) +
+      (tokenCount > 5 ? 0.2 : tokenCount > 3 ? 0.1 : 0) +
+      (queryLength > 50 ? 0.2 : queryLength > 20 ? 0.1 : 0) +
+      (tokens.length / Math.max(1, normalized.split(/\s+/).length)) * 0.3
+  )
+
+  // Determine query type
+  let queryType: QueryAnalysis['queryType'] = 'general'
+  if (hasTemporalIndicators) {
+    queryType = 'temporal'
+  } else if (specificity > 0.6) {
+    queryType = 'specific'
+  } else if (specificity < 0.3) {
+    queryType = 'exploratory'
+  }
+
+  // Estimate memory age based on query
+  let estimatedMemoryAge: QueryAnalysis['estimatedMemoryAge'] = 'any'
+  if (
+    normalized.includes('years ago') ||
+    normalized.includes('old') ||
+    normalized.includes('ancient')
+  ) {
+    estimatedMemoryAge = 'old'
+  } else if (
+    normalized.includes('recent') ||
+    normalized.includes('last week') ||
+    normalized.includes('last month')
+  ) {
+    estimatedMemoryAge = 'recent'
+  } else if (normalized.includes('last year')) {
+    estimatedMemoryAge = 'medium'
+  }
+
+  // Determine if deep search is needed
+  const requiresDeepSearch =
+    estimatedMemoryAge === 'old' ||
+    specificity < 0.4 ||
+    userMemoryCount > 1000 ||
+    queryType === 'exploratory'
+
+  const keywordDensity = tokenCount / Math.max(1, normalized.split(/\s+/).length)
+
+  return {
+    queryType,
+    specificity,
+    temporalIndicators: hasTemporalIndicators,
+    keywordDensity,
+    estimatedMemoryAge,
+    requiresDeepSearch,
+  }
+}
+
+type DynamicSearchParams = {
+  qdrantLimit: number
+  semanticThreshold: number
+  keywordThreshold: number
+  coverageThreshold: number
+  minScore: number
+  searchStrategy: 'narrow' | 'balanced' | 'broad'
+  maxResults: number
+}
+
+function calculateDynamicSearchParams(
+  analysis: QueryAnalysis,
+  userMemoryCount: number,
+  requestedLimit?: number
+): DynamicSearchParams {
+  const baseLimit = requestedLimit || Number(process.env.SEARCH_TOP_K || 50)
+  const maxLimit = Number(process.env.SEARCH_MAX_LIMIT || 1000)
+  const effectiveLimit = Math.min(baseLimit, maxLimit)
+
+  // Determine search strategy
+  let searchStrategy: 'narrow' | 'balanced' | 'broad' = 'balanced'
+  let qdrantLimit: number
+  let semanticThreshold: number
+  let keywordThreshold: number
+  let coverageThreshold: number
+  let minScore: number
+
+  if (analysis.requiresDeepSearch || analysis.estimatedMemoryAge === 'old') {
+    // Broad search for old memories or exploratory queries
+    searchStrategy = 'broad'
+    qdrantLimit = Math.min(effectiveLimit * 10, Math.max(500, userMemoryCount * 0.5))
+    semanticThreshold = 0.1
+    keywordThreshold = 0.2
+    coverageThreshold = 0.3
+    minScore = 0.1
+  } else if (analysis.specificity > 0.7) {
+    // Narrow search for very specific queries
+    searchStrategy = 'narrow'
+    qdrantLimit = effectiveLimit * 2
+    semanticThreshold = 0.2
+    keywordThreshold = 0.4
+    coverageThreshold = 0.6
+    minScore = 0.2
+  } else {
+    // Balanced search for normal queries
+    searchStrategy = 'balanced'
+    qdrantLimit = effectiveLimit * 3
+    semanticThreshold = 0.15
+    keywordThreshold = 0.3
+    coverageThreshold = 0.5
+    minScore = 0.15
+  }
+
+  // Adjust based on user memory count
+  if (userMemoryCount > 5000) {
+    qdrantLimit = Math.min(qdrantLimit * 1.5, userMemoryCount * 0.3)
+  } else if (userMemoryCount < 100) {
+    qdrantLimit = Math.min(qdrantLimit, userMemoryCount)
+  }
+
+  // Adjust thresholds based on query characteristics
+  if (analysis.keywordDensity > 0.7) {
+    // High keyword density - favor keyword matching
+    keywordThreshold *= 0.8
+    semanticThreshold *= 1.1
+  } else if (analysis.keywordDensity < 0.3) {
+    // Low keyword density - favor semantic matching
+    semanticThreshold *= 0.8
+    keywordThreshold *= 1.2
+  }
+
+  return {
+    qdrantLimit: Math.max(effectiveLimit, Math.min(qdrantLimit, 10000)),
+    semanticThreshold,
+    keywordThreshold,
+    coverageThreshold,
+    minScore,
+    searchStrategy,
+    maxResults: effectiveLimit,
+  }
+}
+
 const STOP_WORDS = new Set([
   'a',
   'an',
@@ -119,21 +303,47 @@ export async function searchMemories(params: {
   const {
     userId,
     query,
-    limit = Number(process.env.SEARCH_TOP_K || 10),
+    limit,
     enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false',
     contextOnly = false,
     jobId,
   } = params
-  const searchLimit = Math.min(Number(limit), 100)
+
+  const normalized = normalizeText(query)
+
+  // Get user to determine memory count for dynamic search
+  const user = await prisma.user.findFirst({
+    where: { OR: [{ external_id: userId }, { id: userId }] },
+  })
+  if (!user) {
+    return { query: normalized, results: [] }
+  }
+
+  const userMemories = await prisma.memory.findMany({
+    where: { user_id: user.id },
+    select: { id: true },
+  })
+
+  const userMemoryIds = userMemories.map(m => m.id)
+
+  if (userMemoryIds.length === 0) {
+    logger.log('[search] no memories found for user', { ts: new Date().toISOString(), userId })
+    return { query: normalized, results: [], answer: undefined, context: undefined }
+  }
+
+  // Analyze query to determine dynamic search parameters
+  const queryAnalysis = analyzeQuery(normalized, userMemoryIds.length)
+  const searchParams = calculateDynamicSearchParams(queryAnalysis, userMemoryIds.length, limit)
 
   logger.log('[search] processing started', {
     ts: new Date().toISOString(),
     userId,
     query: query.slice(0, 100),
-    limit: searchLimit,
+    limit: searchParams.maxResults,
     enableReasoning,
     contextOnly,
     jobId,
+    searchStrategy: searchParams.searchStrategy,
   })
 
   // Skip caching for contextOnly or jobId requests
@@ -141,7 +351,7 @@ export async function searchMemories(params: {
 
   if (shouldCache) {
     try {
-      const cacheKey = getCacheKey(userId, query, searchLimit)
+      const cacheKey = getCacheKey(userId, query, searchParams.maxResults)
       const client = getRedisClient()
       const cached = await client.get(cacheKey)
 
@@ -163,15 +373,6 @@ export async function searchMemories(params: {
   if (!aiProvider.isInitialized) {
     logger.error('AI Provider not initialized. Check GEMINI_API_KEY or AI_PROVIDER configuration.')
     throw new Error('AI Provider not configured. Set GEMINI_API_KEY or configure AI_PROVIDER.')
-  }
-
-  const normalized = normalizeText(query)
-
-  const user = await prisma.user.findFirst({
-    where: { OR: [{ external_id: userId }, { id: userId }] },
-  })
-  if (!user) {
-    return { query: normalized, results: [] }
   }
 
   let embedding: number[]
@@ -217,32 +418,64 @@ export async function searchMemories(params: {
 
   await ensureCollection()
 
-  const userMemories = await prisma.memory.findMany({
-    where: { user_id: user.id },
-    select: { id: true },
-  })
-
-  const userMemoryIds = userMemories.map(m => m.id)
-
-  if (userMemoryIds.length === 0) {
-    logger.log('[search] no memories found for user', { ts: new Date().toISOString(), userId })
-    return { query: normalized, results: [], answer: undefined, context: undefined }
-  }
-
-  logger.log('[search] searching qdrant', {
+  logger.log('[search] query analysis', {
     ts: new Date().toISOString(),
     userId,
+    queryAnalysis,
+    searchParams,
     memoryCount: userMemoryIds.length,
-    searchLimit: searchLimit * 3,
   })
-  const qdrantSearchResult = await qdrantClient.search(COLLECTION_NAME, {
-    vector: embedding,
-    filter: {
-      must: [{ key: 'memory_id', match: { any: userMemoryIds } }],
-    },
-    limit: searchLimit * 3,
-    with_payload: true,
-  })
+
+  // Multi-stage search: start broad, narrow if needed
+  let qdrantSearchResult: Array<{ score?: number; payload?: { memory_id?: string } }> = []
+
+  if (searchParams.searchStrategy === 'broad') {
+    // Broad search: get more results with lower threshold
+    logger.log('[search] performing broad search', {
+      ts: new Date().toISOString(),
+      userId,
+      qdrantLimit: searchParams.qdrantLimit,
+    })
+    qdrantSearchResult = await qdrantClient.search(COLLECTION_NAME, {
+      vector: embedding,
+      filter: {
+        must: [{ key: 'memory_id', match: { any: userMemoryIds } }],
+      },
+      limit: searchParams.qdrantLimit,
+      with_payload: true,
+      score_threshold: 0.1,
+    })
+
+    // If we got too many low-quality results, do a second pass with higher threshold
+    if (qdrantSearchResult.length > searchParams.maxResults * 2) {
+      const highQualityResults = qdrantSearchResult.filter(r => (r.score || 0) > 0.3)
+      if (highQualityResults.length >= searchParams.maxResults) {
+        qdrantSearchResult = highQualityResults
+        logger.log('[search] narrowed to high-quality results', {
+          ts: new Date().toISOString(),
+          userId,
+          filteredCount: qdrantSearchResult.length,
+        })
+      }
+    }
+  } else {
+    // Standard search
+    logger.log('[search] searching qdrant', {
+      ts: new Date().toISOString(),
+      userId,
+      memoryCount: userMemoryIds.length,
+      qdrantLimit: searchParams.qdrantLimit,
+      strategy: searchParams.searchStrategy,
+    })
+    qdrantSearchResult = await qdrantClient.search(COLLECTION_NAME, {
+      vector: embedding,
+      filter: {
+        must: [{ key: 'memory_id', match: { any: userMemoryIds } }],
+      },
+      limit: searchParams.qdrantLimit,
+      with_payload: true,
+    })
+  }
   logger.log('[search] qdrant search completed', {
     ts: new Date().toISOString(),
     userId,
@@ -354,20 +587,41 @@ export async function searchMemories(params: {
     }
   })
 
-  // Sort by final score and apply relevance threshold
+  // Apply dynamic thresholds based on query analysis
   const filteredRows = scoredRows
     .filter(row => {
-      // Keep results with good semantic score OR good keyword matches
-      return row.semantic_score >= 0.15 || row.keyword_score >= 0.3 || row.coverage_ratio >= 0.5
+      // Dynamic threshold: keep results that meet any criteria
+      const passesSemantic = row.semantic_score >= searchParams.semanticThreshold
+      const passesKeyword = row.keyword_score >= searchParams.keywordThreshold
+      const passesCoverage = row.coverage_ratio >= searchParams.coverageThreshold
+      const passesMinScore = row.final_score >= searchParams.minScore
+
+      return (passesSemantic || passesKeyword || passesCoverage) && passesMinScore
     })
-    .sort((a, b) => b.final_score - a.final_score)
-    .slice(0, searchLimit)
+    .sort((a, b) => {
+      // Multi-factor sorting: score first, then recency for old memories
+      if (Math.abs(a.final_score - b.final_score) < 0.01) {
+        // If scores are very close, prefer more recent for old memory searches
+        if (queryAnalysis.estimatedMemoryAge === 'old') {
+          return Number(b.timestamp) - Number(a.timestamp)
+        }
+      }
+      return b.final_score - a.final_score
+    })
+    .slice(0, searchParams.maxResults)
 
   logger.log('[search] results filtered and sorted', {
     ts: new Date().toISOString(),
     userId,
     filteredCount: filteredRows.length,
     totalScored: scoredRows.length,
+    searchStrategy: searchParams.searchStrategy,
+    thresholds: {
+      semantic: searchParams.semanticThreshold,
+      keyword: searchParams.keywordThreshold,
+      coverage: searchParams.coverageThreshold,
+      minScore: searchParams.minScore,
+    },
   })
 
   const memoryIds = filteredRows.map(r => r.id)
@@ -643,7 +897,7 @@ ${bullets}`
   // Cache the results if caching is enabled
   if (shouldCache) {
     try {
-      const cacheKey = getCacheKey(userId, query, searchLimit)
+      const cacheKey = getCacheKey(userId, query, searchParams.maxResults)
       const client = getRedisClient()
       await client.setex(cacheKey, SEARCH_CACHE_TTL, JSON.stringify(searchResult))
       logger.log('[search] cache write', {

@@ -133,8 +133,12 @@ import { validateRequestSize } from './utils/validation.util'
 app.use(validateRequestSize(10 * 1024 * 1024)) // 10MB limit
 
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 60000) // 60 seconds default
+const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 360000) // 6 minutes for search requests
 
 app.use((req: Request, res: Response, next: NextFunction) => {
+  const isSearchRequest = req.path === '/api/search' && req.method === 'POST'
+  const timeoutMs = isSearchRequest ? SEARCH_TIMEOUT_MS : REQUEST_TIMEOUT_MS
+
   const timeout = setTimeout(() => {
     if (!res.headersSent) {
       res.status(408).json({
@@ -143,7 +147,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
         message: 'The request took too long to process',
       })
     }
-  }, REQUEST_TIMEOUT_MS)
+  }, timeoutMs)
 
   res.on('finish', () => {
     clearTimeout(timeout)
