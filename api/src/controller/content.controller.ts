@@ -1,13 +1,13 @@
 import { Response, NextFunction } from 'express'
-import { AuthenticatedRequest } from '../middleware/auth'
+import { AuthenticatedRequest } from '../middleware/auth.middleware'
 
-import { addContentJob, ContentJobData, contentQueue } from '../lib/queue'
+import { addContentJob, ContentJobData, contentQueue } from '../lib/queue.lib'
 
-import { prisma } from '../lib/prisma'
+import { prisma } from '../lib/prisma.lib'
 
-import AppError from '../utils/appError'
-import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text'
-import { logger } from '../utils/logger'
+import AppError from '../utils/app-error.util'
+import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
+import { logger } from '../utils/logger.util'
 
 export const submitContent = async (
   req: AuthenticatedRequest,

@@ -1,5 +1,5 @@
-import { prisma } from '../lib/prisma'
-import { logger } from '../utils/logger'
+import { prisma } from '../lib/prisma.lib'
+import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 
 export type OperationType =

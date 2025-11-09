@@ -1,5 +1,5 @@
 import { QdrantClient } from '@qdrant/js-client-rest'
-import { logger } from '../utils/logger'
+import { logger } from '../utils/logger.util'
 
 const globalForQdrant = globalThis as unknown as {
   qdrant: QdrantClient | undefined

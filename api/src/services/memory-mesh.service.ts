@@ -1,11 +1,16 @@
 import { Prisma } from '@prisma/client'
-import { prisma } from '../lib/prisma'
-import { aiProvider } from './aiProvider'
+import { prisma } from '../lib/prisma.lib'
+import { aiProvider } from './ai-provider.service'
 import { UMAP } from 'umap-js'
-import { qdrantClient, COLLECTION_NAME, ensureCollection, EMBEDDING_DIMENSION } from '../lib/qdrant'
+import {
+  qdrantClient,
+  COLLECTION_NAME,
+  ensureCollection,
+  EMBEDDING_DIMENSION,
+} from '../lib/qdrant.lib'
 import { randomUUID } from 'crypto'
-import { logger } from '../utils/logger'
-import { GEMINI_EMBED_MODEL } from './gemini'
+import { logger } from '../utils/logger.util'
+import { GEMINI_EMBED_MODEL } from './gemini.service'
 
 type MemoryWithMetadata = Prisma.MemoryGetPayload<{
   select: {

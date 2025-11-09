@@ -1,9 +1,9 @@
 import { Response } from 'express'
 import { Prisma } from '@prisma/client'
-import { AuthenticatedRequest } from '../middleware/auth'
-import { prisma } from '../lib/prisma'
-import { tokenTracking } from '../services/tokenTracking'
-import { logger } from '../utils/logger'
+import { AuthenticatedRequest } from '../middleware/auth.middleware'
+import { prisma } from '../lib/prisma.lib'
+import { tokenTracking } from '../services/token-tracking.service'
+import { logger } from '../utils/logger.util'
 
 type MemoryWithMetadata = Prisma.MemoryGetPayload<{
   select: {

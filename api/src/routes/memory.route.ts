@@ -1,11 +1,11 @@
 import { Router } from 'express'
 import { MemoryController } from '../controller/memory.controller'
-import { MemorySearchController } from '../controller/memorySearch.controller'
-import { MemoryMeshController } from '../controller/memoryMesh.controller'
-import { MemorySnapshotController } from '../controller/memorySnapshot.controller'
+import { MemorySearchController } from '../controller/memory-search.controller'
+import { MemoryMeshController } from '../controller/memory-mesh.controller'
+import { MemorySnapshotController } from '../controller/memory-snapshot.controller'
 import { AnalyticsController } from '../controller/analytics.controller'
 import { submitContent } from '../controller/content.controller'
-import { authenticateToken } from '../middleware/auth'
+import { authenticateToken } from '../middleware/auth.middleware'
 
 const router = Router()
 

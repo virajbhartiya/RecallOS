@@ -1,12 +1,12 @@
 import crypto from 'crypto'
-import { prisma } from '../lib/prisma'
-import { aiProvider } from './aiProvider'
-import { setSearchJobResult } from './searchJob'
-import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant'
-import { profileUpdateService } from './profileUpdate'
-import { logger } from '../utils/logger'
-import { getRedisClient } from '../lib/redis'
-import { GEMINI_EMBED_MODEL } from './gemini'
+import { prisma } from '../lib/prisma.lib'
+import { aiProvider } from './ai-provider.service'
+import { setSearchJobResult } from './search-job.service'
+import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant.lib'
+import { profileUpdateService } from './profile-update.service'
+import { logger } from '../utils/logger.util'
+import { getRedisClient } from '../lib/redis.lib'
+import { GEMINI_EMBED_MODEL } from './gemini.service'
 
 type SearchResult = {
   memory_id: string

@@ -1,5 +1,5 @@
-import { aiProvider } from './aiProvider'
-import { logger } from '../utils/logger'
+import { aiProvider } from './ai-provider.service'
+import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 
 export interface StaticProfile {

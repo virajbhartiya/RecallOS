@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from 'express'
-import { verifyToken, extractTokenFromHeader } from '../utils/jwt'
-import { getSessionCookieName } from '../utils/env'
-import { logger } from '../utils/logger'
-import { getUserWithCache } from '../utils/userCache'
+import { verifyToken, extractTokenFromHeader } from '../utils/jwt.util'
+import { getSessionCookieName } from '../utils/env.util'
+import { logger } from '../utils/logger.util'
+import { getUserWithCache } from '../utils/user-cache.util'
 
 export interface AuthenticatedRequest extends Request {
   user?: {

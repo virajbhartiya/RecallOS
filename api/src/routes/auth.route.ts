@@ -1,10 +1,10 @@
 import { Router, Request, Response } from 'express'
-import { prisma } from '../lib/prisma'
-import { setAuthCookie, clearAuthCookie } from '../utils/authCookie'
-import { generateToken } from '../utils/jwt'
-import { authenticateToken, AuthenticatedRequest } from '../middleware/auth'
-import { hashPassword, comparePassword } from '../utils/password'
-import { logger } from '../utils/logger'
+import { prisma } from '../lib/prisma.lib'
+import { setAuthCookie, clearAuthCookie } from '../utils/auth-cookie.util'
+import { generateToken } from '../utils/jwt.util'
+import { authenticateToken, AuthenticatedRequest } from '../middleware/auth.middleware'
+import { hashPassword, comparePassword } from '../utils/password.util'
+import { logger } from '../utils/logger.util'
 
 const router = Router()
 

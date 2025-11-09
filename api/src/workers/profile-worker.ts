@@ -1,5 +1,5 @@
-import { profileUpdateService } from '../services/profileUpdate'
-import { logger } from '../utils/logger'
+import { profileUpdateService } from '../services/profile-update.service'
+import { logger } from '../utils/logger.util'
 
 export const startProfileWorker = async (
   daysSinceLastUpdate: number = 7,

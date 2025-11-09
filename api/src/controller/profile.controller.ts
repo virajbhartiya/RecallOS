@@ -1,7 +1,7 @@
 import { Response } from 'express'
-import { AuthenticatedRequest } from '../middleware/auth'
-import { profileUpdateService } from '../services/profileUpdate'
-import { logger } from '../utils/logger'
+import { AuthenticatedRequest } from '../middleware/auth.middleware'
+import { profileUpdateService } from '../services/profile-update.service'
+import { logger } from '../utils/logger.util'
 
 export class ProfileController {
   static async getProfile(req: AuthenticatedRequest, res: Response) {

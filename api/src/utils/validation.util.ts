@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import AppError from './appError'
+import AppError from './app-error.util'
 
 export const validateRequestSize = (maxSizeBytes: number = 1000000) => {
   return (req: Request, res: Response, next: NextFunction) => {

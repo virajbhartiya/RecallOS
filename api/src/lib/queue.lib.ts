@@ -1,8 +1,8 @@
 import { Queue, QueueEvents, JobsOptions, QueueOptions } from 'bullmq'
 import crypto from 'crypto'
-import { getRedisConnection } from '../utils/env'
-import { logger } from '../utils/logger'
-import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text'
+import { getRedisConnection } from '../utils/env.util'
+import { logger } from '../utils/logger.util'
+import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
 
 export interface ContentJobData {
   user_id: string

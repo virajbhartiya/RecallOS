@@ -1,8 +1,8 @@
 import { Response } from 'express'
-import { AuthenticatedRequest } from '../middleware/auth'
+import { AuthenticatedRequest } from '../middleware/auth.middleware'
 import { createHash } from 'crypto'
-import { prisma } from '../lib/prisma'
-import { logger } from '../utils/logger'
+import { prisma } from '../lib/prisma.lib'
+import { logger } from '../utils/logger.util'
 
 export class MemorySnapshotController {
   static async getMemorySnapshots(req: AuthenticatedRequest, res: Response) {

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { ProfileController } from '../controller/profile.controller'
-import { authenticateToken } from '../middleware/auth'
+import { authenticateToken } from '../middleware/auth.middleware'
 
 const router = Router()
 

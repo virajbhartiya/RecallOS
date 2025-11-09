@@ -1,13 +1,13 @@
 import { Worker } from 'bullmq'
-import { ContentJobData } from '../lib/queue'
-import { aiProvider } from '../services/aiProvider'
-import { memoryMeshService } from '../services/memoryMesh'
-import { profileUpdateService } from '../services/profileUpdate'
-import { prisma } from '../lib/prisma'
+import { ContentJobData } from '../lib/queue.lib'
+import { aiProvider } from '../services/ai-provider.service'
+import { memoryMeshService } from '../services/memory-mesh.service'
+import { profileUpdateService } from '../services/profile-update.service'
+import { prisma } from '../lib/prisma.lib'
 import { createHash } from 'crypto'
-import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../utils/env'
-import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text'
-import { logger } from '../utils/logger'
+import { getQueueConcurrency, getRedisConnection, getQueueLimiter } from '../utils/env.util'
+import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
+import { logger } from '../utils/logger.util'
 
 type PrismaError = {
   code?: string

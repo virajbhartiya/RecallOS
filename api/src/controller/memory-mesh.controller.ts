@@ -1,8 +1,8 @@
 import { Response } from 'express'
-import { AuthenticatedRequest } from '../middleware/auth'
-import { prisma } from '../lib/prisma'
-import { memoryMeshService } from '../services/memoryMesh'
-import { logger } from '../utils/logger'
+import { AuthenticatedRequest } from '../middleware/auth.middleware'
+import { prisma } from '../lib/prisma.lib'
+import { memoryMeshService } from '../services/memory-mesh.service'
+import { logger } from '../utils/logger.util'
 
 export class MemoryMeshController {
   static async getMemoryMesh(req: AuthenticatedRequest, res: Response) {

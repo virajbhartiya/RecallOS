@@ -1,5 +1,5 @@
 import Redis from 'ioredis'
-import { getRedisConnection } from '../utils/env'
+import { getRedisConnection } from '../utils/env.util'
 
 let redisClient: Redis | null = null
 

@@ -1,6 +1,6 @@
 import crypto from 'crypto'
-import { getRedisClient } from '../lib/redis'
-import { logger } from '../utils/logger'
+import { getRedisClient } from '../lib/redis.lib'
+import { logger } from '../utils/logger.util'
 
 export type SearchJobStatus = 'pending' | 'processing' | 'completed' | 'failed'
 

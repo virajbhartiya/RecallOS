@@ -1,7 +1,7 @@
 import fetch from 'node-fetch'
-import { geminiService } from './gemini'
-import { tokenTracking } from './tokenTracking'
-import { logger } from '../utils/logger'
+import { geminiService } from './gemini.service'
+import { tokenTracking } from './token-tracking.service'
+import { logger } from '../utils/logger.util'
 
 type Provider = 'gemini' | 'ollama' | 'hybrid'
 

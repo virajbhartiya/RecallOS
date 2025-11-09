@@ -1,9 +1,9 @@
 import { Response } from 'express'
-import { AuthenticatedRequest } from '../middleware/auth'
-import { prisma } from '../lib/prisma'
-import { memoryMeshService } from '../services/memoryMesh'
-import { searchMemories } from '../services/memorySearch'
-import { logger } from '../utils/logger'
+import { AuthenticatedRequest } from '../middleware/auth.middleware'
+import { prisma } from '../lib/prisma.lib'
+import { memoryMeshService } from '../services/memory-mesh.service'
+import { searchMemories } from '../services/memory-search.service'
+import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 
 type MemoryWithMetadata = {

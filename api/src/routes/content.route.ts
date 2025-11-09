@@ -6,7 +6,7 @@ import {
   getPendingJobs,
   deletePendingJob,
 } from '../controller/content.controller'
-import { authenticateToken } from '../middleware/auth'
+import { authenticateToken } from '../middleware/auth.middleware'
 
 const router = Router()
 

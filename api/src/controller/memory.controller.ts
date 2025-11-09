@@ -1,11 +1,11 @@
 import { Request, Response } from 'express'
-import { AuthenticatedRequest } from '../middleware/auth'
+import { AuthenticatedRequest } from '../middleware/auth.middleware'
 import { createHash } from 'crypto'
-import { prisma } from '../lib/prisma'
-import { aiProvider } from '../services/aiProvider'
-import { memoryMeshService } from '../services/memoryMesh'
-import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text'
-import { logger } from '../utils/logger'
+import { prisma } from '../lib/prisma.lib'
+import { aiProvider } from '../services/ai-provider.service'
+import { memoryMeshService } from '../services/memory-mesh.service'
+import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
+import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 
 type MemorySelect = Prisma.MemoryGetPayload<{

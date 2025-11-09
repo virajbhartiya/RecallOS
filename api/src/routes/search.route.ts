@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { postSearch, getSearchJobStatus, getContext } from '../controller/search.controller'
-import { authenticateToken } from '../middleware/auth'
+import { authenticateToken } from '../middleware/auth.middleware'
 
 const router = Router()
 

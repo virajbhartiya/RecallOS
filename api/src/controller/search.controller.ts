@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from 'express'
-import { AuthenticatedRequest } from '../middleware/auth'
-import AppError from '../utils/appError'
-import { searchMemories } from '../services/memorySearch'
-import { createSearchJob, getSearchJob } from '../services/searchJob'
-import { logger } from '../utils/logger'
+import { AuthenticatedRequest } from '../middleware/auth.middleware'
+import AppError from '../utils/app-error.util'
+import { searchMemories } from '../services/memory-search.service'
+import { createSearchJob, getSearchJob } from '../services/search-job.service'
+import { logger } from '../utils/logger.util'
 
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   let job: { id: string } | null = null
@@ -39,7 +39,7 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       // Update job with initial results
       setImmediate(async () => {
         try {
-          const { setSearchJobResult } = await import('../services/searchJob')
+          const { setSearchJobResult } = await import('../services/search-job.service')
           await setSearchJobResult(job!.id, {
             status: 'pending',
             results: data.results.slice(0, 10).map(r => ({
@@ -88,8 +88,8 @@ Return clean, readable plain text only.
 User query: "${data.query}"
 Evidence notes (ordered by relevance):
 ${bullets}`
-          const { aiProvider } = await import('../services/aiProvider')
-          const { withTimeout } = await import('../services/memorySearch')
+          const { aiProvider } = await import('../services/ai-provider.service')
+          const { withTimeout } = await import('../services/memory-search.service')
           logger.log('[search/controller] generating async answer', {
             ts: new Date().toISOString(),
             jobId: job.id,
@@ -161,7 +161,7 @@ ${bullets}`
         } catch (error) {
           logger.error('[search] error generating async answer in controller:', error)
           try {
-            const { setSearchJobResult } = await import('../services/searchJob')
+            const { setSearchJobResult } = await import('../services/search-job.service')
             await setSearchJobResult(job!.id, { status: 'failed' })
           } catch (jobError) {
             logger.error('Error updating search job status:', jobError)
@@ -212,7 +212,7 @@ ${bullets}`
     // Update search job status to failed if there's a job
     try {
       if (job?.id) {
-        const { setSearchJobResult } = await import('../services/searchJob')
+        const { setSearchJobResult } = await import('../services/search-job.service')
         await setSearchJobResult(job.id, { status: 'failed' })
       }
     } catch (jobError) {

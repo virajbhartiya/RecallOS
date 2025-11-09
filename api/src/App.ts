@@ -14,17 +14,17 @@ import https from 'https'
 
 import dotenv from 'dotenv'
 
-import globalErrorHandler from './controller/utils/globalErrorController'
+import globalErrorHandler from './controller/utils/global-error.controller'
 
 import { routes } from './routes/index.route'
 
-import { prisma } from './lib/prisma'
+import { prisma } from './lib/prisma.lib'
 
-import { startContentWorker } from './workers/contentWorker'
-import { startCyclicProfileWorker } from './workers/profileWorker'
-import { ensureCollection } from './lib/qdrant'
-import { aiProvider } from './services/aiProvider'
-import { logger } from './utils/logger'
+import { startContentWorker } from './workers/content-worker'
+import { startCyclicProfileWorker } from './workers/profile-worker'
+import { ensureCollection } from './lib/qdrant.lib'
+import { aiProvider } from './services/ai-provider.service'
+import { logger } from './utils/logger.util'
 
 dotenv.config()
 
@@ -127,8 +127,8 @@ const coloredMorganFormat = (tokens: morgan.TokenIndexer, req: Request, res: Res
 app.use(morgan(coloredMorganFormat))
 app.use(express.urlencoded({ extended: false, limit: '10mb' }))
 app.use(express.json({ limit: '10mb' }))
-import { getAllowedOrigins } from './utils/env'
-import { validateRequestSize } from './utils/validation'
+import { getAllowedOrigins } from './utils/env.util'
+import { validateRequestSize } from './utils/validation.util'
 
 app.use(validateRequestSize(10 * 1024 * 1024)) // 10MB limit
 

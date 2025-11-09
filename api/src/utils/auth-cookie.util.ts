@@ -1,6 +1,6 @@
 import { Response } from 'express'
-import { getCookieDomain, getSessionCookieName, isCookieSecure } from './env'
-import { logger } from './logger'
+import { getCookieDomain, getSessionCookieName, isCookieSecure } from './env.util'
+import { logger } from './logger.util'
 
 export function setAuthCookie(
   res: Response,

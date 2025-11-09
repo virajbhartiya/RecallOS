@@ -1,7 +1,7 @@
-import { prisma } from '../lib/prisma'
-import { profileExtractionService, ProfileExtractionResult } from './profileExtraction'
-import { getRedisClient } from '../lib/redis'
-import { logger } from '../utils/logger'
+import { prisma } from '../lib/prisma.lib'
+import { profileExtractionService, ProfileExtractionResult } from './profile-extraction.service'
+import { getRedisClient } from '../lib/redis.lib'
+import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 
 export interface UserProfile {
