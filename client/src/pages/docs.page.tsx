@@ -13,6 +13,7 @@ const TableOfContents: React.FC<{ onSectionClick: (id: string) => void }> = ({
     { id: "web-client", title: "Web Client" },
     { id: "search", title: "Search & AI Answers" },
     { id: "memory-mesh", title: "Memory Mesh" },
+    { id: "backend-architecture", title: "Backend Architecture" },
     { id: "api-reference", title: "API Reference" },
     { id: "troubleshooting", title: "Troubleshooting" },
     { id: "faq", title: "FAQ" },
@@ -396,23 +397,28 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                 <h3 className="text-lg font-medium">How Search Works</h3>
                 <ol className="list-decimal list-inside space-y-2 text-gray-700">
                   <li>
-                    Your query is processed through both keyword and semantic
-                    search
+                    Query analysis determines search strategy (narrow, balanced, or broad) based on specificity, temporal indicators, and memory count
                   </li>
                   <li>
-                    Keyword search matches text in titles, summaries, and
-                    content
+                    Query is converted to vector embedding using Google Gemini or Ollama
                   </li>
                   <li>
-                    Semantic search uses vector embeddings with cosine
-                    similarity
+                    Semantic search queries Qdrant vector database with dynamic thresholds based on query analysis
                   </li>
                   <li>
-                    Results are blended with weighted scores (40% keyword, 60%
-                    semantic)
+                    Keyword search matches tokens in titles (0.5 weight), summaries (0.3 weight), and content (0.2 weight) using Prisma
                   </li>
                   <li>
-                    AI generates answers with citations and relevance scores
+                    Results are scored and blended: 60% semantic score + 40% keyword score, with coverage ratio boost
+                  </li>
+                  <li>
+                    Dynamic filtering applies thresholds based on query type (semantic ≥0.15, keyword ≥0.3, coverage ≥0.5)
+                  </li>
+                  <li>
+                    AI generates contextual answers using Google Gemini with profile context and memory summaries, extracting citations from [n] references
+                  </li>
+                  <li>
+                    Results are cached in Redis for 5 minutes to improve performance
                   </li>
                 </ol>
 
@@ -423,8 +429,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                       Keyword Search
                     </h4>
                     <p className="text-xs text-blue-800 mt-1">
-                      Matches exact terms in memory content with relevance
-                      scoring
+                      Tokenizes query, matches against title/summary/content with weighted scoring. Filters by category, topic, sentiment, date range. Calculates coverage ratio for query tokens.
                     </p>
                   </div>
                   <div className="bg-purple-50 border border-purple-200 p-3">
@@ -432,8 +437,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                       Semantic Search
                     </h4>
                     <p className="text-xs text-purple-800 mt-1">
-                      Uses vector embeddings to find conceptually similar
-                      content
+                      Generates query embedding, searches Qdrant vector database with cosine similarity. Uses dynamic limits (50-1000) based on query analysis. Filters by user_id and optional pre-filtered memory IDs.
                     </p>
                   </div>
                   <div className="bg-indigo-50 border border-indigo-200 p-3">
@@ -441,7 +445,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                       Hybrid Search
                     </h4>
                     <p className="text-xs text-indigo-800 mt-1">
-                      Combines both approaches for comprehensive results
+                      Runs keyword and semantic search in parallel, merges results by memory ID, calculates blended scores (40% keyword + 60% semantic), sorts by final score, applies pagination.
                     </p>
                   </div>
                 </div>
@@ -482,8 +486,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                       Semantic Relations
                     </h4>
                     <p className="text-xs text-blue-800 mt-1">
-                      Memories with similar content using vector embeddings
-                      (configurable threshold)
+                      Uses Qdrant vector search to find memories with similar content embeddings. Searches for top 12 related memories, filters by similarity ≥0.3, applies domain-specific boosts (e.g., GitHub + Filecoin topics get +0.2 similarity).
                     </p>
                   </div>
                   <div className="bg-green-50 border border-green-200 p-3">
@@ -491,7 +494,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                       Topical Relations
                     </h4>
                     <p className="text-xs text-green-800 mt-1">
-                      Memories sharing topics, categories, or extracted metadata
+                      Calculates set overlap for topics (40% weight), categories (30% weight), key points (20% weight), and searchable terms (10% weight). Adds +0.1 boost for same domain URLs. Filters by similarity ≥0.25, returns top 8 matches.
                     </p>
                   </div>
                   <div className="bg-purple-50 border border-purple-200 p-3">
@@ -499,8 +502,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                       Temporal Relations
                     </h4>
                     <p className="text-xs text-purple-800 mt-1">
-                      Memories captured close together in time with similar
-                      content
+                      Finds memories within time windows (1 hour, 1 day, 1 week, 1 month) with exponential decay similarity scoring. Same hour gets 0.9+ similarity, same day 0.7+, same week 0.4+, same month 0.1+. Filters by similarity ≥0.2, returns top 5.
                     </p>
                   </div>
                 </div>
@@ -518,22 +520,185 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                   <li>Explore memory clusters and relationships</li>
                 </ul>
 
-                <h3 className="text-lg font-medium mt-6">Mesh Processing</h3>
+                <h3 className="text-lg font-medium mt-6">Mesh Processing Pipeline</h3>
                 <p className="text-gray-700">
-                  The mesh is built asynchronously as new memories are added.
-                  Each memory is processed to:
+                  When a new memory is created, it's processed asynchronously:
+                </p>
+                <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                  <li>
+                    <strong>Embedding Generation:</strong> Creates vector embeddings for content, summary, and title using Google Gemini embeddings, stores in Qdrant with metadata (memory_id, user_id, embedding_type, model_name)
+                  </li>
+                  <li>
+                    <strong>Relation Discovery:</strong> Finds semantic (top 12), topical (top 8), and temporal (top 5) relations in parallel
+                  </li>
+                  <li>
+                    <strong>AI Evaluation:</strong> For low-confidence relations (0.4-0.5 similarity), uses AI to evaluate relevance with batch processing and 24-hour caching
+                  </li>
+                  <li>
+                    <strong>Relation Storage:</strong> Stores relations in PostgreSQL with similarity scores and relation types, handles race conditions with unique constraints
+                  </li>
+                  <li>
+                    <strong>Cleanup:</strong> Removes relations with similarity &lt;0.3, keeps only top 10 per memory, removes old low-quality relations
+                  </li>
+                  <li>
+                    <strong>3D Layout:</strong> Uses UMAP to project embeddings to 3D coordinates, applies spatial grid for efficient neighbor finding, calculates edge weights from latent space distances
+                  </li>
+                </ol>
+
+                <h3 className="text-lg font-medium mt-6">Mesh Visualization Algorithm</h3>
+                <p className="text-gray-700">
+                  The 3D mesh uses advanced algorithms for layout:
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-gray-700">
-                  <li>Generate vector embeddings for semantic similarity</li>
-                  <li>Extract topics, categories, and metadata</li>
-                  <li>Find connections with existing memories</li>
-                  <li>Update the knowledge graph structure</li>
+                  <li>
+                    <strong>UMAP Projection:</strong> Reduces 768-dimensional embeddings to 3D using UMAP with adaptive epochs (30-100 based on dataset size)
+                  </li>
+                  <li>
+                    <strong>Spatial Grid:</strong> Divides 3D space into grid cells for O(1) neighbor lookup, searches 2-cell radius for connections
+                  </li>
+                  <li>
+                    <strong>Edge Calculation:</strong> Uses inverse distance with non-linear scaling (1 - normalized_dist)^1.5, adds boosts for same source/domain/timestamp
+                  </li>
+                  <li>
+                    <strong>Degree Control:</strong> Limits edges per node (max 20), ensures minimum degree (2-5) for connectivity, uses mutual KNN pruning
+                  </li>
+                  <li>
+                    <strong>Clustering:</strong> Applies DBSCAN-like clustering (ε=250, min_points=2) to identify memory clusters in latent space
+                  </li>
                 </ul>
 
                 <InfoBox type="info">
                   The mesh helps you discover unexpected connections and
                   learning patterns. It requires at least 5-10 memories to form
-                  meaningful connections.
+                  meaningful connections. Processing happens asynchronously after memory creation.
+                </InfoBox>
+              </div>
+            </section>
+
+            <section id="backend-architecture">
+              <h2 className="text-2xl font-light font-editorial mb-4 border-b border-gray-200 pb-2">
+                Backend Architecture
+              </h2>
+              <div className="space-y-4">
+                <p className="text-gray-700">
+                  RecallOS backend is built with Node.js, Express, PostgreSQL, Qdrant, and Redis. Here's how the core processing works:
+                </p>
+
+                <h3 className="text-lg font-medium">Memory Processing Flow</h3>
+                <ol className="list-decimal list-inside space-y-2 text-gray-700">
+                  <li>
+                    <strong>Content Reception:</strong> POST /api/memory/process receives content, URL, title, and metadata
+                  </li>
+                  <li>
+                    <strong>Duplicate Detection:</strong> Normalizes text, creates canonical hash (SHA256), checks PostgreSQL for existing memory by canonical_hash
+                  </li>
+                  <li>
+                    <strong>URL Fallback:</strong> If no canonical match, checks recent memories (last hour) by normalized URL with 90%+ similarity threshold
+                  </li>
+                  <li>
+                    <strong>AI Processing:</strong> Runs in parallel: summarizeContent() and extractContentMetadata() using Google Gemini or Ollama
+                  </li>
+                  <li>
+                    <strong>Database Storage:</strong> Creates memory record in PostgreSQL with content, summary, canonical_hash, page_metadata (topics, categories, sentiment, etc.)
+                  </li>
+                  <li>
+                    <strong>Async Processing:</strong> Uses setImmediate() to asynchronously create memory snapshot and process mesh relations
+                  </li>
+                  <li>
+                    <strong>Embedding Generation:</strong> Generates vector embeddings for content, summary, and title, stores in Qdrant with payload metadata
+                  </li>
+                  <li>
+                    <strong>Relation Creation:</strong> Finds semantic, topical, and temporal relations, evaluates with AI if needed, stores in memory_relation table
+                  </li>
+                </ol>
+
+                <h3 className="text-lg font-medium mt-6">Background Workers</h3>
+                <p className="text-gray-700">
+                  Content processing uses BullMQ workers with Redis for job queuing:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-gray-700">
+                  <li>
+                    <strong>Content Worker:</strong> Processes content from queue with retry logic (8 attempts, exponential backoff 3s-60s), handles rate limits and API errors
+                  </li>
+                  <li>
+                    <strong>Profile Worker:</strong> Cyclically updates user profiles based on memory patterns and topics
+                  </li>
+                  <li>
+                    <strong>Queue Configuration:</strong> Configurable concurrency, rate limiting, stalled job detection, max retry attempts
+                  </li>
+                </ul>
+
+                <h3 className="text-lg font-medium mt-6">Search Implementation</h3>
+                <p className="text-gray-700">
+                  Search uses dynamic query analysis and hybrid scoring:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-gray-700">
+                  <li>
+                    <strong>Query Analysis:</strong> Analyzes query for type (specific/general/temporal/exploratory), specificity score, temporal indicators, keyword density
+                  </li>
+                  <li>
+                    <strong>Dynamic Parameters:</strong> Adjusts Qdrant limit (50-10000), semantic threshold (0.1-0.2), keyword threshold (0.2-0.4) based on query analysis
+                  </li>
+                  <li>
+                    <strong>Search Strategy:</strong> Narrow (specific queries), Balanced (normal), or Broad (exploratory/old memories)
+                  </li>
+                  <li>
+                    <strong>Parallel Execution:</strong> Runs semantic (Qdrant) and keyword (PostgreSQL) search simultaneously, merges results
+                  </li>
+                  <li>
+                    <strong>Scoring:</strong> Blends 60% semantic + 40% keyword, applies coverage ratio boost, filters by dynamic thresholds
+                  </li>
+                  <li>
+                    <strong>Caching:</strong> Redis cache with 5-minute TTL, keyed by userId + normalized query + limit
+                  </li>
+                </ul>
+
+                <h3 className="text-lg font-medium mt-6">AI Provider System</h3>
+                <p className="text-gray-700">
+                  Supports multiple AI backends with fallback mechanisms:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-gray-700">
+                  <li>
+                    <strong>Gemini Mode:</strong> Uses Google Gemini for embeddings (text-embedding-004) and content generation (gemini-2.0-flash-exp)
+                  </li>
+                  <li>
+                    <strong>Ollama Mode:</strong> Uses local Ollama for embeddings (all-minilm:l6-v2) and generation (llama3.1:8b)
+                  </li>
+                  <li>
+                    <strong>Hybrid Mode:</strong> Tries multiple embedding methods (fallback, Ollama models) with automatic fallback
+                  </li>
+                  <li>
+                    <strong>Fallback Embeddings:</strong> Generates 768-dimensional embeddings using word hashing, semantic clusters, and text analysis if AI unavailable
+                  </li>
+                  <li>
+                    <strong>Token Tracking:</strong> Records token usage per user for embeddings, summarization, metadata extraction, and search operations
+                  </li>
+                </ul>
+
+                <h3 className="text-lg font-medium mt-6">Data Storage</h3>
+                <div className="space-y-2">
+                  <div className="bg-white border border-gray-200 p-3">
+                    <h4 className="font-medium text-sm">PostgreSQL</h4>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Stores memories, users, relations, snapshots, query events. Uses Prisma ORM with BigInt for timestamps, JSONB for page_metadata.
+                    </p>
+                  </div>
+                  <div className="bg-white border border-gray-200 p-3">
+                    <h4 className="font-medium text-sm">Qdrant</h4>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Vector database for embeddings. Stores 768-dimensional vectors with payload (memory_id, user_id, embedding_type). Collection auto-created on startup.
+                    </p>
+                  </div>
+                  <div className="bg-white border border-gray-200 p-3">
+                    <h4 className="font-medium text-sm">Redis</h4>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Job queue (BullMQ) for background processing, search result caching (5min TTL), relationship evaluation cache (24h TTL).
+                    </p>
+                  </div>
+                </div>
+
+                <InfoBox type="tip">
+                  The backend is designed for scalability with async processing, caching, and efficient vector search. All AI operations have fallback mechanisms to ensure reliability.
                 </InfoBox>
               </div>
             </section>
@@ -554,16 +719,19 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                     <h4 className="font-medium text-sm">Memory Management</h4>
                     <div className="text-xs text-gray-600 mt-1 space-y-1">
                       <p>
-                        <code>POST /api/memory/processRawContent</code> -
-                        Process new content
+                        <code>POST /api/memory/process</code> - Process new content (requires auth token)
                       </p>
                       <p>
-                        <code>GET /api/memory/recent/:userAddress</code> - Get
-                        recent memories
+                        <code>GET /api/memory/user/recent</code> - Get recent memories (query: count)
                       </p>
                       <p>
-                        <code>GET /api/memory/insights/:userAddress</code> - Get
-                        memory analytics
+                        <code>GET /api/memory/user/count</code> - Get memory count
+                      </p>
+                      <p>
+                        <code>GET /api/memory/insights</code> - Get memory analytics (topics, categories, sentiment)
+                      </p>
+                      <p>
+                        <code>DELETE /api/memory/:memoryId</code> - Delete a memory
                       </p>
                     </div>
                   </div>
@@ -571,31 +739,50 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                     <h4 className="font-medium text-sm">Search & AI</h4>
                     <div className="text-xs text-gray-600 mt-1 space-y-1">
                       <p>
-                        <code>POST /api/search</code> - Semantic search with AI
-                        answers
+                        <code>GET /api/memory/search</code> - Semantic search with AI answers (query: query, limit)
                       </p>
                       <p>
-                        <code>GET /api/search/job/:id</code> - Check search job
-                        status
+                        <code>GET /api/memory/search-embeddings</code> - Semantic-only search (query: query, limit, category, topic, sentiment, source, dateRange, page)
                       </p>
                       <p>
-                        <code>POST /api/search/context</code> - Get context for
-                        queries
+                        <code>GET /api/memory/search-hybrid</code> - Hybrid search combining keyword and semantic (query: query, limit, filters, page)
                       </p>
                     </div>
                   </div>
-                  <div className="bg-white border border-gray-200 p-3"></div>
+                  <div className="bg-white border border-gray-200 p-3">
+                    <h4 className="font-medium text-sm">Memory Mesh</h4>
+                    <div className="text-xs text-gray-600 mt-1 space-y-1">
+                      <p>
+                        <code>GET /api/memory/mesh</code> - Get memory mesh graph (query: limit, threshold)
+                      </p>
+                      <p>
+                        <code>GET /api/memory/relations/:memoryId</code> - Get memory with relations
+                      </p>
+                      <p>
+                        <code>GET /api/memory/cluster/:memoryId</code> - Get memory cluster (query: depth)
+                      </p>
+                      <p>
+                        <code>POST /api/memory/process-mesh/:memoryId</code> - Process memory for mesh
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 <h3 className="text-lg font-medium mt-6">Authentication</h3>
                 <p className="text-gray-700">
-                  The API uses userId. Include your userId in requests:
+                  The API uses JWT tokens. Include Authorization header:
                 </p>
                 <CodeBlock
-                  code={`{
-  "userId": "your-user-id",
+                  code={`Authorization: Bearer <your-jwt-token>
+
+Request body example:
+{
   "content": "Your content here",
-  "url": "https://example.com"
+  "url": "https://example.com",
+  "title": "Page Title",
+  "metadata": {
+    "source": "extension"
+  }
 }`}
                 />
 
@@ -607,16 +794,23 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                   code={`{
   "success": true,
   "data": {
-    "memoryId": "uuid"
+    "memoryId": "uuid",
+    "userId": "user-id"
   },
   "message": "Memory processed successfully"
+}
+
+Error response:
+{
+  "success": false,
+  "error": "Error message"
 }`}
                 />
 
                 <InfoBox type="info">
                   The API supports both synchronous and asynchronous operations.
                   Long-running tasks like AI processing may return job IDs for
-                  status checking.
+                  status checking. All endpoints require authentication except /health.
                 </InfoBox>
               </div>
             </section>
