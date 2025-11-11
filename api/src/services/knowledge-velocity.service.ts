@@ -195,24 +195,55 @@ export const knowledgeVelocityService = {
     }
   ): Promise<void> {
     try {
-      await prisma.knowledgeScore.create({
-        data: {
+      const periodStartStr = periodStart.toISOString().split('T')[0]
+      const existing = await prisma.knowledgeScore.findFirst({
+        where: {
           user_id: userId,
           period_type: periodType,
-          period_start: periodStart,
-          period_end: periodEnd,
-          velocity_score: metrics.velocityScore,
-          impact_score: impactMetrics.impactScore || 0,
-          topic_rate: metrics.topicRate,
-          diversity_index: metrics.diversityIndex,
-          consistency_score: metrics.consistencyScore,
-          depth_balance: metrics.depthBalance,
-          search_frequency: impactMetrics.searchFrequency,
-          recall_efficiency: impactMetrics.recallEfficiency,
-          connection_strength: impactMetrics.connectionStrength,
-          access_quality: impactMetrics.accessQuality,
+          period_start: {
+            gte: new Date(periodStartStr),
+            lt: new Date(new Date(periodStartStr).getTime() + 24 * 60 * 60 * 1000),
+          },
         },
       })
+
+      if (existing) {
+        await prisma.knowledgeScore.update({
+          where: { id: existing.id },
+          data: {
+            period_end: periodEnd,
+            velocity_score: metrics.velocityScore,
+            impact_score: impactMetrics.impactScore || 0,
+            topic_rate: metrics.topicRate,
+            diversity_index: metrics.diversityIndex,
+            consistency_score: metrics.consistencyScore,
+            depth_balance: metrics.depthBalance,
+            search_frequency: impactMetrics.searchFrequency,
+            recall_efficiency: impactMetrics.recallEfficiency,
+            connection_strength: impactMetrics.connectionStrength,
+            access_quality: impactMetrics.accessQuality,
+          },
+        })
+      } else {
+        await prisma.knowledgeScore.create({
+          data: {
+            user_id: userId,
+            period_type: periodType,
+            period_start: periodStart,
+            period_end: periodEnd,
+            velocity_score: metrics.velocityScore,
+            impact_score: impactMetrics.impactScore || 0,
+            topic_rate: metrics.topicRate,
+            diversity_index: metrics.diversityIndex,
+            consistency_score: metrics.consistencyScore,
+            depth_balance: metrics.depthBalance,
+            search_frequency: impactMetrics.searchFrequency,
+            recall_efficiency: impactMetrics.recallEfficiency,
+            connection_strength: impactMetrics.connectionStrength,
+            access_quality: impactMetrics.accessQuality,
+          },
+        })
+      }
     } catch (error) {
       logger.error('Error saving velocity score:', error)
       throw error
