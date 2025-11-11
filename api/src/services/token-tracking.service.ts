@@ -24,6 +24,24 @@ export interface TokenUsageRecord {
 export const tokenTracking = {
   async recordTokenUsage(record: TokenUsageRecord): Promise<void> {
     try {
+      if (!record.userId) {
+        logger.warn('Skipping token usage recording: missing userId', record)
+        return
+      }
+
+      const userExists = await prisma.user.findUnique({
+        where: { id: record.userId },
+        select: { id: true },
+      })
+
+      if (!userExists) {
+        logger.warn('Skipping token usage recording: user not found', {
+          userId: record.userId,
+          operationType: record.operationType,
+        })
+        return
+      }
+
       await prisma.tokenUsage.create({
         data: {
           user_id: record.userId,
