@@ -14,4 +14,3 @@ router.post('/calculate', authenticateToken, KnowledgeController.calculateScores
 router.post('/opt-in', authenticateToken, KnowledgeController.setOptIn)
 
 export default router
-

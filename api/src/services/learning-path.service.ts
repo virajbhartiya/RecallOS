@@ -99,10 +99,12 @@ Return ONLY valid JSON array, no markdown or extra text.`
       let recommendations: LearningRecommendation[] = []
 
       try {
-        const jsonMatch = typeof aiResponse === 'string' 
-          ? aiResponse.match(/\[[\s\S]*\]/) 
-          : null
-        const jsonStr = jsonMatch ? jsonMatch[0] : (typeof aiResponse === 'string' ? aiResponse : JSON.stringify(aiResponse))
+        const jsonMatch = typeof aiResponse === 'string' ? aiResponse.match(/\[[\s\S]*\]/) : null
+        const jsonStr = jsonMatch
+          ? jsonMatch[0]
+          : typeof aiResponse === 'string'
+            ? aiResponse
+            : JSON.stringify(aiResponse)
         recommendations = JSON.parse(jsonStr)
       } catch (error) {
         logger.error('Error parsing AI response for learning path:', error)
@@ -136,9 +138,12 @@ Return ONLY valid JSON array, no markdown or extra text.`
     }
   },
 
-  generateFallbackRecommendations(shallowTopics: string[], deepTopics: string[]): LearningRecommendation[] {
+  generateFallbackRecommendations(
+    shallowTopics: string[],
+    deepTopics: string[]
+  ): LearningRecommendation[] {
     const recommendations: LearningRecommendation[] = []
-    
+
     shallowTopics.slice(0, 5).forEach((topic, index) => {
       recommendations.push({
         topic,
@@ -215,4 +220,3 @@ Return ONLY valid JSON array, no markdown or extra text.`
     }
   },
 }
-

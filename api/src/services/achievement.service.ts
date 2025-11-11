@@ -43,7 +43,9 @@ const ACHIEVEMENTS: AchievementDefinition[] = [
           try {
             const urlObj = new URL(m.url)
             domains.add(urlObj.hostname.replace('www.', ''))
-          } catch {}
+          } catch {
+            // Invalid URL, skip this memory
+          }
         }
       })
       const progress = Math.min(100, (domains.size / 50) * 100)
@@ -109,10 +111,10 @@ const ACHIEVEMENTS: AchievementDefinition[] = [
         take: 100,
       })
       if (memories.length === 0) return { progress: 0, unlocked: false }
-      
+
       const days = new Set(memories.map(m => m.created_at.toISOString().split('T')[0]))
       const sortedDays = Array.from(days).sort().reverse()
-      
+
       let streak = 1
       for (let i = 0; i < sortedDays.length - 1; i++) {
         const current = new Date(sortedDays[i])
@@ -124,7 +126,7 @@ const ACHIEVEMENTS: AchievementDefinition[] = [
           break
         }
       }
-      
+
       const progress = Math.min(100, (streak / 30) * 100)
       return { progress, unlocked: streak >= 30 }
     },
@@ -140,10 +142,10 @@ const ACHIEVEMENTS: AchievementDefinition[] = [
         take: 200,
       })
       if (memories.length === 0) return { progress: 0, unlocked: false }
-      
+
       const days = new Set(memories.map(m => m.created_at.toISOString().split('T')[0]))
       const sortedDays = Array.from(days).sort().reverse()
-      
+
       let streak = 1
       for (let i = 0; i < sortedDays.length - 1; i++) {
         const current = new Date(sortedDays[i])
@@ -155,7 +157,7 @@ const ACHIEVEMENTS: AchievementDefinition[] = [
           break
         }
       }
-      
+
       const progress = Math.min(100, (streak / 100) * 100)
       return { progress, unlocked: streak >= 100 }
     },
@@ -291,12 +293,14 @@ export const achievementService = {
     return newlyUnlocked
   },
 
-  async getUserAchievements(userId: string): Promise<Array<{
-    badgeType: string
-    badgeName: string
-    progress: number
-    unlocked: boolean
-  }>> {
+  async getUserAchievements(userId: string): Promise<
+    Array<{
+      badgeType: string
+      badgeName: string
+      progress: number
+      unlocked: boolean
+    }>
+  > {
     const achievements = await prisma.achievement.findMany({
       where: { user_id: userId },
       orderBy: { unlocked_at: 'desc' },
@@ -310,7 +314,10 @@ export const achievementService = {
     }))
   },
 
-  async getAchievementProgress(userId: string, badgeType: string): Promise<{
+  async getAchievementProgress(
+    userId: string,
+    badgeType: string
+  ): Promise<{
     progress: number
     unlocked: boolean
   } | null> {
@@ -331,4 +338,3 @@ export const achievementService = {
     }
   },
 }
-

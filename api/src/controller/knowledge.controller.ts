@@ -87,7 +87,10 @@ export class KnowledgeController {
         knowledgeImpactService.getLatestScore(userId, periodType),
       ])
 
-      const velocityHistorical = await knowledgeVelocityService.getHistoricalScores(userId, periodType)
+      const velocityHistorical = await knowledgeVelocityService.getHistoricalScores(
+        userId,
+        periodType
+      )
       const impactHistorical = await knowledgeImpactService.getHistoricalScores(userId, periodType)
 
       res.status(200).json({
@@ -206,9 +209,10 @@ export class KnowledgeController {
       const periodType = (req.body.period_type as 'daily' | 'weekly') || 'weekly'
 
       const now = new Date()
-      const periodStart = periodType === 'daily'
-        ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
-        : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      const periodStart =
+        periodType === 'daily'
+          ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
+          : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       const periodEnd = now
 
       const [velocityMetrics, impactMetrics] = await Promise.all([
@@ -292,4 +296,3 @@ export class KnowledgeController {
     }
   }
 }
-

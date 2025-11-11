@@ -69,16 +69,18 @@ export const knowledgeImpactService = {
         return null
       }
 
-      const periodDays = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) || 1
+      const periodDays =
+        Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) || 1
       const searchFrequency = Math.min(100, (searchCount / periodDays) * 7)
 
       const avgSearchTime = 5.0
       const targetSearchTime = 2.0
-      const recallEfficiency = Math.min(100, Math.max(0, ((targetSearchTime / avgSearchTime) * 100)))
+      const recallEfficiency = Math.min(100, Math.max(0, (targetSearchTime / avgSearchTime) * 100))
 
-      const avgSimilarity = relations.length > 0
-        ? relations.reduce((sum, r) => sum + r.similarity_score, 0) / relations.length
-        : 0
+      const avgSimilarity =
+        relations.length > 0
+          ? relations.reduce((sum, r) => sum + r.similarity_score, 0) / relations.length
+          : 0
       const connectionStrength = Math.min(100, avgSimilarity * 100)
 
       const recentMemories = memories.filter(m => {
@@ -87,15 +89,21 @@ export const knowledgeImpactService = {
         return memTime >= periodStartTime
       })
 
-      const avgImportance = recentMemories.length > 0
-        ? recentMemories.reduce((sum, m) => sum + (m.importance_score || 0), 0) / recentMemories.length
-        : 0
+      const avgImportance =
+        recentMemories.length > 0
+          ? recentMemories.reduce((sum, m) => sum + (m.importance_score || 0), 0) /
+            recentMemories.length
+          : 0
 
-      const avgAccessCount = recentMemories.length > 0
-        ? recentMemories.reduce((sum, m) => sum + m.access_count, 0) / recentMemories.length
-        : 0
+      const avgAccessCount =
+        recentMemories.length > 0
+          ? recentMemories.reduce((sum, m) => sum + m.access_count, 0) / recentMemories.length
+          : 0
 
-      const accessQuality = Math.min(100, (avgImportance * 50 + Math.min(avgAccessCount / 10, 1) * 50))
+      const accessQuality = Math.min(
+        100,
+        avgImportance * 50 + Math.min(avgAccessCount / 10, 1) * 50
+      )
 
       const impactScore =
         searchFrequency * 0.3 +
@@ -143,7 +151,11 @@ export const knowledgeImpactService = {
     }
   },
 
-  async getHistoricalScores(userId: string, periodType: PeriodType, limit: number = 30): Promise<Array<{ date: Date; score: number }>> {
+  async getHistoricalScores(
+    userId: string,
+    periodType: PeriodType,
+    limit: number = 30
+  ): Promise<Array<{ date: Date; score: number }>> {
     try {
       const scores = await prisma.knowledgeScore.findMany({
         where: {
@@ -208,4 +220,3 @@ export const knowledgeImpactService = {
     }
   },
 }
-

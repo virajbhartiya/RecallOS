@@ -31,7 +31,10 @@ function calculateShannonEntropy(items: string[]): number {
   return -probabilities.reduce((sum, p) => sum + (p > 0 ? p * Math.log2(p) : 0), 0)
 }
 
-function calculateTopicRate(memories: Array<{ page_metadata: unknown; created_at: Date }>, periodDays: number): number {
+function calculateTopicRate(
+  memories: Array<{ page_metadata: unknown; created_at: Date }>,
+  periodDays: number
+): number {
   const topicsSet = new Set<string>()
   memories.forEach(memory => {
     const metadata = memory.page_metadata as Record<string, unknown> | null
@@ -47,7 +50,9 @@ function calculateTopicRate(memories: Array<{ page_metadata: unknown; created_at
   return Math.min(100, (uniqueTopics / periodDays) * 7)
 }
 
-function calculateDiversityIndex(memories: Array<{ url: string | null; page_metadata: unknown }>): number {
+function calculateDiversityIndex(
+  memories: Array<{ url: string | null; page_metadata: unknown }>
+): number {
   const domains: string[] = []
   const topics: string[] = []
   const categories: string[] = []
@@ -72,35 +77,40 @@ function calculateDiversityIndex(memories: Array<{ url: string | null; page_meta
   const categoryEntropy = calculateShannonEntropy(categories)
 
   const maxEntropy = Math.log2(Math.max(domains.length, topics.length, categories.length, 1))
-  const normalizedEntropy = maxEntropy > 0 
-    ? ((domainEntropy + topicEntropy + categoryEntropy) / 3) / maxEntropy 
-    : 0
+  const normalizedEntropy =
+    maxEntropy > 0 ? (domainEntropy + topicEntropy + categoryEntropy) / 3 / maxEntropy : 0
 
   return Math.min(100, normalizedEntropy * 100)
 }
 
-function calculateConsistencyScore(userId: string, periodStart: Date, periodEnd: Date): Promise<number> {
-  return prisma.memory.groupBy({
-    by: ['created_at'],
-    where: {
-      user_id: userId,
-      created_at: {
-        gte: periodStart,
-        lte: periodEnd,
+function calculateConsistencyScore(
+  userId: string,
+  periodStart: Date,
+  periodEnd: Date
+): Promise<number> {
+  return prisma.memory
+    .groupBy({
+      by: ['created_at'],
+      where: {
+        user_id: userId,
+        created_at: {
+          gte: periodStart,
+          lte: periodEnd,
+        },
       },
-    },
-  }).then(groups => {
-    const daysWithMemories = new Set(
-      groups.map(g => g.created_at.toISOString().split('T')[0])
-    ).size
-    const totalDays = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) || 1
-    return Math.min(100, (daysWithMemories / totalDays) * 100)
-  })
+    })
+    .then(groups => {
+      const daysWithMemories = new Set(groups.map(g => g.created_at.toISOString().split('T')[0]))
+        .size
+      const totalDays =
+        Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) || 1
+      return Math.min(100, (daysWithMemories / totalDays) * 100)
+    })
 }
 
 function calculateDepthBalance(memories: Array<{ page_metadata: unknown }>): number {
   const topicCounts: Record<string, number> = {}
-  
+
   memories.forEach(memory => {
     const metadata = memory.page_metadata as Record<string, unknown> | null
     if (metadata?.topics && Array.isArray(metadata.topics)) {
@@ -154,18 +164,16 @@ export const knowledgeVelocityService = {
         return null
       }
 
-      const periodDays = Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) || 1
-      
+      const periodDays =
+        Math.ceil((periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24)) || 1
+
       const topicRate = calculateTopicRate(memories, periodDays)
       const diversityIndex = calculateDiversityIndex(memories)
       const consistencyScore = await calculateConsistencyScore(userId, periodStart, periodEnd)
       const depthBalance = calculateDepthBalance(memories)
 
-      const velocityScore = 
-        topicRate * 0.3 +
-        diversityIndex * 0.25 +
-        consistencyScore * 0.25 +
-        depthBalance * 0.2
+      const velocityScore =
+        topicRate * 0.3 + diversityIndex * 0.25 + consistencyScore * 0.25 + depthBalance * 0.2
 
       return {
         topicRate,
@@ -277,7 +285,11 @@ export const knowledgeVelocityService = {
     }
   },
 
-  async getHistoricalScores(userId: string, periodType: PeriodType, limit: number = 30): Promise<Array<{ date: Date; score: number }>> {
+  async getHistoricalScores(
+    userId: string,
+    periodType: PeriodType,
+    limit: number = 30
+  ): Promise<Array<{ date: Date; score: number }>> {
     try {
       const scores = await prisma.knowledgeScore.findMany({
         where: {
@@ -304,4 +316,3 @@ export const knowledgeVelocityService = {
     }
   },
 }
-

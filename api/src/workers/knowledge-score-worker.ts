@@ -145,4 +145,3 @@ export const stopCyclicKnowledgeScoreWorker = () => {
     logger.log('[Knowledge Score Worker] Stopped cyclic worker')
   }
 }
-

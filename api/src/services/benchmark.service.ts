@@ -59,10 +59,19 @@ export const benchmarkService = {
         return (index / sortedArray.length) * 100
       }
 
-      const velocityPercentile = calculatePercentile(latestUserScores.velocity_score, velocityScores)
+      const velocityPercentile = calculatePercentile(
+        latestUserScores.velocity_score,
+        velocityScores
+      )
       const impactPercentile = calculatePercentile(latestUserScores.impact_score, impactScores)
-      const connectionPercentile = calculatePercentile(latestUserScores.connection_strength, connectionScores)
-      const diversityPercentile = calculatePercentile(latestUserScores.diversity_index, diversityScores)
+      const connectionPercentile = calculatePercentile(
+        latestUserScores.connection_strength,
+        connectionScores
+      )
+      const diversityPercentile = calculatePercentile(
+        latestUserScores.diversity_index,
+        diversityScores
+      )
 
       await prisma.userBenchmark.upsert({
         where: { user_id: userId },
@@ -131,4 +140,3 @@ export const benchmarkService = {
     }
   },
 }
-
