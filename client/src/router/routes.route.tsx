@@ -31,6 +31,11 @@ const Insights = lazy(() =>
     default: module.Insights,
   }))
 )
+const Knowledge = lazy(() =>
+  import("@/pages/knowledge.page").then((module) => ({
+    default: module.Knowledge,
+  }))
+)
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -50,6 +55,7 @@ const AppRoutes = () => {
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/insights" element={<Insights />} />
+        <Route path="/knowledge" element={<Knowledge />} />
 
         <Route path="*" element={<Landing />} />
       </Routes>
