@@ -8,10 +8,32 @@ import {
   getBenchmarks,
   calculateScores,
   type KnowledgeScores,
-  type Achievement,
-  type LearningPath,
-  type Benchmarks,
 } from '@/services/knowledge.service'
+
+type Achievement = {
+  badgeType: string
+  badgeName: string
+  progress: number
+  unlocked: boolean
+}
+
+type LearningPath = {
+  recommendations: Array<{
+    topic: string
+    reason: string
+    priority: number
+    prerequisites?: string[]
+  }>
+  knowledgeGaps: string[]
+  trendingTopics: string[]
+}
+
+type Benchmarks = {
+  velocityPercentile: number | null
+  impactPercentile: number | null
+  connectionPercentile: number | null
+  diversityPercentile: number | null
+}
 import { toast } from 'sonner'
 
 export const Knowledge: React.FC = () => {
