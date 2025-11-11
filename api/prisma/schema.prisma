@@ -18,6 +18,7 @@ model User {
   memory_snapshots MemorySnapshot[]
   token_usage      TokenUsage[]
   profile          UserProfile?
+  browsing_summaries BrowsingSummary[]
 
   @@map("users")
 }
@@ -163,4 +164,31 @@ model UserProfile {
   @@index([user_id])
   @@index([last_updated])
   @@map("user_profiles")
+}
+
+model BrowsingSummary {
+  id                 String   @id @default(uuid()) @db.Uuid
+  user_id            String   @db.Uuid
+  period_type        String
+  period_start       DateTime
+  period_end         DateTime
+  wow_facts          Json?
+  narrative_summary  String?  @db.Text
+  domain_stats       Json?
+  topics_explored    Json?
+  categories_explored Json?
+  time_estimates     Json?
+  key_insights       Json?
+  memory_ids         Json?
+  created_at         DateTime @default(now())
+  updated_at         DateTime @default(now()) @updatedAt
+  user               User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([period_type])
+  @@index([period_start])
+  @@index([period_end])
+  @@index([user_id, period_type])
+  @@index([user_id, period_type, period_start])
+  @@map("browsing_summaries")
 }

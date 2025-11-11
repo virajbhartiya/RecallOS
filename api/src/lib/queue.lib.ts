@@ -34,30 +34,9 @@ const queueOptions: QueueOptions = {
 export const contentQueue = new Queue<ContentJobData>(queueName, queueOptions)
 export const contentQueueEvents = new QueueEvents(queueName, { connection: getRedisConnection() })
 
-contentQueueEvents.on('waiting', ({ jobId }) => {
-  logger.log(`[Redis Queue] Job waiting in queue`, {
-    jobId,
-    state: 'waiting',
-    timestamp: new Date().toISOString(),
-  })
-})
-
-contentQueueEvents.on('active', ({ jobId }) => {
-  logger.log(`[Redis Queue] Job started processing`, {
-    jobId,
-    state: 'active',
-    timestamp: new Date().toISOString(),
-  })
-})
-
-contentQueueEvents.on('completed', ({ jobId, returnvalue }) => {
-  logger.log(`[Redis Queue] Job completed successfully`, {
-    jobId,
-    state: 'completed',
-    returnvalue: returnvalue ? JSON.stringify(returnvalue).substring(0, 200) : null,
-    timestamp: new Date().toISOString(),
-  })
-})
+contentQueueEvents.on('waiting', () => {})
+contentQueueEvents.on('active', () => {})
+contentQueueEvents.on('completed', () => {})
 
 contentQueueEvents.on('failed', ({ jobId, failedReason }) => {
   logger.error(`[Redis Queue] Job failed`, {
@@ -68,31 +47,11 @@ contentQueueEvents.on('failed', ({ jobId, failedReason }) => {
   })
 })
 
-contentQueueEvents.on('progress', ({ jobId, data }) => {
-  logger.log(`[Redis Queue] Job progress update`, {
-    jobId,
-    state: 'progress',
-    progress: data,
-    timestamp: new Date().toISOString(),
-  })
-})
-
+contentQueueEvents.on('progress', () => {})
 contentQueueEvents.on('stalled', ({ jobId }) => {
-  logger.warn(`[Redis Queue] Job stalled`, {
-    jobId,
-    state: 'stalled',
-    timestamp: new Date().toISOString(),
-  })
+  logger.warn(`[Redis Queue] Job stalled`, { jobId })
 })
-
-contentQueueEvents.on('delayed', ({ jobId, delay }) => {
-  logger.log(`[Redis Queue] Job delayed`, {
-    jobId,
-    state: 'delayed',
-    delayMs: delay,
-    timestamp: new Date().toISOString(),
-  })
-})
+contentQueueEvents.on('delayed', () => {})
 
 export const addContentJob = async (data: ContentJobData) => {
   const canonicalText = normalizeText(data.raw_text)
@@ -115,12 +74,6 @@ export const addContentJob = async (data: ContentJobData) => {
     const existingCanonicalHash = hashCanonical(existingCanonicalText)
 
     if (existingCanonicalHash === canonicalHash) {
-      logger.log(`[Redis Queue] Duplicate job detected in queue, returning existing job`, {
-        existingJobId: existingJob.id,
-        userId: data.user_id,
-        canonicalHash,
-        timestamp: new Date().toISOString(),
-      })
       return { id: existingJob.id, isDuplicate: true }
     }
 
@@ -137,13 +90,6 @@ export const addContentJob = async (data: ContentJobData) => {
         const similarity = calculateSimilarity(canonicalText, existingCanonicalText)
 
         if (similarity > 0.9) {
-          logger.log(`[Redis Queue] URL duplicate detected in queue, returning existing job`, {
-            existingJobId: existingJob.id,
-            userId: data.user_id,
-            url: normalizedUrl,
-            similarity,
-            timestamp: new Date().toISOString(),
-          })
           return { id: existingJob.id, isDuplicate: true }
         }
       }
@@ -156,14 +102,6 @@ export const addContentJob = async (data: ContentJobData) => {
   }
   const job = await contentQueue.add(queueName, data, jobOptions)
 
-  logger.log(`[Redis Queue] Job queued for processing`, {
-    jobId: job.id,
-    userId: data.user_id,
-    contentLength: data.raw_text?.length || 0,
-    source: data.metadata?.source || 'unknown',
-    url: data.metadata?.url || 'unknown',
-    timestamp: new Date().toISOString(),
-  })
 
   return { id: job.id }
 }

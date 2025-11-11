@@ -33,14 +33,6 @@ export const startContentWorker = () => {
     async job => {
       const { user_id, raw_text, metadata } = job.data as ContentJobData
 
-      logger.log(`[Redis Worker] Processing job started`, {
-        jobId: job.id,
-        userId: user_id,
-        contentLength: raw_text?.length || 0,
-        source: metadata?.source || 'unknown',
-        attemptsMade: job.attemptsMade,
-        timestamp: new Date().toISOString(),
-      })
 
       if (!metadata?.memory_id) {
         const user = await prisma.user.findUnique({
@@ -56,12 +48,6 @@ export const startContentWorker = () => {
           })
 
           if (existingByCanonical) {
-            logger.log(`[Redis Worker] Duplicate memory detected, skipping processing`, {
-              jobId: job.id,
-              userId: user_id,
-              existingMemoryId: existingByCanonical.id,
-              timestamp: new Date().toISOString(),
-            })
             return {
               success: true,
               contentId: existingByCanonical.id,
@@ -201,12 +187,6 @@ export const startContentWorker = () => {
         throw new Error('Failed to generate summary after retries')
       }
 
-      logger.log(`[Redis Worker] Summary generated successfully`, {
-        jobId: job.id,
-        userId: user_id,
-        summaryLength: summary.length,
-        timestamp: new Date().toISOString(),
-      })
 
       let extractedMetadata: {
         topics?: string[]
@@ -241,14 +221,6 @@ export const startContentWorker = () => {
         } else {
           extractedMetadata = extractedMetadataResult as typeof extractedMetadata
         }
-        logger.log(`[Redis Worker] Metadata extracted successfully`, {
-          jobId: job.id,
-          userId: user_id,
-          hasTopics: !!extractedMetadata.topics?.length,
-          hasCategories: !!extractedMetadata.categories?.length,
-          hasSentiment: !!extractedMetadata.sentiment,
-          timestamp: new Date().toISOString(),
-        })
       } catch (metadataError) {
         logger.warn(`[Redis Worker] Failed to extract metadata, continuing without it`, {
           jobId: job.id,
@@ -290,28 +262,12 @@ export const startContentWorker = () => {
           },
         })
 
-        logger.log(`[Redis Worker] Memory updated successfully`, {
-          jobId: job.id,
-          userId: user_id,
-          memoryId: metadata.memory_id,
-          timestamp: new Date().toISOString(),
-        })
 
         setImmediate(async () => {
           try {
             const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 7)
             if (shouldUpdate) {
-              logger.log(`[Redis Worker] Triggering profile update`, {
-                jobId: job.id,
-                userId: user_id,
-                timestamp: new Date().toISOString(),
-              })
               await profileUpdateService.updateUserProfile(user_id)
-              logger.log(`[Redis Worker] Profile update completed`, {
-                jobId: job.id,
-                userId: user_id,
-                timestamp: new Date().toISOString(),
-              })
             }
           } catch (profileError) {
             logger.error(`[Redis Worker] Error updating profile:`, profileError)
@@ -362,12 +318,6 @@ export const startContentWorker = () => {
               })
 
               if (existingByCanonical) {
-                logger.log(`[Redis Worker] Duplicate memory detected on create, skipping`, {
-                  jobId: job.id,
-                  userId: user_id,
-                  existingMemoryId: existingByCanonical.id,
-                  timestamp: new Date().toISOString(),
-                })
                 return {
                   success: true,
                   contentId: existingByCanonical.id,
@@ -429,14 +379,6 @@ export const startContentWorker = () => {
         memoryId: metadata?.memory_id || null,
         summary: summary.substring(0, 100) + '...',
       }
-
-      logger.log(`[Redis Worker] Job completed successfully`, {
-        jobId: job.id,
-        userId: user_id,
-        result,
-        processingTime: Date.now() - job.timestamp,
-        timestamp: new Date().toISOString(),
-      })
 
       return result
     },

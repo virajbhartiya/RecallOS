@@ -5,27 +5,13 @@ export const startProfileWorker = async (
   daysSinceLastUpdate: number = 7,
   hoursSinceLastUpdate?: number
 ) => {
-  logger.log('[Profile Worker] Starting batch profile update', {
-    ts: new Date().toISOString(),
-    daysSinceLastUpdate,
-    hoursSinceLastUpdate,
-  })
-
   try {
     const userIds =
       hoursSinceLastUpdate !== undefined
         ? await profileUpdateService.getUsersNeedingUpdateByHours(hoursSinceLastUpdate)
         : await profileUpdateService.getUsersNeedingUpdate(daysSinceLastUpdate)
 
-    logger.log('[Profile Worker] Found users needing update', {
-      ts: new Date().toISOString(),
-      count: userIds.length,
-    })
-
     if (userIds.length === 0) {
-      logger.log('[Profile Worker] No users need profile update', {
-        ts: new Date().toISOString(),
-      })
       return { updated: 0, failed: 0 }
     }
 
@@ -34,11 +20,6 @@ export const startProfileWorker = async (
 
     for (const userId of userIds) {
       try {
-        logger.log('[Profile Worker] Updating profile', {
-          ts: new Date().toISOString(),
-          userId,
-        })
-
         let profile
         try {
           profile = await profileUpdateService.updateUserProfile(userId, true)
@@ -51,10 +32,6 @@ export const startProfileWorker = async (
 
           try {
             profile = await profileUpdateService.updateUserProfile(userId, true)
-            logger.log('[Profile Worker] Profile updated successfully on retry', {
-              ts: new Date().toISOString(),
-              userId,
-            })
           } catch (retryError) {
             logger.error('[Profile Worker] Error updating profile on retry', {
               ts: new Date().toISOString(),
@@ -66,12 +43,6 @@ export const startProfileWorker = async (
         }
 
         updated++
-
-        logger.log('[Profile Worker] Profile updated successfully', {
-          ts: new Date().toISOString(),
-          userId,
-          version: profile.version,
-        })
       } catch (error) {
         failed++
         logger.error('[Profile Worker] Error updating profile', {
@@ -81,13 +52,6 @@ export const startProfileWorker = async (
         })
       }
     }
-
-    logger.log('[Profile Worker] Batch update completed', {
-      ts: new Date().toISOString(),
-      updated,
-      failed,
-      total: userIds.length,
-    })
 
     return { updated, failed }
   } catch (error) {
@@ -114,24 +78,10 @@ export const startCyclicProfileWorker = () => {
   const useHoursBasedUpdate = intervalHours < 24
   const hoursSinceLastUpdate = useHoursBasedUpdate ? intervalHours : undefined
 
-  logger.log('[Profile Worker] Starting cyclic profile update worker', {
-    ts: new Date().toISOString(),
-    intervalHours,
-    intervalMs,
-    daysSinceLastUpdate,
-    useHoursBasedUpdate,
-    hoursSinceLastUpdate,
-  })
 
   const runUpdate = async () => {
     try {
-      logger.log('[Profile Worker] Cyclic update cycle started', {
-        ts: new Date().toISOString(),
-      })
       await startProfileWorker(daysSinceLastUpdate, hoursSinceLastUpdate)
-      logger.log('[Profile Worker] Cyclic update cycle completed', {
-        ts: new Date().toISOString(),
-      })
     } catch (error) {
       logger.error('[Profile Worker] Cyclic update cycle failed', {
         ts: new Date().toISOString(),
@@ -144,10 +94,6 @@ export const startCyclicProfileWorker = () => {
 
   profileWorkerInterval = setInterval(runUpdate, intervalMs)
 
-  logger.log('[Profile Worker] Cyclic profile update worker started', {
-    ts: new Date().toISOString(),
-    nextUpdateIn: `${intervalHours} hours`,
-  })
 
   return profileWorkerInterval
 }
@@ -156,8 +102,5 @@ export const stopCyclicProfileWorker = () => {
   if (profileWorkerInterval) {
     clearInterval(profileWorkerInterval)
     profileWorkerInterval = null
-    logger.log('[Profile Worker] Cyclic profile update worker stopped', {
-      ts: new Date().toISOString(),
-    })
   }
 }

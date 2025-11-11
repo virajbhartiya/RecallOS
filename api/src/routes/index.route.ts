@@ -4,6 +4,7 @@ import contentRouter from './content.route'
 import searchRouter from './search.route'
 import authRouter from './auth.route'
 import profileRouter from './profile.route'
+import insightsRouter from './insights.route'
 
 export const routes = (app: Express) => {
   app.use('/api/memory', memoryRouter)
@@ -12,4 +13,5 @@ export const routes = (app: Express) => {
   app.use('/api/search', searchRouter)
   app.use('/api/auth', authRouter)
   app.use('/api/profile', profileRouter)
+  app.use('/api/insights', insightsRouter)
 }

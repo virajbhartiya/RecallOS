@@ -108,8 +108,15 @@ export class ProfileExtractionService {
         logger.log('Profile extraction succeeded on retry')
         return { ...retryParsed, isFallback: false }
       } catch (retryError) {
-        logger.error('Error extracting profile from memories on retry, using fallback:', retryError)
+        logger.error('Error extracting profile from memories on retry, using fallback:', {
+          error: retryError instanceof Error ? retryError.message : String(retryError),
+          stack: retryError instanceof Error ? retryError.stack : undefined,
+        })
         const fallbackResult = this.extractProfileFallback(memories)
+        logger.log('Using fallback profile extraction', {
+          hasStatic: !!fallbackResult.static_profile_json,
+          hasDynamic: !!fallbackResult.dynamic_profile_json,
+        })
         return { ...fallbackResult, isFallback: true }
       }
     }
@@ -295,6 +302,11 @@ Return ONLY the JSON object:`
     }
 
     if (!data.static_profile_json || !data.dynamic_profile_json) {
+      logger.warn('Invalid profile structure: missing required fields', {
+        hasStatic: !!data.static_profile_json,
+        hasDynamic: !!data.dynamic_profile_json,
+        dataKeys: Object.keys(data),
+      })
       throw new Error('Invalid profile structure: missing required fields')
     }
 

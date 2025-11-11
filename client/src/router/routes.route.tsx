@@ -26,6 +26,9 @@ const Analytics = lazy(() =>
 const Profile = lazy(() =>
   import("@/pages/profile.page").then((module) => ({ default: module.Profile }))
 )
+const Insights = lazy(() =>
+  import("@/pages/insights.page").then((module) => ({ default: module.Insights }))
+)
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -44,6 +47,7 @@ const AppRoutes = () => {
         <Route path="/docs" element={<Docs />} />
         <Route path="/analytics" element={<Analytics />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/insights" element={<Insights />} />
 
         <Route path="*" element={<Landing />} />
       </Routes>
