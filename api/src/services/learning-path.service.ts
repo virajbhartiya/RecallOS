@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.lib'
 import { aiProvider } from './ai-provider.service'
 import { logger } from '../utils/logger.util'
+import { Prisma } from '@prisma/client'
 
 interface LearningRecommendation {
   topic: string
@@ -117,9 +118,9 @@ Return ONLY valid JSON array, no markdown or extra text.`
       await prisma.learningPath.create({
         data: {
           user_id: userId,
-          recommendations: recommendations as unknown as Record<string, unknown>,
-          knowledge_gaps: knowledgeGaps as unknown as Record<string, unknown>,
-          trending_topics: trendingTopics as unknown as Record<string, unknown>,
+          recommendations: recommendations as unknown as Prisma.InputJsonValue,
+          knowledge_gaps: knowledgeGaps as unknown as Prisma.InputJsonValue,
+          trending_topics: trendingTopics as unknown as Prisma.InputJsonValue,
           expires_at: expiresAt,
         },
       })
