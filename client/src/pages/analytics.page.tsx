@@ -8,7 +8,8 @@ export const Analytics: React.FC = () => {
   const navigate = useNavigate()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
-  const [knowledgeScores, setKnowledgeScores] = useState<KnowledgeScores | null>(null)
+  const [knowledgeScores, setKnowledgeScores] =
+    useState<KnowledgeScores | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -142,40 +143,47 @@ export const Analytics: React.FC = () => {
             </p>
           </div>
 
-          {knowledgeScores && (knowledgeScores.velocity || knowledgeScores.impact) && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {knowledgeScores.velocity && (
-                <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
-                  <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">
-                    Knowledge Velocity
+          {knowledgeScores &&
+            (knowledgeScores.velocity || knowledgeScores.impact) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {knowledgeScores.velocity && (
+                  <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
+                    <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">
+                      Knowledge Velocity
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {Math.round(knowledgeScores.velocity.velocityScore)}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      <a
+                        href="/knowledge"
+                        className="text-blue-600 hover:underline"
+                      >
+                        View details →
+                      </a>
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {Math.round(knowledgeScores.velocity.velocityScore)}
+                )}
+                {knowledgeScores.impact && (
+                  <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
+                    <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">
+                      Knowledge Impact
+                    </div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {Math.round(knowledgeScores.impact.impactScore)}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      <a
+                        href="/knowledge"
+                        className="text-blue-600 hover:underline"
+                      >
+                        View details →
+                      </a>
+                    </div>
                   </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    <a href="/knowledge" className="text-blue-600 hover:underline">
-                      View details →
-                    </a>
-                  </div>
-                </div>
-              )}
-              {knowledgeScores.impact && (
-                <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
-                  <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">
-                    Knowledge Impact
-                  </div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {Math.round(knowledgeScores.impact.impactScore)}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-1">
-                    <a href="/knowledge" className="text-blue-600 hover:underline">
-                      View details →
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
 
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">

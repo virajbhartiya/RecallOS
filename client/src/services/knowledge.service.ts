@@ -1,7 +1,7 @@
-import axios from 'axios'
-import { getAuthToken } from '@/utils/user-id.util'
+import { getAuthToken } from "@/utils/user-id.util"
+import axios from "axios"
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000"
 
 interface VelocityMetrics {
   topicRate: number
@@ -19,27 +19,27 @@ interface ImpactMetrics {
   impactScore: number
 }
 
-interface Achievement {
+export interface Achievement {
   badgeType: string
   badgeName: string
   progress: number
   unlocked: boolean
 }
 
-interface LearningRecommendation {
+export interface LearningRecommendation {
   topic: string
   reason: string
   priority: number
   prerequisites?: string[]
 }
 
-interface LearningPath {
+export interface LearningPath {
   recommendations: LearningRecommendation[]
   knowledgeGaps: string[]
   trendingTopics: string[]
 }
 
-interface Benchmarks {
+export interface Benchmarks {
   velocityPercentile: number | null
   impactPercentile: number | null
   connectionPercentile: number | null
@@ -55,27 +55,40 @@ export interface KnowledgeScores {
 
 const getHeaders = () => ({
   Authorization: `Bearer ${getAuthToken()}`,
-  'Content-Type': 'application/json',
+  "Content-Type": "application/json",
 })
 
-export const getVelocity = async (periodType: 'daily' | 'weekly' = 'weekly') => {
-  const response = await axios.get(`${API_URL}/api/knowledge/velocity?period_type=${periodType}`, {
-    headers: getHeaders(),
-  })
+export const getVelocity = async (
+  periodType: "daily" | "weekly" = "weekly"
+) => {
+  const response = await axios.get(
+    `${API_URL}/api/knowledge/velocity?period_type=${periodType}`,
+    {
+      headers: getHeaders(),
+    }
+  )
   return response.data.data
 }
 
-export const getImpact = async (periodType: 'daily' | 'weekly' = 'weekly') => {
-  const response = await axios.get(`${API_URL}/api/knowledge/impact?period_type=${periodType}`, {
-    headers: getHeaders(),
-  })
+export const getImpact = async (periodType: "daily" | "weekly" = "weekly") => {
+  const response = await axios.get(
+    `${API_URL}/api/knowledge/impact?period_type=${periodType}`,
+    {
+      headers: getHeaders(),
+    }
+  )
   return response.data.data
 }
 
-export const getScores = async (periodType: 'daily' | 'weekly' = 'weekly'): Promise<KnowledgeScores> => {
-  const response = await axios.get(`${API_URL}/api/knowledge/scores?period_type=${periodType}`, {
-    headers: getHeaders(),
-  })
+export const getScores = async (
+  periodType: "daily" | "weekly" = "weekly"
+): Promise<KnowledgeScores> => {
+  const response = await axios.get(
+    `${API_URL}/api/knowledge/scores?period_type=${periodType}`,
+    {
+      headers: getHeaders(),
+    }
+  )
   return response.data.data
 }
 
@@ -100,7 +113,9 @@ export const getBenchmarks = async (): Promise<Benchmarks | null> => {
   return response.data.data.benchmarks
 }
 
-export const calculateScores = async (periodType: 'daily' | 'weekly' = 'weekly') => {
+export const calculateScores = async (
+  periodType: "daily" | "weekly" = "weekly"
+) => {
   const response = await axios.post(
     `${API_URL}/api/knowledge/calculate`,
     { period_type: periodType },
@@ -117,4 +132,3 @@ export const setOptIn = async (optIn: boolean) => {
   )
   return response.data
 }
-

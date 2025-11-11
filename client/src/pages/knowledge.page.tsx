@@ -1,18 +1,19 @@
-import React, { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { requireAuthToken } from '@/utils/user-id.util'
+import React, { useEffect, useState } from "react"
 import {
-  getScores,
-  getAchievements,
-  getLearningPath,
-  getBenchmarks,
   calculateScores,
-  type KnowledgeScores,
+  getAchievements,
+  getBenchmarks,
+  getLearningPath,
+  getScores,
   type Achievement,
-  type LearningPath,
   type Benchmarks,
-} from '@/services/knowledge.service'
-import { toast } from 'sonner'
+  type KnowledgeScores,
+  type LearningPath,
+  type LearningRecommendation,
+} from "@/services/knowledge.service"
+import { requireAuthToken } from "@/utils/user-id.util"
+import { useNavigate } from "react-router-dom"
+import { toast } from "sonner"
 
 export const Knowledge: React.FC = () => {
   const navigate = useNavigate()
@@ -29,7 +30,7 @@ export const Knowledge: React.FC = () => {
       requireAuthToken()
       setIsAuthenticated(true)
     } catch (error) {
-      navigate('/login')
+      navigate("/login")
     }
   }, [navigate])
 
@@ -39,19 +40,20 @@ export const Knowledge: React.FC = () => {
     const fetchData = async () => {
       try {
         setIsLoading(true)
-        const [scoresData, achievementsData, pathData, benchmarksData] = await Promise.all([
-          getScores(),
-          getAchievements(),
-          getLearningPath(),
-          getBenchmarks(),
-        ])
+        const [scoresData, achievementsData, pathData, benchmarksData] =
+          await Promise.all([
+            getScores(),
+            getAchievements(),
+            getLearningPath(),
+            getBenchmarks(),
+          ])
         setScores(scoresData)
         setAchievements(achievementsData)
         setLearningPath(pathData)
         setBenchmarks(benchmarksData)
       } catch (err) {
-        console.error('Error fetching knowledge data:', err)
-        toast.error('Failed to load knowledge data')
+        console.error("Error fetching knowledge data:", err)
+        toast.error("Failed to load knowledge data")
       } finally {
         setIsLoading(false)
       }
@@ -69,13 +71,16 @@ export const Knowledge: React.FC = () => {
           toast.success(`Achievement unlocked: ${badge}!`)
         })
       }
-      const [scoresData, achievementsData] = await Promise.all([getScores(), getAchievements()])
+      const [scoresData, achievementsData] = await Promise.all([
+        getScores(),
+        getAchievements(),
+      ])
       setScores(scoresData)
       setAchievements(achievementsData)
-      toast.success('Scores calculated successfully')
+      toast.success("Scores calculated successfully")
     } catch (err) {
-      console.error('Error calculating scores:', err)
-      toast.error('Failed to calculate scores')
+      console.error("Error calculating scores:", err)
+      toast.error("Failed to calculate scores")
     } finally {
       setIsCalculating(false)
     }
@@ -88,20 +93,22 @@ export const Knowledge: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-sm font-mono text-gray-600">Loading knowledge dashboard...</div>
+        <div className="text-sm font-mono text-gray-600">
+          Loading knowledge dashboard...
+        </div>
       </div>
     )
   }
 
   const formatScore = (score: number | null | undefined): string => {
-    if (score === null || score === undefined) return 'N/A'
+    if (score === null || score === undefined) return "N/A"
     return Math.round(score).toString()
   }
 
   const getScoreColor = (score: number): string => {
-    if (score >= 80) return 'text-green-600'
-    if (score >= 60) return 'text-yellow-600'
-    return 'text-red-600'
+    if (score >= 80) return "text-green-600"
+    if (score >= 60) return "text-yellow-600"
+    return "text-red-600"
   }
 
   return (
@@ -111,7 +118,7 @@ export const Knowledge: React.FC = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 sm:gap-6">
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate("/")}
                 className="text-sm font-medium text-gray-700 hover:text-black transition-colors"
               >
                 ← Home
@@ -121,7 +128,9 @@ export const Knowledge: React.FC = () => {
                 <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold text-lg font-mono">
                   K
                 </div>
-                <div className="text-sm font-medium text-gray-900">Knowledge Dashboard</div>
+                <div className="text-sm font-medium text-gray-900">
+                  Knowledge Dashboard
+                </div>
               </div>
             </div>
             <button
@@ -129,7 +138,7 @@ export const Knowledge: React.FC = () => {
               disabled={isCalculating}
               className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors disabled:opacity-50"
             >
-              {isCalculating ? 'Calculating...' : 'Calculate Scores'}
+              {isCalculating ? "Calculating..." : "Calculate Scores"}
             </button>
           </div>
         </div>
@@ -140,54 +149,78 @@ export const Knowledge: React.FC = () => {
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white border border-gray-200 rounded p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-gray-900 mb-2">Knowledge Velocity Score</h2>
-              <div className={`text-4xl font-bold ${getScoreColor(scores?.velocity?.velocityScore || 0)}`}>
+              <h2 className="text-sm font-semibold text-gray-900 mb-2">
+                Knowledge Velocity Score
+              </h2>
+              <div
+                className={`text-4xl font-bold ${getScoreColor(scores?.velocity?.velocityScore || 0)}`}
+              >
                 {formatScore(scores?.velocity?.velocityScore)}
               </div>
               {scores?.velocity && (
                 <div className="mt-4 space-y-1 text-xs text-gray-600">
                   <div className="flex justify-between">
                     <span>Topic Rate:</span>
-                    <span className="font-semibold">{formatScore(scores.velocity.topicRate)}</span>
+                    <span className="font-semibold">
+                      {formatScore(scores.velocity.topicRate)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Diversity:</span>
-                    <span className="font-semibold">{formatScore(scores.velocity.diversityIndex)}</span>
+                    <span className="font-semibold">
+                      {formatScore(scores.velocity.diversityIndex)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Consistency:</span>
-                    <span className="font-semibold">{formatScore(scores.velocity.consistencyScore)}</span>
+                    <span className="font-semibold">
+                      {formatScore(scores.velocity.consistencyScore)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Depth Balance:</span>
-                    <span className="font-semibold">{formatScore(scores.velocity.depthBalance)}</span>
+                    <span className="font-semibold">
+                      {formatScore(scores.velocity.depthBalance)}
+                    </span>
                   </div>
                 </div>
               )}
             </div>
 
             <div className="bg-white border border-gray-200 rounded p-6 shadow-sm">
-              <h2 className="text-sm font-semibold text-gray-900 mb-2">Knowledge Impact Score</h2>
-              <div className={`text-4xl font-bold ${getScoreColor(scores?.impact?.impactScore || 0)}`}>
+              <h2 className="text-sm font-semibold text-gray-900 mb-2">
+                Knowledge Impact Score
+              </h2>
+              <div
+                className={`text-4xl font-bold ${getScoreColor(scores?.impact?.impactScore || 0)}`}
+              >
                 {formatScore(scores?.impact?.impactScore)}
               </div>
               {scores?.impact && (
                 <div className="mt-4 space-y-1 text-xs text-gray-600">
                   <div className="flex justify-between">
                     <span>Search Frequency:</span>
-                    <span className="font-semibold">{formatScore(scores.impact.searchFrequency)}</span>
+                    <span className="font-semibold">
+                      {formatScore(scores.impact.searchFrequency)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Recall Efficiency:</span>
-                    <span className="font-semibold">{formatScore(scores.impact.recallEfficiency)}</span>
+                    <span className="font-semibold">
+                      {formatScore(scores.impact.recallEfficiency)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Connection Strength:</span>
-                    <span className="font-semibold">{formatScore(scores.impact.connectionStrength)}</span>
+                    <span className="font-semibold">
+                      {formatScore(scores.impact.connectionStrength)}
+                    </span>
                   </div>
                   <div className="flex justify-between">
                     <span>Access Quality:</span>
-                    <span className="font-semibold">{formatScore(scores.impact.accessQuality)}</span>
+                    <span className="font-semibold">
+                      {formatScore(scores.impact.accessQuality)}
+                    </span>
                   </div>
                 </div>
               )}
@@ -196,7 +229,9 @@ export const Knowledge: React.FC = () => {
 
           {benchmarks && (
             <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-gray-900 mb-3">Your Rankings</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">
+                Your Rankings
+              </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
                 {benchmarks.velocityPercentile !== null && (
                   <div>
@@ -235,25 +270,35 @@ export const Knowledge: React.FC = () => {
           )}
 
           <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">Achievements</h2>
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">
+              Achievements
+            </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
               {achievements.map((achievement) => (
                 <div
                   key={achievement.badgeType}
                   className={`p-3 border rounded ${
-                    achievement.unlocked ? 'border-green-500 bg-green-50' : 'border-gray-200'
+                    achievement.unlocked
+                      ? "border-green-500 bg-green-50"
+                      : "border-gray-200"
                   }`}
                 >
-                  <div className="text-xs font-medium text-gray-900 mb-1">{achievement.badgeName}</div>
+                  <div className="text-xs font-medium text-gray-900 mb-1">
+                    {achievement.badgeName}
+                  </div>
                   <div className="w-full bg-gray-200 rounded-full h-1.5 mb-1">
                     <div
                       className={`h-1.5 rounded-full ${
-                        achievement.unlocked ? 'bg-green-500' : 'bg-gray-400'
+                        achievement.unlocked ? "bg-green-500" : "bg-gray-400"
                       }`}
-                      style={{ width: `${Math.min(100, achievement.progress)}%` }}
+                      style={{
+                        width: `${Math.min(100, achievement.progress)}%`,
+                      }}
                     ></div>
                   </div>
-                  <div className="text-xs text-gray-600">{Math.round(achievement.progress)}%</div>
+                  <div className="text-xs text-gray-600">
+                    {Math.round(achievement.progress)}%
+                  </div>
                 </div>
               ))}
             </div>
@@ -261,28 +306,44 @@ export const Knowledge: React.FC = () => {
 
           {learningPath && (
             <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
-              <h2 className="text-sm font-semibold text-gray-900 mb-3">Learning Path</h2>
+              <h2 className="text-sm font-semibold text-gray-900 mb-3">
+                Learning Path
+              </h2>
               {learningPath.recommendations.length > 0 ? (
                 <div className="space-y-2">
-                  {learningPath.recommendations.map((rec, index) => (
-                    <div key={index} className="p-3 border border-gray-200 rounded">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-900">{rec.topic}</div>
-                          <div className="text-xs text-gray-600 mt-1">{rec.reason}</div>
-                          {rec.prerequisites && rec.prerequisites.length > 0 && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Prerequisites: {rec.prerequisites.join(', ')}
+                  {learningPath.recommendations.map(
+                    (rec: LearningRecommendation, index: number) => (
+                      <div
+                        key={index}
+                        className="p-3 border border-gray-200 rounded"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900">
+                              {rec.topic}
                             </div>
-                          )}
+                            <div className="text-xs text-gray-600 mt-1">
+                              {rec.reason}
+                            </div>
+                            {rec.prerequisites &&
+                              rec.prerequisites.length > 0 && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  Prerequisites: {rec.prerequisites.join(", ")}
+                                </div>
+                              )}
+                          </div>
+                          <div className="text-xs font-semibold text-gray-600">
+                            Priority: {rec.priority}
+                          </div>
                         </div>
-                        <div className="text-xs font-semibold text-gray-600">Priority: {rec.priority}</div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  )}
                 </div>
               ) : (
-                <div className="text-xs text-gray-500">No recommendations available</div>
+                <div className="text-xs text-gray-500">
+                  No recommendations available
+                </div>
               )}
             </div>
           )}
@@ -291,4 +352,3 @@ export const Knowledge: React.FC = () => {
     </div>
   )
 }
-
