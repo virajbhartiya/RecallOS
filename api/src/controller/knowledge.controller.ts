@@ -229,11 +229,14 @@ export class KnowledgeController {
         periodStart,
         periodEnd,
         velocityMetrics,
-        impactMetrics
+        {
+          searchFrequency: impactMetrics.searchFrequency,
+          recallEfficiency: impactMetrics.recallEfficiency,
+          connectionStrength: impactMetrics.connectionStrength,
+          accessQuality: impactMetrics.accessQuality,
+          impactScore: impactMetrics.impactScore,
+        }
       )
-
-      const impactScore = impactMetrics.impactScore
-      await knowledgeImpactService.getLatestScore(userId, periodType)
 
       const newlyUnlocked = await achievementService.checkAndAwardAchievements(userId)
 

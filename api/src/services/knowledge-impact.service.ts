@@ -169,5 +169,43 @@ export const knowledgeImpactService = {
       return []
     }
   },
+
+  async saveImpactScore(
+    userId: string,
+    periodType: PeriodType,
+    periodStart: Date,
+    periodEnd: Date,
+    metrics: ImpactMetrics,
+    velocityMetrics: {
+      topicRate: number
+      diversityIndex: number
+      consistencyScore: number
+      depthBalance: number
+    }
+  ): Promise<void> {
+    try {
+      await prisma.knowledgeScore.create({
+        data: {
+          user_id: userId,
+          period_type: periodType,
+          period_start: periodStart,
+          period_end: periodEnd,
+          velocity_score: 0,
+          impact_score: metrics.impactScore,
+          topic_rate: velocityMetrics.topicRate,
+          diversity_index: velocityMetrics.diversityIndex,
+          consistency_score: velocityMetrics.consistencyScore,
+          depth_balance: velocityMetrics.depthBalance,
+          search_frequency: metrics.searchFrequency,
+          recall_efficiency: metrics.recallEfficiency,
+          connection_strength: metrics.connectionStrength,
+          access_quality: metrics.accessQuality,
+        },
+      })
+    } catch (error) {
+      logger.error('Error saving impact score:', error)
+      throw error
+    }
+  },
 }
 

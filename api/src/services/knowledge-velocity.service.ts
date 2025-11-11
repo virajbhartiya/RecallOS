@@ -191,6 +191,7 @@ export const knowledgeVelocityService = {
       recallEfficiency: number
       connectionStrength: number
       accessQuality: number
+      impactScore: number
     }
   ): Promise<void> {
     try {
@@ -201,7 +202,7 @@ export const knowledgeVelocityService = {
           period_start: periodStart,
           period_end: periodEnd,
           velocity_score: metrics.velocityScore,
-          impact_score: 0,
+          impact_score: impactMetrics.impactScore || 0,
           topic_rate: metrics.topicRate,
           diversity_index: metrics.diversityIndex,
           consistency_score: metrics.consistencyScore,
