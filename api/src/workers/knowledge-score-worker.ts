@@ -17,33 +17,81 @@ export const startKnowledgeScoreWorker = async () => {
         const dailyStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
         const weeklyStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-        const [dailyVelocity, dailyImpact, weeklyVelocity, weeklyImpact] = await Promise.all([
-          knowledgeVelocityService.calculateVelocityScore(user.id, 'daily', dailyStart, now),
-          knowledgeImpactService.calculateImpactScore(user.id, 'daily', dailyStart, now),
-          knowledgeVelocityService.calculateVelocityScore(user.id, 'weekly', weeklyStart, now),
-          knowledgeImpactService.calculateImpactScore(user.id, 'weekly', weeklyStart, now),
+        const [existingDaily, existingWeekly] = await Promise.all([
+          prisma.knowledgeScore.findFirst({
+            where: {
+              user_id: user.id,
+              period_type: 'daily',
+              period_start: {
+                gte: dailyStart,
+                lt: new Date(dailyStart.getTime() + 24 * 60 * 60 * 1000),
+              },
+            },
+          }),
+          prisma.knowledgeScore.findFirst({
+            where: {
+              user_id: user.id,
+              period_type: 'weekly',
+              period_start: {
+                gte: weeklyStart,
+              },
+            },
+          }),
         ])
 
-        if (dailyVelocity && dailyImpact) {
-          await knowledgeVelocityService.saveVelocityScore(
-            user.id,
-            'daily',
-            dailyStart,
-            now,
-            dailyVelocity,
-            dailyImpact
-          )
+        if (!existingDaily) {
+          const [dailyVelocity, dailyImpact] = await Promise.all([
+            knowledgeVelocityService.calculateVelocityScore(user.id, 'daily', dailyStart, now),
+            knowledgeImpactService.calculateImpactScore(user.id, 'daily', dailyStart, now),
+          ])
+
+          if (dailyVelocity && dailyImpact) {
+            await knowledgeVelocityService.saveVelocityScore(
+              user.id,
+              'daily',
+              dailyStart,
+              now,
+              dailyVelocity,
+              dailyImpact
+            )
+            logger.log('[Knowledge Score Worker] Created daily score', { userId: user.id })
+          }
         }
 
-        if (weeklyVelocity && weeklyImpact) {
-          await knowledgeVelocityService.saveVelocityScore(
-            user.id,
-            'weekly',
-            weeklyStart,
-            now,
-            weeklyVelocity,
-            weeklyImpact
-          )
+        if (!existingWeekly) {
+          const [weeklyVelocity, weeklyImpact] = await Promise.all([
+            knowledgeVelocityService.calculateVelocityScore(user.id, 'weekly', weeklyStart, now),
+            knowledgeImpactService.calculateImpactScore(user.id, 'weekly', weeklyStart, now),
+          ])
+
+          if (weeklyVelocity && weeklyImpact) {
+            await knowledgeVelocityService.saveVelocityScore(
+              user.id,
+              'weekly',
+              weeklyStart,
+              now,
+              weeklyVelocity,
+              weeklyImpact
+            )
+            logger.log('[Knowledge Score Worker] Created weekly score', { userId: user.id })
+          }
+        } else {
+          const [weeklyVelocity, weeklyImpact] = await Promise.all([
+            knowledgeVelocityService.calculateVelocityScore(user.id, 'weekly', weeklyStart, now),
+            knowledgeImpactService.calculateImpactScore(user.id, 'weekly', weeklyStart, now),
+          ])
+
+          if (weeklyVelocity && weeklyImpact) {
+            await knowledgeVelocityService.saveVelocityScore(
+              user.id,
+              'weekly',
+              weeklyStart,
+              now,
+              weeklyVelocity,
+              weeklyImpact
+            )
+            logger.log('[Knowledge Score Worker] Updated weekly score', { userId: user.id })
+          }
         }
 
         await achievementService.checkAndAwardAchievements(user.id)
@@ -71,7 +119,7 @@ export const startCyclicKnowledgeScoreWorker = () => {
     clearInterval(knowledgeScoreWorkerInterval)
   }
 
-  knowledgeScoreWorkerInterval = setInterval(async () => {
+  const runWorker = async () => {
     try {
       await startKnowledgeScoreWorker()
     } catch (error) {
@@ -79,7 +127,11 @@ export const startCyclicKnowledgeScoreWorker = () => {
         error: error instanceof Error ? error.message : String(error),
       })
     }
-  }, intervalHours * 60 * 60 * 1000)
+  }
+
+  runWorker()
+
+  knowledgeScoreWorkerInterval = setInterval(runWorker, intervalHours * 60 * 60 * 1000)
 
   logger.log('[Knowledge Score Worker] Started cyclic worker', {
     intervalHours,
