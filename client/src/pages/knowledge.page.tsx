@@ -8,10 +8,34 @@ import {
   getBenchmarks,
   calculateScores,
   type KnowledgeScores,
-  type Achievement,
-  type LearningPath,
-  type Benchmarks,
 } from '@/services/knowledge.service'
+
+interface Achievement {
+  badgeType: string
+  badgeName: string
+  progress: number
+  unlocked: boolean
+}
+
+interface LearningRecommendation {
+  topic: string
+  reason: string
+  priority: number
+  prerequisites?: string[]
+}
+
+interface LearningPath {
+  recommendations: LearningRecommendation[]
+  knowledgeGaps: string[]
+  trendingTopics: string[]
+}
+
+interface Benchmarks {
+  velocityPercentile: number | null
+  impactPercentile: number | null
+  connectionPercentile: number | null
+  diversityPercentile: number | null
+}
 import { toast } from 'sonner'
 
 export const Knowledge: React.FC = () => {
@@ -396,7 +420,7 @@ export const Knowledge: React.FC = () => {
                     Learning Path
                   </h2>
                   <div className="space-y-3">
-                    {learningPath.recommendations.map((rec, index) => (
+                    {learningPath.recommendations.map((rec: LearningRecommendation, index: number) => (
                       <div
                         key={index}
                         className="p-4 border-2 border-gray-200 rounded-xl hover:border-purple-300 hover:shadow-md transition-all bg-gradient-to-r from-white to-gray-50"
