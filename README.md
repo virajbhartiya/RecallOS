@@ -7,41 +7,17 @@
 
 ### Prerequisites
 - Node.js 18+
-- PostgreSQL 14+
-- Qdrant (for vector embeddings storage)
-- Redis (for background jobs)
+- Docker and Docker Compose
 - Gemini API key or Ollama (for AI)
 
-### 1. Database Setup
-
-#### PostgreSQL
+### 1. Start Databases
 
 ```bash
-# Install PostgreSQL
-# macOS
-brew install postgresql@14
-
-# Start PostgreSQL
-brew services start postgresql@14
-
-# Create database
-createdb recallos
-```
-
-#### Qdrant Vector Database
-
-Qdrant is used for storing and searching memory embeddings. You can run it using Docker:
-
-```bash
-# Using Docker Compose (recommended)
 cd api
-docker-compose up -d qdrant
-
-# Or using Docker directly
-docker run -p 6333:6333 -p 6334:6334 -v $(pwd)/qdrant_storage:/qdrant/storage qdrant/qdrant
+docker compose up -d
 ```
 
-Qdrant will be available at `http://localhost:6333` (web UI) and `http://localhost:6334` (gRPC).
+This starts PostgreSQL, Qdrant, and Redis. Qdrant will be available at `http://localhost:6333` (web UI) and `http://localhost:6334` (gRPC).
 
 The API will automatically create the `memory_embeddings` collection on startup with the configured embedding dimension and payload indexes.
 
@@ -70,10 +46,7 @@ cp .env.example .env
 # Run migrations
 npm run db:migrate
 
-# Start all services (PostgreSQL, Qdrant, Redis)
-npm run docker:up
-
-# Or start API server only
+# Start API server
 npm start
 # Server runs on http://localhost:3000
 ```
@@ -241,215 +214,31 @@ npm run build
 
 ---
 
-## API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - Register new user (email/password)
-- `POST /api/auth/login` - Login with email/password
-- `POST /api/auth/logout` - Logout and clear session
-- `GET /api/auth/me` - Get current authenticated user
-- `POST /api/auth/extension-token` - Generate token for extension
-- `POST /api/auth/session` - Set session cookie (demo)
-- `DELETE /api/auth/session` - Clear session cookie
-
-### Memory Management
-- `POST /api/memory/process` - Queue content for processing (authenticated)
-- `POST /api/memory/` - Store new memory (authenticated)
-- `POST /api/memory/batch` - Store multiple memories (authenticated)
-- `GET /api/memory/user/:userId/recent` - Get recent memories (authenticated)
-- `GET /api/memory/user/:userId/count` - Get memory count (authenticated)
-- `GET /api/memory/user/:userId/memory/:index` - Get memory by index (authenticated)
-- `GET /api/memory/insights` - Analytics and insights (authenticated)
-
-### Memory Mesh
-- `GET /api/memory/mesh/:userId` - Get full graph (authenticated)
-- `GET /api/memory/relations/:memoryId` - Get memory with edges (authenticated)
-- `GET /api/memory/cluster/:memoryId` - Get memory cluster (authenticated)
-
-### Search
-- `POST /api/search` - Semantic search with AI answer (authenticated)
-- `GET /api/search/job/:id` - Search job status
-- `POST /api/search/context` - Context-only search
-- `GET /api/memory/search` - Keyword search (authenticated)
-- `GET /api/memory/search-embeddings` - Semantic search with filters (authenticated)
-- `GET /api/memory/search-hybrid` - Hybrid search (authenticated)
-
-### Content Queue
-- `POST /api/content/submit` - Queue content for processing (authenticated)
-- `GET /api/content/:user_id` - Get processed content (authenticated)
-
----
-
 ## Usage
 
-### Capturing Memories
+RecallOS provides multiple ways to capture and interact with your knowledge:
 
-**Via Browser Extension:**
-1. Install and configure extension
-2. Browse the web normally
-3. Extension auto-captures pages you visit
-4. Check web client to see captured memories
+- **Browser Extension**: Automatically captures web content as you browse, with smart deduplication and privacy-aware detection
+- **Web Client**: Manual memory entry with rich editing and visualization tools
+- **SDK/MCP Integration**: Programmatic access for custom integrations and automation
 
-**Via Web Client:**
-1. Register or login to your account
-2. Navigate to Memories page
-3. Click "Add Memory" button
-4. Paste content or URL
-5. Submit for processing
+Once captured, memories are automatically processed with AI-powered summarization, metadata extraction, and vector embeddings. The system builds a knowledge graph connecting related memories through semantic, topical, and temporal relationships.
 
-**Via SDK:**
-```typescript
-import { createRecallOSClient } from '@recallos/sdk'
+Search your knowledge base using natural language queries. The system performs semantic search across vector embeddings and generates AI-powered answers with inline citations to source memories. Results can be exported for use with ChatGPT or Claude.
 
-const client = createRecallOSClient({
-  baseURL: 'http://localhost:3000',
-  token: 'your-jwt-token'
-})
-
-await client.memory.process({
-  content: 'Your content here...',
-  url: 'https://example.com',
-  title: 'Example Page',
-  metadata: { source: 'sdk' }
-})
-```
-
-### Searching Memories
-
-**Web Client:**
-1. Navigate to Search page
-2. Enter query: "machine learning algorithms"
-3. View AI-generated answer with citations
-4. Click citations to view source memories
-5. Export context for ChatGPT if needed
-
-**API:**
-```bash
-curl -X POST http://localhost:3000/api/search \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -d '{
-    "query": "machine learning",
-    "limit": 10
-  }'
-```
-
-**SDK:**
-```typescript
-const results = await client.search.search({
-  query: 'machine learning',
-  limit: 10
-})
-
-console.log(results.answer) // AI-generated answer
-console.log(results.citations) // Source memories
-```
-
-### Viewing Memory Mesh
-
-**Web Client:**
-1. Navigate to Memories page
-2. Click "View Mesh" button
-3. Interact with 3D force-directed graph
-4. Zoom, pan, click nodes
-5. Nodes colored by source type
-6. Edge thickness = similarity strength
-
-**API:**
-```bash
-curl http://localhost:3000/api/memory/mesh/YOUR_USER_ID?limit=50&threshold=0.3 \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
-### Authentication
-
-**Web Client:**
-1. Navigate to Login page
-2. Register with email/password or login with existing account
-3. Session cookie is automatically set
-4. All API requests include authentication automatically
-
-**API:**
-```bash
-# Register
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "securepassword"
-  }'
-
-# Login
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "password": "securepassword"
-  }' \
-  -c cookies.txt
-
-# Use session cookie for authenticated requests
-curl http://localhost:3000/api/memory/insights \
-  -b cookies.txt
-```
+Visualize your knowledge as an interactive 3D force-directed graph, where nodes represent memories and edges show relationships. The graph is color-coded by source type and edge thickness indicates relationship strength.
 
 ---
 
 ## Development
 
-### Running Tests
+**Tests**: `cd api && npm test`
 
-**API:**
-```bash
-cd api
-npm test
-```
+**Formatting**: `npm run format` (api/extension) or `npx prettier --write .` (client)
 
-### Code Formatting
+**Database**: `npm run db:migrate` (migrations), `npm run db:generate` (Prisma client), `npm run db:studio` (Prisma Studio), `npm run db:reset` (⚠️ deletes all data)
 
-```bash
-# API
-cd api
-npm run format
-
-# Client
-cd client
-npx prettier --write .
-
-# Extension
-cd extension
-npm run format
-```
-
-### Database Migrations
-
-```bash
-cd api
-
-# Create new migration
-npm run db:migrate
-
-# Generate Prisma client
-npm run db:generate
-
-# Reset database (WARNING: deletes all data)
-npm run db:reset
-
-# Open Prisma Studio
-npm run db:studio
-```
-
-### Qdrant Management
-
-```bash
-cd api
-
-# Clean Qdrant collection (WARNING: deletes all embeddings)
-npm run clean:qdrant
-
-# Clean everything (Qdrant + database)
-npm run clean:all
-```
+**Qdrant**: `npm run clean:qdrant` (⚠️ deletes embeddings), `npm run clean:all` (⚠️ deletes everything)
 
 ---
 
@@ -480,93 +269,28 @@ npm run clean:all
 
 ## Troubleshooting
 
-### Extension not capturing
-- Check extension is enabled
-- Verify API endpoint is correct
-- Check authentication token is set
-- Look for errors in browser console
-- Ensure content is > 50 characters
+**Extension not capturing**: Verify extension is enabled, API endpoint is correct, and authentication token is set. Check browser console for errors.
 
-### Search returns no results
-- Verify user has memories stored
-- Check authentication token is valid
-- Ensure embeddings were generated
-- Review API logs for errors
-- Try different search query
+**Search returns no results**: Ensure memories exist, embeddings were generated, and authentication is valid. Review API logs.
 
-### Authentication failed
-- Verify email and password are correct
-- Check JWT_SECRET is set in API environment
-- Ensure cookies are enabled in browser
-- Check CORS configuration allows your origin
-- Review API logs for authentication errors
+**Authentication failed**: Verify credentials, check JWT_SECRET is set, ensure cookies are enabled, and review CORS configuration.
 
-### AI processing slow
-- Gemini API may be rate-limited
-- Try switching to Ollama (local)
-- Check network connection
-- Review AI_PROVIDER setting
-- Increase timeouts if needed
+**AI processing slow**: Gemini API may be rate-limited. Try switching to Ollama (local) or check network connection.
 
-### Database connection failed
-- Verify PostgreSQL is running
-- Check DATABASE_URL is correct
-- Test connection with psql
-- Review database logs
-
-### Qdrant connection failed
-- Verify Qdrant is running (check `http://localhost:6333/health`)
-- Check QDRANT_URL is correct (default: http://localhost:6333)
-- If using Qdrant Cloud, verify QDRANT_API_KEY is set
-- Check EMBEDDING_DIMENSION matches your embedding model (default: 768)
-- Review Qdrant logs: `docker-compose logs qdrant`
+**Database/Qdrant connection failed**: Verify services are running, check connection URLs, and review service logs. For Qdrant, check `http://localhost:6333/health`.
 
 ---
 
 ## Performance
 
-### Ingestion
-- **Synchronous**: 2-5 seconds
-- **Async processing**: 5-30 seconds
-- **Throughput**: 10-20 memories/minute
-
-### Search
-- **Vector similarity**: < 100ms (Qdrant)
-- **AI answer**: 5-15 seconds
-- **Total**: 5-20 seconds
-
-### Database
-- **Memory capacity**: 1M+ memories
-- **Relations capacity**: 10M+ edges
-- **Query performance**: < 100ms
-- **Embedding storage**: Qdrant handles all vector embeddings
+- **Ingestion**: 2-5s synchronous, 5-30s async processing, 10-20 memories/minute throughput
+- **Search**: <100ms vector similarity (Qdrant), 5-15s AI answer generation
+- **Database**: 1M+ memories, 10M+ relations, <100ms query performance
 
 ---
 
 ## Security
 
-- **Authentication**: JWT-based with secure password hashing (bcryptjs)
-- **Session Management**: HttpOnly, Secure cookies for web clients
-- **Data Isolation**: User-scoped queries with authentication middleware
-- **SQL Injection**: Prevented via Prisma ORM
-- **XSS**: React auto-escaping
-- **CORS**: Allowlisted origins with credentials support
-- **Rate Limiting**: To be implemented
-- **Password Security**: Hashed with 12 salt rounds
+JWT-based authentication with bcryptjs password hashing (12 rounds). HttpOnly, Secure session cookies for web clients. User-scoped data isolation via authentication middleware. SQL injection prevented via Prisma ORM. XSS protection via React auto-escaping. CORS with allowlisted origins and credentials support.
 
----
-
-## Cookies, CORS, and Local HTTPS
-
-- API issues `HttpOnly; Secure; SameSite=None` session cookies on your domain.
-- CORS echoes only allowlisted origins and enables `credentials: true`.
-- SPA uses `axios` with `withCredentials: true`; extension uses `fetch` with `credentials: 'include'`.
-
-### Environment variables
-- API: `SESSION_COOKIE_NAME`, `COOKIE_DOMAIN`, `CORS_ALLOWED_ORIGINS`, `EXTENSION_IDS`, `COOKIE_SECURE`, `HTTPS_ENABLE`, `HTTPS_KEY_PATH`, `HTTPS_CERT_PATH`.
-- Client: `VITE_SERVER_URL`, `VITE_HTTPS_ENABLE`, `VITE_HTTPS_KEY_PATH`, `VITE_HTTPS_CERT_PATH`, `VITE_DEV_HOST`, `VITE_DEV_PORT`.
-
-### Local HTTPS (mkcert)
-See `cookie.plan.md` for the full step-by-step. For dev HTTPS:
-- API: set `HTTPS_ENABLE=true` and point to mkcert key/cert.
-- Client: set `VITE_HTTPS_ENABLE=true` and point to mkcert key/cert.
+**Cookies & CORS**: API issues `HttpOnly; Secure; SameSite=None` cookies. CORS allows only configured origins with `credentials: true`. For local HTTPS, see `cookie.plan.md` or set `HTTPS_ENABLE=true` with mkcert key/cert paths.
