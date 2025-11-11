@@ -9,6 +9,7 @@ import {
   calculateScores,
   type KnowledgeScores,
 } from '@/services/knowledge.service'
+import { toast } from 'sonner'
 
 interface Achievement {
   badgeType: string
@@ -36,7 +37,6 @@ interface Benchmarks {
   connectionPercentile: number | null
   diversityPercentile: number | null
 }
-import { toast } from 'sonner'
 
 export const Knowledge: React.FC = () => {
   const navigate = useNavigate()
