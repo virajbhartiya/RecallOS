@@ -1,7 +1,7 @@
 import { getRequest, postRequest } from "../utils/general-services.util"
 import { requireAuthToken } from "../utils/user-id.util"
 
-export type PeriodType = 'daily' | 'weekly'
+export type PeriodType = "daily" | "weekly"
 
 export interface BrowsingSummary {
   id: string
@@ -30,11 +30,13 @@ export interface SummaryResponse {
   summary: BrowsingSummary
 }
 
-export async function getSummaries(periodType?: PeriodType): Promise<SummariesResponse> {
+export async function getSummaries(
+  periodType?: PeriodType
+): Promise<SummariesResponse> {
   requireAuthToken()
 
   try {
-    const params = periodType ? `?period_type=${periodType}` : ''
+    const params = periodType ? `?period_type=${periodType}` : ""
     const response = await getRequest(`/insights/summaries${params}`)
 
     if (response.data?.success === false) {
@@ -49,14 +51,18 @@ export async function getSummaries(periodType?: PeriodType): Promise<SummariesRe
   }
 }
 
-export async function getLatestSummary(periodType: PeriodType = 'daily'): Promise<BrowsingSummary | null> {
+export async function getLatestSummary(
+  periodType: PeriodType = "daily"
+): Promise<BrowsingSummary | null> {
   requireAuthToken()
 
   try {
-    const response = await getRequest(`/insights/summaries/latest?period_type=${periodType}`)
+    const response = await getRequest(
+      `/insights/summaries/latest?period_type=${periodType}`
+    )
 
     if (response.data?.success === false) {
-      if (response.data?.error === 'No summary found') {
+      if (response.data?.error === "No summary found") {
         return null
       }
       console.error("API error:", response.data?.error)
@@ -70,14 +76,16 @@ export async function getLatestSummary(periodType: PeriodType = 'daily'): Promis
   }
 }
 
-export async function getSummaryById(id: string): Promise<BrowsingSummary | null> {
+export async function getSummaryById(
+  id: string
+): Promise<BrowsingSummary | null> {
   requireAuthToken()
 
   try {
     const response = await getRequest(`/insights/summaries/${id}`)
 
     if (response.data?.success === false) {
-      if (response.data?.error === 'Summary not found') {
+      if (response.data?.error === "Summary not found") {
         return null
       }
       console.error("API error:", response.data?.error)
@@ -91,16 +99,21 @@ export async function getSummaryById(id: string): Promise<BrowsingSummary | null
   }
 }
 
-export async function generateSummary(periodType: PeriodType, date?: string): Promise<SummaryResponse> {
+export async function generateSummary(
+  periodType: PeriodType,
+  date?: string
+): Promise<SummaryResponse> {
   requireAuthToken()
 
   try {
-    const body: { period_type: PeriodType; date?: string } = { period_type: periodType }
+    const body: { period_type: PeriodType; date?: string } = {
+      period_type: periodType,
+    }
     if (date) {
       body.date = date
     }
 
-    const response = await postRequest('/insights/summaries/generate', body)
+    const response = await postRequest("/insights/summaries/generate", body)
 
     if (response.data?.success === false) {
       console.error("API error:", response.data?.error)
@@ -113,4 +126,3 @@ export async function generateSummary(periodType: PeriodType, date?: string): Pr
     throw error
   }
 }
-

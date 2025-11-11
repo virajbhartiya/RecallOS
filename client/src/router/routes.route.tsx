@@ -27,7 +27,9 @@ const Profile = lazy(() =>
   import("@/pages/profile.page").then((module) => ({ default: module.Profile }))
 )
 const Insights = lazy(() =>
-  import("@/pages/insights.page").then((module) => ({ default: module.Insights }))
+  import("@/pages/insights.page").then((module) => ({
+    default: module.Insights,
+  }))
 )
 
 const LoadingFallback = () => (

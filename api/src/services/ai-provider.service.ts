@@ -870,7 +870,9 @@ JSON array only:`
     }
 
     if (userId) {
-      const inputTokens = tokenTracking.estimateTokens(JSON.stringify(memories) + JSON.stringify(stats))
+      const inputTokens = tokenTracking.estimateTokens(
+        JSON.stringify(memories) + JSON.stringify(stats)
+      )
       const outputTokens = tokenTracking.estimateTokens(JSON.stringify(result))
       await tokenTracking.recordTokenUsage({
         userId,
@@ -896,10 +898,14 @@ JSON array only:`
       facts.push(`You visited ${topDomain[1]} pages on ${topDomain[0]} this period`)
     }
     if (stats.totalMemories > 50) {
-      facts.push(`You explored ${stats.totalMemories} different pages, showing high browsing activity`)
+      facts.push(
+        `You explored ${stats.totalMemories} different pages, showing high browsing activity`
+      )
     }
     if (stats.topics.length > 10) {
-      facts.push(`Your browsing covered ${stats.topics.length} different topics, showing diverse interests`)
+      facts.push(
+        `Your browsing covered ${stats.topics.length} different topics, showing diverse interests`
+      )
     }
     if (stats.categories.length > 5) {
       facts.push(`You explored content across ${stats.categories.length} different categories`)
@@ -972,7 +978,9 @@ Narrative summary:`
     }
 
     if (userId) {
-      const inputTokens = tokenTracking.estimateTokens(JSON.stringify(memories) + JSON.stringify(stats))
+      const inputTokens = tokenTracking.estimateTokens(
+        JSON.stringify(memories) + JSON.stringify(stats)
+      )
       const outputTokens = tokenTracking.estimateTokens(result)
       await tokenTracking.recordTokenUsage({
         userId,
@@ -1085,7 +1093,9 @@ JSON array only:`
     }
 
     if (userId) {
-      const inputTokens = tokenTracking.estimateTokens(JSON.stringify(memories) + JSON.stringify(stats))
+      const inputTokens = tokenTracking.estimateTokens(
+        JSON.stringify(memories) + JSON.stringify(stats)
+      )
       const outputTokens = tokenTracking.estimateTokens(JSON.stringify(result))
       await tokenTracking.recordTokenUsage({
         userId,

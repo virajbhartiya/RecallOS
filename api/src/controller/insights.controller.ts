@@ -1,4 +1,4 @@
-import { Request, Response } from 'express'
+import { Response } from 'express'
 import { AuthenticatedRequest } from '../middleware/auth.middleware'
 import { insightsService } from '../services/insights.service'
 import { logger } from '../utils/logger.util'
@@ -17,9 +17,7 @@ export class InsightsController {
 
       const userId = req.user.id
       const periodType = req.query.period_type as PeriodType | undefined
-      const limit = req.query.limit
-        ? Math.min(parseInt(req.query.limit as string), 100)
-        : 50
+      const limit = req.query.limit ? Math.min(parseInt(req.query.limit as string), 100) : 50
 
       const summaries = await insightsService.getSummaries(userId, periodType, limit)
 
@@ -161,20 +159,23 @@ export class InsightsController {
             period_type,
             targetDate: targetDate.toISOString(),
           })
-          
+
           let result
           if (period_type === 'daily') {
             result = await insightsService.generateDailySummary(userId, targetDate)
           } else {
             result = await insightsService.generateWeeklySummary(userId, targetDate)
           }
-          
+
           if (result) {
-            logger.log('[Insights Controller] Background summary generation completed successfully', {
-              userId,
-              period_type,
-              summaryId: result.id,
-            })
+            logger.log(
+              '[Insights Controller] Background summary generation completed successfully',
+              {
+                userId,
+                period_type,
+                summaryId: result.id,
+              }
+            )
           } else {
             logger.log('[Insights Controller] Background summary generation returned null', {
               userId,
@@ -200,4 +201,3 @@ export class InsightsController {
     }
   }
 }
-

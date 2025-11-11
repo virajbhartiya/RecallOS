@@ -89,7 +89,6 @@ export const startCyclicInsightsWorker = () => {
   const dailyIntervalHours = Number(process.env.INSIGHTS_DAILY_INTERVAL_HOURS || 24)
   const weeklyIntervalHours = Number(process.env.INSIGHTS_WEEKLY_INTERVAL_HOURS || 168)
 
-
   const runDailyUpdate = async () => {
     try {
       const userIds = await insightsService.getActiveUsers()
@@ -157,7 +156,6 @@ export const startCyclicInsightsWorker = () => {
   scheduleDaily()
   scheduleWeekly()
 
-
   return { dailyWorkerInterval, weeklyWorkerInterval }
 }
 
@@ -175,4 +173,3 @@ export const stopCyclicInsightsWorker = () => {
     insightsWorkerInterval = null
   }
 }
-

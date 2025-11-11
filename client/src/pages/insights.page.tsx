@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react"
 import {
-  getSummaries,
-  getLatestSummary,
   generateSummary,
+  getSummaries,
   type BrowsingSummary,
   type PeriodType,
 } from "@/services/insights.service"
@@ -14,7 +13,8 @@ export const Insights: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [periodType, setPeriodType] = useState<PeriodType>("daily")
   const [summaries, setSummaries] = useState<BrowsingSummary[]>([])
-  const [selectedSummary, setSelectedSummary] = useState<BrowsingSummary | null>(null)
+  const [selectedSummary, setSelectedSummary] =
+    useState<BrowsingSummary | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -36,7 +36,7 @@ export const Insights: React.FC = () => {
         setIsLoading(true)
         setError(null)
         const data = await getSummaries(periodType)
-        console.log('[Insights Page] Fetched summaries:', {
+        console.log("[Insights Page] Fetched summaries:", {
           periodType,
           count: data.summaries.length,
           summaries: data.summaries,
@@ -64,11 +64,11 @@ export const Insights: React.FC = () => {
       setIsGenerating(true)
       setError(null)
       await generateSummary(periodType)
-      
+
       let attempts = 0
       const maxAttempts = 30
       const pollInterval = 2000
-      
+
       const pollForSummary = async () => {
         try {
           const data = await getSummaries(periodType)
@@ -78,13 +78,15 @@ export const Insights: React.FC = () => {
             setIsGenerating(false)
             return
           }
-          
+
           attempts++
           if (attempts < maxAttempts) {
             setTimeout(pollForSummary, pollInterval)
           } else {
             setIsGenerating(false)
-            setError("Summary generation is taking longer than expected. Please refresh the page.")
+            setError(
+              "Summary generation is taking longer than expected. Please refresh the page."
+            )
           }
         } catch (err) {
           setIsGenerating(false)
@@ -92,7 +94,7 @@ export const Insights: React.FC = () => {
           setError(error.message || "Error checking for summary")
         }
       }
-      
+
       setTimeout(pollForSummary, pollInterval)
     } catch (err) {
       setIsGenerating(false)
@@ -286,7 +288,8 @@ export const Insights: React.FC = () => {
                             {formatDate(selectedSummary.period_end)}
                           </h2>
                           <p className="text-xs text-gray-500 mt-1">
-                            Generated {formatDateTime(selectedSummary.created_at)}
+                            Generated{" "}
+                            {formatDateTime(selectedSummary.created_at)}
                           </p>
                         </div>
                       </div>
@@ -356,14 +359,16 @@ export const Insights: React.FC = () => {
                             Topics Explored
                           </h2>
                           <div className="flex flex-wrap gap-2">
-                            {selectedSummary.topics_explored.map((topic, index) => (
-                              <span
-                                key={index}
-                                className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded"
-                              >
-                                {topic}
-                              </span>
-                            ))}
+                            {selectedSummary.topics_explored.map(
+                              (topic, index) => (
+                                <span
+                                  key={index}
+                                  className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded"
+                                >
+                                  {topic}
+                                </span>
+                              )
+                            )}
                           </div>
                         </div>
                       )}
@@ -390,7 +395,8 @@ export const Insights: React.FC = () => {
                       )}
 
                     {selectedSummary.time_estimates &&
-                      Object.keys(selectedSummary.time_estimates).length > 0 && (
+                      Object.keys(selectedSummary.time_estimates).length >
+                        0 && (
                         <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
                           <h2 className="text-sm font-semibold text-gray-900 mb-3">
                             Time Estimates
@@ -423,15 +429,17 @@ export const Insights: React.FC = () => {
                             Key Insights
                           </h2>
                           <ul className="space-y-2">
-                            {selectedSummary.key_insights.map((insight, index) => (
-                              <li
-                                key={index}
-                                className="text-sm text-gray-700 flex items-start"
-                              >
-                                <span className="text-gray-400 mr-2">•</span>
-                                <span>{insight}</span>
-                              </li>
-                            ))}
+                            {selectedSummary.key_insights.map(
+                              (insight, index) => (
+                                <li
+                                  key={index}
+                                  className="text-sm text-gray-700 flex items-start"
+                                >
+                                  <span className="text-gray-400 mr-2">•</span>
+                                  <span>{insight}</span>
+                                </li>
+                              )
+                            )}
                           </ul>
                         </div>
                       )}
@@ -451,4 +459,3 @@ export const Insights: React.FC = () => {
     </div>
   )
 }
-

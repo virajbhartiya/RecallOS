@@ -33,7 +33,6 @@ export const startContentWorker = () => {
     async job => {
       const { user_id, raw_text, metadata } = job.data as ContentJobData
 
-
       if (!metadata?.memory_id) {
         const user = await prisma.user.findUnique({
           where: { id: user_id },
@@ -187,7 +186,6 @@ export const startContentWorker = () => {
         throw new Error('Failed to generate summary after retries')
       }
 
-
       let extractedMetadata: {
         topics?: string[]
         categories?: string[]
@@ -261,7 +259,6 @@ export const startContentWorker = () => {
             summary_hash: summaryHash,
           },
         })
-
 
         setImmediate(async () => {
           try {

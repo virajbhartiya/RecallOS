@@ -20,9 +20,8 @@ export const startProfileWorker = async (
 
     for (const userId of userIds) {
       try {
-        let profile
         try {
-          profile = await profileUpdateService.updateUserProfile(userId, true)
+          await profileUpdateService.updateUserProfile(userId, true)
         } catch (error) {
           logger.error('[Profile Worker] Error updating profile, retrying once', {
             ts: new Date().toISOString(),
@@ -31,7 +30,7 @@ export const startProfileWorker = async (
           })
 
           try {
-            profile = await profileUpdateService.updateUserProfile(userId, true)
+            await profileUpdateService.updateUserProfile(userId, true)
           } catch (retryError) {
             logger.error('[Profile Worker] Error updating profile on retry', {
               ts: new Date().toISOString(),
@@ -78,7 +77,6 @@ export const startCyclicProfileWorker = () => {
   const useHoursBasedUpdate = intervalHours < 24
   const hoursSinceLastUpdate = useHoursBasedUpdate ? intervalHours : undefined
 
-
   const runUpdate = async () => {
     try {
       await startProfileWorker(daysSinceLastUpdate, hoursSinceLastUpdate)
@@ -93,7 +91,6 @@ export const startCyclicProfileWorker = () => {
   runUpdate()
 
   profileWorkerInterval = setInterval(runUpdate, intervalMs)
-
 
   return profileWorkerInterval
 }

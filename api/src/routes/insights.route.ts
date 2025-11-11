@@ -10,4 +10,3 @@ router.get('/summaries/:id', authenticateToken, InsightsController.getSummaryByI
 router.post('/summaries/generate', authenticateToken, InsightsController.generateSummary)
 
 export default router
-

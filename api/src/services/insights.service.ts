@@ -71,13 +71,7 @@ function aggregateStats(memories: MemoryData[]): AggregatedStats {
 }
 
 export const insightsService = {
-  async generateSummary(
-    userId: string,
-    periodType: PeriodType,
-    startDate: Date,
-    endDate: Date
-  ) {
-
+  async generateSummary(userId: string, periodType: PeriodType, startDate: Date, endDate: Date) {
     const memories = await prisma.memory.findMany({
       where: {
         user_id: userId,
@@ -109,16 +103,21 @@ export const insightsService = {
 
     const stats = aggregateStats(memories)
 
-
     let wowFacts: string[] = []
     let narrativeSummary: string = 'No summary available.'
     let keyInsights: string[] = []
 
     try {
-      logger.log('[Insights Service] Starting wow facts generation', { userId, memoryCount: memories.length })
+      logger.log('[Insights Service] Starting wow facts generation', {
+        userId,
+        memoryCount: memories.length,
+      })
       const wowFactsPromise = aiProvider.generateWowFacts(memories, stats, userId)
       const timeoutPromise = new Promise<string[]>((_, reject) => {
-        setTimeout(() => reject(new Error('Wow facts generation timed out after 5 minutes')), 300000)
+        setTimeout(
+          () => reject(new Error('Wow facts generation timed out after 5 minutes')),
+          300000
+        )
       })
       wowFacts = await Promise.race([wowFactsPromise, timeoutPromise])
       logger.log('[Insights Service] Wow facts generated', { userId, count: wowFacts.length })
@@ -135,10 +134,16 @@ export const insightsService = {
       logger.log('[Insights Service] Starting narrative summary generation', { userId })
       const narrativePromise = aiProvider.generateNarrativeSummary(memories, stats, userId)
       const timeoutPromise = new Promise<string>((_, reject) => {
-        setTimeout(() => reject(new Error('Narrative summary generation timed out after 5 minutes')), 300000)
+        setTimeout(
+          () => reject(new Error('Narrative summary generation timed out after 5 minutes')),
+          300000
+        )
       })
       narrativeSummary = await Promise.race([narrativePromise, timeoutPromise])
-      logger.log('[Insights Service] Narrative summary generated', { userId, length: narrativeSummary.length })
+      logger.log('[Insights Service] Narrative summary generated', {
+        userId,
+        length: narrativeSummary.length,
+      })
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err)
       logger.error('[Insights Service] Error generating narrative summary:', {
@@ -153,7 +158,10 @@ export const insightsService = {
       logger.log('[Insights Service] Starting key insights generation', { userId })
       const insightsPromise = aiProvider.generateKeyInsights(memories, stats, userId)
       const timeoutPromise = new Promise<string[]>((_, reject) => {
-        setTimeout(() => reject(new Error('Key insights generation timed out after 5 minutes')), 300000)
+        setTimeout(
+          () => reject(new Error('Key insights generation timed out after 5 minutes')),
+          300000
+        )
       })
       keyInsights = await Promise.race([insightsPromise, timeoutPromise])
       logger.log('[Insights Service] Key insights generated', { userId, count: keyInsights.length })
@@ -166,7 +174,6 @@ export const insightsService = {
       })
       keyInsights = []
     }
-
 
     try {
       logger.log('[Insights Service] Saving summary to database', {
@@ -209,11 +216,7 @@ export const insightsService = {
     }
   },
 
-  async getSummaries(
-    userId: string,
-    periodType?: PeriodType,
-    limit: number = 50
-  ) {
+  async getSummaries(userId: string, periodType?: PeriodType, limit: number = 50) {
     const where: { user_id: string; period_type?: string } = {
       user_id: userId,
     }
@@ -295,13 +298,8 @@ export const insightsService = {
     startOfDay.setUTCHours(0, 0, 0, 0)
     const endOfDay = new Date(date)
     endOfDay.setUTCHours(23, 59, 59, 999)
-    
-    const shouldGenerate = await this.shouldGenerateSummary(
-      userId,
-      'daily',
-      startOfDay,
-      endOfDay
-    )
+
+    const shouldGenerate = await this.shouldGenerateSummary(userId, 'daily', startOfDay, endOfDay)
 
     if (!shouldGenerate) {
       logger.log('[Insights Service] Daily summary already exists or no memories', {
@@ -360,4 +358,3 @@ export const insightsService = {
     return users.map(u => u.user_id)
   },
 }
-

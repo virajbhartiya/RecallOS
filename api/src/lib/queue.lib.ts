@@ -102,7 +102,6 @@ export const addContentJob = async (data: ContentJobData) => {
   }
   const job = await contentQueue.add(queueName, data, jobOptions)
 
-
   return { id: job.id }
 }
 

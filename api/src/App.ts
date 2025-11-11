@@ -140,7 +140,11 @@ const INSIGHTS_TIMEOUT_MS = Number(process.env.INSIGHTS_TIMEOUT_MS || 360000) //
 app.use((req: Request, res: Response, next: NextFunction) => {
   const isSearchRequest = req.path === '/api/search' && req.method === 'POST'
   const isInsightsRequest = req.path === '/api/insights/summaries/generate' && req.method === 'POST'
-  const timeoutMs = isSearchRequest ? SEARCH_TIMEOUT_MS : isInsightsRequest ? INSIGHTS_TIMEOUT_MS : REQUEST_TIMEOUT_MS
+  const timeoutMs = isSearchRequest
+    ? SEARCH_TIMEOUT_MS
+    : isInsightsRequest
+      ? INSIGHTS_TIMEOUT_MS
+      : REQUEST_TIMEOUT_MS
 
   const timeout = setTimeout(() => {
     if (!res.headersSent) {
