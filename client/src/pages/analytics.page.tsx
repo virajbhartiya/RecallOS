@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react"
 import { getAnalytics, type AnalyticsData } from "@/services/analytics.service"
+import { getScores, type KnowledgeScores } from "@/services/knowledge.service"
 import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
 
@@ -7,6 +8,7 @@ export const Analytics: React.FC = () => {
   const navigate = useNavigate()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [knowledgeScores, setKnowledgeScores] = useState<KnowledgeScores | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,8 +28,12 @@ export const Analytics: React.FC = () => {
       try {
         setIsLoading(true)
         setError(null)
-        const data = await getAnalytics()
-        setAnalytics(data)
+        const [analyticsData, scoresData] = await Promise.all([
+          getAnalytics(),
+          getScores().catch(() => null),
+        ])
+        setAnalytics(analyticsData)
+        setKnowledgeScores(scoresData)
       } catch (err) {
         const error = err as { message?: string }
         console.error("Error fetching analytics:", err)
