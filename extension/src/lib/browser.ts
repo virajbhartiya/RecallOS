@@ -188,7 +188,7 @@ export const tabs = {
             }
           })
         }
-      } catch (error) {}
+      } catch (_error) {}
     }
   },
   get onActivated() {

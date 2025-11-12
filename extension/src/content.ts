@@ -63,7 +63,7 @@ let privacyExtensionDetected = false
 let privacyExtensionType = 'unknown'
 function detectPrivacyExtensions(): void {
   try {
-    const privacyExtensions = [
+    const _privacyExtensions = [
       'uBlock Origin',
       'AdBlock Plus',
       'Ghostery',
@@ -96,11 +96,11 @@ function detectPrivacyExtensions(): void {
       testIframe.style.display = 'none'
       document.body.appendChild(testIframe)
       document.body.removeChild(testIframe)
-    } catch (error) {
+    } catch (_error) {
       privacyExtensionDetected = true
       privacyExtensionType = 'iframe_restriction'
     }
-  } catch (error) {}
+  } catch (_error) {}
 }
 ;(window as any).pageLoadTime = Date.now()
 ;(window as any).interactionCount = 0
@@ -120,7 +120,7 @@ function extractVisibleText(): string {
             return NodeFilter.FILTER_REJECT
           }
           return NodeFilter.FILTER_ACCEPT
-        } catch (error) {
+        } catch (_error) {
           return NodeFilter.FILTER_ACCEPT
         }
       },
@@ -133,17 +133,17 @@ function extractVisibleText(): string {
         if (text && text.length > 0) {
           textNodes.push(text)
         }
-      } catch (error) {
+      } catch (_error) {
         continue
       }
     }
     return textNodes.join(' ')
-  } catch (error) {
+  } catch (_error) {
     try {
       return (
         document.body?.textContent || document.documentElement?.textContent || document.title || ''
       )
-    } catch (fallbackError) {
+    } catch (_fallbackError) {
       return document.title || window.location.href
     }
   }
@@ -222,14 +222,14 @@ function extractMeaningfulContent(): string {
     const tempDiv = document.createElement('div')
     try {
       tempDiv.innerHTML = document.body.innerHTML
-    } catch (error) {
+    } catch (_error) {
       tempDiv.textContent = document.body.textContent || ''
     }
     boilerplateSelectors.forEach(selector => {
       try {
         const elements = tempDiv.querySelectorAll(selector)
         elements.forEach(el => el.remove())
-      } catch (error) {}
+      } catch (_error) {}
     })
     const contentSelectors = [
       'article',
@@ -267,7 +267,7 @@ function extractMeaningfulContent(): string {
             break
           }
         }
-      } catch (error) {
+      } catch (_error) {
         continue
       }
     }
@@ -280,7 +280,7 @@ function extractMeaningfulContent(): string {
           .map(el => {
             try {
               return cleanAndExtractText(el)
-            } catch (error) {
+            } catch (_error) {
               return ''
             }
           })
@@ -289,17 +289,17 @@ function extractMeaningfulContent(): string {
         if (paragraphs.length > 200) {
           meaningfulContent = paragraphs
         }
-      } catch (error) {}
+      } catch (_error) {}
     }
     if (!meaningfulContent) {
       try {
         meaningfulContent = cleanAndExtractText(tempDiv)
-      } catch (error) {
+      } catch (_error) {
         meaningfulContent = extractVisibleText()
       }
     }
     return cleanText(meaningfulContent).substring(0, 50000)
-  } catch (error) {
+  } catch (_error) {
     return extractVisibleText()
   }
 }
@@ -310,14 +310,14 @@ function cleanAndExtractText(element: Element): string {
     scripts.forEach(el => {
       try {
         el.remove()
-      } catch (error) {}
+      } catch (_error) {}
     })
     const text = element.textContent || ''
     return cleanText(text)
-  } catch (error) {
+  } catch (_error) {
     try {
       return cleanText(element.textContent || '')
-    } catch (fallbackError) {
+    } catch (_fallbackError) {
       return ''
     }
   }
@@ -390,7 +390,7 @@ function extractContentSummary(): string {
 function extractContentType(): string {
   const url = window.location.href
   const title = document.title.toLowerCase()
-  const metaKeywords =
+  const _metaKeywords =
     document.querySelector('meta[name="keywords"]')?.getAttribute('content')?.toLowerCase() || ''
   if (url.includes('/blog/') || url.includes('/post/') || title.includes('blog')) return 'blog_post'
   if (url.includes('/docs/') || url.includes('/documentation/') || title.includes('docs'))
@@ -480,13 +480,13 @@ function extractStructuredDataTopics(): string[] {
             topics.push(data.about)
           }
         }
-      } catch (e) {}
+      } catch (_e) {}
     })
-  } catch (e) {}
+  } catch (_e) {}
   return topics
 }
 function extractUrlTopics(): string[] {
-  const url = window.location.href
+  const _url = window.location.href
   const pathname = window.location.pathname
   const segments = pathname
     .split('/')
@@ -640,7 +640,7 @@ function captureContext(): ContextData {
       user_activity: extractUserActivity(),
       content_quality: extractContentQuality(),
     }
-  } catch (error) {
+  } catch (_error) {
     const basicTitle = document.title || 'Untitled Page'
     const basicUrl = window.location.href
     const basicContent = `Page: ${basicTitle} | URL: ${basicUrl}`
@@ -749,9 +749,9 @@ async function sendContextToBackground() {
       type: privacyExtensionType,
       compatibility_mode: privacyExtensionDetected,
     }
-    runtime.sendMessage({ type: 'CAPTURE_CONTEXT', data: contextData }, response => {})
+    runtime.sendMessage({ type: 'CAPTURE_CONTEXT', data: contextData }, _response => {})
     lastCaptureTime = now
-  } catch (error) {}
+  } catch (_error) {}
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
@@ -1013,7 +1013,7 @@ let currentPlatform: AIChatPlatform = 'none'
 let chatInput: HTMLTextAreaElement | HTMLElement | null = null
 let chatSendButton: HTMLButtonElement | null = null
 let originalSendHandler: ((event: Event) => void) | null = null
-let isProcessingMemory = false
+const _isProcessingMemory = false
 let cogniaIcon: HTMLElement | null = null
 let typingTimeout: ReturnType<typeof setTimeout> | null = null
 let lastTypedText = ''
@@ -1051,7 +1051,7 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
     let authToken: string
     try {
       authToken = await requireAuthToken()
-    } catch (error) {
+    } catch (_error) {
       console.error('Cognia: Authentication required. Please log in through the web client first.')
       return null
     }
@@ -1080,7 +1080,7 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
     }
 
     return null // Still pending
-  } catch (error) {
+  } catch (_error) {
     return null
   }
 }
@@ -1090,7 +1090,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
     let userId: string
     try {
       userId = await getUserId()
-    } catch (error) {
+    } catch (_error) {
       return null
     }
     // Derive API base from extension settings
@@ -1116,7 +1116,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
     let authToken: string
     try {
       authToken = await requireAuthToken()
-    } catch (error) {
+    } catch (_error) {
       console.error('Cognia: Authentication required. Please log in through the web client first.')
       return null
     }
@@ -1207,7 +1207,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
     const finalSummary = summaryParts.join('\n\n')
     console.log('Cognia: Final memory summary:', finalSummary.substring(0, 200) + '...')
     return finalSummary
-  } catch (error) {
+  } catch (_error) {
     console.error('Cognia: Error in getMemorySummary:', error)
     return null
   }
@@ -1217,7 +1217,7 @@ async function getApiEndpointForMemory(): Promise<string> {
   try {
     const result = await storage.sync.get(['apiEndpoint'])
     return result.apiEndpoint || 'http://localhost:3000/api/memory/process'
-  } catch (error) {
+  } catch (_error) {
     console.error('Cognia: Error getting API endpoint:', error)
     return 'http://localhost:3000/api/memory/process'
   }
@@ -1310,7 +1310,7 @@ async function autoInjectMemories(userText: string): Promise<void> {
         cogniaIcon.style.animation = 'none'
       }
     }
-  } catch (error) {
+  } catch (_error) {
     console.error('Cognia: Error auto-injecting memories:', error)
     if (cogniaIcon) {
       cogniaIcon.style.color = '#ef4444'
@@ -1370,7 +1370,7 @@ function calculateIconPosition(): string {
         const rightPosition = buttonRightFromContainer + buttonWidth + spacing
         return `${Math.max(rightPosition, 60)}px`
       }
-    } catch (error) {}
+    } catch (_error) {}
   }
   return '60px'
 }
@@ -1460,7 +1460,7 @@ async function createCogniaIcon(): Promise<HTMLElement> {
 //     });
 
 //     return response.status < 500;
-//   } catch (error) {
+//   } catch (_error) {
 //     console.error('Cognia: Health check failed:', error);
 //     return false;
 //   }
@@ -1473,7 +1473,7 @@ async function checkExtensionEnabled(): Promise<boolean> {
         resolve(response?.success ? response.enabled : true)
       })
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Cognia: Error checking extension enabled state:', error)
     return true
   }
@@ -1486,7 +1486,7 @@ async function checkMemoryInjectionEnabled(): Promise<boolean> {
         resolve(response?.success ? response.enabled : true)
       })
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Cognia: Error checking memory injection enabled state:', error)
     return true
   }
@@ -1499,7 +1499,7 @@ async function checkWebsiteBlocked(url: string): Promise<boolean> {
         resolve(response?.success ? response.blocked : false)
       })
     })
-  } catch (error) {
+  } catch (_error) {
     return false
   }
 }
@@ -1567,7 +1567,7 @@ async function showCogniaStatus(): Promise<void> {
         ${extensionEnabled ? 'Memories are automatically injected as you type (1.5s delay).' : 'Extension is disabled. Click the popup to enable.'}
       </div>
     `
-  } catch (error) {
+  } catch (_error) {
     console.error('Cognia: Error checking status:', error)
     tooltip.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -1797,15 +1797,15 @@ function setupAIChatIntegration(): void {
   }
 
   if (chatInput && !originalSendHandler) {
-    const inputHandler = (e: Event) => {
+    const inputHandler = (_e: Event) => {
       handleTyping()
     }
 
-    const keyupHandler = (e: Event) => {
+    const keyupHandler = (_e: Event) => {
       handleTyping()
     }
 
-    const pasteHandler = (e: Event) => {
+    const pasteHandler = (_e: Event) => {
       setTimeout(handleTyping, 100)
     }
 
@@ -1971,6 +1971,7 @@ function initAIChatIntegration(): void {
         setupAIChatIntegration()
         setTimeout(retrySetup, 3000)
       } else if (retryCount >= maxRetries) {
+        // Max retries reached, giving up
       }
     }
 
@@ -2001,13 +2002,14 @@ function debugAIChatElements(): void {
   if (currentText && currentText.length >= 3) {
     await autoInjectMemories(currentText)
   } else {
+    // Text too short, skipping
   }
 }
 ;(window as any).setupCogniaListeners = () => {
   findChatInputElements()
   if (chatInput) {
     console.log('Cognia: Setting up listeners')
-    const inputHandler = (e: Event) => {
+    const inputHandler = (_e: Event) => {
       handleTyping()
     }
 
@@ -2023,13 +2025,14 @@ function debugAIChatElements(): void {
   if (currentText && currentText.length >= 3) {
     await autoInjectMemories(currentText)
   } else {
+    // Text too short, skipping
   }
 }
 ;(window as any).testCogniaSearch = async (query = 'server boilerplates') => {
   try {
     const result = await getMemorySummary(query)
     return result
-  } catch (error) {
+  } catch (_error) {
     return null
   }
 }

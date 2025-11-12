@@ -23,7 +23,7 @@ async function getApiEndpoint(): Promise<string> {
   try {
     const result = await storage.sync.get([STORAGE_KEYS.API_ENDPOINT])
     return result[STORAGE_KEYS.API_ENDPOINT] || DEFAULT_API_ENDPOINT
-  } catch (error) {
+  } catch (_error) {
     return DEFAULT_API_ENDPOINT
   }
 }
@@ -33,7 +33,7 @@ async function getApiBaseUrl(): Promise<string> {
     const endpoint = await getApiEndpoint()
     const url = new URL(endpoint)
     return `${url.protocol}//${url.host}`
-  } catch (error) {
+  } catch (_error) {
     return DEFAULT_API_BASE
   }
 }
@@ -54,7 +54,7 @@ async function checkApiHealth(): Promise<boolean> {
       })
       clearTimeout(timeout)
       return response.ok || response.status < 500
-    } catch (error) {
+    } catch (_error) {
       clearTimeout(timeout)
       try {
         const searchUrl = `${apiBase}/api/search`
@@ -70,7 +70,7 @@ async function checkApiHealth(): Promise<boolean> {
         return false
       }
     }
-  } catch (error) {
+  } catch (_error) {
     return false
   }
 }
@@ -79,7 +79,7 @@ async function isExtensionEnabled(): Promise<boolean> {
   try {
     const result = await storage.sync.get([STORAGE_KEYS.EXTENSION_ENABLED])
     return result[STORAGE_KEYS.EXTENSION_ENABLED] !== false
-  } catch (error) {
+  } catch (_error) {
     return true
   }
 }
@@ -87,7 +87,7 @@ async function isExtensionEnabled(): Promise<boolean> {
 async function setExtensionEnabled(enabled: boolean): Promise<void> {
   try {
     await storage.sync.set({ [STORAGE_KEYS.EXTENSION_ENABLED]: enabled })
-  } catch (error) {
+  } catch (_error) {
     if (error instanceof Error) {
       throw error
     }
@@ -99,7 +99,7 @@ async function getBlockedWebsites(): Promise<string[]> {
   try {
     const result = await storage.sync.get([STORAGE_KEYS.BLOCKED_WEBSITES])
     return result[STORAGE_KEYS.BLOCKED_WEBSITES] || []
-  } catch (error) {
+  } catch (_error) {
     return []
   }
 }
@@ -107,14 +107,14 @@ async function getBlockedWebsites(): Promise<string[]> {
 async function setBlockedWebsites(websites: string[]): Promise<void> {
   try {
     await storage.sync.set({ [STORAGE_KEYS.BLOCKED_WEBSITES]: websites })
-  } catch (error) {}
+  } catch (_error) {}
 }
 
 async function isMemoryInjectionEnabled(): Promise<boolean> {
   try {
     const result = await storage.sync.get([STORAGE_KEYS.MEMORY_INJECTION_ENABLED])
     return result[STORAGE_KEYS.MEMORY_INJECTION_ENABLED] !== false
-  } catch (error) {
+  } catch (_error) {
     return true
   }
 }
@@ -122,7 +122,7 @@ async function isMemoryInjectionEnabled(): Promise<boolean> {
 async function setMemoryInjectionEnabled(enabled: boolean): Promise<void> {
   try {
     await storage.sync.set({ [STORAGE_KEYS.MEMORY_INJECTION_ENABLED]: enabled })
-  } catch (error) {
+  } catch (_error) {
     if (error instanceof Error) {
       throw error
     }
@@ -134,7 +134,7 @@ function extractDomain(url: string): string {
   try {
     const urlObj = new URL(url)
     return urlObj.hostname.replace(/^www\./, '')
-  } catch (error) {
+  } catch (_error) {
     return ''
   }
 }
@@ -162,7 +162,7 @@ async function isWebsiteBlocked(url: string): Promise<boolean> {
         blockedDomain.endsWith('.' + domain)
       )
     })
-  } catch (error) {
+  } catch (_error) {
     return false
   }
 }
@@ -209,7 +209,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
     let userId: string
     try {
       userId = await getUserId()
-    } catch (error) {
+    } catch (_error) {
       return
     }
 
@@ -232,7 +232,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
     let authToken: string
     try {
       authToken = await requireAuthToken()
-    } catch (error) {
+    } catch (_error) {
       return
     }
 
@@ -260,7 +260,7 @@ async function sendToBackend(data: ContextData): Promise<void> {
       }
       throw new Error(`HTTP error! status: ${response.status}`)
     }
-  } catch (error) {}
+  } catch (_error) {}
 }
 
 runtime.onInstalled.addListener(() => {})
@@ -284,7 +284,7 @@ if (tabs.onActivated) {
           type: MESSAGE_TYPES.CAPTURE_CONTEXT_NOW,
         })
       }
-    } catch (error) {}
+    } catch (_error) {}
   })
 }
 
@@ -293,7 +293,7 @@ if (tabs.onUpdated) {
     if (changeInfo.status === 'complete' && tab.url && isValidContentScriptUrl(tab.url)) {
       try {
         tabs.sendMessage(tabId, { type: MESSAGE_TYPES.CAPTURE_CONTEXT_NOW })
-      } catch (error) {}
+      } catch (_error) {}
     }
   })
 }
@@ -301,7 +301,7 @@ if (tabs.onUpdated) {
 async function setApiEndpoint(endpoint: string): Promise<void> {
   try {
     await storage.sync.set({ apiEndpoint: endpoint })
-  } catch (error) {
+  } catch (_error) {
     console.error('Cognia: Error setting API endpoint:', error)
   }
 }
@@ -348,7 +348,7 @@ runtime.onMessage.addListener(
           if (token) {
             await storage.local.set({ [STORAGE_KEYS.AUTH_TOKEN]: token })
           }
-        } catch (error) {}
+        } catch (_error) {}
       })()
     }
 
@@ -384,7 +384,7 @@ runtime.onMessage.addListener(
         try {
           await setExtensionEnabled(message.enabled!)
           sendResponse({ success: true, message: 'Extension state updated' })
-        } catch (error) {
+        } catch (_error) {
           sendResponse({
             success: false,
             error: error instanceof Error ? error.message : 'Failed to update extension state',
@@ -502,7 +502,7 @@ runtime.onMessage.addListener(
         try {
           await setMemoryInjectionEnabled(message.enabled!)
           sendResponse({ success: true, message: 'Memory injection state updated' })
-        } catch (error) {
+        } catch (_error) {
           sendResponse({
             success: false,
             error:

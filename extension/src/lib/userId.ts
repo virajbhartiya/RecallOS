@@ -14,7 +14,7 @@ export function getAuthenticatedUserId(): string | null {
       if (payload.externalId) {
         return payload.externalId
       }
-    } catch (e) {
+    } catch (_e) {
       // Invalid token format
     }
     return null
@@ -24,7 +24,7 @@ export function getAuthenticatedUserId(): string | null {
 }
 
 export async function getUserId(): Promise<string> {
-  let authUserId = getAuthenticatedUserId()
+  const authUserId = getAuthenticatedUserId()
   if (authUserId) {
     return authUserId
   }
@@ -34,13 +34,13 @@ export async function getUserId(): Promise<string> {
     if (token) {
       try {
         await storage.local.set({ auth_token: token })
-      } catch (e) {}
+      } catch (_e) {}
 
       try {
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('auth_token', token)
         }
-      } catch (e) {}
+      } catch (_e) {}
 
       try {
         const payload = JSON.parse(atob(token.split('.')[1]))
@@ -50,9 +50,9 @@ export async function getUserId(): Promise<string> {
         if (payload.externalId) {
           return payload.externalId
         }
-      } catch (e) {}
+      } catch (_e) {}
     }
-  } catch (e) {}
+  } catch (_e) {}
 
   throw new Error('User not authenticated. Please log in through the web client first.')
 }
@@ -98,7 +98,7 @@ async function getTokenFromCookie(): Promise<string | null> {
           if (cookie?.value) {
             return cookie.value
           }
-        } catch (e) {}
+        } catch (_e) {}
       }
     }
 
@@ -118,7 +118,7 @@ async function getTokenFromCookie(): Promise<string | null> {
             }
           }
         }
-      } catch (e) {}
+      } catch (_e) {}
     }
 
     try {
@@ -135,7 +135,7 @@ async function getTokenFromCookie(): Promise<string | null> {
           }
         }
       }
-    } catch (e) {}
+    } catch (_e) {}
 
     try {
       const allCookies = await cookies.getAll({})
@@ -147,10 +147,10 @@ async function getTokenFromCookie(): Promise<string | null> {
           }
         }
       }
-    } catch (e) {}
+    } catch (_e) {}
 
     return null
-  } catch (error) {
+  } catch (_error) {
     return null
   }
 }
@@ -239,7 +239,7 @@ export function setAuthToken(token: string): void {
       localStorage.setItem('auth_token', token)
     }
     storage.local.set({ auth_token: token }).catch(() => {})
-  } catch (error) {}
+  } catch (_error) {}
 }
 
 export function clearAuthToken(): void {
@@ -248,5 +248,5 @@ export function clearAuthToken(): void {
       localStorage.removeItem('auth_token')
     }
     storage.local.remove('auth_token').catch(() => {})
-  } catch (error) {}
+  } catch (_error) {}
 }

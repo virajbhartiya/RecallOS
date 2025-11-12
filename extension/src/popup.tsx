@@ -42,7 +42,7 @@ const Popup: React.FC = () => {
       if (blockedResponse && blockedResponse.success) {
         setBlockedWebsites(blockedResponse.websites || [])
       }
-    } catch (error) {
+    } catch (_error) {
       console.error('Error loading settings:', error)
     }
   }
@@ -77,11 +77,11 @@ const Popup: React.FC = () => {
             }
           }
         }
-      } catch (error) {
+      } catch (_error) {
         isAuth = false
       }
       setIsAuthenticated(isAuth)
-    } catch (error) {
+    } catch (_error) {
       setIsConnected(false)
       setIsAuthenticated(false)
     } finally {
@@ -101,7 +101,7 @@ const Popup: React.FC = () => {
       if (response && response.success) {
         setExtensionEnabled(newState)
       }
-    } catch (error) {
+    } catch (_error) {
       console.error('Error toggling extension:', error)
     } finally {
       setIsLoading(false)
@@ -120,7 +120,7 @@ const Popup: React.FC = () => {
       if (response && response.success) {
         setMemoryInjectionEnabled(newState)
       }
-    } catch (error) {
+    } catch (_error) {
       console.error('Error toggling memory injection:', error)
     } finally {
       setIsLoading(false)
@@ -142,7 +142,7 @@ const Popup: React.FC = () => {
         setNewBlockedWebsite('')
         await loadSettings()
       }
-    } catch (error) {
+    } catch (_error) {
       console.error('Error adding blocked website:', error)
     } finally {
       setIsLoading(false)
@@ -165,10 +165,10 @@ const Popup: React.FC = () => {
         if (domain) {
           await addBlockedWebsite(domain)
         }
-      } catch (error) {
+      } catch (_error) {
         console.error('Error extracting domain:', error)
       }
-    } catch (error) {
+    } catch (_error) {
       console.error('Error getting current tab:', error)
     } finally {
       setIsLoading(false)
@@ -184,7 +184,7 @@ const Popup: React.FC = () => {
       if (response && response.success) {
         await loadSettings()
       }
-    } catch (error) {
+    } catch (_error) {
       console.error('Error removing blocked website:', error)
     } finally {
       setIsLoading(false)
