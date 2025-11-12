@@ -1,22 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "RecallOS",
+  "name": "Cognia",
   "version": "0.1.0",
   "description": "Blockchain-verified, AI-powered knowledge graph for capturing and retrieving your digital context.",
   "icons": {
-    "16": "logo.png",
-    "32": "logo.png",
-    "48": "logo.png",
-    "128": "logo.png"
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png",
+    "256": "icon-256.png",
+    "512": "icon-512.png"
   },
   "action": {
-    "default_title": "RecallOS",
+    "default_title": "Cognia",
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "logo.png",
-      "32": "logo.png",
-      "48": "logo.png",
-      "128": "logo.png"
+      "16": "icon-16.png",
+      "32": "icon-32.png",
+      "48": "icon-48.png",
+      "128": "icon-128.png"
     }
   },
   "background": {
@@ -46,7 +48,7 @@
   "web_accessible_resources": [],
   "browser_specific_settings": {
     "gecko": {
-      "id": "recallos@recallos.com",
+      "id": "cognia@cognia.com",
       "strict_min_version": "109.0"
     }
   }

@@ -5,7 +5,7 @@ const TableOfContents: React.FC<{ onSectionClick: (id: string) => void }> = ({
   onSectionClick,
 }) => {
   const sections = [
-    { id: "what-is", title: "What is RecallOS?" },
+    { id: "what-is", title: "What is Cognia?" },
     { id: "quick-start", title: "Quick Start" },
     { id: "features", title: "Key Features" },
     { id: "how-to-use", title: "How to Use" },
@@ -92,7 +92,7 @@ export const Docs = () => {
     },
     {
       question: "How much does it cost?",
-      answer: "RecallOS is free to use.",
+      answer: "Cognia is free to use.",
     },
 
     {
@@ -144,7 +144,7 @@ export const Docs = () => {
               ← Back to Home
             </button>
             <h1 className="text-xl font-mono uppercase tracking-wide">
-              RecallOS Documentation
+              Cognia Documentation
             </h1>
             <div className="w-24"></div>
           </div>
@@ -160,17 +160,17 @@ export const Docs = () => {
           <main className="lg:col-span-3 space-y-12">
             <section id="what-is">
               <h2 className="text-2xl font-light font-editorial mb-4 border-b border-gray-200 pb-2">
-                What is RecallOS?
+                What is Cognia?
               </h2>
               <div className="prose prose-gray max-w-none space-y-4">
                 <p className="text-gray-700 leading-relaxed">
-                  RecallOS is a personal memory system that captures, organizes,
+                  Cognia is a personal memory system that captures, organizes,
                   and retrieves your digital context. Think of it as your
                   personal search engine for everything you've read and learned
                   on the web.
                 </p>
                 <p className="text-gray-700 leading-relaxed">
-                  Unlike traditional bookmarks or note-taking apps, RecallOS:
+                  Unlike traditional bookmarks or note-taking apps, Cognia:
                 </p>
                 <ul className="list-disc list-inside space-y-2 text-gray-700">
                   <li>
@@ -207,7 +207,7 @@ export const Docs = () => {
                     1. Create Your User ID
                   </h3>
                   <p className="text-gray-700 mb-3">
-                    RecallOS uses a simple user ID to associate your memories
+                    Cognia uses a simple user ID to associate your memories
                     across the extension and web client.
                   </p>
                   <InfoBox type="tip">
@@ -232,7 +232,7 @@ export const Docs = () => {
                     3. Start Capturing
                   </h3>
                   <p className="text-gray-700">
-                    Browse the web normally. RecallOS captures pages
+                    Browse the web normally. Cognia captures pages
                     automatically (with extension) or you can manually add
                     content through the web client.
                   </p>
@@ -282,7 +282,7 @@ export const Docs = () => {
                 How to Use
               </h2>
               <p className="text-gray-700 mb-4">
-                RecallOS can be used in three ways: Browser Extension
+                Cognia can be used in three ways: Browser Extension
                 (automatic), Web Client (manual), or SDK (programmatic).
               </p>
             </section>
@@ -331,7 +331,7 @@ export const Docs = () => {
                   <li>Automatically detects when you're typing in ChatGPT</li>
                   <li>Searches your memories for relevant context</li>
                   <li>Injects memory summaries into your prompts</li>
-                  <li>Shows a RecallOS icon with status indicators</li>
+                  <li>Shows a Cognia icon with status indicators</li>
                 </ul>
 
                 <InfoBox type="warning">
@@ -390,7 +390,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
               </h2>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  RecallOS uses hybrid search combining keyword and semantic
+                  Cognia uses hybrid search combining keyword and semantic
                   search powered by vector embeddings to find relevant memories.
                 </p>
 
@@ -640,7 +640,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
               </h2>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  RecallOS backend is built with Node.js, Express, PostgreSQL,
+                  Cognia backend is built with Node.js, Express, PostgreSQL,
                   Qdrant, and Redis. Here's how the core processing works:
                 </p>
 
@@ -817,7 +817,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
               </h2>
               <div className="space-y-4">
                 <p className="text-gray-700">
-                  RecallOS provides a comprehensive REST API for programmatic
+                  Cognia provides a comprehensive REST API for programmatic
                   access to your memories and system functionality.
                 </p>
 
@@ -1015,7 +1015,7 @@ Error response:
                 </p>
                 <div className="flex items-center justify-center gap-4">
                   <a
-                    href="https://github.com/virajbhartiya/RecallOS"
+                    href="https://github.com/virajbhartiya/Cognia"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-2 bg-black text-white text-sm hover:bg-gray-800 transition-colors"

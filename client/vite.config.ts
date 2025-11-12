@@ -12,11 +12,11 @@ export default defineConfig({
         ? {
             key: fs.readFileSync(
               process.env.VITE_HTTPS_KEY_PATH ||
-                "./certs/app.recallos.test+3-key.pem"
+                "./certs/app.cognia.test+3-key.pem"
             ),
             cert: fs.readFileSync(
               process.env.VITE_HTTPS_CERT_PATH ||
-                "./certs/app.recallos.test+3.pem"
+                "./certs/app.cognia.test+3.pem"
             ),
           }
         : undefined,
@@ -39,17 +39,35 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: [
         "favicon.ico",
+        "favicon-16x16.png",
+        "favicon-32x32.png",
         "apple-touch-icon.png",
-        "logo.svg",
         "android-chrome-192x192.png",
         "android-chrome-512x512.png",
+        "icon.png",
         "logo.png",
       ],
       manifest: {
-        name: "RecallOS",
-        short_name: "RecallOS",
-        description: "RecallOS - description",
+        name: "Cognia",
+        short_name: "Cognia",
+        description: "Cognia - description",
         icons: [
+          {
+            src: "/favicon-16x16.png",
+            sizes: "16x16",
+            type: "image/png",
+          },
+          {
+            src: "/favicon-32x32.png",
+            sizes: "32x32",
+            type: "image/png",
+          },
+          {
+            src: "/apple-touch-icon.png",
+            sizes: "180x180",
+            type: "image/png",
+            purpose: "apple touch icon",
+          },
           {
             src: "/android-chrome-192x192.png",
             sizes: "192x192",
@@ -61,22 +79,10 @@ export default defineConfig({
             type: "image/png",
           },
           {
-            src: "/android-chrome-512x512.png",
+            src: "/icon.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any",
-          },
-          {
-            src: "/apple-touch-icon.png",
-            sizes: "180x180",
-            type: "image/png",
-            purpose: "apple touch icon",
-          },
-          {
-            src: "/logo.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
+            purpose: "any maskable",
           },
         ],
         theme_color: "#ffffff",
@@ -94,3 +100,4 @@ export default defineConfig({
     },
   },
 })
+

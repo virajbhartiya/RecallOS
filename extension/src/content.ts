@@ -1014,7 +1014,7 @@ let chatInput: HTMLTextAreaElement | HTMLElement | null = null
 let chatSendButton: HTMLButtonElement | null = null
 let originalSendHandler: ((event: Event) => void) | null = null
 let isProcessingMemory = false
-let recallOSIcon: HTMLElement | null = null
+let cogniaIcon: HTMLElement | null = null
 let typingTimeout: ReturnType<typeof setTimeout> | null = null
 let lastTypedText = ''
 let isAutoInjecting = false
@@ -1053,7 +1053,7 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
       authToken = await requireAuthToken()
     } catch (error) {
       console.error(
-        'RecallOS: Authentication required. Please log in through the web client first.'
+        'Cognia: Authentication required. Please log in through the web client first.'
       )
       return null
     }
@@ -1120,7 +1120,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
       authToken = await requireAuthToken()
     } catch (error) {
       console.error(
-        'RecallOS: Authentication required. Please log in through the web client first.'
+        'Cognia: Authentication required. Please log in through the web client first.'
       )
       return null
     }
@@ -1139,7 +1139,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
     })
 
     if (!response.ok) {
-      console.error('RecallOS: Search request failed:', response.status, response.statusText)
+      console.error('Cognia: Search request failed:', response.status, response.statusText)
       return null
     }
 
@@ -1149,14 +1149,14 @@ async function getMemorySummary(query: string): Promise<string | null> {
     try {
       result = JSON.parse(responseText)
     } catch (parseError) {
-      console.error('RecallOS: Failed to parse search response:', parseError)
+      console.error('Cognia: Failed to parse search response:', parseError)
       return null
     }
 
     // Handle response structure exactly like client-side
     let summaryParts: string[] = []
 
-    console.log('RecallOS: Search response received:', {
+    console.log('Cognia: Search response received:', {
       hasAnswer: !!result.answer,
       hasMetaSummary: !!result.meta_summary,
       resultsCount: result.results?.length || 0,
@@ -1166,13 +1166,13 @@ async function getMemorySummary(query: string): Promise<string | null> {
     })
 
     if (result.answer) {
-      console.log('RecallOS: Using answer from response')
+      console.log('Cognia: Using answer from response')
       summaryParts.push(result.answer)
     } else if (result.meta_summary) {
-      console.log('RecallOS: Using meta_summary from response')
+      console.log('Cognia: Using meta_summary from response')
       summaryParts.push(result.meta_summary)
     } else if (result.results && result.results.length > 0) {
-      console.log('RecallOS: Using results count from response')
+      console.log('Cognia: Using results count from response')
       summaryParts.push(`Found ${result.results.length} relevant memories about "${query}".`)
     }
 
@@ -1204,15 +1204,15 @@ async function getMemorySummary(query: string): Promise<string | null> {
     }
 
     if (summaryParts.length === 0) {
-      console.log('RecallOS: No summary parts found, returning null')
+      console.log('Cognia: No summary parts found, returning null')
       return null
     }
 
     const finalSummary = summaryParts.join('\n\n')
-    console.log('RecallOS: Final memory summary:', finalSummary.substring(0, 200) + '...')
+    console.log('Cognia: Final memory summary:', finalSummary.substring(0, 200) + '...')
     return finalSummary
   } catch (error) {
-    console.error('RecallOS: Error in getMemorySummary:', error)
+    console.error('Cognia: Error in getMemorySummary:', error)
     return null
   }
 }
@@ -1222,39 +1222,39 @@ async function getApiEndpointForMemory(): Promise<string> {
     const result = await storage.sync.get(['apiEndpoint'])
     return result.apiEndpoint || 'http://localhost:3000/api/memory/process'
   } catch (error) {
-    console.error('RecallOS: Error getting API endpoint:', error)
+    console.error('Cognia: Error getting API endpoint:', error)
     return 'http://localhost:3000/api/memory/process'
   }
 }
 
 function injectMemorySummary(summary: string, originalMessage: string): void {
   if (!chatInput) {
-    console.log('RecallOS: No chat input found for injection')
+    console.log('Cognia: No chat input found for injection')
     return
   }
 
-  const combinedMessage = `[RecallOS Memory Context]\n${summary}\n\n[Your Question]\n${originalMessage}`
-  console.log('RecallOS: Injecting combined message:', combinedMessage.substring(0, 200) + '...')
+  const combinedMessage = `[Cognia Memory Context]\n${summary}\n\n[Your Question]\n${originalMessage}`
+  console.log('Cognia: Injecting combined message:', combinedMessage.substring(0, 200) + '...')
 
   if (chatInput.tagName === 'TEXTAREA') {
-    console.log('RecallOS: Injecting into textarea')
+    console.log('Cognia: Injecting into textarea')
     ;(chatInput as HTMLTextAreaElement).value = combinedMessage
     const inputEvent = new Event('input', { bubbles: true })
     chatInput.dispatchEvent(inputEvent)
   } else if ((chatInput as HTMLElement).contentEditable === 'true') {
-    console.log('RecallOS: Injecting into contentEditable div')
+    console.log('Cognia: Injecting into contentEditable div')
     chatInput.textContent = combinedMessage
     const inputEvent = new Event('input', { bubbles: true })
     chatInput.dispatchEvent(inputEvent)
   } else {
-    console.log('RecallOS: Unknown input type:', chatInput.tagName, chatInput)
+    console.log('Cognia: Unknown input type:', chatInput.tagName, chatInput)
   }
 }
 
 async function autoInjectMemories(userText: string): Promise<void> {
   if (isAutoInjecting || !userText || userText.length < 3) return
 
-  if (userText.includes('[RecallOS Memory Context]')) return
+  if (userText.includes('[Cognia Memory Context]')) return
 
   const enabled = await checkExtensionEnabled()
   if (!enabled) {
@@ -1269,16 +1269,16 @@ async function autoInjectMemories(userText: string): Promise<void> {
   isAutoInjecting = true
 
   try {
-    if (recallOSIcon) {
-      recallOSIcon.style.color = '#f59e0b'
-      recallOSIcon.style.animation = 'pulse 1s infinite'
+    if (cogniaIcon) {
+      cogniaIcon.style.color = '#f59e0b'
+      cogniaIcon.style.animation = 'pulse 1s infinite'
     }
 
     const memorySummary = await getMemorySummary(userText)
 
     if (memorySummary) {
       const currentText = getCurrentInputText()
-      console.log('RecallOS: Memory found, checking text match:', {
+      console.log('Cognia: Memory found, checking text match:', {
         originalText: userText,
         currentText: currentText,
         textsMatch: currentText === userText,
@@ -1294,37 +1294,37 @@ async function autoInjectMemories(userText: string): Promise<void> {
         currentText.trim() === userText.trim()
 
       if (textMatches) {
-        console.log('RecallOS: Injecting memory summary')
+        console.log('Cognia: Injecting memory summary')
         injectMemorySummary(memorySummary, userText)
 
-        if (recallOSIcon) {
-          recallOSIcon.style.color = '#10a37f'
-          recallOSIcon.style.animation = 'none'
+        if (cogniaIcon) {
+          cogniaIcon.style.color = '#10a37f'
+          cogniaIcon.style.animation = 'none'
         }
       } else {
-        console.log('RecallOS: Text changed during search, not injecting')
-        if (recallOSIcon) {
-          recallOSIcon.style.color = '#8e8ea0'
-          recallOSIcon.style.animation = 'none'
+        console.log('Cognia: Text changed during search, not injecting')
+        if (cogniaIcon) {
+          cogniaIcon.style.color = '#8e8ea0'
+          cogniaIcon.style.animation = 'none'
         }
       }
     } else {
-      if (recallOSIcon) {
-        recallOSIcon.style.color = '#8e8ea0'
-        recallOSIcon.style.animation = 'none'
+      if (cogniaIcon) {
+        cogniaIcon.style.color = '#8e8ea0'
+        cogniaIcon.style.animation = 'none'
       }
     }
   } catch (error) {
-    console.error('RecallOS: Error auto-injecting memories:', error)
-    if (recallOSIcon) {
-      recallOSIcon.style.color = '#ef4444'
-      recallOSIcon.style.animation = 'none'
+    console.error('Cognia: Error auto-injecting memories:', error)
+    if (cogniaIcon) {
+      cogniaIcon.style.color = '#ef4444'
+      cogniaIcon.style.animation = 'none'
     }
   } finally {
     isAutoInjecting = false
     setTimeout(() => {
-      if (recallOSIcon) {
-        recallOSIcon.style.color = '#8e8ea0'
+      if (cogniaIcon) {
+        cogniaIcon.style.color = '#8e8ea0'
       }
     }, 2000)
   }
@@ -1347,7 +1347,7 @@ function handleTyping(): void {
 
   const currentText = getCurrentInputText()
 
-  if (currentText.includes('[RecallOS Memory Context]')) return
+  if (currentText.includes('[Cognia Memory Context]')) return
 
   if (typingTimeout) {
     clearTimeout(typingTimeout)
@@ -1379,9 +1379,9 @@ function calculateIconPosition(): string {
   return '60px'
 }
 
-async function createRecallOSIcon(): Promise<HTMLElement> {
+async function createCogniaIcon(): Promise<HTMLElement> {
   const icon = document.createElement('div')
-  icon.id = 'recallos-extension-icon'
+  icon.id = 'cognia-extension-icon'
   icon.innerHTML = `
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 2L13.09 8.26L20 9L13.09 9.74L12 16L10.91 9.74L4 9L10.91 8.26L12 2Z" fill="currentColor"/>
@@ -1439,7 +1439,7 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
   })
 
   icon.addEventListener('click', async () => {
-    await showRecallOSStatus()
+    await showCogniaStatus()
   })
 
   return icon
@@ -1465,7 +1465,7 @@ async function createRecallOSIcon(): Promise<HTMLElement> {
 
 //     return response.status < 500;
 //   } catch (error) {
-//     console.error('RecallOS: Health check failed:', error);
+//     console.error('Cognia: Health check failed:', error);
 //     return false;
 //   }
 // }
@@ -1478,7 +1478,7 @@ async function checkExtensionEnabled(): Promise<boolean> {
       })
     })
   } catch (error) {
-    console.error('RecallOS: Error checking extension enabled state:', error)
+    console.error('Cognia: Error checking extension enabled state:', error)
     return true
   }
 }
@@ -1491,7 +1491,7 @@ async function checkMemoryInjectionEnabled(): Promise<boolean> {
       })
     })
   } catch (error) {
-    console.error('RecallOS: Error checking memory injection enabled state:', error)
+    console.error('Cognia: Error checking memory injection enabled state:', error)
     return true
   }
 }
@@ -1508,7 +1508,7 @@ async function checkWebsiteBlocked(url: string): Promise<boolean> {
   }
 }
 
-async function showRecallOSStatus(): Promise<void> {
+async function showCogniaStatus(): Promise<void> {
   const tooltip = document.createElement('div')
   tooltip.style.cssText = `
     position: fixed;
@@ -1530,7 +1530,7 @@ async function showRecallOSStatus(): Promise<void> {
   tooltip.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
         <div style="width: 8px; height: 8px; border-radius: 50%; background: #ffffff; animation: pulse 1s infinite;"></div>
-        <strong>RecallOS Extension</strong>
+        <strong>Cognia Extension</strong>
       </div>
       <div style="font-size: 12px; color: rgba(255, 255, 255, 0.8);">
         Checking status...
@@ -1561,7 +1561,7 @@ async function showRecallOSStatus(): Promise<void> {
     tooltip.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
         <div style="width: 8px; height: 8px; border-radius: 50%; background: ${statusColor};"></div>
-        <strong>RecallOS on ${platformName}</strong>
+        <strong>Cognia on ${platformName}</strong>
       </div>
       <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9);">
         <div>Extension: ${extensionStatus}</div>
@@ -1572,11 +1572,11 @@ async function showRecallOSStatus(): Promise<void> {
       </div>
     `
   } catch (error) {
-    console.error('RecallOS: Error checking status:', error)
+    console.error('Cognia: Error checking status:', error)
     tooltip.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
         <div style="width: 8px; height: 8px; border-radius: 50%; background: #ef4444;"></div>
-        <strong>RecallOS Extension</strong>
+        <strong>Cognia Extension</strong>
       </div>
       <div style="font-size: 12px; color: rgba(255, 255, 255, 0.9);">
         Error checking status
@@ -1671,7 +1671,7 @@ function setupAIChatIntegration(): void {
 
   findChatInputElements()
 
-  if (chatInput && !recallOSIcon) {
+  if (chatInput && !cogniaIcon) {
     const containerSelectors = [
       'div[class*="input"]',
       'div[class*="chat"]',
@@ -1702,24 +1702,24 @@ function setupAIChatIntegration(): void {
         ;(inputContainer as HTMLElement).style.position = 'relative'
       }
 
-      const existingIcon = document.getElementById('recallos-extension-icon')
+      const existingIcon = document.getElementById('cognia-extension-icon')
       if (existingIcon) {
         existingIcon.remove()
       }
 
-      createRecallOSIcon().then(icon => {
-        recallOSIcon = icon
-        inputContainer.appendChild(recallOSIcon)
+      createCogniaIcon().then(icon => {
+        cogniaIcon = icon
+        inputContainer.appendChild(cogniaIcon)
         setTimeout(() => {
-          if (recallOSIcon && chatSendButton) {
+          if (cogniaIcon && chatSendButton) {
             const newRightPosition = calculateIconPosition()
-            recallOSIcon.style.right = newRightPosition
+            cogniaIcon.style.right = newRightPosition
           }
         }, 100)
       })
 
       const ensureIconVisible = () => {
-        if (!recallOSIcon || !document.body.contains(recallOSIcon)) {
+        if (!cogniaIcon || !document.body.contains(cogniaIcon)) {
           findChatInputElements()
 
           if (chatInput) {
@@ -1748,18 +1748,18 @@ function setupAIChatIntegration(): void {
             }
 
             if (newContainer && document.body.contains(newContainer)) {
-              const existingIcon = document.getElementById('recallos-extension-icon')
+              const existingIcon = document.getElementById('cognia-extension-icon')
               if (existingIcon) {
                 existingIcon.remove()
               }
 
-              createRecallOSIcon().then(icon => {
-                recallOSIcon = icon
-                newContainer.appendChild(recallOSIcon)
+              createCogniaIcon().then(icon => {
+                cogniaIcon = icon
+                newContainer.appendChild(cogniaIcon)
                 setTimeout(() => {
-                  if (recallOSIcon && chatSendButton) {
+                  if (cogniaIcon && chatSendButton) {
                     const newRightPosition = calculateIconPosition()
-                    recallOSIcon.style.right = newRightPosition
+                    cogniaIcon.style.right = newRightPosition
                   }
                 }, 100)
               })
@@ -1777,12 +1777,12 @@ function setupAIChatIntegration(): void {
             const iconRemoved = removedNodes.some(
               node =>
                 node.nodeType === Node.ELEMENT_NODE &&
-                (node as Element).id === 'recallos-extension-icon'
+                (node as Element).id === 'cognia-extension-icon'
             )
 
             if (iconRemoved) {
               setTimeout(() => {
-                if (!recallOSIcon || !document.body.contains(recallOSIcon)) {
+                if (!cogniaIcon || !document.body.contains(cogniaIcon)) {
                   ensureIconVisible()
                 }
               }, 500)
@@ -1845,28 +1845,28 @@ function setupAIChatIntegration(): void {
 
     originalSendHandler = () => {}
   } else if (!chatInput) {
-    console.log('RecallOS: No chat input found for event listeners')
+    console.log('Cognia: No chat input found for event listeners')
   } else if (originalSendHandler) {
-    console.log('RecallOS: Event listeners already attached')
+    console.log('Cognia: Event listeners already attached')
   }
 }
 
-function addRecallOSStyles(): void {
-  if (document.getElementById('recallos-styles')) return
+function addCogniaStyles(): void {
+  if (document.getElementById('cognia-styles')) return
 
   const style = document.createElement('style')
-  style.id = 'recallos-styles'
+  style.id = 'cognia-styles'
   style.textContent = `
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
     
-    #recallos-extension-icon {
+    #cognia-extension-icon {
       transition: all 0.2s ease;
     }
     
-    #recallos-extension-icon:hover {
+    #cognia-extension-icon:hover {
       transform: translateY(-50%) scale(1.1) !important;
     }
   `
@@ -1903,7 +1903,7 @@ function waitForAIChatReady(): Promise<void> {
 function trySetupImmediately(): void {
   setupAIChatIntegration()
 
-  if (!recallOSIcon) {
+  if (!cogniaIcon) {
     setTimeout(() => {
       setupAIChatIntegration()
     }, 3000)
@@ -1918,7 +1918,7 @@ function initAIChatIntegration(): void {
   currentPlatform = detectAIChatPlatform()
 
   if (currentPlatform !== 'none') {
-    addRecallOSStyles()
+    addCogniaStyles()
 
     trySetupImmediately()
 
@@ -1970,7 +1970,7 @@ function initAIChatIntegration(): void {
     let retryCount = 0
     const maxRetries = 3
     const retrySetup = () => {
-      if (!recallOSIcon && !originalSendHandler && retryCount < maxRetries) {
+      if (!cogniaIcon && !originalSendHandler && retryCount < maxRetries) {
         retryCount++
         setupAIChatIntegration()
         setTimeout(retrySetup, 3000)
@@ -1983,7 +1983,7 @@ function initAIChatIntegration(): void {
     })
 
     const continuousIconMonitor = () => {
-      if (!recallOSIcon && currentPlatform !== 'none') {
+      if (!cogniaIcon && currentPlatform !== 'none') {
         setupAIChatIntegration()
       }
     }
@@ -1993,24 +1993,24 @@ function initAIChatIntegration(): void {
 }
 
 function debugAIChatElements(): void {
-  console.log('RecallOS Debug Info:')
+  console.log('Cognia Debug Info:')
   console.log('Platform:', currentPlatform)
   console.log('Chat Input:', chatInput)
-  console.log('RecallOS Icon:', recallOSIcon)
+  console.log('Cognia Icon:', cogniaIcon)
 }
 
-;(window as any).debugRecallOS = debugAIChatElements
-;(window as any).triggerRecallOS = async () => {
+;(window as any).debugCognia = debugAIChatElements
+;(window as any).triggerCognia = async () => {
   const currentText = getCurrentInputText()
   if (currentText && currentText.length >= 3) {
     await autoInjectMemories(currentText)
   } else {
   }
 }
-;(window as any).setupRecallOSListeners = () => {
+;(window as any).setupCogniaListeners = () => {
   findChatInputElements()
   if (chatInput) {
-    console.log('RecallOS: Setting up listeners')
+    console.log('Cognia: Setting up listeners')
     const inputHandler = (e: Event) => {
       handleTyping()
     }
@@ -2019,7 +2019,7 @@ function debugAIChatElements(): void {
     chatInput.addEventListener('keyup', inputHandler, true)
     chatInput.addEventListener('paste', inputHandler, true)
   } else {
-    console.log('RecallOS: No chat input found')
+    console.log('Cognia: No chat input found')
   }
 }
 ;(window as any).testMemoryInjection = async () => {
@@ -2029,7 +2029,7 @@ function debugAIChatElements(): void {
   } else {
   }
 }
-;(window as any).testRecallOSSearch = async (query = 'server boilerplates') => {
+;(window as any).testCogniaSearch = async (query = 'server boilerplates') => {
   try {
     const result = await getMemorySummary(query)
     return result
@@ -2037,7 +2037,7 @@ function debugAIChatElements(): void {
     return null
   }
 }
-;(window as any).checkRecallOSStatus = async () => {
+;(window as any).checkCogniaStatus = async () => {
   // const apiHealthy = await checkApiHealth();
   const apiEndpoint = await getApiEndpointForMemory()
 
@@ -2047,7 +2047,7 @@ function debugAIChatElements(): void {
     apiHealthy: true,
     platform: currentPlatform,
     chatInput: !!chatInput,
-    recallOSIcon: !!recallOSIcon,
+    cogniaIcon: !!cogniaIcon,
   }
 }
 

@@ -19,7 +19,17 @@ const getTimestamp = (): string => {
 const formatMessage = (args: unknown[], color: string, label: string): unknown[] => {
   const timestamp = `${colors.dim}${colors.gray}[${getTimestamp()}]${colors.reset}`
   const labelColor = `${color}${colors.bright}${label}${colors.reset}`
-  return [timestamp, labelColor, ...args]
+  const line = args
+    .map(arg => {
+      if (typeof arg === 'string') return arg
+      try {
+        return JSON.stringify(arg)
+      } catch {
+        return String(arg)
+      }
+    })
+    .join(' ')
+  return [timestamp, labelColor, line]
 }
 
 const shouldUseColors = process.stdout.isTTY && process.env.NO_COLOR !== '1'
@@ -28,31 +38,35 @@ export const logger = {
   log: (...args: unknown[]) => {
     const formatted = shouldUseColors
       ? formatMessage(args, colors.cyan, 'LOG')
-      : [`[${getTimestamp()}]`, 'LOG', ...args]
+      : [`[${getTimestamp()}]`, 'LOG', args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')]
     console.log(...formatted)
   },
   error: (...args: unknown[]) => {
     const formatted = shouldUseColors
       ? formatMessage(args, colors.red, 'ERROR')
-      : [`[${getTimestamp()}]`, 'ERROR', ...args]
+      : [
+          `[${getTimestamp()}]`,
+          'ERROR',
+          args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' '),
+        ]
     console.error(...formatted)
   },
   warn: (...args: unknown[]) => {
     const formatted = shouldUseColors
       ? formatMessage(args, colors.yellow, 'WARN')
-      : [`[${getTimestamp()}]`, 'WARN', ...args]
+      : [`[${getTimestamp()}]`, 'WARN', args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')]
     console.warn(...formatted)
   },
   info: (...args: unknown[]) => {
     const formatted = shouldUseColors
       ? formatMessage(args, colors.blue, 'INFO')
-      : [`[${getTimestamp()}]`, 'INFO', ...args]
+      : [`[${getTimestamp()}]`, 'INFO', args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')]
     console.info(...formatted)
   },
   debug: (...args: unknown[]) => {
     const formatted = shouldUseColors
       ? formatMessage(args, colors.gray, 'DEBUG')
-      : [`[${getTimestamp()}]`, 'DEBUG', ...args]
+      : [`[${getTimestamp()}]`, 'DEBUG', args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')]
     console.debug(...formatted)
   },
 }

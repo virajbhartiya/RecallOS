@@ -302,7 +302,7 @@ async function setApiEndpoint(endpoint: string): Promise<void> {
   try {
     await storage.sync.set({ apiEndpoint: endpoint })
   } catch (error) {
-    console.error('RecallOS: Error setting API endpoint:', error)
+    console.error('Cognia: Error setting API endpoint:', error)
   }
 }
 

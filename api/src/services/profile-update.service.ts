@@ -106,7 +106,7 @@ export class ProfileUpdateService {
     }
 
     if (extractionResult.isFallback) {
-      logger.warn('Profile extraction used fallback, preserving existing profile')
+      logger.warn('[Profile Extraction] Fallback used - preserving existing profile')
       if (existingProfile) {
         return existingProfile as UserProfile
       }

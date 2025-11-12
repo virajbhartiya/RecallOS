@@ -1,69 +1,69 @@
 services:
   postgres:
     image: postgres:15
-    container_name: recallos_db
+    container_name: cognia_db
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: recallos
+      POSTGRES_DB: cognia
       POSTGRES_INITDB_ARGS: '--encoding=UTF-8 --lc-collate=C --lc-ctype=C'
     ports:
       - '5432:5432'
     volumes:
-      - recallos_data:/var/lib/postgresql/data
+      - cognia_data:/var/lib/postgresql/data
       - ./init-scripts:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U postgres -d recallos']
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d cognia']
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     networks:
-      - recallos_network
+      - cognia_network
 
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: recallos_qdrant
+    container_name: cognia_qdrant
     restart: unless-stopped
     ports:
       - '6333:6333'
       - '6334:6334'
     volumes:
-      - recallos_qdrant_data:/qdrant/storage
+      - cognia_qdrant_data:/qdrant/storage
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:6333/health']
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - recallos_network
+      - cognia_network
 
   redis:
     image: redis:7-alpine
-    container_name: recallos_redis
+    container_name: cognia_redis
     restart: unless-stopped
     command: ['redis-server', '--appendonly', 'yes']
     ports:
       - '6379:6379'
     volumes:
-      - recallos_redis_data:/data
+      - cognia_redis_data:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - recallos_network
+      - cognia_network
 
 volumes:
-  recallos_data:
+  cognia_data:
     driver: local
-  recallos_qdrant_data:
+  cognia_qdrant_data:
     driver: local
-  recallos_redis_data:
+  cognia_redis_data:
     driver: local
 
 networks:
-  recallos_network:
+  cognia_network:
     driver: bridge

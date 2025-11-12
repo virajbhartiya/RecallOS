@@ -34,11 +34,20 @@ const app = express()
 app.set('trust proxy', 1)
 app.use(cookieParser())
 
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'cognia-api',
+    uptime: Number(process.uptime().toFixed(3)),
+    timestamp: new Date().toISOString(),
+  })
+})
+
 let server: http.Server | https.Server
 if (process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true') {
   try {
-    const keyPath = process.env.HTTPS_KEY_PATH || './certs/api.recallos.test+3-key.pem'
-    const certPath = process.env.HTTPS_CERT_PATH || './certs/api.recallos.test+3.pem'
+    const keyPath = process.env.HTTPS_KEY_PATH || './certs/api.cognia.test+3-key.pem'
+    const certPath = process.env.HTTPS_CERT_PATH || './certs/api.cognia.test+3.pem'
     const httpsOptions = {
       key: fs.readFileSync(keyPath),
       cert: fs.readFileSync(certPath),
@@ -104,26 +113,67 @@ const getStatusColor = (status: number): string => {
   return colors.reset
 }
 
+const padColumn = (value: string | number | undefined | null, width: number): string => {
+  const str = value === undefined || value === null || value === '' ? '-' : String(value)
+  return str.length >= width ? str.slice(0, width) : str + ' '.repeat(width - str.length)
+}
+
+const formatDuration = (value: string | undefined, width: number): string => {
+  if (!value) return padColumn('-', width)
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return padColumn('-', width)
+  return padColumn(`${numeric.toFixed(3)} ms`, width)
+}
+
+const formatSize = (value: string | undefined | null, width: number): string => {
+  if (!value || value === '-' || value === '0') return padColumn('-', width)
+  return padColumn(`${value} B`, width)
+}
+
+const mapOutcome = (status: number): string => {
+  if (status >= 500) return 'Fail'
+  if (status >= 400) return 'Warn'
+  if (status >= 200) return 'OK'
+  if (status === 304) return 'Skip'
+  return '-'
+}
+
 const coloredMorganFormat = (tokens: morgan.TokenIndexer, req: Request, res: Response): string => {
   const method = tokens.method(req, res)
-  const status = tokens.status(req, res)
+  const statusRaw = tokens.status(req, res)
+  const status = Number(statusRaw ?? 0)
   const url = tokens.url(req, res)
   const responseTime = tokens['response-time'](req, res)
   const contentLength = tokens.res(req, res, 'content-length')
   const timestamp = tokens.timestamp(req, res)
 
-  const methodColor = getMethodColor(method)
-  const statusColor = getStatusColor(Number(status))
-  const timestampColor = shouldUseColors ? colors.dim + colors.gray : ''
-  const resetColor = shouldUseColors ? colors.reset : ''
+  const timestampBase = `[${timestamp}]`
+  const methodColumn = padColumn(method, 8)
+  const statusColumn = padColumn(statusRaw ?? '-', 6)
+  const durationColumn = formatDuration(responseTime, 12)
+  const sizeColumn = formatSize(contentLength, 10)
+  const outcomeColumn = padColumn(mapOutcome(status), 6)
 
-  const coloredMethod = shouldUseColors ? `${methodColor}${method}${resetColor}` : method
-  const coloredStatus = shouldUseColors ? `${statusColor}${status}${resetColor}` : status
-  const coloredTimestamp = shouldUseColors
-    ? `${timestampColor}${timestamp}${resetColor}`
-    : timestamp
+  if (!shouldUseColors) {
+    return `${timestampBase}  ${methodColumn}${statusColumn}${durationColumn}${sizeColumn}${outcomeColumn}${url}`
+  }
 
-  return `${coloredTimestamp} ${coloredMethod} ${url} ${coloredStatus} ${responseTime} ms - ${contentLength || '-'}`
+  const timestampColored = `${colors.dim}${colors.gray}${timestampBase}${colors.reset}`
+  const methodColored = `${getMethodColor(method)}${methodColumn}${colors.reset}`
+  const statusColored = `${getStatusColor(status)}${statusColumn}${colors.reset}`
+  const durationColored = `${colors.cyan}${durationColumn}${colors.reset}`
+  const sizeColored = `${colors.magenta}${sizeColumn}${colors.reset}`
+  const outcomeColor =
+    status >= 500
+      ? colors.red
+      : status >= 400
+        ? colors.yellow
+        : status === 304
+          ? colors.blue
+          : colors.green
+  const outcomeColored = `${outcomeColor}${outcomeColumn}${colors.reset}`
+
+  return `${timestampColored}  ${methodColored}${statusColored}${durationColored}${sizeColored}${outcomeColored}${url}`
 }
 
 app.use(morgan(coloredMorganFormat))

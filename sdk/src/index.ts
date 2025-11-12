@@ -7,14 +7,14 @@ import { SearchClient } from './clients/SearchClient'
 export type { ApiResponse, Pagination, Memory, MemoryMesh, MemorySnapshot, Insights, TransactionStats, SearchPostResponse, SearchJob, BlockscoutTxCached } from './types'
 export type { HttpClientOptions }
 
-export type RecallOSClient = {
+export type CogniaClient = {
   memory: MemoryClient
   content: ContentClient
   blockscout: BlockscoutClient
   search: SearchClient
 }
 
-export function createRecallOSClient(opts: HttpClientOptions): RecallOSClient {
+export function createCogniaClient(opts: HttpClientOptions): CogniaClient {
   const http = new HttpClient(opts)
   return {
     memory: new MemoryClient(http),

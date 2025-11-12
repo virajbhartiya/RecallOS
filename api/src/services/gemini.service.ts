@@ -336,23 +336,23 @@ Return clean, readable plain text only.`
     const keyTopics = metadata?.key_topics || []
 
     const baseContext = `
-    RecallOS Memory Context:
+    Cognia Memory Context:
     - This system captures, anchors, and reasons over user knowledge.
     - Each summary must preserve conceptual and factual signals that aid downstream embedding and memory linkage.
     - Focus on what this content teaches, why it matters, and how it connects to user knowledge evolution.
     `
 
     const prompts: Record<string, string> = {
-      blog_post: `Summarize this blog post for RecallOS memory storage. Extract conceptual essence, useful principles, and any links to AI reasoning or systems thinking. Limit to 200 words.`,
+      blog_post: `Summarize this blog post for Cognia memory storage. Extract conceptual essence, useful principles, and any links to AI reasoning or systems thinking. Limit to 200 words.`,
       article: `Summarize this article emphasizing the knowledge kernel — ideas worth recalling in context of verifiable cognition. Capture main argument, supporting evidence, and conceptual contribution. 200 words max.`,
       documentation: `Summarize this documentation for knowledge anchoring. Include system purpose, key methods, conceptual model, and when it's relevant. Preserve implementation-level cues for recall. 200 words.`,
       tutorial: `Summarize this tutorial as a learning trace. Identify goal, key procedures, conceptual lessons, and result. Summaries must support future reasoning and contextual recall. 200 words.`,
       news_article: `Summarize this news article for cognition memory. Focus on what happened, implications, and how it alters knowledge or perception. 200 words.`,
-      code_repository: `Summarize this repository for embedding into RecallOS. Include purpose, architecture, dependencies, and conceptual innovation. Avoid trivial descriptions. 200 words.`,
+      code_repository: `Summarize this repository for embedding into Cognia. Include purpose, architecture, dependencies, and conceptual innovation. Avoid trivial descriptions. 200 words.`,
       qa_thread: `Summarize this Q&A for recall. Capture the problem, reasoning behind the best answer, and generalizable lessons. 200 words.`,
       video_content: `Summarize this video for conceptual retention. Capture teaching points, narrative logic, and actionable outcomes. 200 words.`,
       social_media: `Summarize this post as an idea capsule. Focus on expressed insight, argument, and why it may shape user reasoning. 150 words.`,
-      default: `Summarize this content for RecallOS memory graph. Capture topic, insights, implications, and long-term relevance. 200 words.`,
+      default: `Summarize this content for Cognia memory graph. Capture topic, insights, implications, and long-term relevance. 200 words.`,
     }
 
     const prompt = `
@@ -448,7 +448,7 @@ Raw Content: ${rawText}
     const contentType = metadata?.content_type || 'web_page'
 
     const prompt = `
-RecallOS Context:
+Cognia Context:
 - You are structuring content for verifiable personal cognition.
 - Metadata must improve future reasoning, search, and memory linking.
 
@@ -632,7 +632,7 @@ Return ONLY the JSON object:`
     this.ensureInit()
 
     const prompt = `
-RecallOS Memory Relationship Evaluation
+Cognia Memory Relationship Evaluation
 - You are mapping conceptual and temporal relationships within a user's verifiable cognition graph.
 - Relationships exist when memories share conceptual, methodological, or contextual synergy useful for reasoning.
 

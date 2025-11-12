@@ -1,4 +1,4 @@
-# RecallOS - Personal Memory System
+# Cognia - Personal Memory System
 
 > An AI-powered knowledge graph for capturing, organizing, and retrieving your digital context.
 <img width="1582" height="976" alt="Screenshot 2025-11-04 at 2 17 22 AM" src="https://github.com/user-attachments/assets/3f42dfd1-237a-41a6-81bc-dc7635307a8e" />
@@ -216,7 +216,7 @@ npm run build
 
 ## Usage
 
-RecallOS provides multiple ways to capture and interact with your knowledge:
+Cognia provides multiple ways to capture and interact with your knowledge:
 
 - **Browser Extension**: Automatically captures web content as you browse, with smart deduplication and privacy-aware detection
 - **Web Client**: Manual memory entry with rich editing and visualization tools

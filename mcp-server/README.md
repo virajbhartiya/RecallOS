@@ -1,6 +1,6 @@
-## RecallOS MCP Server
+## Cognia MCP Server
 
-Dual-mode MCP server exposing RecallOS features via MCP tools.
+Dual-mode MCP server exposing Cognia features via MCP tools.
 
 ### Prereqs
 - Populate `api/.env` with `DATABASE_URL` (and optional `REDIS_*`, `GEMINI_API_KEY`).

@@ -121,11 +121,9 @@ export const submitContent = async (
               ...existingMemory,
               timestamp: existingMemory.timestamp ? existingMemory.timestamp.toString() : null,
             }
-            logger.log('[Content API] URL duplicate detected, skipping queue', {
-              existingMemoryId: existingMemory.id,
-              similarity,
-              userId: user_id,
-            })
+            logger.log(
+              `[Content] skip url-duplicate user=${user_id} memory=${existingMemory.id} similarity=${similarity.toFixed(3)}`
+            )
             return res.status(200).json({
               status: 'success',
               message: 'Duplicate memory detected by URL similarity, returning existing record',
@@ -149,14 +147,9 @@ export const submitContent = async (
     const job = await addContentJob(jobData)
 
     if (job.isDuplicate) {
-      logger.log(`[Content API] Duplicate job detected in queue, returning existing job`, {
-        jobId: job.id,
-        userId: user_id,
-        contentLength: raw_text.length,
-        source: metadata?.source || 'unknown',
-        url: metadata?.url || 'unknown',
-        timestamp: new Date().toISOString(),
-      })
+      logger.log(
+        `[Content] skip queued-duplicate job=${job.id} user=${user_id} len=${raw_text.length} source=${metadata?.source || 'unknown'}`
+      )
 
       return res.status(200).json({
         status: 'success',
@@ -171,14 +164,9 @@ export const submitContent = async (
       })
     }
 
-    logger.log(`[Content API] Content submitted and queued for processing`, {
-      jobId: job.id,
-      userId: user_id,
-      contentLength: raw_text.length,
-      source: metadata?.source || 'unknown',
-      url: metadata?.url || 'unknown',
-      timestamp: new Date().toISOString(),
-    })
+    logger.log(
+      `[Content] queued job=${job.id} user=${user_id} len=${raw_text.length} source=${metadata?.source || 'unknown'}`
+    )
 
     res.status(202).json({
       status: 'success',

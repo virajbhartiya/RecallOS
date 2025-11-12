@@ -167,7 +167,7 @@ ${allMemories}`
   }
 
   private buildExtractionPrompt(memoryContext: string): string {
-    return `You are RecallOS profile extraction system. Your task is to deeply understand WHO this user is as a person, not just what they do. Analyze their memories to build a comprehensive, deeply personalized profile that captures their essence, personality, preferences, and unique characteristics.
+    return `You are Cognia profile extraction system. Your task is to deeply understand WHO this user is as a person, not just what they do. Analyze their memories to build a comprehensive, deeply personalized profile that captures their essence, personality, preferences, and unique characteristics.
 
 CRITICAL: Return ONLY valid JSON. No explanations, no markdown formatting, no code blocks, no special characters. Just the JSON object.
 

@@ -59,7 +59,7 @@ export async function getUserId(): Promise<string> {
 
 async function getTokenFromCookie(): Promise<string | null> {
   try {
-    const cookieNames = ['recallos_session', 'recallos_session_dev']
+    const cookieNames = ['cognia_session', 'cognia_session_dev']
     const apiUrl = await getApiBaseUrl()
 
     if (!apiUrl) {

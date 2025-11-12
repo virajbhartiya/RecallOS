@@ -11,7 +11,7 @@ import './util/env'
 async function main() {
   const mode = process.argv.includes('--server') ? 'server' : 'stdio'
 
-  const server = new Server({ name: 'recallos-mcp', version: '0.1.0' })
+  const server = new Server({ name: 'cognia-mcp', version: '0.1.0' })
   // Register tools
   for (const t of [...memoryTools, ...searchTools, ...meshTools, ...blockscoutTools, ...contentTools]) {
     server.addTool(t)
