@@ -9,7 +9,7 @@ const steps = [
     color: "blue",
     title: "Browse Naturally",
     description:
-      "Just browse the web as you normally do. RecallOS quietly captures what you read and learn.",
+      "Just browse the web as you normally do. Cognia quietly captures what you read and learn.",
     features: [
       "Works in the background",
       "No interruption to your flow",
@@ -33,7 +33,7 @@ const steps = [
     color: "purple",
     title: "Connects Ideas",
     description:
-      "RecallOS finds connections between different pages and topics, building your personal knowledge web.",
+      "Cognia finds connections between different pages and topics, building your personal knowledge web.",
     features: [
       "Links related content",
       "Builds knowledge connections",
@@ -65,7 +65,7 @@ const steps = [
     color: "indigo",
     title: "Works with ChatGPT",
     description:
-      "When you chat with AI, RecallOS automatically shares relevant memories to give you better answers.",
+      "When you chat with AI, Cognia automatically shares relevant memories to give you better answers.",
     features: [
       "Automatic memory sharing",
       "Better AI conversations",
@@ -121,7 +121,7 @@ export const HowItWorks: React.FC = () => {
     <Section className="bg-gray-50">
       <div className="text-center mb-12">
         <h2 className="text-3xl font-light font-editorial mb-4">
-          How RecallOS Works
+          How Cognia Works
         </h2>
         <p className="text-lg text-gray-600 max-w-3xl mx-auto">
           Turn your browsing into a powerful, searchable memory that works with

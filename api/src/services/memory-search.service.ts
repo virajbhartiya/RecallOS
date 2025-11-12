@@ -411,7 +411,7 @@ export async function searchMemories(params: {
       return { query: normalized, results: [], answer: undefined }
     }
   }
-  const salt = process.env.SEARCH_EMBED_SALT || 'recallos'
+  const salt = process.env.SEARCH_EMBED_SALT || 'cognia'
   const embeddingHash = sha256Hex(
     JSON.stringify({ model: GEMINI_EMBED_MODEL, values: embedding.slice(0, 64), salt })
   )
@@ -700,7 +700,7 @@ ${title ? title + '\n' : ''}${url ? url + '\n' : ''}Summary: ${summary}`
       const profileContext = await profileUpdateService.getProfileContext(userId)
       const profileSection = profileContext ? `\n\nUser Profile Context:\n${profileContext}\n` : ''
 
-      const ansPrompt = `You are RecallOS. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
+      const ansPrompt = `You are Cognia. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
 
 Rules:
 - Use inline numeric citations like [1], [2].

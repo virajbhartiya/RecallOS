@@ -66,7 +66,7 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
               return `- [${i + 1}] ${date} ${r.summary || ''}`.trim()
             })
             .join('\n')
-          const ansPrompt = `You are RecallOS. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
+          const ansPrompt = `You are Cognia. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
 
 Rules:
 - Use inline numeric citations like [1], [2].

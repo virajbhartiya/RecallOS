@@ -34,11 +34,20 @@ const app = express()
 app.set('trust proxy', 1)
 app.use(cookieParser())
 
+app.get('/health', (_req: Request, res: Response) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'cognia-api',
+    uptime: Number(process.uptime().toFixed(3)),
+    timestamp: new Date().toISOString(),
+  })
+})
+
 let server: http.Server | https.Server
 if (process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true') {
   try {
-    const keyPath = process.env.HTTPS_KEY_PATH || './certs/api.recallos.test+3-key.pem'
-    const certPath = process.env.HTTPS_CERT_PATH || './certs/api.recallos.test+3.pem'
+    const keyPath = process.env.HTTPS_KEY_PATH || './certs/api.cognia.test+3-key.pem'
+    const certPath = process.env.HTTPS_CERT_PATH || './certs/api.cognia.test+3.pem'
     const httpsOptions = {
       key: fs.readFileSync(keyPath),
       cert: fs.readFileSync(certPath),
@@ -104,6 +113,24 @@ const getStatusColor = (status: number): string => {
   return colors.reset
 }
 
+const padColumn = (value: string, length: number, align: 'left' | 'right' = 'left'): string => {
+  const str = value ?? '-'
+  if (str.length >= length) return str
+  return align === 'left' ? str.padEnd(length) : str.padStart(length)
+}
+
+const formatDuration = (value: string | undefined): string => {
+  if (!value) return '-'
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return '-'
+  return `${numeric.toFixed(3)} ms`
+}
+
+const formatSize = (value: string | undefined): string => {
+  if (!value || value === '-') return '-'
+  return `${value} B`
+}
+
 const coloredMorganFormat = (tokens: morgan.TokenIndexer, req: Request, res: Response): string => {
   const method = tokens.method(req, res)
   const status = tokens.status(req, res)
@@ -114,16 +141,27 @@ const coloredMorganFormat = (tokens: morgan.TokenIndexer, req: Request, res: Res
 
   const methodColor = getMethodColor(method)
   const statusColor = getStatusColor(Number(status))
+  const timestampBase = `[${timestamp}]`
+  const durationBase = formatDuration(responseTime)
+  const sizeBase = formatSize(contentLength)
+
   const timestampColor = shouldUseColors ? colors.dim + colors.gray : ''
   const resetColor = shouldUseColors ? colors.reset : ''
 
-  const coloredMethod = shouldUseColors ? `${methodColor}${method}${resetColor}` : method
-  const coloredStatus = shouldUseColors ? `${statusColor}${status}${resetColor}` : status
-  const coloredTimestamp = shouldUseColors
-    ? `${timestampColor}${timestamp}${resetColor}`
-    : timestamp
+  const methodColumn = padColumn(method, 7)
+  const statusColumn = padColumn(status ?? '-', 4)
+  const durationColumn = padColumn(durationBase, 12)
+  const sizeColumn = padColumn(sizeBase, 10)
 
-  return `${coloredTimestamp} ${coloredMethod} ${url} ${coloredStatus} ${responseTime} ms - ${contentLength || '-'}`
+  const coloredMethod = shouldUseColors ? `${methodColor}${methodColumn}${resetColor}` : methodColumn
+  const coloredStatus = shouldUseColors ? `${statusColor}${statusColumn}${resetColor}` : statusColumn
+  const coloredTimestamp = shouldUseColors
+    ? `${timestampColor}${timestampBase}${resetColor}`
+    : timestampBase
+  const coloredDuration = shouldUseColors ? `${colors.cyan}${durationColumn}${resetColor}` : durationColumn
+  const coloredSize = shouldUseColors ? `${colors.magenta}${sizeColumn}${resetColor}` : sizeColumn
+
+  return `${coloredTimestamp}  ${coloredMethod}  ${coloredStatus}  ${coloredDuration}  ${coloredSize}  ${url}`
 }
 
 app.use(morgan(coloredMorganFormat))

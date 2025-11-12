@@ -234,7 +234,7 @@ export const Login = () => {
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-bold text-italics font-editorial text-black">
-                  RecallOS
+                  Cognia
                 </span>
                 <span className="text-xs text-gray-600 font-mono -mt-1">
                   Remember what the web showed you
@@ -253,7 +253,7 @@ export const Login = () => {
                 </h2>
                 <p className="text-sm text-gray-600">
                   {isRegister
-                    ? "Get started with RecallOS today"
+                    ? "Get started with Cognia today"
                     : "Enter your credentials to continue"}
                 </p>
               </div>

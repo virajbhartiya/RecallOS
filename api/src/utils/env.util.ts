@@ -1,9 +1,9 @@
 export function getCookieDomain(): string {
-  return process.env.COOKIE_DOMAIN || '.recallos.xyz'
+  return process.env.COOKIE_DOMAIN || '.cognia.xyz'
 }
 
 export function getSessionCookieName(): string {
-  return process.env.SESSION_COOKIE_NAME || 'recallos_session'
+  return process.env.SESSION_COOKIE_NAME || 'cognia_session'
 }
 
 export function isCookieSecure(): boolean {

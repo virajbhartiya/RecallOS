@@ -10,7 +10,7 @@ export function setAuthCookie(
   const name = getSessionCookieName()
   const cookieDomain = getCookieDomain()
   const isLocalhost =
-    process.env.NODE_ENV !== 'production' || !cookieDomain || cookieDomain === '.recallos.xyz'
+    process.env.NODE_ENV !== 'production' || !cookieDomain || cookieDomain === '.cognia.xyz'
 
   interface CookieOptions {
     httpOnly: boolean
@@ -54,7 +54,7 @@ export function clearAuthCookie(res: Response): void {
   const cookieDomain = getCookieDomain()
 
   // Clear cookie with domain if set
-  if (cookieDomain && cookieDomain !== '.recallos.xyz') {
+  if (cookieDomain && cookieDomain !== '.cognia.xyz') {
     res.clearCookie(name, {
       httpOnly: true,
       secure: isCookieSecure(),

@@ -1,4 +1,4 @@
-# RecallOS Browser Extension
+# Cognia Browser Extension
 
 A browser extension that automatically captures and processes your web browsing activity to create a searchable, AI-powered memory network.
 
@@ -17,7 +17,7 @@ A browser extension that automatically captures and processes your web browsing 
 
 Since the extension is not yet published to the Chrome Web Store, you'll need to install it manually:
 
-1. **Download**: Get the latest release from [GitHub Releases](https://github.com/virajbhartiya/RecallOS/releases/latest)
+1. **Download**: Get the latest release from [GitHub Releases](https://github.com/virajbhartiya/Cognia/releases/latest)
 2. **Extract**: Unzip the downloaded file to a folder on your computer
 3. **Install**: Load the extension in Chrome/Edge developer mode
 4. **Configure**: Set your API endpoint and preferences
@@ -27,7 +27,7 @@ Since the extension is not yet published to the Chrome Web Store, you'll need to
 ### Usage
 
 1. **Browse Normally**: Just use the web as you normally do
-2. **Automatic Capture**: RecallOS quietly captures and processes content in the background
+2. **Automatic Capture**: Cognia quietly captures and processes content in the background
 3. **Search Memories**: Use the extension popup to search your captured memories
 4. **AI Integration**: Chat with AI tools that now have access to your memory network
 
@@ -118,9 +118,9 @@ This project is licensed under the MIT License - see the main repository for det
 ## Support
 
 - **Documentation**: Check the main [README.md](../README.md)
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/virajbhartiya/RecallOS/issues)
+- **Issues**: Report bugs on [GitHub Issues](https://github.com/virajbhartiya/Cognia/issues)
 - **Discussions**: Join community discussions in GitHub Discussions
 
 ---
 
-**Note**: This is a development version of RecallOS. The extension is still in development and may have bugs or incomplete features.
+**Note**: This is a development version of Cognia. The extension is still in development and may have bugs or incomplete features.

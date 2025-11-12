@@ -1,6 +1,30 @@
 import { profileUpdateService } from '../services/profile-update.service'
 import { logger } from '../utils/logger.util'
 
+const noMemoriesCooldown = new Map<string, number>()
+const getCooldownMs = () =>
+  Number(process.env.PROFILE_NO_MEMORIES_COOLDOWN_HOURS || 6) * 60 * 60 * 1000
+
+const isWithinCooldown = (userId: string): boolean => {
+  const until = noMemoriesCooldown.get(userId)
+  if (!until) return false
+  if (Date.now() < until) return true
+  noMemoriesCooldown.delete(userId)
+  return false
+}
+
+const scheduleCooldown = (userId: string) => {
+  const cooldownMs = getCooldownMs()
+  if (cooldownMs <= 0) return
+  noMemoriesCooldown.set(userId, Date.now() + cooldownMs)
+}
+
+const extractErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
+
+const isNoMemoriesError = (error: unknown): boolean =>
+  extractErrorMessage(error).toLowerCase().includes('no memories')
+
 export const startProfileWorker = async (
   daysSinceLastUpdate: number = 7,
   hoursSinceLastUpdate?: number
@@ -17,25 +41,60 @@ export const startProfileWorker = async (
 
     let updated = 0
     let failed = 0
+    let skipped = 0
 
     for (const userId of userIds) {
+      if (isWithinCooldown(userId)) {
+        skipped++
+        logger.log('[Profile Worker] Skipping profile update (cooldown active)', {
+          ts: new Date().toISOString(),
+          userId,
+          cooldownUntil: new Date(noMemoriesCooldown.get(userId) || Date.now()).toISOString(),
+        })
+        continue
+      }
+
+      const attemptUpdate = async () => profileUpdateService.updateUserProfile(userId, true)
+
       try {
         try {
-          await profileUpdateService.updateUserProfile(userId, true)
+          await attemptUpdate()
         } catch (error) {
+          if (isNoMemoriesError(error)) {
+            scheduleCooldown(userId)
+            skipped++
+            logger.warn('[Profile Worker] Skipping profile update (no memories)', {
+              ts: new Date().toISOString(),
+              userId,
+              cooldownHours: Number(process.env.PROFILE_NO_MEMORIES_COOLDOWN_HOURS || 6),
+            })
+            continue
+          }
+
           logger.error('[Profile Worker] Error updating profile, retrying once', {
             ts: new Date().toISOString(),
             userId,
-            error: error instanceof Error ? error.message : String(error),
+            error: extractErrorMessage(error),
           })
 
           try {
-            await profileUpdateService.updateUserProfile(userId, true)
+            await attemptUpdate()
           } catch (retryError) {
+            if (isNoMemoriesError(retryError)) {
+              scheduleCooldown(userId)
+              skipped++
+              logger.warn('[Profile Worker] Skipping profile update after retry (no memories)', {
+                ts: new Date().toISOString(),
+                userId,
+                cooldownHours: Number(process.env.PROFILE_NO_MEMORIES_COOLDOWN_HOURS || 6),
+              })
+              continue
+            }
+
             logger.error('[Profile Worker] Error updating profile on retry', {
               ts: new Date().toISOString(),
               userId,
-              error: retryError instanceof Error ? retryError.message : String(retryError),
+              error: extractErrorMessage(retryError),
             })
             throw retryError
           }
@@ -47,12 +106,12 @@ export const startProfileWorker = async (
         logger.error('[Profile Worker] Error updating profile', {
           ts: new Date().toISOString(),
           userId,
-          error: error instanceof Error ? error.message : String(error),
+          error: extractErrorMessage(error),
         })
       }
     }
 
-    return { updated, failed }
+    return { updated, failed, skipped }
   } catch (error) {
     logger.error('[Profile Worker] Batch update failed', {
       ts: new Date().toISOString(),

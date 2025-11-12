@@ -178,7 +178,7 @@ export const Landing = () => {
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-bold text-italics font-editorial text-black">
-                  RecallOS
+                  Cognia
                 </span>
                 <span className="text-xs text-gray-600 font-mono -mt-1">
                   Remember what the web showed you
@@ -192,7 +192,7 @@ export const Landing = () => {
                 className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
                 onClick={() =>
                   window.open(
-                    "https://github.com/virajbhartiya/RecallOS/releases/latest",
+                    "https://github.com/virajbhartiya/Cognia/releases/latest",
                     "_blank"
                   )
                 }
@@ -256,7 +256,7 @@ export const Landing = () => {
                 className="group relative overflow-hidden rounded-none px-3 py-2 transition-all duration-200 hover:shadow-md"
                 onClick={() =>
                   window.open(
-                    "https://github.com/virajbhartiya/RecallOS/releases/latest",
+                    "https://github.com/virajbhartiya/Cognia/releases/latest",
                     "_blank"
                   )
                 }
@@ -401,7 +401,7 @@ export const Landing = () => {
                   : "none",
               }}
             >
-              RecallOS is your photographic memory for the web, capturing text,
+              Cognia is your photographic memory for the web, capturing text,
               links and context as you browse so you can find it in seconds.
             </p>
 
@@ -420,7 +420,7 @@ export const Landing = () => {
                   className="group relative overflow-hidden flex-1 sm:flex-none sm:min-w-[160px] rounded-none px-4 py-2 transition-all duration-200 hover:shadow-md"
                   onClick={() =>
                     window.open(
-                      "https://github.com/virajbhartiya/RecallOS/releases/latest",
+                      "https://github.com/virajbhartiya/Cognia/releases/latest",
                       "_blank"
                     )
                   }
@@ -631,7 +631,7 @@ export const Landing = () => {
                   R
                 </div>
                 <div className="text-sm text-gray-800 font-medium">
-                  RecallOS
+                  Cognia
                 </div>
               </div>
               <p className="text-sm text-gray-600">
@@ -666,7 +666,7 @@ export const Landing = () => {
                 <button
                   onClick={() =>
                     window.open(
-                      "https://github.com/virajbhartiya/RecallOS",
+                      "https://github.com/virajbhartiya/Cognia",
                       "_blank"
                     )
                   }
@@ -726,14 +726,14 @@ export const Landing = () => {
 
           <div className="mt-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-[12px] text-gray-600">
             <div>
-              © {new Date().getFullYear()} RecallOS. All rights reserved.
+              © {new Date().getFullYear()} Cognia. All rights reserved.
             </div>
             <div className="flex flex-wrap gap-4">
               <button
                 className="block hover:underline"
                 onClick={() =>
                   window.open(
-                    "https://github.com/virajbhartiya/RecallOS",
+                    "https://github.com/virajbhartiya/Cognia",
                     "_blank"
                   )
                 }

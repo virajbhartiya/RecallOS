@@ -1,8 +1,8 @@
-# RecallOS Extension Installation Guide
+# Cognia Extension Installation Guide
 
 ## Quick Start (4 Steps)
 
-1. **Download**: [Get the latest release](https://github.com/virajbhartiya/RecallOS/releases/latest)
+1. **Download**: [Get the latest release](https://github.com/virajbhartiya/Cognia/releases/latest)
 2. **Extract**: Unzip the downloaded file
 3. **Enable**: Chrome/Edge → Extensions → Developer mode → ON
 4. **Load**: Click "Load unpacked" → Select the extracted folder
@@ -13,7 +13,7 @@
 
 ## Overview
 
-RecallOS is a browser extension that automatically captures and processes your web browsing activity to create a searchable, AI-powered memory network. Since the extension is not yet published to the Chrome Web Store, you'll need to install it manually using Chrome's developer mode.
+Cognia is a browser extension that automatically captures and processes your web browsing activity to create a searchable, AI-powered memory network. Since the extension is not yet published to the Chrome Web Store, you'll need to install it manually using Chrome's developer mode.
 
 ## Prerequisites
 
@@ -25,15 +25,15 @@ RecallOS is a browser extension that automatically captures and processes your w
 
 ### Step 1: Download the Extension
 
-1. Go to the [RecallOS GitHub Releases page](https://github.com/virajbhartiya/RecallOS/releases/latest)
-2. Look for the latest release with a file named `recallos-extension-vX.X.X.zip`
+1. Go to the [Cognia GitHub Releases page](https://github.com/virajbhartiya/Cognia/releases/latest)
+2. Look for the latest release with a file named `cognia-extension-vX.X.X.zip`
 3. Click the download link to save the zip file to your computer
 4. Note the location where you saved the file (usually your Downloads folder)
 
 ### Step 2: Extract the Extension Files
 
 1. Navigate to the folder where you downloaded the zip file
-2. Right-click on the `recallos-extension-vX.X.X.zip` file
+2. Right-click on the `cognia-extension-vX.X.X.zip` file
 3. Select "Extract All" or "Extract Here" (depending on your operating system)
 4. This will create a new folder with the extension files
 5. **Important**: Remember the location of this extracted folder - you'll need it in the next step
@@ -61,16 +61,16 @@ RecallOS is a browser extension that automatically captures and processes your w
 
 ### Step 5: Verify Installation
 
-1. You should see the RecallOS extension appear in your extensions list
-2. Look for the RecallOS icon in your browser toolbar (top-right area)
-3. Click on the RecallOS icon to open the extension popup
-4. You should see the RecallOS interface with connection options
+1. You should see the Cognia extension appear in your extensions list
+2. Look for the Cognia icon in your browser toolbar (top-right area)
+3. Click on the Cognia icon to open the extension popup
+4. You should see the Cognia interface with connection options
 
 ## Post-Installation Setup
 
 ### Configure Settings (Optional)
 
-1. Click the RecallOS extension icon
+1. Click the Cognia extension icon
 2. Click on **"Settings"** or the gear icon
 3. Configure your preferences:
    - **Monitoring frequency**: How often to capture page content
@@ -93,12 +93,12 @@ RecallOS is a browser extension that automatically captures and processes your w
 
 ### Extension Icon Not Visible
 
-**Problem**: Can't find the RecallOS icon in the toolbar
+**Problem**: Can't find the Cognia icon in the toolbar
 
 **Solutions**:
 
 - Click the puzzle piece icon (Chrome) or extensions icon (Edge) in the toolbar
-- Look for RecallOS in the list and click the pin icon to pin it to the toolbar
+- Look for Cognia in the list and click the pin icon to pin it to the toolbar
 - Check if the extension is enabled in the extensions page
 
 ### API Connection Issues
@@ -117,14 +117,14 @@ RecallOS is a browser extension that automatically captures and processes your w
 
 **Solutions**:
 
-- Go to the extensions page and click "Details" on RecallOS
+- Go to the extensions page and click "Details" on Cognia
 - Review and approve all required permissions
 - Make sure the extension has access to the sites you want to monitor
 
 ## Security Notes
 
 - **Developer Mode**: Installing unpacked extensions requires Developer mode, which is intended for developers
-- **Source Verification**: Only download the extension from the official RecallOS GitHub repository
+- **Source Verification**: Only download the extension from the official Cognia GitHub repository
 - **Permissions**: Review the extension permissions before installation
 - **Updates**: You'll need to manually update the extension by downloading new releases
 
@@ -133,7 +133,7 @@ RecallOS is a browser extension that automatically captures and processes your w
 If you need to remove the extension:
 
 1. Go to `chrome://extensions/` (Chrome) or `edge://extensions/` (Edge)
-2. Find RecallOS in the list
+2. Find Cognia in the list
 3. Click **"Remove"** or the trash icon
 4. Confirm the removal
 
@@ -141,7 +141,7 @@ If you need to remove the extension:
 
 If you encounter issues not covered in this guide:
 
-1. **Check the Issues**: Visit the [GitHub Issues page](https://github.com/virajbhartiya/RecallOS/issues)
+1. **Check the Issues**: Visit the [GitHub Issues page](https://github.com/virajbhartiya/Cognia/issues)
 2. **Read the Documentation**: Check the main [README.md](../README.md) for more information
 3. **Join the Community**: Look for community discussions in GitHub Discussions
 4. **Report Bugs**: Create a new issue on GitHub with detailed information about your problem
@@ -181,10 +181,10 @@ If you encounter issues not covered in this guide:
 ### Need Help?
 
 - 📖 **This Guide**: Complete installation and troubleshooting
-- 🐛 **Report Issues**: [GitHub Issues](https://github.com/virajbhartiya/RecallOS/issues)
-- 💬 **Get Support**: [GitHub Discussions](https://github.com/virajbhartiya/RecallOS/discussions)
+- 🐛 **Report Issues**: [GitHub Issues](https://github.com/virajbhartiya/Cognia/issues)
+- 💬 **Get Support**: [GitHub Discussions](https://github.com/virajbhartiya/Cognia/discussions)
 - 📚 **Documentation**: [Main README](../README.md)
 
 ---
 
-**Note**: This is a development version of RecallOS. The extension is still in development and may have bugs or incomplete features. Use at your own discretion and report any issues you encounter.
+**Note**: This is a development version of Cognia. The extension is still in development and may have bugs or incomplete features. Use at your own discretion and report any issues you encounter.

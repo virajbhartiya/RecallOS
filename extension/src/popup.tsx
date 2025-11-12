@@ -200,10 +200,10 @@ const Popup: React.FC = () => {
       <div className="border-b border-gray-200 px-4 py-3">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold text-base font-mono">
-            R
+            C
           </div>
           <div className="flex flex-col">
-            <span className="text-base font-bold text-black">RecallOS</span>
+            <span className="text-base font-bold text-black">Cognia</span>
             <span className="text-xs text-gray-600 font-mono -mt-0.5">
               Remember what the web showed you
             </span>

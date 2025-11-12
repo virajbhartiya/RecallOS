@@ -12,11 +12,11 @@ export default defineConfig({
         ? {
             key: fs.readFileSync(
               process.env.VITE_HTTPS_KEY_PATH ||
-                "./certs/app.recallos.test+3-key.pem"
+                "./certs/app.cognia.test+3-key.pem"
             ),
             cert: fs.readFileSync(
               process.env.VITE_HTTPS_CERT_PATH ||
-                "./certs/app.recallos.test+3.pem"
+                "./certs/app.cognia.test+3.pem"
             ),
           }
         : undefined,
@@ -48,9 +48,9 @@ export default defineConfig({
         "logo.png",
       ],
       manifest: {
-        name: "RecallOS",
-        short_name: "RecallOS",
-        description: "RecallOS - description",
+        name: "Cognia",
+        short_name: "Cognia",
+        description: "Cognia - description",
         icons: [
           {
             src: "/favicon-16x16.png",
