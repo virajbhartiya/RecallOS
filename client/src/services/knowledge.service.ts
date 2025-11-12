@@ -13,7 +13,7 @@ interface VelocityMetrics {
 
 interface ImpactMetrics {
   searchFrequency: number
-  recallEfficiency: number
+  retrievalEfficiency: number
   connectionStrength: number
   accessQuality: number
   impactScore: number

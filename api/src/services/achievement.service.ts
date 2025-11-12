@@ -90,8 +90,8 @@ const ACHIEVEMENTS: AchievementDefinition[] = [
     },
   },
   {
-    badgeType: 'recall_pro',
-    badgeName: 'Recall Pro',
+    badgeType: 'cognia_pro',
+    badgeName: 'Cognia Pro',
     checkProgress: async (userId: string) => {
       const count = await prisma.queryEvent.count({
         where: { user_id: userId },

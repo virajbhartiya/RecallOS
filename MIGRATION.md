@@ -38,7 +38,7 @@ The database name has changed from `recallos` to `cognia`. If you have existing 
 ### Option 2: Migrate Existing Data
 1. Export data from old database:
    ```bash
-   docker exec recallos_db pg_dump -U postgres recallos > backup.sql
+   docker exec cognia_db pg_dump -U postgres cognia > backup.sql
    ```
 2. Update docker-compose.yml (already done - uses `cognia_db` and `cognia` database)
 3. Start new containers:
@@ -65,10 +65,10 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/cognia
 ## Docker Volumes
 
 Old volumes (if they exist):
-- `recallos_data`
-- `recallos_qdrant_data`
-- `recallos_redis_data`
-- `recallos_network`
+- `cognia_data`
+- `cognia_qdrant_data`
+- `cognia_redis_data`
+- `cognia_network`
 
 New volumes:
 - `cognia_data`
@@ -91,5 +91,5 @@ Update `/etc/hosts` (or equivalent) to include:
 
 ## Extension IDs
 
-The Firefox extension ID has changed from `recallos@recallos.com` to `cognia@cognia.com`. If you have the extension installed, you may need to reinstall it.
+The Firefox extension ID is `cognia@cognia.com`. If you have the extension installed, you may need to reinstall it.
 

@@ -196,7 +196,7 @@ export const knowledgeVelocityService = {
     metrics: VelocityMetrics,
     impactMetrics: {
       searchFrequency: number
-      recallEfficiency: number
+      retrievalEfficiency: number
       connectionStrength: number
       accessQuality: number
       impactScore: number
@@ -227,7 +227,7 @@ export const knowledgeVelocityService = {
             consistency_score: metrics.consistencyScore,
             depth_balance: metrics.depthBalance,
             search_frequency: impactMetrics.searchFrequency,
-            recall_efficiency: impactMetrics.recallEfficiency,
+            retrieval_efficiency: impactMetrics.retrievalEfficiency,
             connection_strength: impactMetrics.connectionStrength,
             access_quality: impactMetrics.accessQuality,
           },
@@ -246,7 +246,7 @@ export const knowledgeVelocityService = {
             consistency_score: metrics.consistencyScore,
             depth_balance: metrics.depthBalance,
             search_frequency: impactMetrics.searchFrequency,
-            recall_efficiency: impactMetrics.recallEfficiency,
+            retrieval_efficiency: impactMetrics.retrievalEfficiency,
             connection_strength: impactMetrics.connectionStrength,
             access_quality: impactMetrics.accessQuality,
           },

@@ -235,7 +235,7 @@ export class KnowledgeController {
         velocityMetrics,
         {
           searchFrequency: impactMetrics.searchFrequency,
-          recallEfficiency: impactMetrics.recallEfficiency,
+          retrievalEfficiency: impactMetrics.retrievalEfficiency,
           connectionStrength: impactMetrics.connectionStrength,
           accessQuality: impactMetrics.accessQuality,
           impactScore: impactMetrics.impactScore,

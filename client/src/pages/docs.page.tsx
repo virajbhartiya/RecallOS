@@ -179,7 +179,7 @@ export const Docs = () => {
                   </li>
                   <li>
                     <strong>AI-summarizes</strong> content using Google Gemini
-                    for quick recall
+                    for quick access
                   </li>
                   <li>
                     <strong>Builds connections</strong> between related memories

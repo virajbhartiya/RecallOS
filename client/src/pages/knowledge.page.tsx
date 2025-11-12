@@ -205,9 +205,9 @@ export const Knowledge: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Recall Efficiency:</span>
+                    <span>Retrieval Efficiency:</span>
                     <span className="font-semibold">
-                      {formatScore(scores.impact.recallEfficiency)}
+                      {formatScore(scores.impact.retrievalEfficiency)}
                     </span>
                   </div>
                   <div className="flex justify-between">

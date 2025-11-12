@@ -5,7 +5,7 @@ type PeriodType = 'daily' | 'weekly'
 
 interface ImpactMetrics {
   searchFrequency: number
-  recallEfficiency: number
+  retrievalEfficiency: number
   connectionStrength: number
   accessQuality: number
   impactScore: number
@@ -75,7 +75,7 @@ export const knowledgeImpactService = {
 
       const avgSearchTime = 5.0
       const targetSearchTime = 2.0
-      const recallEfficiency = Math.min(100, Math.max(0, (targetSearchTime / avgSearchTime) * 100))
+      const retrievalEfficiency = Math.min(100, Math.max(0, (targetSearchTime / avgSearchTime) * 100))
 
       const avgSimilarity =
         relations.length > 0
@@ -107,13 +107,13 @@ export const knowledgeImpactService = {
 
       const impactScore =
         searchFrequency * 0.3 +
-        recallEfficiency * 0.25 +
+        retrievalEfficiency * 0.25 +
         connectionStrength * 0.25 +
         accessQuality * 0.2
 
       return {
         searchFrequency,
-        recallEfficiency,
+        retrievalEfficiency,
         connectionStrength,
         accessQuality,
         impactScore: Math.min(100, Math.max(0, impactScore)),
@@ -140,7 +140,7 @@ export const knowledgeImpactService = {
 
       return {
         searchFrequency: score.search_frequency,
-        recallEfficiency: score.recall_efficiency,
+        retrievalEfficiency: score.retrieval_efficiency,
         connectionStrength: score.connection_strength,
         accessQuality: score.access_quality,
         impactScore: score.impact_score,
@@ -209,7 +209,7 @@ export const knowledgeImpactService = {
           consistency_score: velocityMetrics.consistencyScore,
           depth_balance: velocityMetrics.depthBalance,
           search_frequency: metrics.searchFrequency,
-          recall_efficiency: metrics.recallEfficiency,
+          retrieval_efficiency: metrics.retrievalEfficiency,
           connection_strength: metrics.connectionStrength,
           access_quality: metrics.accessQuality,
         },
