@@ -11,3 +11,7 @@ certs/
 *.crt
 
 /generated/prisma
+
+# Log files
+logs/
+*.log

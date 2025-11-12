@@ -27,6 +27,7 @@ import { startCyclicKnowledgeScoreWorker } from './workers/knowledge-score-worke
 import { ensureCollection } from './lib/qdrant.lib'
 import { aiProvider } from './services/ai-provider.service'
 import { logger } from './utils/logger.util'
+import { getMorganOutputMode } from './utils/env.util'
 
 dotenv.config()
 
@@ -176,7 +177,40 @@ const coloredMorganFormat = (tokens: morgan.TokenIndexer, req: Request, res: Res
   return `${timestampColored}  ${methodColored}${statusColored}${durationColored}${sizeColored}${outcomeColored}${url}`
 }
 
-app.use(morgan(coloredMorganFormat))
+const plainMorganFormat = (tokens: morgan.TokenIndexer, req: Request, res: Response): string => {
+  const method = tokens.method(req, res)
+  const statusRaw = tokens.status(req, res)
+  const status = Number(statusRaw ?? 0)
+  const url = tokens.url(req, res)
+  const responseTime = tokens['response-time'](req, res)
+  const contentLength = tokens.res(req, res, 'content-length')
+  const timestamp = tokens.timestamp(req, res)
+
+  const timestampBase = `[${timestamp}]`
+  const methodColumn = padColumn(method, 8)
+  const statusColumn = padColumn(statusRaw ?? '-', 6)
+  const durationColumn = formatDuration(responseTime, 12)
+  const sizeColumn = formatSize(contentLength, 10)
+  const outcomeColumn = padColumn(mapOutcome(status), 6)
+
+  return `${timestampBase}  ${methodColumn}${statusColumn}${durationColumn}${sizeColumn}${outcomeColumn}${url}\n`
+}
+
+const morganOutputMode = getMorganOutputMode()
+
+const morganFileStream = {
+  write: (message: string) => {
+    logger.writeToFile(message)
+  },
+}
+
+if (morganOutputMode === 'print' || morganOutputMode === 'both') {
+  app.use(morgan(coloredMorganFormat))
+}
+
+if (morganOutputMode === 'log' || morganOutputMode === 'both') {
+  app.use(morgan(plainMorganFormat, { stream: morganFileStream }))
+}
 app.use(express.urlencoded({ extended: false, limit: '10mb' }))
 app.use(express.json({ limit: '10mb' }))
 import { getAllowedOrigins } from './utils/env.util'

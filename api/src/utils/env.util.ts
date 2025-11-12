@@ -68,3 +68,19 @@ export function getQueueStalledInterval() {
 export function getQueueMaxStalledCount() {
   return Number(process.env.QUEUE_MAX_STALLED_COUNT || 10)
 }
+
+export function getLoggerOutputMode(): 'print' | 'log' | 'both' | 'none' {
+  const mode = process.env.LOGGER_OUTPUT_MODE || 'log'
+  if (mode === 'print' || mode === 'log' || mode === 'both' || mode === 'none') return mode
+  return 'log'
+}
+
+export function getMorganOutputMode(): 'print' | 'log' | 'both' | 'none' {
+  const mode = process.env.MORGAN_OUTPUT_MODE || 'print'
+  if (mode === 'print' || mode === 'log' || mode === 'both' || mode === 'none') return mode
+  return 'print'
+}
+
+export function getLogFilePath(): string {
+  return process.env.LOG_FILE_PATH || './logs/app.log'
+}
