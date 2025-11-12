@@ -22,15 +22,20 @@ async function copyPublic() {
   const manifestContent = await readFile(manifestPath, 'utf-8')
   const manifest = JSON.parse(manifestContent)
 
-  // For Firefox, use background.scripts instead of service_worker
+  // For Firefox, write a compatibility manifest using background.scripts
   if (manifest.background?.service_worker) {
-    manifest.background = {
-      scripts: [manifest.background.service_worker],
+    const firefoxManifest = {
+      ...manifest,
+      background: {
+        scripts: [manifest.background.service_worker],
+      },
     }
-  }
 
-  // Write Firefox manifest
-  await writeFile(resolve(outDir, 'manifest.json'), JSON.stringify(manifest, null, 2))
+    await writeFile(
+      resolve(outDir, 'manifest-firefox.json'),
+      JSON.stringify(firefoxManifest, null, 2)
+    )
+  }
 }
 
 async function buildCSS() {
