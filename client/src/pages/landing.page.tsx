@@ -663,10 +663,7 @@ export const Landing = () => {
               <div className="flex items-center gap-4 pt-2">
                 <button
                   onClick={() =>
-                    window.open(
-                      "https://github.com/cogniahq/Cognia",
-                      "_blank"
-                    )
+                    window.open("https://github.com/cogniahq/Cognia", "_blank")
                   }
                   className="block text-sm text-gray-700 hover:underline text-left"
                 >
@@ -730,10 +727,7 @@ export const Landing = () => {
               <button
                 className="block hover:underline"
                 onClick={() =>
-                  window.open(
-                    "https://github.com/cogniahq/Cognia",
-                    "_blank"
-                  )
+                  window.open("https://github.com/cogniahq/Cognia", "_blank")
                 }
               >
                 GitHub

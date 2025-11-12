@@ -59,8 +59,10 @@ const logDir = path.dirname(logFilePath)
 let logFileStream: fs.WriteStream | null = null
 
 const needsFileStream =
-  (loggerOutputMode === 'log' || loggerOutputMode === 'both') ||
-  (morganOutputMode === 'log' || morganOutputMode === 'both')
+  loggerOutputMode === 'log' ||
+  loggerOutputMode === 'both' ||
+  morganOutputMode === 'log' ||
+  morganOutputMode === 'both'
 
 if (needsFileStream) {
   if (!fs.existsSync(logDir)) {
@@ -93,7 +95,7 @@ const writeToFile = (message: string) => {
 export const logger = {
   log: (...args: unknown[]) => {
     if (loggerOutputMode === 'none') return
-    
+
     const fileMessage = formatMessageForFile(args, 'LOG')
     const shouldPrint = loggerOutputMode === 'print' || loggerOutputMode === 'both'
     const shouldLog = loggerOutputMode === 'log' || loggerOutputMode === 'both'
@@ -114,7 +116,7 @@ export const logger = {
   },
   error: (...args: unknown[]) => {
     if (loggerOutputMode === 'none') return
-    
+
     const fileMessage = formatMessageForFile(args, 'ERROR')
     const shouldPrint = loggerOutputMode === 'print' || loggerOutputMode === 'both'
     const shouldLog = loggerOutputMode === 'log' || loggerOutputMode === 'both'
@@ -135,7 +137,7 @@ export const logger = {
   },
   warn: (...args: unknown[]) => {
     if (loggerOutputMode === 'none') return
-    
+
     const fileMessage = formatMessageForFile(args, 'WARN')
     const shouldPrint = loggerOutputMode === 'print' || loggerOutputMode === 'both'
     const shouldLog = loggerOutputMode === 'log' || loggerOutputMode === 'both'
@@ -156,7 +158,7 @@ export const logger = {
   },
   info: (...args: unknown[]) => {
     if (loggerOutputMode === 'none') return
-    
+
     const fileMessage = formatMessageForFile(args, 'INFO')
     const shouldPrint = loggerOutputMode === 'print' || loggerOutputMode === 'both'
     const shouldLog = loggerOutputMode === 'log' || loggerOutputMode === 'both'
@@ -177,7 +179,7 @@ export const logger = {
   },
   debug: (...args: unknown[]) => {
     if (loggerOutputMode === 'none') return
-    
+
     const fileMessage = formatMessageForFile(args, 'DEBUG')
     const shouldPrint = loggerOutputMode === 'print' || loggerOutputMode === 'both'
     const shouldLog = loggerOutputMode === 'log' || loggerOutputMode === 'both'
