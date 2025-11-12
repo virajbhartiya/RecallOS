@@ -31,17 +31,7 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your values:
-# - DATABASE_URL
-# - QDRANT_URL (default: http://localhost:6333)
-# - QDRANT_API_KEY (optional, for production)
-# - EMBEDDING_DIMENSION (default: 768)
-# - REDIS_URL
-# - GEMINI_API_KEY (or OLLAMA_BASE_URL)
-# - JWT_SECRET
-# - SESSION_COOKIE_NAME
-# - COOKIE_DOMAIN
-# - CORS_ALLOWED_ORIGINS
+# Edit .env with your values (see .env.example for details)
 
 # Run migrations
 npm run db:migrate
@@ -61,8 +51,7 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Edit .env with:
-# - VITE_API_URL=http://localhost:3000
+# Edit .env with your values (see .env.example for details)
 
 # Start development server
 npm run dev
@@ -131,7 +120,7 @@ npm run build
                         │
           ┌─────────────┬───────────┐
           │             │           │
-     ┌────▼─────┐  ┌────▼─────┐ ┌────▼─────┐
+     ┌────▼─────┐  ┌────▼─────┐ ┌────▼────┐
      │PostgreSQL│  │ Qdrant   │ │  Redis  │
      │ Database │  │Vectors   │ │ Queue   │
      └──────────┘  └──────────┘ └─────────┘
@@ -242,6 +231,18 @@ Visualize your knowledge as an interactive 3D force-directed graph, where nodes 
 
 ---
 
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for:
+
+- Development setup and workflow
+- Coding standards and conventions
+- Commit message format
+- Pull request process
+- Issue reporting guidelines
+
+---
+
 ## Deployment
 
 ### API (Railway/Render)
@@ -286,11 +287,3 @@ Visualize your knowledge as an interactive 3D force-directed graph, where nodes 
 - **Ingestion**: 2-5s synchronous, 5-30s async processing, 10-20 memories/minute throughput
 - **Search**: <100ms vector similarity (Qdrant), 5-15s AI answer generation
 - **Database**: 1M+ memories, 10M+ relations, <100ms query performance
-
----
-
-## Security
-
-JWT-based authentication with bcryptjs password hashing (12 rounds). HttpOnly, Secure session cookies for web clients. User-scoped data isolation via authentication middleware. SQL injection prevented via Prisma ORM. XSS protection via React auto-escaping. CORS with allowlisted origins and credentials support.
-
-**Cookies & CORS**: API issues `HttpOnly; Secure; SameSite=None` cookies. CORS allows only configured origins with `credentials: true`. For local HTTPS, see `cookie.plan.md` or set `HTTPS_ENABLE=true` with mkcert key/cert paths.
