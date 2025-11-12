@@ -17,7 +17,7 @@ A browser extension that automatically captures and processes your web browsing 
 
 Since the extension is not yet published to the Chrome Web Store, you'll need to install it manually:
 
-1. **Download**: Get the latest release from [GitHub Releases](https://github.com/virajbhartiya/Cognia/releases/latest)
+1. **Download**: Get the latest release from [GitHub Releases](https://github.com/cogniahq/Cognia/releases/latest)
 2. **Extract**: Unzip the downloaded file to a folder on your computer
 3. **Install**: Load the extension in Chrome/Edge developer mode
 4. **Configure**: Set your API endpoint and preferences
@@ -118,7 +118,7 @@ This project is licensed under the MIT License - see the main repository for det
 ## Support
 
 - **Documentation**: Check the main [README.md](../README.md)
-- **Issues**: Report bugs on [GitHub Issues](https://github.com/virajbhartiya/Cognia/issues)
+- **Issues**: Report bugs on [GitHub Issues](https://github.com/cogniahq/Cognia/issues)
 - **Discussions**: Join community discussions in GitHub Discussions
 
 ---

@@ -1015,7 +1015,7 @@ Error response:
                 </p>
                 <div className="flex items-center justify-center gap-4">
                   <a
-                    href="https://github.com/virajbhartiya/Cognia"
+                    href="https://github.com/cogniahq/Cognia"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-4 py-2 bg-black text-white text-sm hover:bg-gray-800 transition-colors"

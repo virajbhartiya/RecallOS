@@ -2,7 +2,7 @@
 
 ## Quick Start (4 Steps)
 
-1. **Download**: [Get the latest release](https://github.com/virajbhartiya/Cognia/releases/latest)
+1. **Download**: [Get the latest release](https://github.com/cogniahq/Cognia/releases/latest)
 2. **Extract**: Unzip the downloaded file
 3. **Enable**: Chrome/Edge → Extensions → Developer mode → ON
 4. **Load**: Click "Load unpacked" → Select the extracted folder
@@ -25,7 +25,7 @@ Cognia is a browser extension that automatically captures and processes your web
 
 ### Step 1: Download the Extension
 
-1. Go to the [Cognia GitHub Releases page](https://github.com/virajbhartiya/Cognia/releases/latest)
+1. Go to the [Cognia GitHub Releases page](https://github.com/cogniahq/Cognia/releases/latest)
 2. Look for the latest release with a file named `cognia-extension-vX.X.X.zip`
 3. Click the download link to save the zip file to your computer
 4. Note the location where you saved the file (usually your Downloads folder)
@@ -141,7 +141,7 @@ If you need to remove the extension:
 
 If you encounter issues not covered in this guide:
 
-1. **Check the Issues**: Visit the [GitHub Issues page](https://github.com/virajbhartiya/Cognia/issues)
+1. **Check the Issues**: Visit the [GitHub Issues page](https://github.com/cogniahq/Cognia/issues)
 2. **Read the Documentation**: Check the main [README.md](../README.md) for more information
 3. **Join the Community**: Look for community discussions in GitHub Discussions
 4. **Report Bugs**: Create a new issue on GitHub with detailed information about your problem
@@ -181,8 +181,8 @@ If you encounter issues not covered in this guide:
 ### Need Help?
 
 - 📖 **This Guide**: Complete installation and troubleshooting
-- 🐛 **Report Issues**: [GitHub Issues](https://github.com/virajbhartiya/Cognia/issues)
-- 💬 **Get Support**: [GitHub Discussions](https://github.com/virajbhartiya/Cognia/discussions)
+- 🐛 **Report Issues**: [GitHub Issues](https://github.com/cogniahq/Cognia/issues)
+- 💬 **Get Support**: [GitHub Discussions](https://github.com/cogniahq/Cognia/discussions)
 - 📚 **Documentation**: [Main README](../README.md)
 
 ---

@@ -192,7 +192,7 @@ export const Landing = () => {
                 className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
                 onClick={() =>
                   window.open(
-                    "https://github.com/virajbhartiya/Cognia/releases/latest",
+                    "https://github.com/cogniahq/Cognia/releases/latest",
                     "_blank"
                   )
                 }
@@ -256,7 +256,7 @@ export const Landing = () => {
                 className="group relative overflow-hidden rounded-none px-3 py-2 transition-all duration-200 hover:shadow-md"
                 onClick={() =>
                   window.open(
-                    "https://github.com/virajbhartiya/Cognia/releases/latest",
+                    "https://github.com/cogniahq/Cognia/releases/latest",
                     "_blank"
                   )
                 }
@@ -420,7 +420,7 @@ export const Landing = () => {
                   className="group relative overflow-hidden flex-1 sm:flex-none sm:min-w-[160px] rounded-none px-4 py-2 transition-all duration-200 hover:shadow-md"
                   onClick={() =>
                     window.open(
-                      "https://github.com/virajbhartiya/Cognia/releases/latest",
+                      "https://github.com/cogniahq/Cognia/releases/latest",
                       "_blank"
                     )
                   }
@@ -664,7 +664,7 @@ export const Landing = () => {
                 <button
                   onClick={() =>
                     window.open(
-                      "https://github.com/virajbhartiya/Cognia",
+                      "https://github.com/cogniahq/Cognia",
                       "_blank"
                     )
                   }
@@ -731,7 +731,7 @@ export const Landing = () => {
                 className="block hover:underline"
                 onClick={() =>
                   window.open(
-                    "https://github.com/virajbhartiya/Cognia",
+                    "https://github.com/cogniahq/Cognia",
                     "_blank"
                   )
                 }
