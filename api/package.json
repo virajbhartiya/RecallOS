@@ -1,7 +1,7 @@
 {
   "name": "servercode",
   "version": "1.0.0",
-  "description": "Work Nexus",
+  "description": "Cognia",
   "main": "App.ts",
   "scripts": {
     "start": "nodemon src/App.ts",
@@ -34,9 +34,9 @@
     "check": "npm run lint:fix && npm run format && npm run build"
   },
   "keywords": [
-    "Startup Marketplace"
+    "Memory Mesh"
   ],
-  "author": "Viraj Bhartiya",
+  "author": "Team Cognia",
   "license": "ISC",
   "devDependencies": {
     "@types/compression": "^1.7.5",
