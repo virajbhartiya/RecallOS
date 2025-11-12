@@ -1052,9 +1052,7 @@ async function pollSearchJob(jobId: string): Promise<string | null> {
     try {
       authToken = await requireAuthToken()
     } catch (error) {
-      console.error(
-        'Cognia: Authentication required. Please log in through the web client first.'
-      )
+      console.error('Cognia: Authentication required. Please log in through the web client first.')
       return null
     }
 
@@ -1119,9 +1117,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
     try {
       authToken = await requireAuthToken()
     } catch (error) {
-      console.error(
-        'Cognia: Authentication required. Please log in through the web client first.'
-      )
+      console.error('Cognia: Authentication required. Please log in through the web client first.')
       return null
     }
 

@@ -232,9 +232,9 @@ export const Docs = () => {
                     3. Start Capturing
                   </h3>
                   <p className="text-gray-700">
-                    Browse the web normally. Cognia captures pages
-                    automatically (with extension) or you can manually add
-                    content through the web client.
+                    Browse the web normally. Cognia captures pages automatically
+                    (with extension) or you can manually add content through the
+                    web client.
                   </p>
                 </div>
               </div>
@@ -282,8 +282,8 @@ export const Docs = () => {
                 How to Use
               </h2>
               <p className="text-gray-700 mb-4">
-                Cognia can be used in three ways: Browser Extension
-                (automatic), Web Client (manual), or SDK (programmatic).
+                Cognia can be used in three ways: Browser Extension (automatic),
+                Web Client (manual), or SDK (programmatic).
               </p>
             </section>
 

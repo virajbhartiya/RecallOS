@@ -47,9 +47,7 @@ export const startProfileWorker = async (
       if (isWithinCooldown(userId)) {
         skipped++
         const until = new Date(noMemoriesCooldown.get(userId) || Date.now()).toISOString()
-        logger.log(
-          `[Profile Worker] skip cooldown user=${userId} until=${until}`
-        )
+        logger.log(`[Profile Worker] skip cooldown user=${userId} until=${until}`)
         continue
       }
 
@@ -78,9 +76,9 @@ export const startProfileWorker = async (
             if (isNoMemoriesError(retryError)) {
               scheduleCooldown(userId)
               skipped++
-            logger.warn(
-              `[Profile Worker] skip no-memories-after-retry user=${userId} cooldown=${Number(process.env.PROFILE_NO_MEMORIES_COOLDOWN_HOURS || 6)}h`
-            )
+              logger.warn(
+                `[Profile Worker] skip no-memories-after-retry user=${userId} cooldown=${Number(process.env.PROFILE_NO_MEMORIES_COOLDOWN_HOURS || 6)}h`
+              )
               continue
             }
 

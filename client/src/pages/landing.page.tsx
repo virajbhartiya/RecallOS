@@ -630,9 +630,7 @@ export const Landing = () => {
                 <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold text-lg font-mono">
                   R
                 </div>
-                <div className="text-sm text-gray-800 font-medium">
-                  Cognia
-                </div>
+                <div className="text-sm text-gray-800 font-medium">Cognia</div>
               </div>
               <p className="text-sm text-gray-600">
                 A searchable memory for everything you see online.

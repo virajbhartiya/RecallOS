@@ -38,7 +38,11 @@ export const logger = {
   log: (...args: unknown[]) => {
     const formatted = shouldUseColors
       ? formatMessage(args, colors.cyan, 'LOG')
-      : [`[${getTimestamp()}]`, 'LOG', args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')]
+      : [
+          `[${getTimestamp()}]`,
+          'LOG',
+          args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' '),
+        ]
     console.log(...formatted)
   },
   error: (...args: unknown[]) => {
@@ -54,19 +58,31 @@ export const logger = {
   warn: (...args: unknown[]) => {
     const formatted = shouldUseColors
       ? formatMessage(args, colors.yellow, 'WARN')
-      : [`[${getTimestamp()}]`, 'WARN', args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')]
+      : [
+          `[${getTimestamp()}]`,
+          'WARN',
+          args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' '),
+        ]
     console.warn(...formatted)
   },
   info: (...args: unknown[]) => {
     const formatted = shouldUseColors
       ? formatMessage(args, colors.blue, 'INFO')
-      : [`[${getTimestamp()}]`, 'INFO', args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')]
+      : [
+          `[${getTimestamp()}]`,
+          'INFO',
+          args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' '),
+        ]
     console.info(...formatted)
   },
   debug: (...args: unknown[]) => {
     const formatted = shouldUseColors
       ? formatMessage(args, colors.gray, 'DEBUG')
-      : [`[${getTimestamp()}]`, 'DEBUG', args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ')]
+      : [
+          `[${getTimestamp()}]`,
+          'DEBUG',
+          args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' '),
+        ]
     console.debug(...formatted)
   },
 }
