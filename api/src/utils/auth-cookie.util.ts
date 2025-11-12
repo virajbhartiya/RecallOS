@@ -36,9 +36,9 @@ export function setAuthCookie(
   }
 
   // Log cookie settings for debugging
-  logger.log('[AuthCookie] Setting cookie:', {
+  logger.log('[AuthCookie] setting cookie', {
     name,
-    domain: cookieOptions.domain || 'localhost (no domain)',
+    domain: cookieOptions.domain || 'localhost',
     path: cookieOptions.path,
     httpOnly: cookieOptions.httpOnly,
     secure: cookieOptions.secure,

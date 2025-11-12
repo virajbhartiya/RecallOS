@@ -46,11 +46,10 @@ export const startProfileWorker = async (
     for (const userId of userIds) {
       if (isWithinCooldown(userId)) {
         skipped++
-        logger.log('[Profile Worker] Skipping profile update (cooldown active)', {
-          ts: new Date().toISOString(),
-          userId,
-          cooldownUntil: new Date(noMemoriesCooldown.get(userId) || Date.now()).toISOString(),
-        })
+        const until = new Date(noMemoriesCooldown.get(userId) || Date.now()).toISOString()
+        logger.log(
+          `[Profile Worker] skip cooldown user=${userId} until=${until}`
+        )
         continue
       }
 
@@ -63,11 +62,9 @@ export const startProfileWorker = async (
           if (isNoMemoriesError(error)) {
             scheduleCooldown(userId)
             skipped++
-            logger.warn('[Profile Worker] Skipping profile update (no memories)', {
-              ts: new Date().toISOString(),
-              userId,
-              cooldownHours: Number(process.env.PROFILE_NO_MEMORIES_COOLDOWN_HOURS || 6),
-            })
+            logger.warn(
+              `[Profile Worker] skip no-memories user=${userId} cooldown=${Number(process.env.PROFILE_NO_MEMORIES_COOLDOWN_HOURS || 6)}h`
+            )
             continue
           }
 
@@ -83,11 +80,9 @@ export const startProfileWorker = async (
             if (isNoMemoriesError(retryError)) {
               scheduleCooldown(userId)
               skipped++
-              logger.warn('[Profile Worker] Skipping profile update after retry (no memories)', {
-                ts: new Date().toISOString(),
-                userId,
-                cooldownHours: Number(process.env.PROFILE_NO_MEMORIES_COOLDOWN_HOURS || 6),
-              })
+            logger.warn(
+              `[Profile Worker] skip no-memories-after-retry user=${userId} cooldown=${Number(process.env.PROFILE_NO_MEMORIES_COOLDOWN_HOURS || 6)}h`
+            )
               continue
             }
 
@@ -103,11 +98,9 @@ export const startProfileWorker = async (
         updated++
       } catch (error) {
         failed++
-        logger.error('[Profile Worker] Error updating profile', {
-          ts: new Date().toISOString(),
-          userId,
-          error: extractErrorMessage(error),
-        })
+        logger.error(
+          `[Profile Worker] update-error user=${userId} error="${extractErrorMessage(error)}"`
+        )
       }
     }
 

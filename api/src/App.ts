@@ -113,55 +113,67 @@ const getStatusColor = (status: number): string => {
   return colors.reset
 }
 
-const padColumn = (value: string, length: number, align: 'left' | 'right' = 'left'): string => {
-  const str = value ?? '-'
-  if (str.length >= length) return str
-  return align === 'left' ? str.padEnd(length) : str.padStart(length)
+const padColumn = (value: string | number | undefined | null, width: number): string => {
+  const str = value === undefined || value === null || value === '' ? '-' : String(value)
+  return str.length >= width ? str.slice(0, width) : str + ' '.repeat(width - str.length)
 }
 
-const formatDuration = (value: string | undefined): string => {
-  if (!value) return '-'
+const formatDuration = (value: string | undefined, width: number): string => {
+  if (!value) return padColumn('-', width)
   const numeric = Number(value)
-  if (!Number.isFinite(numeric)) return '-'
-  return `${numeric.toFixed(3)} ms`
+  if (!Number.isFinite(numeric)) return padColumn('-', width)
+  return padColumn(`${numeric.toFixed(3)} ms`, width)
 }
 
-const formatSize = (value: string | undefined): string => {
-  if (!value || value === '-') return '-'
-  return `${value} B`
+const formatSize = (value: string | undefined | null, width: number): string => {
+  if (!value || value === '-' || value === '0') return padColumn('-', width)
+  return padColumn(`${value} B`, width)
+}
+
+const mapOutcome = (status: number): string => {
+  if (status >= 500) return 'Fail'
+  if (status >= 400) return 'Warn'
+  if (status >= 200) return 'OK'
+  if (status === 304) return 'Skip'
+  return '-'
 }
 
 const coloredMorganFormat = (tokens: morgan.TokenIndexer, req: Request, res: Response): string => {
   const method = tokens.method(req, res)
-  const status = tokens.status(req, res)
+  const statusRaw = tokens.status(req, res)
+  const status = Number(statusRaw ?? 0)
   const url = tokens.url(req, res)
   const responseTime = tokens['response-time'](req, res)
   const contentLength = tokens.res(req, res, 'content-length')
   const timestamp = tokens.timestamp(req, res)
 
-  const methodColor = getMethodColor(method)
-  const statusColor = getStatusColor(Number(status))
   const timestampBase = `[${timestamp}]`
-  const durationBase = formatDuration(responseTime)
-  const sizeBase = formatSize(contentLength)
+  const methodColumn = padColumn(method, 8)
+  const statusColumn = padColumn(statusRaw ?? '-', 6)
+  const durationColumn = formatDuration(responseTime, 12)
+  const sizeColumn = formatSize(contentLength, 10)
+  const outcomeColumn = padColumn(mapOutcome(status), 6)
 
-  const timestampColor = shouldUseColors ? colors.dim + colors.gray : ''
-  const resetColor = shouldUseColors ? colors.reset : ''
+  if (!shouldUseColors) {
+    return `${timestampBase}  ${methodColumn}${statusColumn}${durationColumn}${sizeColumn}${outcomeColumn}${url}`
+  }
 
-  const methodColumn = padColumn(method, 7)
-  const statusColumn = padColumn(status ?? '-', 4)
-  const durationColumn = padColumn(durationBase, 12)
-  const sizeColumn = padColumn(sizeBase, 10)
+  const timestampColored = `${colors.dim}${colors.gray}${timestampBase}${colors.reset}`
+  const methodColored = `${getMethodColor(method)}${methodColumn}${colors.reset}`
+  const statusColored = `${getStatusColor(status)}${statusColumn}${colors.reset}`
+  const durationColored = `${colors.cyan}${durationColumn}${colors.reset}`
+  const sizeColored = `${colors.magenta}${sizeColumn}${colors.reset}`
+  const outcomeColor =
+    status >= 500
+      ? colors.red
+      : status >= 400
+        ? colors.yellow
+        : status === 304
+          ? colors.blue
+          : colors.green
+  const outcomeColored = `${outcomeColor}${outcomeColumn}${colors.reset}`
 
-  const coloredMethod = shouldUseColors ? `${methodColor}${methodColumn}${resetColor}` : methodColumn
-  const coloredStatus = shouldUseColors ? `${statusColor}${statusColumn}${resetColor}` : statusColumn
-  const coloredTimestamp = shouldUseColors
-    ? `${timestampColor}${timestampBase}${resetColor}`
-    : timestampBase
-  const coloredDuration = shouldUseColors ? `${colors.cyan}${durationColumn}${resetColor}` : durationColumn
-  const coloredSize = shouldUseColors ? `${colors.magenta}${sizeColumn}${resetColor}` : sizeColumn
-
-  return `${coloredTimestamp}  ${coloredMethod}  ${coloredStatus}  ${coloredDuration}  ${coloredSize}  ${url}`
+  return `${timestampColored}  ${methodColored}${statusColored}${durationColored}${sizeColored}${outcomeColored}${url}`
 }
 
 app.use(morgan(coloredMorganFormat))
