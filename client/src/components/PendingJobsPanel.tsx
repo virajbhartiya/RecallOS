@@ -26,7 +26,7 @@ interface PendingJob {
   raw_text: string
   full_text_length: number
   metadata: Record<string, unknown>
-  status: "waiting" | "active" | "delayed"
+  status: "waiting" | "active" | "delayed" | "failed"
   created_at: string
   processed_on: string | null
   finished_on: string | null
@@ -49,6 +49,7 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
     waiting: 0,
     active: 0,
     delayed: 0,
+    failed: 0,
   })
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -214,6 +215,8 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
         return <Loader className="w-4 h-4 text-blue-600 animate-spin" />
       case "delayed":
         return <AlertCircle className="w-4 h-4 text-orange-600" />
+      case "failed":
+        return <AlertCircle className="w-4 h-4 text-red-600" />
       default:
         return null
     }
@@ -244,6 +247,14 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
             className={`${baseClasses} bg-orange-50 text-orange-800 border-orange-200`}
           >
             DELAYED
+          </span>
+        )
+      case "failed":
+        return (
+          <span
+            className={`${baseClasses} bg-red-50 text-red-800 border-red-200`}
+          >
+            FAILED
           </span>
         )
       default:
@@ -333,7 +344,7 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
               <div className="bg-white border border-gray-200 p-4">
                 <div className="text-xs font-mono text-gray-500 uppercase mb-1">
                   Total
@@ -367,6 +378,15 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
                 </div>
                 <div className="text-2xl font-mono font-bold text-orange-600">
                   {counts.delayed}
+                </div>
+              </div>
+              <div className="bg-white border border-gray-200 p-4">
+                <div className="text-xs font-mono text-gray-500 uppercase mb-1 flex items-center space-x-2">
+                  <AlertCircle className="w-3 h-3 text-red-600" />
+                  <span>Failed</span>
+                </div>
+                <div className="text-2xl font-mono font-bold text-red-600">
+                  {counts.failed}
                 </div>
               </div>
             </div>

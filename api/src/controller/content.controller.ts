@@ -253,17 +253,19 @@ export const getPendingJobs = async (
   next: NextFunction
 ) => {
   try {
-    const [waiting, active, delayed] = await Promise.all([
+    const [waiting, active, delayed, failed] = await Promise.all([
       contentQueue.getWaiting(),
       contentQueue.getActive(),
       contentQueue.getDelayed(),
+      contentQueue.getFailed(),
     ])
 
     const waitingJobs = waiting.map(job => ({ job, status: 'waiting' as const }))
     const activeJobs = active.map(job => ({ job, status: 'active' as const }))
     const delayedJobs = delayed.map(job => ({ job, status: 'delayed' as const }))
+    const failedJobs = failed.map(job => ({ job, status: 'failed' as const }))
 
-    let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs]
+    let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs, ...failedJobs]
 
     allJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)
 
@@ -285,15 +287,21 @@ export const getPendingJobs = async (
       }))
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
+    const userWaitingCount = waiting.filter(job => job.data.user_id === req.user!.id).length
+    const userActiveCount = active.filter(job => job.data.user_id === req.user!.id).length
+    const userDelayedCount = delayed.filter(job => job.data.user_id === req.user!.id).length
+    const userFailedCount = failed.filter(job => job.data.user_id === req.user!.id).length
+
     res.status(200).json({
       status: 'success',
       data: {
         jobs,
         counts: {
           total: jobs.length,
-          waiting: waiting.length,
-          active: active.length,
-          delayed: delayed.length,
+          waiting: userWaitingCount,
+          active: userActiveCount,
+          delayed: userDelayedCount,
+          failed: userFailedCount,
         },
       },
     })

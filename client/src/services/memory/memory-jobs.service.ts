@@ -8,7 +8,7 @@ export async function getPendingJobs(): Promise<{
     raw_text: string
     full_text_length: number
     metadata: Record<string, unknown>
-    status: "waiting" | "active" | "delayed"
+    status: "waiting" | "active" | "delayed" | "failed"
     created_at: string
     processed_on: string | null
     finished_on: string | null
@@ -20,6 +20,7 @@ export async function getPendingJobs(): Promise<{
     waiting: number
     active: number
     delayed: number
+    failed: number
   }
 }> {
   requireAuthToken()
@@ -27,7 +28,7 @@ export async function getPendingJobs(): Promise<{
   return (
     response.data?.data || {
       jobs: [],
-      counts: { total: 0, waiting: 0, active: 0, delayed: 0 },
+      counts: { total: 0, waiting: 0, active: 0, delayed: 0, failed: 0 },
     }
   )
 }
