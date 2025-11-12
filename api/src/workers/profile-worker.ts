@@ -68,11 +68,9 @@ export const startProfileWorker = async (
             continue
           }
 
-          logger.error('[Profile Worker] Error updating profile, retrying once', {
-            ts: new Date().toISOString(),
-            userId,
-            error: extractErrorMessage(error),
-          })
+          logger.error(
+            `[Profile Worker] retry update user=${userId} error="${extractErrorMessage(error)}"`
+          )
 
           try {
             await attemptUpdate()
@@ -86,11 +84,9 @@ export const startProfileWorker = async (
               continue
             }
 
-            logger.error('[Profile Worker] Error updating profile on retry', {
-              ts: new Date().toISOString(),
-              userId,
-              error: extractErrorMessage(retryError),
-            })
+            logger.error(
+              `[Profile Worker] retry failed user=${userId} error="${extractErrorMessage(retryError)}"`
+            )
             throw retryError
           }
         }
@@ -106,10 +102,11 @@ export const startProfileWorker = async (
 
     return { updated, failed, skipped }
   } catch (error) {
-    logger.error('[Profile Worker] Batch update failed', {
-      ts: new Date().toISOString(),
-      error: error instanceof Error ? error.message : String(error),
-    })
+    logger.error(
+      `[Profile Worker] batch-failed error="${
+        error instanceof Error ? error.message : String(error)
+      }"`
+    )
     throw error
   }
 }
@@ -133,10 +130,11 @@ export const startCyclicProfileWorker = () => {
     try {
       await startProfileWorker(daysSinceLastUpdate, hoursSinceLastUpdate)
     } catch (error) {
-      logger.error('[Profile Worker] Cyclic update cycle failed', {
-        ts: new Date().toISOString(),
-        error: error instanceof Error ? error.message : String(error),
-      })
+      logger.error(
+        `[Profile Worker] cycle-failed error="${
+          error instanceof Error ? error.message : String(error)
+        }"`
+      )
     }
   }
 
