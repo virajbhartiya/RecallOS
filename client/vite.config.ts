@@ -39,10 +39,12 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: [
         "favicon.ico",
+        "favicon-16x16.png",
+        "favicon-32x32.png",
         "apple-touch-icon.png",
-        "logo.svg",
         "android-chrome-192x192.png",
         "android-chrome-512x512.png",
+        "icon.png",
         "logo.png",
       ],
       manifest: {
@@ -50,6 +52,22 @@ export default defineConfig({
         short_name: "RecallOS",
         description: "RecallOS - description",
         icons: [
+          {
+            src: "/favicon-16x16.png",
+            sizes: "16x16",
+            type: "image/png",
+          },
+          {
+            src: "/favicon-32x32.png",
+            sizes: "32x32",
+            type: "image/png",
+          },
+          {
+            src: "/apple-touch-icon.png",
+            sizes: "180x180",
+            type: "image/png",
+            purpose: "apple touch icon",
+          },
           {
             src: "/android-chrome-192x192.png",
             sizes: "192x192",
@@ -61,22 +79,10 @@ export default defineConfig({
             type: "image/png",
           },
           {
-            src: "/android-chrome-512x512.png",
+            src: "/icon.png",
             sizes: "512x512",
             type: "image/png",
-            purpose: "any",
-          },
-          {
-            src: "/apple-touch-icon.png",
-            sizes: "180x180",
-            type: "image/png",
-            purpose: "apple touch icon",
-          },
-          {
-            src: "/logo.png",
-            sizes: "512x512",
-            type: "image/png",
-            purpose: "maskable",
+            purpose: "any maskable",
           },
         ],
         theme_color: "#ffffff",
@@ -94,3 +100,4 @@ export default defineConfig({
     },
   },
 })
+
