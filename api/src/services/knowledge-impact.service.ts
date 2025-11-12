@@ -75,7 +75,10 @@ export const knowledgeImpactService = {
 
       const avgSearchTime = 5.0
       const targetSearchTime = 2.0
-      const retrievalEfficiency = Math.min(100, Math.max(0, (targetSearchTime / avgSearchTime) * 100))
+      const retrievalEfficiency = Math.min(
+        100,
+        Math.max(0, (targetSearchTime / avgSearchTime) * 100)
+      )
 
       const avgSimilarity =
         relations.length > 0

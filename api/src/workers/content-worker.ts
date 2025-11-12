@@ -84,7 +84,6 @@ export const startContentWorker = () => {
                     userId: user_id,
                     existingMemoryId: existingMemory.id,
                     similarity,
-                    timestamp: new Date().toISOString(),
                   })
                   return {
                     success: true,
@@ -131,7 +130,6 @@ export const startContentWorker = () => {
               jobId: job.id,
               userId: user_id,
               attempt,
-              timestamp: new Date().toISOString(),
             })
           }
           const summaryResult = await aiProvider.summarizeContent(raw_text, metadata)
@@ -140,14 +138,6 @@ export const startContentWorker = () => {
           } else {
             const result = summaryResult as { text?: string }
             summary = result.text || summaryResult
-          }
-          if (attempt > 1) {
-            logger.log(`[Redis Worker] Job retry successful`, {
-              jobId: job.id,
-              userId: user_id,
-              attempt,
-              timestamp: new Date().toISOString(),
-            })
           }
           break
         } catch (err) {
@@ -158,7 +148,6 @@ export const startContentWorker = () => {
               attempt,
               error: err?.message || String(err),
               isRetryable: isRetryableError(err),
-              timestamp: new Date().toISOString(),
             })
             throw err
           }
@@ -170,7 +159,6 @@ export const startContentWorker = () => {
             attempt,
             backoffMs: backoff + jitter,
             error: err?.message || String(err),
-            timestamp: new Date().toISOString(),
           })
           await sleep(backoff + jitter)
         }
@@ -181,7 +169,6 @@ export const startContentWorker = () => {
           jobId: job.id,
           userId: user_id,
           maxAttempts,
-          timestamp: new Date().toISOString(),
         })
         throw new Error('Failed to generate summary after retries')
       }
@@ -224,7 +211,6 @@ export const startContentWorker = () => {
           jobId: job.id,
           userId: user_id,
           error: metadataError?.message || String(metadataError),
-          timestamp: new Date().toISOString(),
         })
       }
 
@@ -344,7 +330,6 @@ export const startContentWorker = () => {
             jobId: job.id,
             userId: user_id,
             memoryId: memory.id,
-            timestamp: new Date().toISOString(),
           })
 
           setImmediate(async () => {
@@ -354,13 +339,11 @@ export const startContentWorker = () => {
                 logger.log(`[Redis Worker] Triggering profile update`, {
                   jobId: job.id,
                   userId: user_id,
-                  timestamp: new Date().toISOString(),
                 })
                 await profileUpdateService.updateUserProfile(user_id)
                 logger.log(`[Redis Worker] Profile update completed`, {
                   jobId: job.id,
                   userId: user_id,
-                  timestamp: new Date().toISOString(),
                 })
               }
             } catch (profileError) {

@@ -18,7 +18,6 @@ async function main() {
   try {
     logger.log('Starting queue cleanup', {
       queueName: 'process-content',
-      timestamp: new Date().toISOString(),
     })
 
     const result = await cleanQueue()

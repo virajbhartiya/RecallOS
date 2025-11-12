@@ -43,7 +43,6 @@ contentQueueEvents.on('failed', ({ jobId, failedReason }) => {
     jobId,
     state: 'failed',
     failedReason: failedReason || 'Unknown error',
-    timestamp: new Date().toISOString(),
   })
 })
 
