@@ -376,9 +376,7 @@ export const resubmitPendingJob = async (
 
     await job.retry()
 
-    logger.log(
-      `[Content] resubmitted job=${job.id} user=${job.data.user_id}`
-    )
+    logger.log(`[Content] resubmitted job=${job.id} user=${job.data.user_id}`)
 
     res.status(200).json({
       status: 'success',

@@ -58,10 +58,14 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
   const [error, setError] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "active" | "delayed" | "failed">("all")
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | "waiting" | "active" | "delayed" | "failed"
+  >("all")
   const [failedJobsExpanded, setFailedJobsExpanded] = useState(true)
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set())
-  const [resubmittingJobs, setResubmittingJobs] = useState<Set<string>>(new Set())
+  const [resubmittingJobs, setResubmittingJobs] = useState<Set<string>>(
+    new Set()
+  )
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean
     jobId: string | null
@@ -187,26 +191,29 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
     }
   }, [filteredJobs, statusFilter])
 
-  const handleResubmitJob = useCallback(async (jobId: string) => {
-    try {
-      requireAuthToken()
-      setResubmittingJobs((prev) => new Set(prev).add(jobId))
-      setError(null)
+  const handleResubmitJob = useCallback(
+    async (jobId: string) => {
+      try {
+        requireAuthToken()
+        setResubmittingJobs((prev) => new Set(prev).add(jobId))
+        setError(null)
 
-      await MemoryService.resubmitPendingJob(jobId)
-      await fetchPendingJobs()
-    } catch (err) {
-      const error = err as { message?: string }
-      console.error("Error resubmitting job:", err)
-      setError(error.message || "Failed to resubmit job")
-    } finally {
-      setResubmittingJobs((prev) => {
-        const next = new Set(prev)
-        next.delete(jobId)
-        return next
-      })
-    }
-  }, [fetchPendingJobs])
+        await MemoryService.resubmitPendingJob(jobId)
+        await fetchPendingJobs()
+      } catch (err) {
+        const error = err as { message?: string }
+        console.error("Error resubmitting job:", err)
+        setError(error.message || "Failed to resubmit job")
+      } finally {
+        setResubmittingJobs((prev) => {
+          const next = new Set(prev)
+          next.delete(jobId)
+          return next
+        })
+      }
+    },
+    [fetchPendingJobs]
+  )
 
   const handleSelectJob = useCallback((jobId: string) => {
     setSelectedJobs((prev) => {
@@ -223,7 +230,7 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
   const handleSelectAll = useCallback(() => {
     const jobsToSelect = statusFilter === "all" ? otherJobs : filteredJobs
     const allSelected = jobsToSelect.every((job) => selectedJobs.has(job.id))
-    
+
     if (allSelected) {
       // Deselect all
       setSelectedJobs(new Set())
@@ -366,7 +373,9 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
                 </div>
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                  onChange={(e) =>
+                    setStatusFilter(e.target.value as typeof statusFilter)
+                  }
                   className="px-4 py-2 text-sm font-mono border border-gray-200 bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
                 >
                   <option value="all">All Status</option>
@@ -503,7 +512,9 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
                                   onClick={() => handleSelectJob(job.id)}
                                   className="text-gray-600 hover:text-black transition-colors"
                                   title={
-                                    selectedJobs.has(job.id) ? "Deselect" : "Select"
+                                    selectedJobs.has(job.id)
+                                      ? "Deselect"
+                                      : "Select"
                                   }
                                 >
                                   {selectedJobs.has(job.id) ? (
@@ -646,7 +657,9 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
                 {(searchQuery || statusFilter !== "all") && (
                   <div className="text-sm font-mono text-gray-600">
                     Showing {otherJobs.length} of {jobs.length} jobs
-                    {statusFilter === "all" && failedJobs.length > 0 && ` (${failedJobs.length} failed shown above)`}
+                    {statusFilter === "all" &&
+                      failedJobs.length > 0 &&
+                      ` (${failedJobs.length} failed shown above)`}
                   </div>
                 )}
                 {otherJobs.length > 0 && (
