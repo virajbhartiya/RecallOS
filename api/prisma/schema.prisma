@@ -2,6 +2,14 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum MemoryType {
+  FACT
+  PREFERENCE
+  PROJECT
+  LOG_EVENT
+  REFERENCE
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
@@ -31,14 +39,18 @@ model Memory {
   id                     String               @id @default(uuid()) @db.Uuid
   user_id                String               @db.Uuid
   source                 String
+  source_app             String?
   url                    String?
   title                  String?
   content                String
   summary                String?
   canonical_text         String?
   canonical_hash         String?
+  memory_type            MemoryType           @default(LOG_EVENT)
+  confidence_score       Float                @default(0.5)
   timestamp              BigInt
   created_at             DateTime             @default(now())
+  expires_at             DateTime?
   full_content           String?
   page_metadata          Json?
   importance_score       Float?               @default(0.0)
@@ -54,6 +66,7 @@ model Memory {
   @@index([user_id, created_at])
   @@index([canonical_hash])
   @@index([url])
+  @@index([memory_type])
   @@unique([user_id, canonical_hash])
   @@map("memories")
 }

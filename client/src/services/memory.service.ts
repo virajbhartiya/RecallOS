@@ -3,6 +3,7 @@ import * as MemoryInsights from "./memory/memory-insights.service"
 import * as MemoryJobs from "./memory/memory-jobs.service"
 import * as MemoryMesh from "./memory/memory-mesh.service"
 import * as MemorySearch from "./memory/memory-search.service"
+import * as MemoryInbox from "./memory/memory-inbox.service"
 
 export class MemoryService {
   static async getMemoriesWithTransactionDetails(limit?: number) {
@@ -18,9 +19,10 @@ export class MemoryService {
     filters = {},
     page: number = 1,
     limit: number = 10,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    policy?: string
   ) {
-    return MemorySearch.searchMemories(query, filters, page, limit, signal)
+    return MemorySearch.searchMemories(query, filters, page, limit, signal, policy)
   }
 
   static async searchMemoriesHybrid(
@@ -90,5 +92,16 @@ export class MemoryService {
 
   static async resubmitPendingJob(jobId: string) {
     return MemoryJobs.resubmitPendingJob(jobId)
+  }
+
+  static async getInbox(signal?: AbortSignal) {
+    return MemoryInbox.fetchInbox(signal)
+  }
+
+  static async updateMemoryFlags(
+    memoryId: string,
+    flags: { reviewed?: boolean; pinned?: boolean }
+  ) {
+    return MemoryInbox.updateMemoryFlags(memoryId, flags)
   }
 }

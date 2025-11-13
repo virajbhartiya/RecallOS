@@ -116,6 +116,20 @@ export interface SearchResult {
   search_type?: "keyword" | "semantic" | "hybrid"
 }
 
+export interface ContextBlockItem {
+  id: string
+  title: string | null
+  summary: string | null
+  url: string | null
+  importance_score?: number | null
+  created_at?: string
+}
+
+export interface ContextBlock {
+  label: string
+  items: ContextBlockItem[]
+}
+
 export interface MemorySearchResponse {
   results: SearchResult[]
   total: number
@@ -130,6 +144,9 @@ export interface MemorySearchResponse {
     url: string | null
   }>
   job_id?: string
+  context?: string
+  contextBlocks?: ContextBlock[]
+  policy?: string
 }
 
 export interface MemoryWithRelations extends Memory {

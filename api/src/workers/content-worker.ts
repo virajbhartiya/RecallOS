@@ -12,7 +12,8 @@ import {
   getQueueStalledInterval,
   getQueueMaxStalledCount,
 } from '../utils/env.util'
-import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
+import { memoryIngestionService } from '../services/memory-ingestion.service'
+import { memoryScoringService } from '../services/memory-scoring.service'
 import { logger } from '../utils/logger.util'
 import { getRedisClient } from '../lib/redis.lib'
 
@@ -27,6 +28,8 @@ type RetryableError = {
   status?: number
   code?: number | string
 }
+
+const PROFILE_IMPORTANCE_THRESHOLD = Number(process.env.PROFILE_IMPORTANCE_THRESHOLD || 0.7)
 
 export const startContentWorker = () => {
   return new Worker<ContentJobData>(
@@ -52,6 +55,11 @@ export const startContentWorker = () => {
       await ensureNotCancelled()
 
       const { user_id, raw_text, metadata } = job.data as ContentJobData
+      const baseUrl = typeof metadata?.url === 'string' ? (metadata.url as string) : undefined
+      let canonicalData =
+        !metadata?.memory_id && raw_text
+          ? memoryIngestionService.canonicalizeContent(raw_text, baseUrl)
+          : null
 
       const handleCancellationError = (error?: Error) => {
         if (error && error.name === 'JobCancelledError') {
@@ -70,62 +78,30 @@ export const startContentWorker = () => {
           })
 
           if (user) {
-            const canonicalText = normalizeText(raw_text)
-            const canonicalHash = hashCanonical(canonicalText)
-
-            const existingByCanonical = await prisma.memory.findFirst({
-              where: { user_id: user.id, canonical_hash: canonicalHash },
+            const duplicateCheck = await memoryIngestionService.findDuplicateMemory({
+              userId: user.id,
+              canonicalHash: canonicalData!.canonicalHash,
+              canonicalText: canonicalData!.canonicalText,
+              url: baseUrl,
             })
 
-            if (existingByCanonical) {
+            if (duplicateCheck) {
+              const merged = await memoryIngestionService.mergeDuplicateMemory(
+                duplicateCheck.memory,
+                metadata,
+                undefined
+              )
+              logger.log(`[Redis Worker] Duplicate detected, skipping processing`, {
+                jobId: job.id,
+                userId: user_id,
+                existingMemoryId: merged.id,
+                reason: duplicateCheck.reason,
+              })
               return {
                 success: true,
-                contentId: existingByCanonical.id,
-                memoryId: existingByCanonical.id,
-                summary:
-                  existingByCanonical.summary?.substring(0, 100) + '...' || 'Duplicate memory',
-              }
-            }
-
-            if (metadata?.url && metadata.url !== 'unknown') {
-              const normalizedUrl = normalizeUrl(metadata.url)
-              const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-
-              const recentMemories = await prisma.memory.findMany({
-                where: {
-                  user_id,
-                  created_at: { gte: oneHourAgo },
-                },
-                orderBy: { created_at: 'desc' },
-                take: 50,
-              })
-
-              for (const existingMemory of recentMemories) {
-                const existingUrl = existingMemory.url
-                if (
-                  existingUrl &&
-                  typeof existingUrl === 'string' &&
-                  normalizeUrl(existingUrl) === normalizedUrl
-                ) {
-                  const existingCanonical = normalizeText(existingMemory.content || '')
-                  const similarity = calculateSimilarity(canonicalText, existingCanonical)
-
-                  if (similarity > 0.9) {
-                    logger.log(`[Redis Worker] URL duplicate detected, skipping processing`, {
-                      jobId: job.id,
-                      userId: user_id,
-                      existingMemoryId: existingMemory.id,
-                      similarity,
-                    })
-                    return {
-                      success: true,
-                      contentId: existingMemory.id,
-                      memoryId: existingMemory.id,
-                      summary:
-                        existingMemory.summary?.substring(0, 100) + '...' || 'Duplicate memory',
-                    }
-                  }
-                }
+                contentId: merged.id,
+                memoryId: merged.id,
+                summary: merged.summary?.substring(0, 100) + '...' || 'Duplicate memory',
               }
             }
           }
@@ -260,22 +236,21 @@ export const startContentWorker = () => {
         }
 
         if (metadata?.memory_id) {
-          const pageMetadata = {
-            ...metadata,
-            extracted_metadata: extractedMetadata,
-            topics: extractedMetadata.topics,
-            categories: extractedMetadata.categories,
-            key_points: extractedMetadata.keyPoints,
-            sentiment: extractedMetadata.sentiment,
-            importance: extractedMetadata.importance,
-            searchable_terms: extractedMetadata.searchableTerms,
-          }
+          const pageMetadata = memoryIngestionService.buildPageMetadata(metadata, extractedMetadata)
           await ensureNotCancelled()
+          const existingMemory = await prisma.memory.findUnique({
+            where: { id: metadata.memory_id },
+            select: { page_metadata: true },
+          })
+          const mergedMetadata = memoryScoringService.mergeMetadata(
+            existingMemory?.page_metadata,
+            pageMetadata
+          )
           await prisma.memory.update({
             where: { id: metadata.memory_id },
             data: {
               summary: summary,
-              page_metadata: pageMetadata,
+              page_metadata: mergedMetadata,
             },
           })
           await ensureNotCancelled()
@@ -310,43 +285,36 @@ export const startContentWorker = () => {
           })
 
           if (user) {
-            const canonicalText = normalizeText(raw_text)
-            const canonicalHash = hashCanonical(canonicalText)
-            const timestamp = Math.floor(Date.now() / 1000)
-
             let memory
             try {
-              const pageMetadata = {
-                ...metadata,
-                extracted_metadata: extractedMetadata,
-                topics: extractedMetadata.topics,
-                categories: extractedMetadata.categories,
-                key_points: extractedMetadata.keyPoints,
-                sentiment: extractedMetadata.sentiment,
-                importance: extractedMetadata.importance,
-                searchable_terms: extractedMetadata.searchableTerms,
+              if (!canonicalData) {
+                canonicalData = memoryIngestionService.canonicalizeContent(raw_text, baseUrl)
               }
+              const extractedMetadataRecord =
+                extractedMetadata && typeof extractedMetadata === 'object'
+                  ? (extractedMetadata as Record<string, unknown>)
+                  : undefined
+              const memoryCreateInput = memoryIngestionService.buildMemoryCreatePayload({
+                userId: user_id,
+                title: metadata?.title as string | undefined,
+                url: baseUrl,
+                source: (metadata?.source as string | undefined) || undefined,
+                content: raw_text,
+                summary,
+                metadata,
+                extractedMetadata: extractedMetadataRecord,
+                canonicalText: canonicalData.canonicalText,
+                canonicalHash: canonicalData.canonicalHash,
+              })
               await ensureNotCancelled()
               memory = await prisma.memory.create({
-                data: {
-                  user_id,
-                  source: metadata?.source || 'queue',
-                  url: metadata?.url || 'unknown',
-                  title: metadata?.title || 'Untitled',
-                  content: raw_text,
-                  summary: summary,
-                  canonical_text: canonicalText,
-                  canonical_hash: canonicalHash,
-                  timestamp: BigInt(timestamp),
-                  full_content: raw_text,
-                  page_metadata: pageMetadata,
-                },
+                data: memoryCreateInput,
               })
             } catch (createError) {
               const error = createError as PrismaError
               if (error.code === 'P2002') {
                 const existingByCanonical = await prisma.memory.findFirst({
-                  where: { user_id, canonical_hash: canonicalHash },
+                  where: { user_id, canonical_hash: canonicalData?.canonicalHash },
                 })
 
                 if (existingByCanonical) {
@@ -384,17 +352,20 @@ export const startContentWorker = () => {
 
             setImmediate(async () => {
               try {
-                const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 7)
-                if (shouldUpdate) {
-                  logger.log(`[Redis Worker] Triggering profile update`, {
-                    jobId: job.id,
-                    userId: user_id,
-                  })
-                  await profileUpdateService.updateUserProfile(user_id)
-                  logger.log(`[Redis Worker] Profile update completed`, {
-                    jobId: job.id,
-                    userId: user_id,
-                  })
+                const importanceScore = memory.importance_score || 0
+                if (importanceScore >= PROFILE_IMPORTANCE_THRESHOLD) {
+                  const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 3)
+                  if (shouldUpdate) {
+                    logger.log(`[Redis Worker] Triggering profile update`, {
+                      jobId: job.id,
+                      userId: user_id,
+                    })
+                    await profileUpdateService.updateUserProfile(user_id)
+                    logger.log(`[Redis Worker] Profile update completed`, {
+                      jobId: job.id,
+                      userId: user_id,
+                    })
+                  }
                 }
               } catch (profileError) {
                 logger.error(`[Redis Worker] Error updating profile:`, profileError)

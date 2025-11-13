@@ -12,6 +12,7 @@ const router = Router()
 router.post('/process', authenticateToken, submitContent)
 router.get('/user/count', authenticateToken, MemoryController.getUserMemoryCount)
 router.get('/user/recent', authenticateToken, MemoryController.getRecentMemories)
+router.get('/inbox', authenticateToken, MemoryController.getMemoryInbox)
 router.get('/search', authenticateToken, MemorySearchController.searchMemories)
 router.get('/insights', authenticateToken, MemoryController.getMemoryInsights)
 router.get('/analytics', authenticateToken, AnalyticsController.getAnalytics)
@@ -35,5 +36,6 @@ router.post(
 router.get('/health', MemoryController.healthCheck)
 router.get('/debug', authenticateToken, MemoryController.debugMemories)
 router.delete('/:memoryId', authenticateToken, MemoryController.deleteMemory)
+router.patch('/:memoryId/flags', authenticateToken, MemoryController.updateMemoryFlags)
 
 export default router
