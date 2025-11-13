@@ -87,4 +87,8 @@ export class MemoryService {
   static async deletePendingJob(jobId: string) {
     return MemoryJobs.deletePendingJob(jobId)
   }
+
+  static async resubmitPendingJob(jobId: string) {
+    return MemoryJobs.resubmitPendingJob(jobId)
+  }
 }

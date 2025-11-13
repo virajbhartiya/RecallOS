@@ -347,3 +347,48 @@ export const deletePendingJob = async (
     next(error)
   }
 }
+
+export const resubmitPendingJob = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { jobId } = req.params
+
+    if (!jobId) {
+      return next(new AppError('Job ID is required', 400))
+    }
+
+    const job = await contentQueue.getJob(jobId)
+
+    if (!job) {
+      return next(new AppError('Job not found', 404))
+    }
+
+    if (job.data.user_id !== req.user!.id) {
+      return next(new AppError('You do not have permission to resubmit this job', 403))
+    }
+
+    if (job.finishedOn && !job.failedReason) {
+      return next(new AppError('Job has already completed successfully', 400))
+    }
+
+    await job.retry()
+
+    logger.log(
+      `[Content] resubmitted job=${job.id} user=${job.data.user_id}`
+    )
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Job resubmitted successfully',
+      data: {
+        jobId: job.id,
+      },
+    })
+  } catch (error) {
+    logger.error('Error resubmitting pending job:', error)
+    next(error)
+  }
+}

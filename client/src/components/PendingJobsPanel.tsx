@@ -4,9 +4,12 @@ import { requireAuthToken } from "@/utils/user-id.util"
 import {
   AlertCircle,
   CheckSquare,
+  ChevronDown,
+  ChevronUp,
   Clock,
   Loader,
   RefreshCw,
+  RotateCcw,
   Search,
   Square,
   Trash2,
@@ -55,7 +58,10 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
   const [error, setError] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState<"all" | "waiting" | "active" | "delayed" | "failed">("all")
+  const [failedJobsExpanded, setFailedJobsExpanded] = useState(true)
   const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set())
+  const [resubmittingJobs, setResubmittingJobs] = useState<Set<string>>(new Set())
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean
     jobId: string | null
@@ -123,41 +129,84 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
     }
   }, [deleteConfirm.jobId, deleteConfirm.jobIds, fetchPendingJobs])
 
-  // Filter jobs based on search query
+  // Filter jobs based on search query and status filter
   const filteredJobs = useMemo(() => {
-    if (!searchQuery.trim()) return jobs
+    let filtered = jobs
 
-    const query = searchQuery.toLowerCase().trim()
-    return jobs.filter((job) => {
-      // Search in job ID
-      if (job.id.toLowerCase().includes(query)) return true
+    // Apply status filter
+    if (statusFilter !== "all") {
+      filtered = filtered.filter((job) => job.status === statusFilter)
+    }
 
-      // Search in user ID
-      if (job.user_id.toLowerCase().includes(query)) return true
+    // Apply search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      filtered = filtered.filter((job) => {
+        // Search in job ID
+        if (job.id.toLowerCase().includes(query)) return true
 
-      // Search in status
-      if (job.status.toLowerCase().includes(query)) return true
+        // Search in user ID
+        if (job.user_id.toLowerCase().includes(query)) return true
 
-      // Search in raw text
-      if (job.raw_text.toLowerCase().includes(query)) return true
+        // Search in status
+        if (job.status.toLowerCase().includes(query)) return true
 
-      // Search in metadata title
-      const title = job.metadata?.title
-      if (
-        title &&
-        typeof title === "string" &&
-        title.toLowerCase().includes(query)
-      )
-        return true
+        // Search in raw text
+        if (job.raw_text.toLowerCase().includes(query)) return true
 
-      // Search in metadata URL
-      const url = job.metadata?.url
-      if (url && typeof url === "string" && url.toLowerCase().includes(query))
-        return true
+        // Search in metadata title
+        const title = job.metadata?.title
+        if (
+          title &&
+          typeof title === "string" &&
+          title.toLowerCase().includes(query)
+        )
+          return true
 
-      return false
-    })
-  }, [jobs, searchQuery])
+        // Search in metadata URL
+        const url = job.metadata?.url
+        if (url && typeof url === "string" && url.toLowerCase().includes(query))
+          return true
+
+        return false
+      })
+    }
+
+    return filtered
+  }, [jobs, searchQuery, statusFilter])
+
+  // Separate failed jobs from other jobs (only when showing all statuses)
+  const { failedJobs, otherJobs } = useMemo(() => {
+    if (statusFilter === "all") {
+      const failed = filteredJobs.filter((job) => job.status === "failed")
+      const other = filteredJobs.filter((job) => job.status !== "failed")
+      return { failedJobs: failed, otherJobs: other }
+    } else {
+      // When filtering by status, show all filtered jobs in the main list
+      return { failedJobs: [], otherJobs: filteredJobs }
+    }
+  }, [filteredJobs, statusFilter])
+
+  const handleResubmitJob = useCallback(async (jobId: string) => {
+    try {
+      requireAuthToken()
+      setResubmittingJobs((prev) => new Set(prev).add(jobId))
+      setError(null)
+
+      await MemoryService.resubmitPendingJob(jobId)
+      await fetchPendingJobs()
+    } catch (err) {
+      const error = err as { message?: string }
+      console.error("Error resubmitting job:", err)
+      setError(error.message || "Failed to resubmit job")
+    } finally {
+      setResubmittingJobs((prev) => {
+        const next = new Set(prev)
+        next.delete(jobId)
+        return next
+      })
+    }
+  }, [fetchPendingJobs])
 
   const handleSelectJob = useCallback((jobId: string) => {
     setSelectedJobs((prev) => {
@@ -172,14 +221,19 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
   }, [])
 
   const handleSelectAll = useCallback(() => {
-    if (selectedJobs.size === filteredJobs.length) {
+    const jobsToSelect = statusFilter === "all" ? otherJobs : filteredJobs
+    const allSelected = jobsToSelect.every((job) => selectedJobs.has(job.id))
+    
+    if (allSelected) {
       // Deselect all
       setSelectedJobs(new Set())
     } else {
-      // Select all filtered jobs
-      setSelectedJobs(new Set(filteredJobs.map((job) => job.id)))
+      // Select all jobs in the current view
+      const newSelected = new Set(selectedJobs)
+      jobsToSelect.forEach((job) => newSelected.add(job.id))
+      setSelectedJobs(newSelected)
     }
-  }, [selectedJobs.size, filteredJobs])
+  }, [selectedJobs, statusFilter, otherJobs, filteredJobs])
 
   useEffect(() => {
     if (!isOpen) return
@@ -310,6 +364,17 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
                     className="w-full pl-10 pr-4 py-2 text-sm font-mono border border-gray-200 bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
                   />
                 </div>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+                  className="px-4 py-2 text-sm font-mono border border-gray-200 bg-white focus:outline-none focus:border-black focus:ring-1 focus:ring-black"
+                >
+                  <option value="all">All Status</option>
+                  <option value="waiting">Waiting</option>
+                  <option value="active">Active</option>
+                  <option value="delayed">Delayed</option>
+                  <option value="failed">Failed</option>
+                </select>
                 {selectedJobs.size > 0 && (
                   <button
                     onClick={handleBatchDeleteClick}
@@ -399,25 +464,197 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
           ) : filteredJobs.length === 0 ? (
             <EmptyState
               title={
-                searchQuery
-                  ? `No jobs found matching "${searchQuery}"`
+                searchQuery || statusFilter !== "all"
+                  ? `No jobs found matching your filters`
                   : "No pending jobs found in the queue"
               }
             />
           ) : (
             <div className="space-y-4">
+              {failedJobs.length > 0 && statusFilter === "all" && (
+                <div className="bg-red-50 border border-red-200">
+                  <button
+                    onClick={() => setFailedJobsExpanded(!failedJobsExpanded)}
+                    className="w-full flex items-center justify-between p-4 hover:bg-red-100 transition-colors"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <AlertCircle className="w-5 h-5 text-red-600" />
+                      <span className="text-lg font-mono font-semibold text-red-900">
+                        Failed Jobs ({failedJobs.length})
+                      </span>
+                    </div>
+                    {failedJobsExpanded ? (
+                      <ChevronUp className="w-5 h-5 text-red-600" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-red-600" />
+                    )}
+                  </button>
+                  {failedJobsExpanded && (
+                    <div className="border-t border-red-200 p-4 space-y-4">
+                      {failedJobs.map((job) => (
+                        <div
+                          key={job.id}
+                          className={`bg-white border p-6 overflow-hidden ${selectedJobs.has(job.id) ? "border-black bg-gray-50" : "border-gray-200"}`}
+                        >
+                          <div className="mb-4">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center space-x-3 flex-wrap gap-2">
+                                <button
+                                  onClick={() => handleSelectJob(job.id)}
+                                  className="text-gray-600 hover:text-black transition-colors"
+                                  title={
+                                    selectedJobs.has(job.id) ? "Deselect" : "Select"
+                                  }
+                                >
+                                  {selectedJobs.has(job.id) ? (
+                                    <CheckSquare className="w-5 h-5" />
+                                  ) : (
+                                    <Square className="w-5 h-5" />
+                                  )}
+                                </button>
+                                {getStatusIcon(job.status)}
+                                {getStatusBadge(job.status)}
+                                <span className="text-xs font-mono text-gray-500 break-all">
+                                  ID: {job.id}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <button
+                                  onClick={() => handleResubmitJob(job.id)}
+                                  disabled={resubmittingJobs.has(job.id)}
+                                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 border border-blue-200 hover:border-blue-300 transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Resubmit job"
+                                >
+                                  {resubmittingJobs.has(job.id) ? (
+                                    <Loader className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <RotateCcw className="w-4 h-4" />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteJobClick(job.id)}
+                                  className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 border border-red-200 hover:border-red-300 transition-colors flex items-center space-x-1"
+                                  title="Delete job"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="text-sm font-mono text-gray-600 mb-2 break-all">
+                              User: {job.user_id}
+                            </div>
+                            {(() => {
+                              const title = job.metadata?.title
+                              if (title && typeof title === "string") {
+                                return (
+                                  <h3 className="text-lg font-mono font-semibold text-gray-900 mb-2 break-words">
+                                    {title}
+                                  </h3>
+                                )
+                              }
+                              return null
+                            })()}
+                            {(() => {
+                              const url = job.metadata?.url
+                              if (url && typeof url === "string") {
+                                return (
+                                  <a
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm font-mono text-blue-600 hover:underline mb-2 block break-all"
+                                  >
+                                    {url}
+                                  </a>
+                                )
+                              }
+                              return null
+                            })()}
+                            <div className="text-sm text-gray-700 mb-3 bg-gray-50 p-3 border border-gray-200 font-mono break-words whitespace-pre-wrap">
+                              {job.raw_text}
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                            <div className="min-w-0">
+                              <div className="text-xs font-mono text-gray-500 uppercase mb-1">
+                                Created
+                              </div>
+                              <div className="text-xs font-mono text-gray-900 break-words">
+                                {formatDate(job.created_at)}
+                              </div>
+                            </div>
+                            {job.processed_on && (
+                              <div className="min-w-0">
+                                <div className="text-xs font-mono text-gray-500 uppercase mb-1">
+                                  Processed
+                                </div>
+                                <div className="text-xs font-mono text-gray-900 break-words">
+                                  {formatDate(job.processed_on)}
+                                </div>
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <div className="text-xs font-mono text-gray-500 uppercase mb-1">
+                                Length
+                              </div>
+                              <div className="text-xs font-mono text-gray-900">
+                                {job.full_text_length.toLocaleString()} chars
+                              </div>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-mono text-gray-500 uppercase mb-1">
+                                Attempts
+                              </div>
+                              <div className="text-xs font-mono text-gray-900">
+                                {job.attempts}
+                              </div>
+                            </div>
+                          </div>
+
+                          {job.failed_reason && (
+                            <div className="mt-4 p-3 bg-red-50 border border-red-200 overflow-hidden">
+                              <div className="text-xs font-mono text-red-800 uppercase mb-1">
+                                Failed Reason
+                              </div>
+                              <div className="text-sm font-mono text-red-900 break-words">
+                                {job.failed_reason}
+                              </div>
+                            </div>
+                          )}
+
+                          {Object.keys(job.metadata).length > 0 && (
+                            <div className="mt-4">
+                              <details className="text-sm">
+                                <summary className="cursor-pointer font-mono text-gray-600 hover:text-gray-900">
+                                  View Metadata
+                                </summary>
+                                <pre className="mt-2 p-3 bg-gray-50 border border-gray-200 text-xs font-mono text-gray-700 overflow-x-auto">
+                                  {JSON.stringify(job.metadata, null, 2)}
+                                </pre>
+                              </details>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex items-center justify-between mb-2">
-                {searchQuery && (
+                {(searchQuery || statusFilter !== "all") && (
                   <div className="text-sm font-mono text-gray-600">
-                    Showing {filteredJobs.length} of {jobs.length} jobs
+                    Showing {otherJobs.length} of {jobs.length} jobs
+                    {statusFilter === "all" && failedJobs.length > 0 && ` (${failedJobs.length} failed shown above)`}
                   </div>
                 )}
-                {filteredJobs.length > 0 && (
+                {otherJobs.length > 0 && (
                   <button
                     onClick={handleSelectAll}
                     className="text-sm font-mono text-gray-700 hover:text-gray-900 flex items-center space-x-2 px-3 py-1 border border-gray-200 hover:bg-gray-50"
                   >
-                    {selectedJobs.size === filteredJobs.length ? (
+                    {otherJobs.every((job) => selectedJobs.has(job.id)) ? (
                       <>
                         <CheckSquare className="w-4 h-4" />
                         <span>Deselect All</span>
@@ -431,7 +668,7 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
                   </button>
                 )}
               </div>
-              {filteredJobs.map((job) => (
+              {otherJobs.map((job) => (
                 <div
                   key={job.id}
                   className={`bg-white border p-6 overflow-hidden ${selectedJobs.has(job.id) ? "border-black bg-gray-50" : "border-gray-200"}`}
@@ -458,13 +695,29 @@ export const PendingJobsPanel: React.FC<PendingJobsPanelProps> = ({
                           ID: {job.id}
                         </span>
                       </div>
-                      <button
-                        onClick={() => handleDeleteJobClick(job.id)}
-                        className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 border border-red-200 hover:border-red-300 transition-colors flex items-center space-x-1"
-                        title="Delete job"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        {job.status === "failed" && (
+                          <button
+                            onClick={() => handleResubmitJob(job.id)}
+                            disabled={resubmittingJobs.has(job.id)}
+                            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50 p-2 border border-blue-200 hover:border-blue-300 transition-colors flex items-center space-x-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Resubmit job"
+                          >
+                            {resubmittingJobs.has(job.id) ? (
+                              <Loader className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteJobClick(job.id)}
+                          className="text-red-600 hover:text-red-800 hover:bg-red-50 p-2 border border-red-200 hover:border-red-300 transition-colors flex items-center space-x-1"
+                          title="Delete job"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <div className="text-sm font-mono text-gray-600 mb-2 break-all">
                       User: {job.user_id}

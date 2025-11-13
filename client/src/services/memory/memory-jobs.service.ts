@@ -39,6 +39,12 @@ export async function deletePendingJob(jobId: string): Promise<void> {
   await deleteRequest(`/content/pending/${jobId}`)
 }
 
+export async function resubmitPendingJob(jobId: string): Promise<void> {
+  requireAuthToken()
+  const { postRequest } = await import("../../utils/general-services.util")
+  await postRequest(`/content/pending/${jobId}/resubmit`, {})
+}
+
 export async function getMemorySnapshots(
   page: number = 1,
   limit: number = 20
