@@ -34,6 +34,10 @@ const queueOptions: QueueOptions = {
 export const contentQueue = new Queue<ContentJobData>(queueName, queueOptions)
 export const contentQueueEvents = new QueueEvents(queueName, { connection: getRedisConnection() })
 
+const cancelledJobKeyPrefix = 'queue:process-content:cancelled:'
+
+export const getContentJobCancellationKey = (jobId: string) => `${cancelledJobKeyPrefix}${jobId}`
+
 contentQueueEvents.on('waiting', () => {})
 contentQueueEvents.on('active', () => {})
 contentQueueEvents.on('completed', () => {})

@@ -1,9 +1,15 @@
 import { Response, NextFunction } from 'express'
 import { AuthenticatedRequest } from '../middleware/auth.middleware'
 
-import { addContentJob, ContentJobData, contentQueue } from '../lib/queue.lib'
+import {
+  addContentJob,
+  ContentJobData,
+  contentQueue,
+  getContentJobCancellationKey,
+} from '../lib/queue.lib'
 
 import { prisma } from '../lib/prisma.lib'
+import { getRedisClient } from '../lib/redis.lib'
 
 import AppError from '../utils/app-error.util'
 import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
@@ -267,6 +273,16 @@ export const getPendingJobs = async (
 
     let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs, ...failedJobs]
 
+    const redis = getRedisClient()
+    const cancellationKeys = allJobs.map(item => getContentJobCancellationKey(item.job.id!))
+    const cancellationStates = cancellationKeys.length > 0 ? await redis.mget(cancellationKeys) : []
+    const cancelledJobIds = new Set<string>()
+    cancellationStates.forEach((value, index) => {
+      if (value) {
+        cancelledJobIds.add(allJobs[index].job.id!)
+      }
+    })
+
     allJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)
 
     const jobs = allJobs
@@ -278,11 +294,13 @@ export const getPendingJobs = async (
           (item.job.data.raw_text && item.job.data.raw_text.length > 200 ? '...' : ''),
         full_text_length: item.job.data.raw_text?.length || 0,
         metadata: item.job.data.metadata || {},
-        status: item.status,
+        status: cancelledJobIds.has(item.job.id) ? 'cancelling' : item.status,
         created_at: new Date(item.job.timestamp).toISOString(),
         processed_on: item.job.processedOn ? new Date(item.job.processedOn).toISOString() : null,
         finished_on: item.job.finishedOn ? new Date(item.job.finishedOn).toISOString() : null,
-        failed_reason: item.job.failedReason || null,
+        failed_reason: cancelledJobIds.has(item.job.id)
+          ? 'Job cancellation requested by user'
+          : item.job.failedReason || null,
         attempts: item.job.attemptsMade,
       }))
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
@@ -333,7 +351,26 @@ export const deletePendingJob = async (
       return next(new AppError('You do not have permission to delete this job', 403))
     }
 
+    const jobState = await job.getState()
+
+    if (jobState === 'active') {
+      const redis = getRedisClient()
+      const key = getContentJobCancellationKey(jobId)
+      await redis.set(key, '1', 'EX', 3600)
+      return res.status(200).json({
+        status: 'success',
+        message: 'Job cancellation requested',
+        data: {
+          jobId,
+          state: 'cancelling',
+        },
+      })
+    }
+
     await job.remove()
+
+    const redis = getRedisClient()
+    await redis.del(getContentJobCancellationKey(jobId))
 
     res.status(200).json({
       status: 'success',
