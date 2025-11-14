@@ -5,6 +5,7 @@ import AppError from '../utils/app-error.util'
 import { profileUpdateService } from '../services/profile-update.service'
 import { aiProvider } from '../services/ai-provider.service'
 import { logger } from '../utils/logger.util'
+import { searchMemories } from '../services/memory-search.service'
 
 const MAX_THREAD_CHARS = 15000
 const MAX_DRAFT_CHARS = 6000
@@ -99,6 +100,7 @@ export const draftEmailReply = async (
       return next(new AppError('thread_text must be at least 50 characters', 400))
     }
 
+    // Get user profile context (summary of important memories)
     let profileContext: string | null = null
     try {
       profileContext = await profileUpdateService.getProfileContext(req.user.id)
@@ -110,11 +112,66 @@ export const draftEmailReply = async (
     }
     const normalizedProfile = profileContext || 'No profile context available.'
 
-    const prompt = `You are Cognia, a precise email drafting co-pilot. Using the user's profile and the full thread, write a ready-to-send reply.
+    // Search for relevant memories related to this email thread
+    let relevantMemoriesContext = ''
+    try {
+      // Build a search query from the email thread and participants
+      const searchQuery = [
+        subject,
+        ...participants.slice(0, 3), // Search by participant names
+        threadText.substring(0, 200), // First 200 chars of thread for topic extraction
+      ]
+        .filter(Boolean)
+        .join(' ')
+
+      if (searchQuery.length > 20) {
+        logger.log('[email/draft] Searching for relevant memories', {
+          userId: req.user.id,
+          queryLength: searchQuery.length,
+        })
+
+        const searchResults = await searchMemories({
+          userId: req.user.id,
+          query: searchQuery,
+          limit: 15, // Get top 15 most relevant memories for better context
+          enableReasoning: false,
+          contextOnly: true, // Just get context, don't generate answer
+          policy: 'chat', // Use chat policy for balanced retrieval
+        })
+
+        if (searchResults.results && searchResults.results.length > 0) {
+          const memorySummaries = searchResults.results
+            .slice(0, 15)
+            .map((mem, idx) => {
+              const date = mem.timestamp
+                ? new Date(mem.timestamp * 1000).toISOString().slice(0, 10)
+                : ''
+              return `[${idx + 1}] ${date}: ${mem.title || 'Untitled'} - ${mem.summary || ''}`
+            })
+            .join('\n')
+
+          relevantMemoriesContext = `\n\nRELEVANT MEMORIES FROM USER'S KNOWLEDGE BASE:\n${memorySummaries}\n\nUse these memories to provide context-aware responses. Reference specific details when relevant.`
+          
+          logger.log('[email/draft] Found relevant memories', {
+            userId: req.user.id,
+            memoryCount: searchResults.results.length,
+          })
+        }
+      }
+    } catch (memorySearchError) {
+      logger.warn('[email/draft] Failed to search relevant memories, continuing without them', {
+        error: memorySearchError instanceof Error ? memorySearchError.message : String(memorySearchError),
+        userId: req.user.id,
+      })
+      // Continue without memory search - not critical
+    }
+
+    const prompt = `You are Cognia, a precise email drafting co-pilot. Using the user's profile, relevant memories, and the full thread, write a ready-to-send reply.
 
 RULES:
 - Match the tone of the thread while keeping it professional and friendly.
 - Assume you are replying as the user. Reference commitments, timelines, and any requests clearly.
+- Use relevant memories to provide context-aware responses (e.g., reference past conversations, preferences, or commitments).
 - If the thread includes questions, answer them. If decisions are needed, propose next steps.
 - Keep greetings and sign-off natural, e.g., "Hi Alex," and "Best, <USER>" (do NOT include their actual name – just say "Best,").
 - Subject line must be <= 120 characters and reflect the reply content (rewrite if necessary).
@@ -129,7 +186,7 @@ Return ONLY valid JSON with this shape:
 }
 
 USER PROFILE:
-${normalizedProfile}
+${normalizedProfile}${relevantMemoriesContext}
 
 PARTICIPANTS: ${participants.join(', ') || 'Not specified'}
 EMAIL PROVIDER: ${provider}
