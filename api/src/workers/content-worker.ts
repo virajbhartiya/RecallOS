@@ -355,16 +355,16 @@ export const startContentWorker = () => {
                 const importanceScore = memory.importance_score || 0
                 if (importanceScore >= PROFILE_IMPORTANCE_THRESHOLD) {
                   const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 3)
-                  if (shouldUpdate) {
-                    logger.log(`[Redis Worker] Triggering profile update`, {
-                      jobId: job.id,
-                      userId: user_id,
-                    })
-                    await profileUpdateService.updateUserProfile(user_id)
-                    logger.log(`[Redis Worker] Profile update completed`, {
-                      jobId: job.id,
-                      userId: user_id,
-                    })
+                if (shouldUpdate) {
+                  logger.log(`[Redis Worker] Triggering profile update`, {
+                    jobId: job.id,
+                    userId: user_id,
+                  })
+                  await profileUpdateService.updateUserProfile(user_id)
+                  logger.log(`[Redis Worker] Profile update completed`, {
+                    jobId: job.id,
+                    userId: user_id,
+                  })
                   }
                 }
               } catch (profileError) {

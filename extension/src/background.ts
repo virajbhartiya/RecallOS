@@ -200,29 +200,44 @@ async function requestEmailDraft(payload: EmailDraftPayload) {
     throw new Error('Authentication required. Please log in through the Cognia web client.')
   }
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${authToken}`,
-    },
-    credentials: 'include',
-    body: JSON.stringify(payload),
-  })
+  // Create AbortController for timeout
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 370000) // 6.17 minutes (slightly longer than server timeout)
 
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '')
-    throw new Error(
-      `Draft request failed (${response.status}): ${errorText || response.statusText}`
-    )
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '')
+      throw new Error(
+        `Draft request failed (${response.status}): ${errorText || response.statusText}`
+      )
+    }
+
+    const result = await response.json()
+    if (!result?.success || !result.data) {
+      throw new Error('Draft service returned an unexpected response.')
+    }
+
+    return result.data as { subject: string; body: string; summary?: string }
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout - email draft took too long to generate')
+    }
+    throw error
   }
-
-  const result = await response.json()
-  if (!result?.success || !result.data) {
-    throw new Error('Draft service returned an unexpected response.')
-  }
-
-  return result.data as { subject: string; body: string; summary?: string }
 }
 
 async function sendToBackend(data: ContextData): Promise<void> {
@@ -561,23 +576,43 @@ runtime.onMessage.addListener(
     }
 
     if (message?.type === MESSAGE_TYPES.DRAFT_EMAIL_REPLY) {
+      // Capture sendResponse before async operation - Chrome message channel timeout is ~5 minutes
+      // We need to ensure response is sent before channel closes
+      const responseCallback = sendResponse
+      let responseSent = false
+      
+      // Helper to ensure response is only sent once
+      const safeSendResponse = (response: any) => {
+        if (!responseSent) {
+          responseSent = true
+          try {
+            responseCallback(response)
+          } catch (err) {
+            console.error('[Cognia] Error sending response:', err)
+          }
+        }
+      }
+      
       ;(async () => {
         try {
           const payload = (message as any).payload as EmailDraftPayload
           if (!payload || typeof payload.thread_text !== 'string') {
-            sendResponse({ success: false, error: 'Invalid payload' })
+            safeSendResponse({ success: false, error: 'Invalid payload' })
             return
           }
+          
+          // Start the draft request
           const data = await requestEmailDraft(payload)
-          sendResponse({ success: true, data })
+          safeSendResponse({ success: true, data })
         } catch (error) {
-          sendResponse({
+          safeSendResponse({
             success: false,
             error: error instanceof Error ? error.message : 'Failed to draft email reply',
           })
         }
       })()
-      return true
+      
+      return true // Indicates we'll send response asynchronously
     }
 
     if (message?.type === MESSAGE_TYPES.PING) {

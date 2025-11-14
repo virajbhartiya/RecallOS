@@ -39,6 +39,9 @@ const Knowledge = lazy(() =>
 const Inbox = lazy(() =>
   import("@/pages/inbox.page").then((module) => ({ default: module.Inbox }))
 )
+const Projects = lazy(() =>
+  import("@/pages/projects.page").then((module) => ({ default: module.Projects }))
+)
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -60,6 +63,7 @@ const AppRoutes = () => {
         <Route path="/insights" element={<Insights />} />
         <Route path="/knowledge" element={<Knowledge />} />
         <Route path="/inbox" element={<Inbox />} />
+        <Route path="/projects" element={<Projects />} />
 
         <Route path="*" element={<Landing />} />
       </Routes>

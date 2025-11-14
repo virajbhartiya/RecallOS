@@ -1048,6 +1048,9 @@ document.addEventListener('mousemove', () => {
 
 let draftToastTimeout: ReturnType<typeof setTimeout> | null = null
 let draftToastElement: HTMLDivElement | null = null
+let draftPillElement: HTMLDivElement | null = null
+let draftPillObserver: MutationObserver | null = null
+let isDrafting = false
 
 async function handleDraftEmailRequest(): Promise<{ success: boolean; error?: string }> {
   const context = extractEmailContext()
@@ -1364,11 +1367,25 @@ function showDraftToast(message: string, variant: 'info' | 'success' | 'error' =
 
 function requestDraftFromBackground(payload: EmailDraftPayload): Promise<EmailDraftResponse> {
   return new Promise((resolve, reject) => {
+    // Add timeout to prevent hanging
+    const timeout = setTimeout(() => {
+      reject(new Error('Request timeout - background script did not respond'))
+    }, 6000000) // 60 second timeout
+
     runtime.sendMessage({ type: MESSAGE_TYPES.DRAFT_EMAIL_REPLY, payload }, response => {
+      clearTimeout(timeout)
+      
+      // Check for Chrome extension API errors
+      if (chrome.runtime.lastError) {
+        reject(new Error(`Extension error: ${chrome.runtime.lastError.message}`))
+        return
+      }
+      
       if (!response) {
         reject(new Error('No response from background script.'))
         return
       }
+      
       if (response.success && response.data) {
         resolve(response.data as EmailDraftResponse)
       } else {
@@ -1376,6 +1393,287 @@ function requestDraftFromBackground(payload: EmailDraftPayload): Promise<EmailDr
       }
     })
   })
+}
+
+function initEmailDraftPill(): void {
+  const host = window.location.hostname
+  const isEmailSite = host.includes('mail.google') || 
+                      host.includes('outlook.') || 
+                      host.includes('office.com') || 
+                      host.includes('live.com') || 
+                      host.includes('microsoft.com')
+  
+  if (!isEmailSite) {
+    return
+  }
+
+  // Watch for compose fields appearing or being focused
+  const checkForComposeField = () => {
+    const context = extractEmailContext()
+    if (context?.composeElement && isElementVisible(context.composeElement)) {
+      ensureDraftPill(context.composeElement, context)
+    } else {
+      removeDraftPill()
+    }
+  }
+
+  // Check on focus events
+  document.addEventListener('focusin', (e) => {
+    const target = e.target as HTMLElement
+    if (target && (target.contentEditable === 'true' || target.closest('[contenteditable="true"]'))) {
+      setTimeout(checkForComposeField, 100)
+    }
+  }, true)
+
+  // Check on input events (user typing)
+  document.addEventListener('input', (e) => {
+    const target = e.target as HTMLElement
+    if (target && target.contentEditable === 'true') {
+      setTimeout(checkForComposeField, 100)
+    }
+  }, true)
+
+  // Watch for DOM changes (Gmail/Outlook dynamically load compose windows)
+  if (!draftPillObserver) {
+    draftPillObserver = new MutationObserver(() => {
+      checkForComposeField()
+    })
+    draftPillObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: false,
+    })
+  }
+
+  // Initial check
+  setTimeout(checkForComposeField, 500)
+}
+
+function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext): void {
+  // Check if pill already exists for this element
+  if (draftPillElement && document.body.contains(draftPillElement)) {
+    const existingCompose = (draftPillElement as any)._composeElement
+    if (existingCompose === composeElement) {
+      return // Same element, keep existing pill
+    }
+    // Different element, remove old pill
+    removeDraftPill()
+  }
+
+  // Create pill element - ChatGPT style
+  const pill = document.createElement('div')
+  pill.className = 'cognia-draft-pill'
+  
+  // ChatGPT-style pill design - compact and small
+  pill.style.cssText = `
+    position: fixed;
+    z-index: 10000;
+    background: #f0f0f0;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: #1a1a1a;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    user-select: none;
+    pointer-events: auto;
+    white-space: nowrap;
+    line-height: 1.2;
+    height: 20px;
+  `
+
+  // Create icon (sparkle - smaller)
+  const icon = document.createElement('span')
+  icon.innerHTML = '✨'
+  icon.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    line-height: 1;
+    margin-top: -1px;
+  `
+
+  // Create text
+  const text = document.createElement('span')
+  text.textContent = 'Draft'
+  text.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+  `
+
+  pill.appendChild(icon)
+  pill.appendChild(text)
+
+  // Hover effects - ChatGPT style
+  pill.addEventListener('mouseenter', () => {
+    pill.style.background = '#e8e8e8'
+    pill.style.borderColor = '#d0d0d0'
+    pill.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.12)'
+  })
+  pill.addEventListener('mouseleave', () => {
+    pill.style.background = '#f0f0f0'
+    pill.style.borderColor = '#e0e0e0'
+    pill.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)'
+  })
+
+  // Click handler
+  pill.addEventListener('click', async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (isDrafting) {
+      return
+    }
+
+    isDrafting = true
+    pill.style.opacity = '0.7'
+    pill.style.cursor = 'wait'
+    text.textContent = '...'
+    
+    try {
+      const currentContext = extractEmailContext()
+      if (!currentContext) {
+        text.textContent = 'Draft'
+        showDraftToast('No email thread detected.', 'error')
+        return
+      }
+      
+      const payload: EmailDraftPayload = {
+        thread_text: currentContext.threadText,
+        subject: currentContext.subject,
+        provider: currentContext.provider,
+        participants: currentContext.participants,
+        existing_draft: currentContext.existingDraft,
+        url: window.location.href,
+        title: document.title,
+      }
+
+      const draft = await requestDraftFromBackground(payload)
+      const injection = injectEmailDraft(currentContext, draft)
+      
+      if (!injection.bodyApplied) {
+        if (copyTextToClipboard(draft.body)) {
+          showDraftToast('Draft copied to clipboard. Paste it into the compose box.', 'error')
+        } else {
+          showDraftToast('Unable to insert draft automatically.', 'error')
+        }
+        return
+      }
+
+      const subjectMessage = injection.subjectApplied ? ' and subject updated' : ''
+      showDraftToast(`Draft inserted${subjectMessage}`, 'success')
+      
+      // Update pill to show success state briefly
+      text.textContent = '✓'
+      pill.style.background = '#e8f5e9'
+      pill.style.borderColor = '#c8e6c9'
+      pill.style.color = '#2e7d32'
+      
+      // Remove pill after successful draft
+      setTimeout(() => {
+        removeDraftPill()
+      }, 2000)
+    } catch (error) {
+      text.textContent = 'Draft'
+      showDraftToast('Failed to draft reply.', 'error')
+      console.error('[Cognia] Draft error:', error)
+    } finally {
+      isDrafting = false
+      if (text.textContent !== '✓') {
+        pill.style.opacity = '1'
+        pill.style.cursor = 'pointer'
+        pill.style.background = '#f0f0f0'
+        pill.style.borderColor = '#e0e0e0'
+        pill.style.color = '#1a1a1a'
+      }
+    }
+  })
+
+  // Position the pill relative to compose element
+  // Try to find the compose element's container (Gmail/Outlook use specific containers)
+  const composeContainer = composeElement.closest('[role="dialog"], .aYF, .ms-ComposeHeader, .ms-ComposeBody') || composeElement.parentElement
+  
+  const positionPill = () => {
+    if (!composeElement || !isElementVisible(composeElement)) {
+      removeDraftPill()
+      return
+    }
+    
+    const rect = composeElement.getBoundingClientRect()
+    
+    // Position at bottom-right corner of compose field, similar to ChatGPT
+    // ChatGPT positions it just above the bottom edge, slightly inset from the right
+    pill.style.position = 'fixed'
+    
+    // Position relative to compose field's bottom-right, with small offset
+    const offsetX = 12 // pixels from right edge
+    const offsetY = 8  // pixels from bottom edge
+    
+    pill.style.top = `${rect.bottom - offsetY - 24}px` // 24px is approximate pill height (compact)
+    pill.style.left = `${rect.right - offsetX - 70}px` // 70px is approximate pill width (compact)
+    
+    // Ensure it doesn't go off-screen
+    const pillRect = pill.getBoundingClientRect()
+    if (pillRect.right > window.innerWidth - 10) {
+      pill.style.left = `${window.innerWidth - pillRect.width - 10}px`
+    }
+    if (pillRect.left < 10) {
+      pill.style.left = '10px'
+    }
+    if (pillRect.bottom > window.innerHeight - 10) {
+      pill.style.top = `${window.innerHeight - pillRect.height - 10}px`
+    }
+    if (pillRect.top < 10) {
+      pill.style.top = `${rect.top + 10}px`
+    }
+  }
+
+  positionPill()
+  
+  // Append to compose container if it exists, otherwise to body
+  if (composeContainer && composeContainer !== document.body && composeContainer instanceof HTMLElement) {
+    composeContainer.style.position = 'relative'
+    composeContainer.appendChild(pill)
+  } else {
+    document.body.appendChild(pill)
+  }
+  
+  draftPillElement = pill
+
+  // Reposition on scroll/resize
+  const repositionHandler = () => {
+    if (isElementVisible(composeElement)) {
+      positionPill()
+    } else {
+      removeDraftPill()
+    }
+  }
+  window.addEventListener('scroll', repositionHandler, true)
+  window.addEventListener('resize', repositionHandler)
+  
+  // Store handler for cleanup
+  ;(pill as any)._repositionHandler = repositionHandler
+  ;(pill as any)._composeElement = composeElement
+}
+
+function removeDraftPill(): void {
+  if (draftPillElement) {
+    const handler = (draftPillElement as any)._repositionHandler
+    if (handler) {
+      window.removeEventListener('scroll', handler, true)
+      window.removeEventListener('resize', handler)
+    }
+    draftPillElement.remove()
+    draftPillElement = null
+  }
 }
 
 // AI Chat Platform Detection
@@ -1579,7 +1877,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
     const finalSummary = summaryParts.join('\n\n')
     console.log('Cognia: Final memory summary:', finalSummary.substring(0, 200) + '...')
     return finalSummary
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error in getMemorySummary:', error)
     return null
   }
@@ -1589,7 +1887,7 @@ async function getApiEndpointForMemory(): Promise<string> {
   try {
     const result = await storage.sync.get(['apiEndpoint'])
     return result.apiEndpoint || 'http://localhost:3000/api/memory/process'
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error getting API endpoint:', error)
     return 'http://localhost:3000/api/memory/process'
   }
@@ -1682,7 +1980,7 @@ async function autoInjectMemories(userText: string): Promise<void> {
         cogniaIcon.style.animation = 'none'
       }
     }
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error auto-injecting memories:', error)
     if (cogniaIcon) {
       cogniaIcon.style.color = '#ef4444'
@@ -1845,7 +2143,7 @@ async function checkExtensionEnabled(): Promise<boolean> {
         resolve(response?.success ? response.enabled : true)
       })
     })
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error checking extension enabled state:', error)
     return true
   }
@@ -1858,7 +2156,7 @@ async function checkMemoryInjectionEnabled(): Promise<boolean> {
         resolve(response?.success ? response.enabled : true)
       })
     })
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error checking memory injection enabled state:', error)
     return true
   }
@@ -1939,7 +2237,7 @@ async function showCogniaStatus(): Promise<void> {
         ${extensionEnabled ? 'Memories are automatically injected as you type (1.5s delay).' : 'Extension is disabled. Click the popup to enable.'}
       </div>
     `
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error checking status:', error)
     tooltip.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -2423,6 +2721,7 @@ function debugAIChatElements(): void {
 }
 
 initAIChatIntegration()
+initEmailDraftPill()
 
 document.addEventListener(
   'input',

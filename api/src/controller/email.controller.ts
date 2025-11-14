@@ -5,7 +5,6 @@ import AppError from '../utils/app-error.util'
 import { profileUpdateService } from '../services/profile-update.service'
 import { aiProvider } from '../services/ai-provider.service'
 import { logger } from '../utils/logger.util'
-import { withTimeout } from '../services/memory-search.service'
 
 const MAX_THREAD_CHARS = 15000
 const MAX_DRAFT_CHARS = 6000
@@ -148,11 +147,10 @@ ${threadText}`
 
     let aiResponse: string
     try {
-      // Use 270 second timeout (4.5 minutes) to stay under the 5 minute middleware timeout
-      aiResponse = await withTimeout(
-        aiProvider.generateContent(prompt, false, req.user.id),
-        270000
-      )
+      // Use 5.5 minute timeout (330000ms) for email drafts - pass timeout override and high priority flag
+      // Email drafts get priority 9 (below search but above normal processing) to ensure fast response
+      // Timeout is slightly less than middleware timeout (6 minutes) to allow for cleanup
+      aiResponse = await aiProvider.generateContent(prompt, false, req.user.id, 330000, true)
       logger.log('[email/draft] AI response received', {
         userId: req.user.id,
         responseLength: aiResponse?.length || 0,

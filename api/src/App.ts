@@ -221,7 +221,7 @@ app.use(validateRequestSize(10 * 1024 * 1024)) // 10MB limit
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 60000) // 60 seconds default
 const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 360000) // 6 minutes for search requests
 const INSIGHTS_TIMEOUT_MS = Number(process.env.INSIGHTS_TIMEOUT_MS || 360000) // 6 minutes for insights generation
-const EMAIL_DRAFT_TIMEOUT_MS = Number(process.env.EMAIL_DRAFT_TIMEOUT_MS || 300000) // 5 minutes for email drafts
+const EMAIL_DRAFT_TIMEOUT_MS = Number(process.env.EMAIL_DRAFT_TIMEOUT_MS || 360000) // 6 minutes for email drafts (allows for queue delays)
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const isSearchRequest = req.path === '/api/search' && req.method === 'POST'
@@ -233,7 +233,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       ? INSIGHTS_TIMEOUT_MS
       : isEmailDraftRequest
         ? EMAIL_DRAFT_TIMEOUT_MS
-        : REQUEST_TIMEOUT_MS
+      : REQUEST_TIMEOUT_MS
 
   const timeout = setTimeout(() => {
     if (!res.headersSent) {

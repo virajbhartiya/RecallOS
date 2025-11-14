@@ -6,6 +6,8 @@ import authRouter from './auth.route'
 import profileRouter from './profile.route'
 import insightsRouter from './insights.route'
 import knowledgeRouter from './knowledge.route'
+import projectRouter from './project.route'
+import exportImportRouter from './export-import.route'
 
 export const routes = (app: Express) => {
   app.use('/api/memory', memoryRouter)
@@ -16,4 +18,6 @@ export const routes = (app: Express) => {
   app.use('/api/profile', profileRouter)
   app.use('/api/insights', insightsRouter)
   app.use('/api/knowledge', knowledgeRouter)
+  app.use('/api/projects', projectRouter)
+  app.use('/api/export', exportImportRouter)
 }

@@ -15,6 +15,7 @@ import {
   type RetrievalPolicyName,
 } from './retrieval-policy.service'
 import { buildContextFromResults, type ContextBlock } from './context-builder.service'
+import { rerankingService } from './reranking.service'
 
 type SearchResult = {
   memory_id: string
@@ -727,12 +728,67 @@ export async function searchMemories(params: {
     .sort((a, b) => b.final_score - a.final_score)
     .slice(0, retrievalPolicy.maxResults)
 
+  // Apply reranking for small result sets (5-20 items) to improve relevance
+  let finalScoredRows = policyScoredRows
+  const shouldRerank = policyScoredRows.length >= 5 && policyScoredRows.length <= 20 && !contextOnly
+
+  if (shouldRerank) {
+    try {
+      logger.log('[search] Applying reranking', {
+        ts: new Date().toISOString(),
+        userId,
+        candidateCount: policyScoredRows.length,
+      })
+
+      const candidates = policyScoredRows.map(row => ({
+        id: row.id,
+        title: row.title,
+        summary: row.summary,
+        content: row.content,
+        score: row.final_score || row.score,
+      }))
+
+      const reranked = await rerankingService.rerankMemories(normalized, candidates, user.id)
+
+      // Create a map of reranked scores
+      const rerankMap = new Map(reranked.map(r => [r.id, r]))
+
+      // Merge reranking scores with existing scores (weighted combination)
+      finalScoredRows = policyScoredRows.map(row => {
+        const rerankResult = rerankMap.get(row.id)
+        if (rerankResult) {
+          // Combine original score (70%) with rerank score (30%)
+          const combinedScore = (row.final_score || row.score) * 0.7 + rerankResult.score * 0.3
+          return {
+            ...row,
+            final_score: combinedScore,
+            rerank_rank: rerankResult.rank,
+            rerank_reasoning: rerankResult.reasoning,
+          }
+        }
+        return row
+      }).sort((a, b) => b.final_score - a.final_score)
+
+      logger.log('[search] Reranking completed', {
+        ts: new Date().toISOString(),
+        userId,
+        rerankedCount: reranked.length,
+      })
+    } catch (rerankError) {
+      logger.warn('[search] Reranking failed, using original order', {
+        error: rerankError instanceof Error ? rerankError.message : String(rerankError),
+      })
+      // Continue with original order if reranking fails
+    }
+  }
+
   logger.log('[search] results filtered and sorted', {
     ts: new Date().toISOString(),
     userId,
-    filteredCount: policyScoredRows.length,
+    filteredCount: finalScoredRows.length,
     totalScored: scoredRows.length,
     searchStrategy: searchParams.searchStrategy,
+    reranked: shouldRerank,
     thresholds: {
       semantic: searchParams.semanticThreshold,
       keyword: searchParams.keywordThreshold,
@@ -741,10 +797,10 @@ export async function searchMemories(params: {
     },
   })
 
-  const memoryIds = policyScoredRows.map(r => r.id)
+  const memoryIds = finalScoredRows.map(r => r.id)
 
   // Fast-path: if no matches, persist minimal query event and return immediately
-  if (policyScoredRows.length === 0) {
+  if (finalScoredRows.length === 0) {
     try {
       await prisma.queryEvent.create({
         data: {
@@ -789,9 +845,9 @@ export async function searchMemories(params: {
     url: string | null
   }> = []
 
-  const profileContext = await profileUpdateService.getProfileContext(userId)
+    const profileContext = await profileUpdateService.getProfileContext(userId)
   const contextArtifacts = buildContextFromResults({
-    items: policyScoredRows.map(row => ({
+    items: finalScoredRows.map(row => ({
       id: row.id,
       title: row.title,
       summary: row.summary,
@@ -814,7 +870,7 @@ export async function searchMemories(params: {
 
   if (!contextOnly) {
     try {
-      const bullets = policyScoredRows
+      const bullets = finalScoredRows
         .map((r, i) => {
           const date = r.timestamp
             ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10)
@@ -851,7 +907,7 @@ ${bullets}`
       logger.log('[search] generating answer', {
         ts: new Date().toISOString(),
         userId,
-        memoryCount: policyScoredRows.length,
+        memoryCount: finalScoredRows.length,
       })
       const answerResult = await withTimeout(aiProvider.generateContent(ansPrompt, true), 300000)
       if (typeof answerResult === 'string') {
@@ -865,7 +921,7 @@ ${bullets}`
         userId,
         answerLength: answer?.length,
       })
-      const allCitations = policyScoredRows.map((r, i) => ({
+      const allCitations = finalScoredRows.map((r, i) => ({
         label: i + 1,
         memory_id: r.id,
         title: r.title,
@@ -874,19 +930,19 @@ ${bullets}`
       const order = extractCitationOrder(answer)
       citations =
         order.length > 0
-          ? order
-              .map(n => allCitations.find(c => c.label === n))
-              .filter(
-                (
-                  c
-                ): c is {
-                  label: number
-                  memory_id: string
-                  title: string | null
-                  url: string | null
-                } => Boolean(c)
-              )
-          : []
+        ? order
+            .map(n => allCitations.find(c => c.label === n))
+            .filter(
+              (
+                c
+              ): c is {
+                label: number
+                memory_id: string
+                title: string | null
+                url: string | null
+              } => Boolean(c)
+            )
+        : []
     } catch (error) {
       logger.error('[search] error generating answer, using fallback', {
         ts: new Date().toISOString(),
@@ -894,11 +950,11 @@ ${bullets}`
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       })
-      answer = `Found ${policyScoredRows.length} relevant memories about "${normalized}". ${policyScoredRows
+      answer = `Found ${finalScoredRows.length} relevant memories about "${normalized}". ${finalScoredRows
         .slice(0, 3)
         .map((r, i) => `[${i + 1}] ${r.title || 'Untitled'}`)
-        .join(', ')}${policyScoredRows.length > 3 ? ' and more.' : '.'}`
-      const fallbackCitations = policyScoredRows.map((r, i) => ({
+        .join(', ')}${finalScoredRows.length > 3 ? ' and more.' : '.'}`
+      const fallbackCitations = finalScoredRows.map((r, i) => ({
         label: i + 1,
         memory_id: r.id,
         title: r.title,
@@ -928,9 +984,9 @@ ${bullets}`
     },
   })
 
-  if (policyScoredRows.length) {
+  if (finalScoredRows.length) {
     await prisma.queryRelatedMemory.createMany({
-      data: policyScoredRows.map((r, idx) => ({
+      data: finalScoredRows.map((r, idx) => ({
         query_event_id: created.id,
         memory_id: r.id,
         rank: idx + 1,
@@ -940,7 +996,7 @@ ${bullets}`
     })
   }
 
-  const results: SearchResult[] = policyScoredRows.map(r => ({
+  const results: SearchResult[] = finalScoredRows.map(r => ({
     memory_id: r.id,
     title: r.title,
     summary: r.summary,
