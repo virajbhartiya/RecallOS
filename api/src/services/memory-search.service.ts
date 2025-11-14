@@ -16,6 +16,7 @@ import {
 } from './retrieval-policy.service'
 import { buildContextFromResults, type ContextBlock } from './context-builder.service'
 import { rerankingService } from './reranking.service'
+import { queryClassificationService } from './query-classification.service'
 
 type SearchResult = {
   memory_id: string
@@ -349,7 +350,29 @@ export async function searchMemories(params: {
 
   const normalized = normalizeText(query)
 
-  const retrievalPolicy = getRetrievalPolicy(policy)
+  // Classify query to determine optimal policy if not explicitly provided
+  let effectivePolicy = policy
+  if (!policy) {
+    try {
+      const classification = await queryClassificationService.classifyQuery(query, userId)
+      if (classification.suggestedPolicy) {
+        effectivePolicy = classification.suggestedPolicy as RetrievalPolicyName
+        logger.log('[search] query_classified', {
+          query: query.substring(0, 50),
+          class: classification.class,
+          confidence: classification.confidence,
+          suggestedPolicy: effectivePolicy,
+        })
+      }
+    } catch (error) {
+      logger.warn('[search] query_classification_failed', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      // Continue with default policy
+    }
+  }
+
+  const retrievalPolicy = getRetrievalPolicy(effectivePolicy)
   const requestedLimit =
     typeof limit === 'number' && Number.isFinite(limit) ? Math.floor(limit) : undefined
   const effectiveLimit = requestedLimit

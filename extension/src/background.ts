@@ -382,6 +382,8 @@ runtime.onMessage.addListener(
     if (message?.type === MESSAGE_TYPES.CAPTURE_CONTEXT && message.data) {
       sendToBackend(message.data)
         .then(() => {
+          // Store last capture time
+          storage.local.set({ last_capture_time: Date.now() })
           sendResponse({ success: true, message: 'Context sent to backend' })
         })
         .catch(error => {

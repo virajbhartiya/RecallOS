@@ -8,6 +8,7 @@ import { memoryIngestionService } from '../services/memory-ingestion.service'
 import { profileUpdateService } from '../services/profile-update.service'
 import { privacyService } from '../services/privacy.service'
 import { auditLogService } from '../services/audit-log.service'
+import { memoryRedactionService } from '../services/memory-redaction.service'
 import { normalizeUrl } from '../utils/text.util'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
@@ -741,8 +742,74 @@ export class MemoryController {
         })
       }
 
+      const domain = memory.url ? privacyService.extractDomain(memory.url) : undefined
+
+      // Delete from Qdrant
+      try {
+        const { qdrantClient, COLLECTION_NAME } = await import('../lib/qdrant.lib')
+        await qdrantClient.delete(COLLECTION_NAME, {
+          filter: {
+            must: [{ key: 'memory_id', match: { value: memoryId } }],
+          },
+        })
+        logger.log('[memory/delete] qdrant_deleted', { memoryId })
+      } catch (qdrantError) {
+        logger.warn('[memory/delete] qdrant_delete_failed', {
+          error: qdrantError instanceof Error ? qdrantError.message : String(qdrantError),
+          memoryId,
+        })
+        // Continue with deletion even if Qdrant delete fails
+      }
+
+      // Clear search cache entries that might reference this memory
+      try {
+        const { getRedisClient } = await import('../lib/redis.lib')
+        const redis = getRedisClient()
+        // Get all cache keys (this is a simple approach - in production you might want a more efficient method)
+        const keys = await redis.keys('search_cache:*')
+        for (const key of keys) {
+          const cached = await redis.get(key)
+          if (cached) {
+            try {
+              const data = JSON.parse(cached)
+              if (data.results && Array.isArray(data.results)) {
+                const hasMemory = data.results.some((r: any) => r.memory_id === memoryId)
+                if (hasMemory) {
+                  await redis.del(key)
+                  logger.log('[memory/delete] cache_cleared', { key, memoryId })
+                }
+              }
+            } catch {
+              // Invalid cache entry, skip
+            }
+          }
+        }
+      } catch (cacheError) {
+        logger.warn('[memory/delete] cache_clear_failed', {
+          error: cacheError instanceof Error ? cacheError.message : String(cacheError),
+          memoryId,
+        })
+        // Continue with deletion even if cache clear fails
+      }
+
+      // Delete from database
       await prisma.memory.delete({
         where: { id: memoryId },
+      })
+
+      // Log audit event
+      auditLogService.logMemoryDelete(
+        req.user!.id,
+        memoryId,
+        domain,
+        {
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent'),
+        }
+      ).catch((err) => {
+        logger.warn('[memory/delete] audit_log_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
       })
 
       res.status(200).json({
@@ -757,6 +824,114 @@ export class MemoryController {
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to delete memory',
+      })
+    }
+  }
+
+  static async redactMemory(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { memoryId } = req.params
+      const { fields } = req.body
+
+      if (!memoryId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Memory ID is required',
+        })
+      }
+
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Fields to redact are required (array of: url, content, title, summary)',
+        })
+      }
+
+      const validFields = ['url', 'content', 'title', 'summary']
+      const invalidFields = fields.filter((f) => !validFields.includes(f))
+      if (invalidFields.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid fields: ${invalidFields.join(', ')}. Valid fields are: ${validFields.join(', ')}`,
+        })
+      }
+
+      const redacted = await memoryRedactionService.redactMemoryFields(
+        req.user!.id,
+        memoryId,
+        fields,
+        {
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent'),
+        }
+      )
+
+      res.status(200).json({
+        success: true,
+        message: 'Memory fields redacted successfully',
+        data: {
+          memoryId: redacted.id,
+          fieldsRedacted: fields,
+        },
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to redact memory'
+      logger.error('Error redacting memory:', error)
+      res.status(500).json({
+        success: false,
+        error: errorMessage,
+      })
+    }
+  }
+
+  static async redactDomainMemories(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { domain, fields } = req.body
+
+      if (!domain || typeof domain !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: 'Domain is required',
+        })
+      }
+
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Fields to redact are required (array of: url, content, title, summary)',
+        })
+      }
+
+      const validFields = ['url', 'content', 'title', 'summary']
+      const invalidFields = fields.filter((f) => !validFields.includes(f))
+      if (invalidFields.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid fields: ${invalidFields.join(', ')}. Valid fields are: ${validFields.join(', ')}`,
+        })
+      }
+
+      const result = await memoryRedactionService.redactDomainMemories(
+        req.user!.id,
+        domain,
+        fields,
+        {
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent'),
+        }
+      )
+
+      res.status(200).json({
+        success: true,
+        message: 'Domain memories redacted successfully',
+        data: result,
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to redact domain memories'
+      logger.error('Error redacting domain memories:', error)
+      res.status(500).json({
+        success: false,
+        error: errorMessage,
       })
     }
   }

@@ -37,5 +37,7 @@ router.get('/health', MemoryController.healthCheck)
 router.get('/debug', authenticateToken, MemoryController.debugMemories)
 router.delete('/:memoryId', authenticateToken, MemoryController.deleteMemory)
 router.patch('/:memoryId/flags', authenticateToken, MemoryController.updateMemoryFlags)
+router.post('/:memoryId/redact', authenticateToken, MemoryController.redactMemory)
+router.post('/redact-domain', authenticateToken, MemoryController.redactDomainMemories)
 
 export default router

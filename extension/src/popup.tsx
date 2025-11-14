@@ -15,13 +15,47 @@ const Popup: React.FC = () => {
   const [isConnected, setIsConnected] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isCheckingHealth, setIsCheckingHealth] = useState(true)
+  const [lastCaptureTime, setLastCaptureTime] = useState<number | null>(null)
+  const [currentDomain, setCurrentDomain] = useState<string>('')
 
   useEffect(() => {
     loadSettings()
     checkStatus()
-    const interval = setInterval(checkStatus, 10000)
+    loadLastCaptureTime()
+    loadCurrentDomain()
+    const interval = setInterval(() => {
+      checkStatus()
+      loadLastCaptureTime()
+    }, 10000)
     return () => clearInterval(interval)
   }, [])
+
+  const loadLastCaptureTime = async () => {
+    try {
+      const stored = await storage.local.get(['last_capture_time'])
+      if (stored?.last_capture_time) {
+        setLastCaptureTime(stored.last_capture_time)
+      }
+    } catch (_error) {
+      // Ignore
+    }
+  }
+
+  const loadCurrentDomain = async () => {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (tabs[0]?.url) {
+        try {
+          const url = new URL(tabs[0].url)
+          setCurrentDomain(url.hostname.replace(/^www\./, ''))
+        } catch {
+          // Invalid URL
+        }
+      }
+    } catch (_error) {
+      // Ignore
+    }
+  }
 
   const loadSettings = async () => {
     try {
@@ -221,6 +255,17 @@ const Popup: React.FC = () => {
     }
   }
 
+  const formatTimeAgo = (timestamp: number): string => {
+    const seconds = Math.floor((Date.now() - timestamp) / 1000)
+    if (seconds < 60) return `${seconds}s ago`
+    const minutes = Math.floor(seconds / 60)
+    if (minutes < 60) return `${minutes}m ago`
+    const hours = Math.floor(minutes / 60)
+    if (hours < 24) return `${hours}h ago`
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
+
   return (
     <div
       className="w-80 bg-white text-black font-primary"
@@ -277,6 +322,16 @@ const Popup: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Last Capture */}
+          {lastCaptureTime && (
+            <div className="flex items-center justify-between py-1">
+              <span className="text-xs text-gray-700">Last Capture</span>
+              <span className="text-xs text-gray-600">
+                {formatTimeAgo(lastCaptureTime)}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Extension Toggle */}

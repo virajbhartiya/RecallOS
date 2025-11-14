@@ -32,6 +32,7 @@
     "clean:all": "npm run clean:qdrant && npm run clean:db",
     "clean:docker": "docker-compose down -v",
     "eval:memory": "node -r ts-node/register src/scripts/memory-eval.script.ts",
+    "admin:stats": "node -r ts-node/register src/scripts/admin-stats.script.ts",
     "check": "npm run lint:fix && npm run format && npm run build"
   },
   "keywords": [
