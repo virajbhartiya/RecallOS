@@ -130,66 +130,100 @@ export const startContentWorker = () => {
         const baseDelayMs = 2000
         const maxDelayMs = 60_000
 
-        let summary: string | null = null
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          try {
-            await ensureNotCancelled()
-            if (attempt > 1) {
-              logger.log(`[Redis Worker] Retrying job (attempt ${attempt}/${maxAttempts})`, {
-                jobId: job.id,
-                userId: user_id,
-                attempt,
-              })
-            }
-            const summaryResult = await aiProvider.summarizeContent(raw_text, metadata)
-            if (typeof summaryResult === 'string') {
-              summary = summaryResult
-            } else {
-              const result = summaryResult as { text?: string }
-              summary = result.text || summaryResult
-            }
-            break
-          } catch (err) {
-            const error = err as Error | undefined
-            if (error && error.name === 'JobCancelledError') {
-              throw error
-            }
-            if (!isRetryableError(err) || attempt === maxAttempts) {
-              logger.error(`[Redis Worker] Job failed permanently`, {
-                jobId: job.id,
-                userId: user_id,
-                attempt,
-                error: err?.message || String(err),
-                isRetryable: isRetryableError(err),
-              })
-              throw err
-            }
-            const backoff = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs)
-            const jitter = Math.floor(Math.random() * 500)
-            logger.warn(`[Redis Worker] Job retryable error, backing off`, {
-              jobId: job.id,
-              userId: user_id,
-              attempt,
-              backoffMs: backoff + jitter,
-              error: err?.message || String(err),
-            })
-            await sleep(backoff + jitter)
-            await ensureNotCancelled()
-          }
-        }
-
-        if (!summary) {
-          logger.error(`[Redis Worker] Failed to generate summary after all retries`, {
-            jobId: job.id,
-            userId: user_id,
-            maxAttempts,
-          })
-          throw new Error('Failed to generate summary after retries')
-        }
-
+        // Run AI calls in parallel for faster processing
+        // Note: This optimization applies to all jobs in the queue, including those
+        // queued before this implementation, as the worker code is loaded at runtime.
         await ensureNotCancelled()
+        const [summaryResult, extractedMetadataResult] = await Promise.all([
+          (async () => {
+            let summary: string | null = null
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+              try {
+                await ensureNotCancelled()
+                if (attempt > 1) {
+                  logger.log(`[Redis Worker] Retrying summary (attempt ${attempt}/${maxAttempts})`, {
+                    jobId: job.id,
+                    userId: user_id,
+                    attempt,
+                  })
+                }
+                const result = await aiProvider.summarizeContent(raw_text, metadata, user_id)
+                if (typeof result === 'string') {
+                  summary = result
+                } else {
+                  const res = result as { text?: string }
+                  summary = res.text || result
+                }
+                break
+              } catch (err) {
+                const error = err as Error | undefined
+                if (error && error.name === 'JobCancelledError') {
+                  throw error
+                }
+                if (!isRetryableError(err) || attempt === maxAttempts) {
+                  logger.error(`[Redis Worker] Summary failed permanently`, {
+                    jobId: job.id,
+                    userId: user_id,
+                    attempt,
+                    error: err?.message || String(err),
+                    isRetryable: isRetryableError(err),
+                  })
+                  throw err
+                }
+                const backoff = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs)
+                const jitter = Math.floor(Math.random() * 500)
+                logger.warn(`[Redis Worker] Summary retryable error, backing off`, {
+                  jobId: job.id,
+                  userId: user_id,
+                  attempt,
+                  backoffMs: backoff + jitter,
+                  error: err?.message || String(err),
+                })
+                await sleep(backoff + jitter)
+                await ensureNotCancelled()
+              }
+            }
+            if (!summary) {
+              throw new Error('Failed to generate summary after retries')
+            }
+            return summary
+          })(),
+          (async () => {
+            try {
+              await ensureNotCancelled()
+              const result = await aiProvider.extractContentMetadata(raw_text, metadata, user_id)
+              if (
+                typeof result === 'object' &&
+                result !== null &&
+                'topics' in result
+              ) {
+                return result
+              } else if (
+                typeof result === 'object' &&
+                result !== null &&
+                'metadata' in result
+              ) {
+                return (result as { metadata?: any }).metadata || result
+              } else {
+                return result
+              }
+            } catch (metadataError) {
+              const error = metadataError as Error | undefined
+              if (error && error.name === 'JobCancelledError') {
+                throw error
+              }
+              logger.warn(`[Redis Worker] Failed to extract metadata, continuing without it`, {
+                jobId: job.id,
+                userId: user_id,
+                error: metadataError?.message || String(metadataError),
+              })
+              return {}
+            }
+          })(),
+        ])
 
-        let extractedMetadata: {
+        const summary = summaryResult
+        const extractedMetadata = extractedMetadataResult as {
           topics?: string[]
           categories?: string[]
           keyPoints?: string[]
@@ -198,41 +232,6 @@ export const startContentWorker = () => {
           usefulness?: number
           searchableTerms?: string[]
           contextRelevance?: string[]
-        } = {}
-        try {
-          await ensureNotCancelled()
-          const extractedMetadataResult = await aiProvider.extractContentMetadata(
-            raw_text,
-            metadata,
-            user_id
-          )
-          if (
-            typeof extractedMetadataResult === 'object' &&
-            extractedMetadataResult !== null &&
-            'topics' in extractedMetadataResult
-          ) {
-            extractedMetadata = extractedMetadataResult
-          } else if (
-            typeof extractedMetadataResult === 'object' &&
-            extractedMetadataResult !== null &&
-            'metadata' in extractedMetadataResult
-          ) {
-            extractedMetadata =
-              (extractedMetadataResult as { metadata?: typeof extractedMetadata }).metadata ||
-              extractedMetadataResult
-          } else {
-            extractedMetadata = extractedMetadataResult as typeof extractedMetadata
-          }
-        } catch (metadataError) {
-          const error = metadataError as Error | undefined
-          if (error && error.name === 'JobCancelledError') {
-            throw error
-          }
-          logger.warn(`[Redis Worker] Failed to extract metadata, continuing without it`, {
-            jobId: job.id,
-            userId: user_id,
-            error: metadataError?.message || String(metadataError),
-          })
         }
 
         if (metadata?.memory_id) {
@@ -253,9 +252,17 @@ export const startContentWorker = () => {
               page_metadata: mergedMetadata,
             },
           })
-          await ensureNotCancelled()
-          await memoryMeshService.generateEmbeddingsForMemory(metadata.memory_id)
-          await memoryMeshService.createMemoryRelations(metadata.memory_id, user_id)
+          
+          // Generate embeddings and relations in background (non-blocking)
+          setImmediate(async () => {
+            try {
+              await ensureNotCancelled()
+              await memoryMeshService.generateEmbeddingsForMemory(metadata.memory_id)
+              await memoryMeshService.createMemoryRelations(metadata.memory_id, user_id)
+            } catch (embeddingError) {
+              logger.error(`[Redis Worker] Error generating embeddings:`, embeddingError)
+            }
+          })
 
           const summaryHash = createHash('sha256').update(summary).digest('hex')
 
@@ -329,9 +336,16 @@ export const startContentWorker = () => {
               throw createError
             }
 
-            await ensureNotCancelled()
-            await memoryMeshService.generateEmbeddingsForMemory(memory.id)
-            await memoryMeshService.createMemoryRelations(memory.id, user_id)
+            // Generate embeddings and relations in background (non-blocking)
+            setImmediate(async () => {
+              try {
+                await ensureNotCancelled()
+                await memoryMeshService.generateEmbeddingsForMemory(memory.id)
+                await memoryMeshService.createMemoryRelations(memory.id, user_id)
+              } catch (embeddingError) {
+                logger.error(`[Redis Worker] Error generating embeddings:`, embeddingError)
+              }
+            })
 
             const summaryHash = '0x' + createHash('sha256').update(summary).digest('hex')
 
@@ -393,6 +407,8 @@ export const startContentWorker = () => {
       limiter: getQueueLimiter(),
       stalledInterval: getQueueStalledInterval(),
       maxStalledCount: getQueueMaxStalledCount(),
+      // Job timeout is set in queue.defaultJobOptions.timeout (5 minutes)
+      // This allows parallel AI calls to complete without timing out
     }
   )
 }

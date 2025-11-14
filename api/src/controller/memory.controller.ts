@@ -403,8 +403,12 @@ export class MemoryController {
         throw createError
       }
 
+      // Return response immediately, process heavy operations in background
+      logger.log('[memory/process] done', { memoryId: memory.id })
+      
+      // Process heavy operations in background (non-blocking)
       setImmediate(async () => {
-        // Always create snapshot even if mesh processing fails
+        // Create snapshot
         try {
           const snapStart = Date.now()
           const summaryHash = '0x' + createHash('sha256').update(summary).digest('hex')
@@ -425,6 +429,7 @@ export class MemoryController {
           logger.error(`Error creating snapshot for memory ${memory.id}:`, snapshotError)
         }
 
+        // Process mesh (embeddings + relations) in background
         try {
           const meshStart = Date.now()
           logger.log('[memory/process] mesh_start', { memoryId: memory.id, userId: userId })
@@ -437,6 +442,7 @@ export class MemoryController {
           logger.error(`Error processing memory ${memory.id} for mesh:`, meshError)
         }
 
+        // Update profile if needed
         try {
           if ((memory.importance_score || 0) >= PROFILE_IMPORTANCE_THRESHOLD) {
             const shouldUpdate = await profileUpdateService.shouldUpdateProfile(userId, 3)
@@ -452,7 +458,6 @@ export class MemoryController {
           logger.error(`[memory/process] profile update failed for ${memory.id}`, profileError)
         }
       })
-      logger.log('[memory/process] done', { memoryId: memory.id })
       res.status(200).json({
         success: true,
         message: 'Content processed and stored successfully',

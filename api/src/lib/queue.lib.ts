@@ -28,6 +28,9 @@ const queueOptions: QueueOptions = {
     removeOnFail: 1000,
     attempts: 1,
     backoff: { type: 'exponential', delay: 5000 },
+    // Note: Job timeout is handled at the AI call level (4 minutes per call)
+    // Since AI calls run in parallel, total job time should be ~4 minutes max
+    // BullMQ will handle job timeouts through the worker's lockDuration setting
   },
 }
 

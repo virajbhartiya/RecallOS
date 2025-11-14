@@ -224,9 +224,16 @@ export const getPendingJobs = async (
       }
     })
 
-    allJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)
+    // Filter jobs to only show current user's jobs
+    const userJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)
 
-    const jobs = allJobs
+    // Calculate counts from filtered user jobs to ensure consistency
+    const userWaitingCount = userJobs.filter(item => item.status === 'waiting').length
+    const userActiveCount = userJobs.filter(item => item.status === 'active').length
+    const userDelayedCount = userJobs.filter(item => item.status === 'delayed').length
+    const userFailedCount = userJobs.filter(item => item.status === 'failed').length
+
+    const jobs = userJobs
       .map(item => ({
         id: item.job.id,
         user_id: item.job.data.user_id,
@@ -245,11 +252,6 @@ export const getPendingJobs = async (
         attempts: item.job.attemptsMade,
       }))
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-
-    const userWaitingCount = waiting.filter(job => job.data.user_id === req.user!.id).length
-    const userActiveCount = active.filter(job => job.data.user_id === req.user!.id).length
-    const userDelayedCount = delayed.filter(job => job.data.user_id === req.user!.id).length
-    const userFailedCount = failed.filter(job => job.data.user_id === req.user!.id).length
 
     res.status(200).json({
       status: 'success',
