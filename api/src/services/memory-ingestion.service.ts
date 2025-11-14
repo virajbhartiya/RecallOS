@@ -258,18 +258,18 @@ export class MemoryIngestionService {
     const sourceApp = this.detectSourceApp(metadata)
 
     return {
-      user_id: payload.userId,
-      source: metadata.source as string | undefined || payload.source || 'extension',
+      user: { connect: { id: payload.userId } },
+      source: (metadata.source as string | undefined) || payload.source || 'extension',
       source_app: sourceApp,
       url: payload.url || 'unknown',
-      title: payload.title || metadata.title || 'Untitled',
+      title: payload.title || (typeof metadata.title === 'string' ? metadata.title : 'Untitled'),
       content: payload.content,
       summary: payload.summary,
       canonical_text: payload.canonicalText,
       canonical_hash: payload.canonicalHash,
       timestamp: BigInt(Math.floor(Date.now() / 1000)),
       full_content: payload.content,
-      page_metadata: pageMetadata,
+      page_metadata: pageMetadata as Prisma.InputJsonValue,
       importance_score: importanceScore,
       confidence_score: confidenceScore,
       expires_at: expiresAt ?? undefined,

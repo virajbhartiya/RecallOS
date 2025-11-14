@@ -5,6 +5,7 @@ import { memoryMeshService } from '../services/memory-mesh.service'
 import { searchMemories } from '../services/memory-search.service'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
+import { RetrievalPolicyName } from '../services/retrieval-policy.service'
 
 type MemoryWithMetadata = {
   memory: {
@@ -27,6 +28,12 @@ type MemoryRecord = {
   content: string
   summary: string | null
   page_metadata: Prisma.JsonValue
+}
+
+const VALID_POLICIES: RetrievalPolicyName[] = ['chat', 'planning', 'profile', 'summarization', 'insight']
+
+function isValidPolicy(policy: unknown): policy is RetrievalPolicyName {
+  return typeof policy === 'string' && VALID_POLICIES.includes(policy as RetrievalPolicyName)
 }
 
 export class MemorySearchController {
@@ -58,7 +65,7 @@ export class MemorySearchController {
         limit: parseInt(limit as string),
         enableReasoning: true,
         contextOnly: false,
-        policy: typeof policy === 'string' ? policy : undefined,
+        policy: isValidPolicy(policy) ? policy : undefined,
       })
 
       const memories = searchResults.results.map(result => ({
