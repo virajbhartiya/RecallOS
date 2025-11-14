@@ -94,7 +94,7 @@ export class MemoryRedactionService {
 
     const results = await Promise.all(
       memories.map((memory) =>
-        this.redactMemoryFields(userId, memory.id, fieldsToRedact, options).catch((err) => {
+        this.redactMemoryFields(userId, memory.id, fieldsToRedact, options).catch((err): any => {
           logger.warn('[redaction] failed_to_redact_memory', {
             memoryId: memory.id,
             error: err instanceof Error ? err.message : String(err),
