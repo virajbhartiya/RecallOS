@@ -19,6 +19,17 @@ interface ContextData {
   content_type?: string
 }
 
+type EmailDraftPayload = {
+  subject?: string
+  thread_text: string
+  provider?: string
+  existing_draft?: string
+  participants?: string[]
+  metadata?: Record<string, unknown>
+  url?: string
+  title?: string
+}
+
 async function getApiEndpoint(): Promise<string> {
   try {
     const result = await storage.sync.get([STORAGE_KEYS.API_ENDPOINT])
@@ -176,6 +187,42 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
       controller.signal.aborted ? reject(new DOMException('Aborted', 'AbortError')) : undefined
     ),
   ]).finally(() => clearTimeout(timeout)) as Promise<T>
+}
+
+async function requestEmailDraft(payload: EmailDraftPayload) {
+  const apiBase = await getApiBaseUrl()
+  const endpoint = `${apiBase}/api/content/email/draft`
+
+  let authToken: string
+  try {
+    authToken = await requireAuthToken()
+  } catch (_error) {
+    throw new Error('Authentication required. Please log in through the Cognia web client.')
+  }
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${authToken}`,
+    },
+    credentials: 'include',
+    body: JSON.stringify(payload),
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '')
+    throw new Error(
+      `Draft request failed (${response.status}): ${errorText || response.statusText}`
+    )
+  }
+
+  const result = await response.json()
+  if (!result?.success || !result.data) {
+    throw new Error('Draft service returned an unexpected response.')
+  }
+
+  return result.data as { subject: string; body: string; summary?: string }
 }
 
 async function sendToBackend(data: ContextData): Promise<void> {
@@ -507,6 +554,26 @@ runtime.onMessage.addListener(
             success: false,
             error:
               error instanceof Error ? error.message : 'Failed to update memory injection state',
+          })
+        }
+      })()
+      return true
+    }
+
+    if (message?.type === MESSAGE_TYPES.DRAFT_EMAIL_REPLY) {
+      ;(async () => {
+        try {
+          const payload = (message as any).payload as EmailDraftPayload
+          if (!payload || typeof payload.thread_text !== 'string') {
+            sendResponse({ success: false, error: 'Invalid payload' })
+            return
+          }
+          const data = await requestEmailDraft(payload)
+          sendResponse({ success: true, data })
+        } catch (error) {
+          sendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to draft email reply',
           })
         }
       })()

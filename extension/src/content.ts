@@ -1,5 +1,6 @@
 import { getUserId, requireAuthToken } from '@/lib/userId'
 import { runtime, storage } from '@/lib/browser'
+import { MESSAGE_TYPES } from '@/lib/constants'
 
 interface ContextData {
   source: string
@@ -46,6 +47,34 @@ interface ContextData {
     readability_score?: number
   }
 }
+
+type EmailDraftPayload = {
+  subject?: string
+  thread_text: string
+  provider?: string
+  existing_draft?: string
+  participants?: string[]
+  url?: string
+  title?: string
+}
+
+type EmailDraftResponse = {
+  subject: string
+  body: string
+  summary?: string
+}
+
+type EmailDraftContext = {
+  provider: 'gmail' | 'outlook' | 'unknown'
+  subject: string
+  threadText: string
+  participants: string[]
+  composeElement?: HTMLElement
+  subjectElement?: HTMLInputElement | HTMLTextAreaElement
+  existingDraft?: string
+}
+
+const EMAIL_THREAD_CHAR_LIMIT = 15000
 let lastUrl = location.href
 let lastContent = ''
 let lastTitle = ''
@@ -813,6 +842,17 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true
   }
+  if (message.type === MESSAGE_TYPES.DRAFT_EMAIL_REPLY) {
+    handleDraftEmailRequest()
+      .then(result => sendResponse(result))
+      .catch(error =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to draft email reply',
+        })
+      )
+    return true
+  }
 })
 function calculateContentHash(content: string): string {
   let hash = 0
@@ -1005,6 +1045,338 @@ document.addEventListener('mousemove', () => {
     mouseMoveTimeout = null
   }, 3000)
 })
+
+let draftToastTimeout: ReturnType<typeof setTimeout> | null = null
+let draftToastElement: HTMLDivElement | null = null
+
+async function handleDraftEmailRequest(): Promise<{ success: boolean; error?: string }> {
+  const context = extractEmailContext()
+  if (!context) {
+    return { success: false, error: 'No supported email thread detected on this page.' }
+  }
+
+  try {
+    showDraftToast('Drafting reply...', 'info')
+    const payload: EmailDraftPayload = {
+      subject: context.subject,
+      thread_text: context.threadText,
+      provider: context.provider,
+      existing_draft: context.existingDraft,
+      participants: context.participants,
+      url: window.location.href,
+      title: document.title,
+    }
+    const draft = await requestDraftFromBackground(payload)
+    const injection = injectEmailDraft(context, draft)
+
+    if (!injection.bodyApplied) {
+      if (copyTextToClipboard(draft.body)) {
+        showDraftToast('Draft copied to clipboard. Paste it into the compose box.', 'error')
+      } else {
+        showDraftToast('Unable to insert draft automatically.', 'error')
+      }
+      return { success: false, error: 'Could not insert draft automatically.' }
+    }
+
+    const subjectMessage = injection.subjectApplied ? '' : ' (Update subject manually if needed.)'
+    showDraftToast(`Draft inserted into compose box${subjectMessage}`, 'success')
+    return { success: true }
+  } catch (error) {
+    showDraftToast('Failed to draft reply.', 'error')
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to draft reply.',
+    }
+  }
+}
+
+function extractEmailContext(): EmailDraftContext | null {
+  const host = window.location.hostname
+  if (host.includes('mail.google')) {
+    return extractGmailContext()
+  }
+  if (
+    host.includes('outlook.') ||
+    host.includes('office.com') ||
+    host.includes('live.com') ||
+    host.includes('microsoft.com')
+  ) {
+    return extractOutlookContext()
+  }
+  return null
+}
+
+function extractGmailContext(): EmailDraftContext | null {
+  const subject =
+    document.querySelector('h2.hP')?.textContent?.trim() ||
+    (document.querySelector('input[name="subjectbox"]') as HTMLInputElement | null)?.value?.trim() ||
+    document.title ||
+    'No subject'
+
+  const messageNodes = Array.from(document.querySelectorAll('div[data-message-id]'))
+  const threadParts = messageNodes
+    .map(node => {
+      const sender =
+        node.querySelector('.gD')?.textContent?.trim() ||
+        node.querySelector('.g2')?.textContent?.trim() ||
+        ''
+      const timestamp = node.querySelector('.g3')?.textContent?.trim() || ''
+      const body =
+        node.querySelector('.a3s')?.textContent?.trim() ||
+        node.querySelector('.a3s')?.innerHTML?.replace(/<[^>]+>/g, ' ').trim() ||
+        ''
+      if (!body) {
+        return ''
+      }
+      return `From: ${sender || 'Unknown'} ${timestamp}\n${body}`
+    })
+    .filter(Boolean)
+
+  const threadText = threadParts.join('\n\n---\n\n').substring(0, EMAIL_THREAD_CHAR_LIMIT)
+  if (!threadText) {
+    return null
+  }
+
+  const composeElement = Array.from(
+    document.querySelectorAll('div[aria-label="Message Body"], div[role="textbox"]')
+  ).find(
+    el => el.getAttribute('contenteditable') === 'true' && isElementVisible(el as HTMLElement)
+  ) as HTMLElement | undefined
+
+  const subjectElement = document.querySelector('input[name="subjectbox"]') as HTMLInputElement | null
+
+  const participantSet = new Set<string>()
+  document.querySelectorAll('span.gD, span.g2, span.go').forEach(el => {
+    const name = el.textContent?.trim()
+    if (name) {
+      participantSet.add(name)
+    }
+  })
+
+  return {
+    provider: 'gmail',
+    subject,
+    threadText,
+    participants: Array.from(participantSet),
+    composeElement,
+    subjectElement: subjectElement || undefined,
+    existingDraft: composeElement?.textContent?.trim(),
+  }
+}
+
+function extractOutlookContext(): EmailDraftContext | null {
+  const subject =
+    document
+      .querySelector('div[role="heading"][aria-level="1"]')
+      ?.textContent?.trim() ||
+    (document.querySelector('input[aria-label*="subject"]') as HTMLInputElement | null)?.value?.trim() ||
+    document.title ||
+    'No subject'
+
+  const messageNodes = Array.from(
+    document.querySelectorAll('[data-testid="messageBodyContent"], div[aria-label="Message body"]')
+  )
+
+  const threadParts = messageNodes
+    .filter(node => node.getAttribute('contenteditable') !== 'true')
+    .map(node => node.textContent?.trim() || '')
+    .filter(Boolean)
+
+  const threadText = threadParts.join('\n\n---\n\n').substring(0, EMAIL_THREAD_CHAR_LIMIT)
+  if (!threadText) {
+    return null
+  }
+
+  const composeElement = Array.from(
+    document.querySelectorAll('div[aria-label="Message body"]')
+  ).find(
+    el => el.getAttribute('contenteditable') === 'true' && isElementVisible(el as HTMLElement)
+  ) as HTMLElement | undefined
+
+  const subjectElement =
+    (document.querySelector('input[aria-label*="subject"]') as HTMLInputElement | null) ||
+    (document.querySelector('input[data-testid="subjectLine"]') as HTMLInputElement | null)
+
+  const participantSet = new Set<string>()
+  document
+    .querySelectorAll('[data-testid="messageHeaderFrom"] span, span[role="presentation"]')
+    .forEach(el => {
+      const text = el.textContent?.trim()
+      if (text) {
+        participantSet.add(text)
+      }
+    })
+
+  return {
+    provider: 'outlook',
+    subject,
+    threadText,
+    participants: Array.from(participantSet),
+    composeElement,
+    subjectElement: subjectElement || undefined,
+    existingDraft: composeElement?.textContent?.trim(),
+  }
+}
+
+function isElementVisible(element?: Element | null): element is HTMLElement {
+  if (!element) return false
+  const rect = element.getBoundingClientRect()
+  const style = window.getComputedStyle(element)
+  return (
+    rect.width > 0 &&
+    rect.height > 0 &&
+    style.visibility !== 'hidden' &&
+    style.display !== 'none'
+  )
+}
+
+function injectEmailDraft(
+  context: EmailDraftContext,
+  draft: EmailDraftResponse
+): { bodyApplied: boolean; subjectApplied: boolean } {
+  let subjectApplied = false
+  if (context.subjectElement && draft.subject) {
+    subjectApplied = setSubjectValue(context.subjectElement, draft.subject)
+  }
+
+  let bodyApplied = false
+  if (context.composeElement) {
+    bodyApplied = setComposeBody(context.composeElement, draft.body)
+  }
+
+  return { bodyApplied, subjectApplied }
+}
+
+function setSubjectValue(
+  element: HTMLInputElement | HTMLTextAreaElement | undefined,
+  value: string
+): boolean {
+  if (!element) {
+    return false
+  }
+  try {
+    element.focus()
+    element.value = value
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+    element.dispatchEvent(new Event('change', { bubbles: true }))
+    return true
+  } catch (_error) {
+    return false
+  }
+}
+
+function setComposeBody(element: HTMLElement, body: string): boolean {
+  try {
+    element.focus()
+    const html = convertPlainTextToHtml(body)
+    element.innerHTML = html
+    const inputEvent = new Event('input', { bubbles: true })
+    element.dispatchEvent(inputEvent)
+    const changeEvent = new Event('change', { bubbles: true })
+    element.dispatchEvent(changeEvent)
+    return true
+  } catch (_error) {
+    return false
+  }
+}
+
+function convertPlainTextToHtml(text: string): string {
+  return text
+    .split('\n')
+    .map(line => {
+      if (!line.trim()) {
+        return '<div><br></div>'
+      }
+      return `<div>${escapeHtml(line)}</div>`
+    })
+    .join('')
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function copyTextToClipboard(text: string): boolean {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(() => {})
+      return true
+    }
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    const success = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return success
+  } catch (_error) {
+    return false
+  }
+}
+
+function showDraftToast(message: string, variant: 'info' | 'success' | 'error' = 'info'): void {
+  if (draftToastTimeout && draftToastElement) {
+    draftToastElement.remove()
+    draftToastElement = null
+  }
+
+  const toast = document.createElement('div')
+  const colors: Record<typeof variant, { bg: string; text: string; border: string }> = {
+    info: { bg: 'rgba(59,130,246,0.95)', text: '#ffffff', border: 'rgba(59,130,246,0.4)' },
+    success: { bg: 'rgba(16,185,129,0.95)', text: '#ffffff', border: 'rgba(16,185,129,0.4)' },
+    error: { bg: 'rgba(239,68,68,0.95)', text: '#ffffff', border: 'rgba(239,68,68,0.4)' },
+  }
+  const palette = colors[variant]
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 2147483647;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: ${palette.bg};
+    color: ${palette.text};
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    border: 1px solid ${palette.border};
+    max-width: 320px;
+  `
+  toast.textContent = message
+  document.body.appendChild(toast)
+  draftToastElement = toast
+
+  draftToastTimeout = setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast)
+    }
+    draftToastElement = null
+  }, 5000)
+}
+
+function requestDraftFromBackground(payload: EmailDraftPayload): Promise<EmailDraftResponse> {
+  return new Promise((resolve, reject) => {
+    runtime.sendMessage({ type: MESSAGE_TYPES.DRAFT_EMAIL_REPLY, payload }, response => {
+      if (!response) {
+        reject(new Error('No response from background script.'))
+        return
+      }
+      if (response.success && response.data) {
+        resolve(response.data as EmailDraftResponse)
+      } else {
+        reject(new Error(response.error || 'Draft request failed.'))
+      }
+    })
+  })
+}
 
 // AI Chat Platform Detection
 type AIChatPlatform = 'chatgpt' | 'claude' | 'none'

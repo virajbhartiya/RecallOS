@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { getAuthToken, requireAuthToken } from '@/lib/userId'
 import { runtime, storage, tabs } from '@/lib/browser'
+import { MESSAGE_TYPES } from '@/lib/constants'
 
 const Popup: React.FC = () => {
   const [extensionEnabled, setExtensionEnabled] = useState(true)
@@ -9,6 +10,8 @@ const Popup: React.FC = () => {
   const [blockedWebsites, setBlockedWebsites] = useState<string[]>([])
   const [newBlockedWebsite, setNewBlockedWebsite] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isDraftingEmail, setIsDraftingEmail] = useState(false)
+  const [draftStatus, setDraftStatus] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isCheckingHealth, setIsCheckingHealth] = useState(true)
@@ -43,7 +46,7 @@ const Popup: React.FC = () => {
         setBlockedWebsites(blockedResponse.websites || [])
       }
     } catch (_error) {
-      console.error('Error loading settings:', error)
+      console.error('Error loading settings:', _error)
     }
   }
 
@@ -102,7 +105,7 @@ const Popup: React.FC = () => {
         setExtensionEnabled(newState)
       }
     } catch (_error) {
-      console.error('Error toggling extension:', error)
+      console.error('Error toggling extension:', _error)
     } finally {
       setIsLoading(false)
     }
@@ -121,7 +124,7 @@ const Popup: React.FC = () => {
         setMemoryInjectionEnabled(newState)
       }
     } catch (_error) {
-      console.error('Error toggling memory injection:', error)
+      console.error('Error toggling memory injection:', _error)
     } finally {
       setIsLoading(false)
     }
@@ -143,7 +146,7 @@ const Popup: React.FC = () => {
         await loadSettings()
       }
     } catch (_error) {
-      console.error('Error adding blocked website:', error)
+      console.error('Error adding blocked website:', _error)
     } finally {
       setIsLoading(false)
     }
@@ -166,10 +169,10 @@ const Popup: React.FC = () => {
           await addBlockedWebsite(domain)
         }
       } catch (_error) {
-        console.error('Error extracting domain:', error)
+        console.error('Error extracting domain:', _error)
       }
     } catch (_error) {
-      console.error('Error getting current tab:', error)
+      console.error('Error getting current tab:', _error)
     } finally {
       setIsLoading(false)
     }
@@ -185,9 +188,36 @@ const Popup: React.FC = () => {
         await loadSettings()
       }
     } catch (_error) {
-      console.error('Error removing blocked website:', error)
+      console.error('Error removing blocked website:', _error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleDraftEmail = async () => {
+    setDraftStatus(null)
+    setIsDraftingEmail(true)
+    try {
+      const activeTabs = await tabs.query({ active: true, currentWindow: true })
+      if (activeTabs.length === 0 || !activeTabs[0].id) {
+        setDraftStatus('No active tab detected.')
+        return
+      }
+
+      await new Promise(resolve => {
+        tabs.sendMessage(activeTabs[0].id!, { type: MESSAGE_TYPES.DRAFT_EMAIL_REPLY }, response => {
+          if (response?.success) {
+            setDraftStatus('Draft inserted into the compose box.')
+          } else {
+            setDraftStatus(response?.error || 'Unable to draft reply on this page.')
+          }
+          resolve(null)
+        })
+      })
+    } catch (_error) {
+      setDraftStatus('Draft request failed.')
+    } finally {
+      setIsDraftingEmail(false)
     }
   }
 
@@ -351,6 +381,30 @@ const Popup: React.FC = () => {
 
           {blockedWebsites.length === 0 && (
             <div className="text-xs text-gray-500 text-center py-2">No websites blocked</div>
+          )}
+        </div>
+
+        {/* Email Drafting */}
+        <div className="border border-gray-200 bg-white p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-medium text-black">Smart Email Reply</div>
+              <div className="text-xs text-gray-600">
+                Draft a reply for the current Gmail or Outlook thread.
+              </div>
+            </div>
+            <button
+              onClick={handleDraftEmail}
+              disabled={isDraftingEmail}
+              className="px-3 py-1.5 text-xs font-medium border border-black bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDraftingEmail ? 'Drafting…' : 'Draft Reply'}
+            </button>
+          </div>
+          {draftStatus && (
+            <div className="text-xs text-gray-600" data-testid="draft-status">
+              {draftStatus}
+            </div>
           )}
         </div>
       </div>
