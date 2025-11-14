@@ -3,6 +3,7 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware'
 import AppError from '../utils/app-error.util'
 import { searchMemories } from '../services/memory-search.service'
 import { createSearchJob, getSearchJob } from '../services/search-job.service'
+import { auditLogService } from '../services/audit-log.service'
 import { logger } from '../utils/logger.util'
 
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
@@ -32,6 +33,21 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       contextOnly,
       jobId: undefined,
       policy,
+    })
+
+    // Log audit event for search
+    auditLogService.logMemorySearch(
+      userId,
+      query,
+      data.results.length,
+      {
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      }
+    ).catch((err) => {
+      logger.warn('[search/controller] audit_log_failed', {
+        error: err instanceof Error ? err.message : String(err),
+      })
     })
 
     // Only create job and return jobId if we don't have an immediate answer (for async delivery)

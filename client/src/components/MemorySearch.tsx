@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 
-import type { SearchFilters } from "../types/memory.type"
+import type { SearchFilters, MemoryType } from "../types/memory.type"
 import { LoadingSpinner } from "./ui/loading-spinner"
 
 interface MemorySearchProps {
@@ -183,6 +183,27 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
             <option value="extension">Extension</option>
             <option value="manual">Manual</option>
             <option value="reasoning">Reasoning</option>
+          </select>
+        </div>
+
+        {/* Memory Type Filter */}
+        <div>
+          <label className="block text-xs font-mono text-gray-600 uppercase tracking-wide mb-1">
+            MEMORY TYPE
+          </label>
+          <select
+            value={filters.memory_type || ""}
+            onChange={(e) =>
+              handleFilterChange("memory_type", e.target.value || undefined)
+            }
+            className="w-full px-2 py-1 border border-gray-300 bg-white text-xs font-mono focus:outline-none focus:border-black"
+          >
+            <option value="">All Types</option>
+            <option value="FACT">Fact</option>
+            <option value="PREFERENCE">Preference</option>
+            <option value="PROJECT">Project</option>
+            <option value="LOG_EVENT">Log Event</option>
+            <option value="REFERENCE">Reference</option>
           </select>
         </div>
       </div>

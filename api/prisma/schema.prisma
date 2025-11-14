@@ -31,8 +31,51 @@ model User {
   achievements     Achievement[]
   learning_paths   LearningPath[]
   user_benchmarks  UserBenchmark?
+  privacy_settings PrivacySetting[]
+  audit_logs       AuditLog[]
 
   @@map("users")
+}
+
+model PrivacySetting {
+  id                String   @id @default(uuid()) @db.Uuid
+  user_id           String   @db.Uuid
+  domain            String
+  block_capture     Boolean  @default(false)
+  block_search      Boolean  @default(false)
+  redact_content    Boolean  @default(false)
+  notes             String?
+  created_at        DateTime @default(now())
+  updated_at        DateTime @default(now()) @updatedAt
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, domain])
+  @@index([user_id])
+  @@index([domain])
+  @@map("privacy_settings")
+}
+
+model AuditLog {
+  id                String   @id @default(uuid()) @db.Uuid
+  user_id           String   @db.Uuid
+  event_type        String
+  event_category    String
+  resource_type     String?
+  resource_id       String?
+  domain            String?
+  action            String
+  metadata          Json?
+  ip_address        String?
+  user_agent        String?
+  created_at        DateTime @default(now())
+  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@index([event_type])
+  @@index([event_category])
+  @@index([created_at])
+  @@index([domain])
+  @@map("audit_logs")
 }
 
 model Memory {

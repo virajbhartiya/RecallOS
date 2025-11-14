@@ -42,6 +42,11 @@ const Inbox = lazy(() =>
 const Projects = lazy(() =>
   import("@/pages/projects.page").then((module) => ({ default: module.Projects }))
 )
+const KnowledgeHealth = lazy(() =>
+  import("@/pages/knowledge-health.page").then((module) => ({
+    default: module.KnowledgeHealth,
+  }))
+)
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -64,6 +69,7 @@ const AppRoutes = () => {
         <Route path="/knowledge" element={<Knowledge />} />
         <Route path="/inbox" element={<Inbox />} />
         <Route path="/projects" element={<Projects />} />
+        <Route path="/knowledge-health" element={<KnowledgeHealth />} />
 
         <Route path="*" element={<Landing />} />
       </Routes>

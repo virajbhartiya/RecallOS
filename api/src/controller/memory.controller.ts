@@ -6,6 +6,8 @@ import { aiProvider } from '../services/ai-provider.service'
 import { memoryMeshService } from '../services/memory-mesh.service'
 import { memoryIngestionService } from '../services/memory-ingestion.service'
 import { profileUpdateService } from '../services/profile-update.service'
+import { privacyService } from '../services/privacy.service'
+import { auditLogService } from '../services/audit-log.service'
 import { normalizeUrl } from '../utils/text.util'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
@@ -196,6 +198,25 @@ export class MemoryController {
         contentLen: typeof content === 'string' ? content.length : undefined,
       })
 
+      // Check privacy settings for this domain
+      if (url && typeof url === 'string') {
+        const domain = privacyService.extractDomain(url)
+        const shouldBlock = await privacyService.shouldBlockCapture(userId, domain)
+        
+        if (shouldBlock) {
+          logger.log('[memory/process] blocked_by_privacy', {
+            userId,
+            domain,
+            url: url.slice(0, 200),
+          })
+          return res.status(403).json({
+            success: false,
+            error: 'Content capture is blocked for this domain',
+            domain,
+          })
+        }
+      }
+
       const metadataPayload =
         metadata && typeof metadata === 'object' && !Array.isArray(metadata)
           ? (metadata as Record<string, unknown>)
@@ -321,6 +342,23 @@ export class MemoryController {
           memoryId: memory.id,
           userId: userId,
         })
+
+        // Log audit event for memory capture
+        if (url && typeof url === 'string') {
+          auditLogService.logMemoryCapture(
+            userId,
+            memory.id,
+            url,
+            {
+              ipAddress: req.ip,
+              userAgent: req.get('user-agent'),
+            }
+          ).catch((err) => {
+            logger.warn('[memory/process] audit_log_failed', {
+              error: err instanceof Error ? err.message : String(err),
+            })
+          })
+        }
       } catch (createError) {
         const error = createError as PrismaError
         if (error.code === 'P2002' && canonicalData.canonicalHash) {

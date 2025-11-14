@@ -1,3 +1,5 @@
+export type MemoryType = 'FACT' | 'PREFERENCE' | 'PROJECT' | 'LOG_EVENT' | 'REFERENCE'
+
 export interface Memory {
   id: string
   user_id: string
@@ -21,6 +23,7 @@ export interface Memory {
   importance_score?: number
   access_count: number
   last_accessed: string
+  memory_type?: MemoryType | null
 }
 
 export interface MemoryInsights {
@@ -104,6 +107,7 @@ export interface SearchFilters {
     end: string
   }
   source?: string
+  memory_type?: MemoryType | null
 }
 
 export interface SearchResult {
