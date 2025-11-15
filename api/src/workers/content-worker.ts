@@ -72,38 +72,42 @@ export const startContentWorker = () => {
 
       try {
         if (!metadata?.memory_id) {
-          await ensureNotCancelled()
-          const user = await prisma.user.findUnique({
-            where: { id: user_id },
-          })
+          const [user, duplicateCheck] = await Promise.all([
+            prisma.user.findUnique({
+              where: { id: user_id },
+            }),
+            canonicalData
+              ? memoryIngestionService.findDuplicateMemory({
+                  userId: user_id,
+                  canonicalHash: canonicalData.canonicalHash,
+                  canonicalText: canonicalData.canonicalText,
+                  url: baseUrl,
+                })
+              : Promise.resolve(null),
+          ])
 
-          if (user) {
-            const duplicateCheck = await memoryIngestionService.findDuplicateMemory({
-              userId: user.id,
-              canonicalHash: canonicalData!.canonicalHash,
-              canonicalText: canonicalData!.canonicalText,
-              url: baseUrl,
+          if (duplicateCheck) {
+            const merged = await memoryIngestionService.mergeDuplicateMemory(
+              duplicateCheck.memory,
+              metadata,
+              undefined
+            )
+            logger.log(`[Redis Worker] Duplicate detected, skipping processing`, {
+              jobId: job.id,
+              userId: user_id,
+              existingMemoryId: merged.id,
+              reason: duplicateCheck.reason,
             })
-
-            if (duplicateCheck) {
-              const merged = await memoryIngestionService.mergeDuplicateMemory(
-                duplicateCheck.memory,
-                metadata,
-                undefined
-              )
-              logger.log(`[Redis Worker] Duplicate detected, skipping processing`, {
-                jobId: job.id,
-                userId: user_id,
-                existingMemoryId: merged.id,
-                reason: duplicateCheck.reason,
-              })
-              return {
-                success: true,
-                contentId: merged.id,
-                memoryId: merged.id,
-                summary: merged.summary?.substring(0, 100) + '...' || 'Duplicate memory',
-              }
+            return {
+              success: true,
+              contentId: merged.id,
+              memoryId: merged.id,
+              summary: merged.summary?.substring(0, 100) + '...' || 'Duplicate memory',
             }
+          }
+
+          if (!user) {
+            throw new Error(`User not found: ${user_id}`)
           }
         }
 
@@ -133,13 +137,11 @@ export const startContentWorker = () => {
         // Run AI calls in parallel for faster processing
         // Note: This optimization applies to all jobs in the queue, including those
         // queued before this implementation, as the worker code is loaded at runtime.
-        await ensureNotCancelled()
         const [summaryResult, extractedMetadataResult] = await Promise.all([
           (async () => {
             let summary: string | null = null
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
               try {
-                await ensureNotCancelled()
                 if (attempt > 1) {
                   logger.log(`[Redis Worker] Retrying summary (attempt ${attempt}/${maxAttempts})`, {
                     jobId: job.id,
@@ -180,7 +182,6 @@ export const startContentWorker = () => {
                   error: err?.message || String(err),
                 })
                 await sleep(backoff + jitter)
-                await ensureNotCancelled()
               }
             }
             if (!summary) {
@@ -190,7 +191,6 @@ export const startContentWorker = () => {
           })(),
           (async () => {
             try {
-              await ensureNotCancelled()
               const result = await aiProvider.extractContentMetadata(raw_text, metadata, user_id)
               if (
                 typeof result === 'object' &&
@@ -236,43 +236,46 @@ export const startContentWorker = () => {
 
         if (metadata?.memory_id) {
           const pageMetadata = memoryIngestionService.buildPageMetadata(metadata, extractedMetadata)
-          await ensureNotCancelled()
-          const existingMemory = await prisma.memory.findUnique({
-            where: { id: metadata.memory_id },
-            select: { page_metadata: true },
-          })
+          const [existingMemory] = await Promise.all([
+            prisma.memory.findUnique({
+              where: { id: metadata.memory_id },
+              select: { page_metadata: true },
+            }),
+            ensureNotCancelled(),
+          ])
           const mergedMetadata = memoryScoringService.mergeMetadata(
             existingMemory?.page_metadata,
             pageMetadata
           )
-          await prisma.memory.update({
-            where: { id: metadata.memory_id },
-            data: {
-              summary: summary,
-              page_metadata: mergedMetadata,
-            },
-          })
+          
+          const summaryHash = createHash('sha256').update(summary).digest('hex')
+
+          await Promise.all([
+            prisma.memory.update({
+              where: { id: metadata.memory_id },
+              data: {
+                summary: summary,
+                page_metadata: mergedMetadata,
+              },
+            }),
+            prisma.memorySnapshot.create({
+              data: {
+                user_id,
+                raw_text,
+                summary,
+                summary_hash: summaryHash,
+              },
+            }),
+          ])
           
           // Generate embeddings and relations in background (non-blocking)
           setImmediate(async () => {
             try {
-              await ensureNotCancelled()
               await memoryMeshService.generateEmbeddingsForMemory(metadata.memory_id)
               await memoryMeshService.createMemoryRelations(metadata.memory_id, user_id)
             } catch (embeddingError) {
               logger.error(`[Redis Worker] Error generating embeddings:`, embeddingError)
             }
-          })
-
-          const summaryHash = createHash('sha256').update(summary).digest('hex')
-
-          await prisma.memorySnapshot.create({
-            data: {
-              user_id,
-              raw_text,
-              summary,
-              summary_hash: summaryHash,
-            },
           })
 
           setImmediate(async () => {
@@ -286,89 +289,85 @@ export const startContentWorker = () => {
             }
           })
         } else {
-          await ensureNotCancelled()
-          const user = await prisma.user.findUnique({
-            where: { id: user_id },
+          if (!canonicalData) {
+            canonicalData = memoryIngestionService.canonicalizeContent(raw_text, baseUrl)
+          }
+          const extractedMetadataRecord =
+            extractedMetadata && typeof extractedMetadata === 'object'
+              ? (extractedMetadata as Record<string, unknown>)
+              : undefined
+          const memoryCreateInput = memoryIngestionService.buildMemoryCreatePayload({
+            userId: user_id,
+            title: metadata?.title as string | undefined,
+            url: baseUrl,
+            source: (metadata?.source as string | undefined) || undefined,
+            content: raw_text,
+            summary,
+            metadata,
+            extractedMetadata: extractedMetadataRecord,
+            canonicalText: canonicalData.canonicalText,
+            canonicalHash: canonicalData.canonicalHash,
           })
-
-          if (user) {
-            let memory
-            try {
-              if (!canonicalData) {
-                canonicalData = memoryIngestionService.canonicalizeContent(raw_text, baseUrl)
-              }
-              const extractedMetadataRecord =
-                extractedMetadata && typeof extractedMetadata === 'object'
-                  ? (extractedMetadata as Record<string, unknown>)
-                  : undefined
-              const memoryCreateInput = memoryIngestionService.buildMemoryCreatePayload({
-                userId: user_id,
-                title: metadata?.title as string | undefined,
-                url: baseUrl,
-                source: (metadata?.source as string | undefined) || undefined,
-                content: raw_text,
-                summary,
-                metadata,
-                extractedMetadata: extractedMetadataRecord,
-                canonicalText: canonicalData.canonicalText,
-                canonicalHash: canonicalData.canonicalHash,
-              })
-              await ensureNotCancelled()
-              memory = await prisma.memory.create({
+          
+          let memory
+          try {
+            const summaryHash = '0x' + createHash('sha256').update(summary).digest('hex')
+            
+            const [createdMemory] = await Promise.all([
+              prisma.memory.create({
                 data: memoryCreateInput,
+              }),
+              prisma.memorySnapshot.create({
+                data: {
+                  user_id,
+                  raw_text,
+                  summary,
+                  summary_hash: summaryHash,
+                },
+              }),
+              ensureNotCancelled(),
+            ])
+            memory = createdMemory
+          } catch (createError) {
+            const error = createError as PrismaError
+            if (error.code === 'P2002') {
+              const existingByCanonical = await prisma.memory.findFirst({
+                where: { user_id, canonical_hash: canonicalData?.canonicalHash },
               })
-            } catch (createError) {
-              const error = createError as PrismaError
-              if (error.code === 'P2002') {
-                const existingByCanonical = await prisma.memory.findFirst({
-                  where: { user_id, canonical_hash: canonicalData?.canonicalHash },
-                })
 
-                if (existingByCanonical) {
-                  return {
-                    success: true,
-                    contentId: existingByCanonical.id,
-                    memoryId: existingByCanonical.id,
-                    summary: summary.substring(0, 100) + '...',
-                  }
+              if (existingByCanonical) {
+                return {
+                  success: true,
+                  contentId: existingByCanonical.id,
+                  memoryId: existingByCanonical.id,
+                  summary: summary.substring(0, 100) + '...',
                 }
               }
-              throw createError
             }
+            throw createError
+          }
 
-            // Generate embeddings and relations in background (non-blocking)
-            setImmediate(async () => {
-              try {
-                await ensureNotCancelled()
-                await memoryMeshService.generateEmbeddingsForMemory(memory.id)
-                await memoryMeshService.createMemoryRelations(memory.id, user_id)
-              } catch (embeddingError) {
-                logger.error(`[Redis Worker] Error generating embeddings:`, embeddingError)
-              }
-            })
+          // Generate embeddings and relations in background (non-blocking)
+          setImmediate(async () => {
+            try {
+              await memoryMeshService.generateEmbeddingsForMemory(memory.id)
+              await memoryMeshService.createMemoryRelations(memory.id, user_id)
+            } catch (embeddingError) {
+              logger.error(`[Redis Worker] Error generating embeddings:`, embeddingError)
+            }
+          })
 
-            const summaryHash = '0x' + createHash('sha256').update(summary).digest('hex')
+          logger.log(`[Redis Worker] New memory created successfully`, {
+            jobId: job.id,
+            userId: user_id,
+            memoryId: memory.id,
+          })
 
-            await prisma.memorySnapshot.create({
-              data: {
-                user_id,
-                raw_text,
-                summary,
-                summary_hash: summaryHash,
-              },
-            })
-
-            logger.log(`[Redis Worker] New memory created successfully`, {
-              jobId: job.id,
-              userId: user_id,
-              memoryId: memory.id,
-            })
-
-            setImmediate(async () => {
-              try {
-                const importanceScore = memory.importance_score || 0
-                if (importanceScore >= PROFILE_IMPORTANCE_THRESHOLD) {
-                  const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 3)
+          setImmediate(async () => {
+            try {
+              const importanceScore = memory.importance_score || 0
+              if (importanceScore >= PROFILE_IMPORTANCE_THRESHOLD) {
+                const shouldUpdate = await profileUpdateService.shouldUpdateProfile(user_id, 3)
                 if (shouldUpdate) {
                   logger.log(`[Redis Worker] Triggering profile update`, {
                     jobId: job.id,
@@ -379,13 +378,12 @@ export const startContentWorker = () => {
                     jobId: job.id,
                     userId: user_id,
                   })
-                  }
                 }
-              } catch (profileError) {
-                logger.error(`[Redis Worker] Error updating profile:`, profileError)
               }
-            })
-          }
+            } catch (profileError) {
+              logger.error(`[Redis Worker] Error updating profile:`, profileError)
+            }
+          })
         }
 
         const result = {
@@ -407,8 +405,9 @@ export const startContentWorker = () => {
       limiter: getQueueLimiter(),
       stalledInterval: getQueueStalledInterval(),
       maxStalledCount: getQueueMaxStalledCount(),
-      // Job timeout is set in queue.defaultJobOptions.timeout (5 minutes)
-      // This allows parallel AI calls to complete without timing out
+      // Lock duration is handled automatically by BullMQ
+      // Increased Redis command timeout in getRedisConnection() prevents lock renewal failures
+      // Jobs with 4-minute AI calls should complete within the default lock renewal window
     }
   )
 }

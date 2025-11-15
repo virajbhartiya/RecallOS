@@ -59,9 +59,12 @@ contentQueueEvents.on('stalled', ({ jobId }) => {
 })
 contentQueueEvents.on('delayed', () => {})
 
-export const addContentJob = async (data: ContentJobData) => {
-  const canonicalText = normalizeText(data.raw_text)
-  const canonicalHash = hashCanonical(canonicalText)
+export const addContentJob = async (
+  data: ContentJobData,
+  precomputed?: { canonicalText: string; canonicalHash: string }
+) => {
+  const canonicalText = precomputed?.canonicalText ?? normalizeText(data.raw_text)
+  const canonicalHash = precomputed?.canonicalHash ?? hashCanonical(canonicalText)
 
   const [waiting, active, delayed] = await Promise.all([
     contentQueue.getWaiting(),
@@ -70,12 +73,23 @@ export const addContentJob = async (data: ContentJobData) => {
   ])
 
   const allJobs = [...waiting, ...active, ...delayed]
+  const userJobs = allJobs.filter(job => job.data.user_id === data.user_id)
 
-  for (const existingJob of allJobs) {
-    if (existingJob.data.user_id !== data.user_id) {
-      continue
+  if (userJobs.length === 0) {
+    const jobId = crypto.randomUUID()
+    const jobOptions: JobsOptions = {
+      jobId,
     }
+    const job = await contentQueue.add(queueName, data, jobOptions)
+    return { id: job.id }
+  }
 
+  const normalizedUrl =
+    data.metadata?.url && data.metadata.url !== 'unknown'
+      ? normalizeUrl(data.metadata.url)
+      : null
+
+  for (const existingJob of userJobs) {
     const existingCanonicalText = normalizeText(existingJob.data.raw_text)
     const existingCanonicalHash = hashCanonical(existingCanonicalText)
 
@@ -83,13 +97,7 @@ export const addContentJob = async (data: ContentJobData) => {
       return { id: existingJob.id, isDuplicate: true }
     }
 
-    if (
-      data.metadata?.url &&
-      data.metadata.url !== 'unknown' &&
-      existingJob.data.metadata?.url &&
-      existingJob.data.metadata.url !== 'unknown'
-    ) {
-      const normalizedUrl = normalizeUrl(data.metadata.url)
+    if (normalizedUrl && existingJob.data.metadata?.url && existingJob.data.metadata.url !== 'unknown') {
       const existingNormalizedUrl = normalizeUrl(existingJob.data.metadata.url)
 
       if (normalizedUrl === existingNormalizedUrl) {

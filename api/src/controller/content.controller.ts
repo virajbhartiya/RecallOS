@@ -47,17 +47,28 @@ export const submitContent = async (
       return next(new AppError('Content too large. Maximum 100,000 characters allowed.', 400))
     }
 
-    const canonicalData = memoryIngestionService.canonicalizeContent(
-      raw_text,
-      typeof metadata?.url === 'string' ? (metadata.url as string) : undefined
-    )
+    const url = typeof metadata?.url === 'string' ? metadata.url : undefined
 
-    const duplicateCheck = await memoryIngestionService.findDuplicateMemory({
-      userId: user_id,
-      canonicalHash: canonicalData.canonicalHash,
-      canonicalText: canonicalData.canonicalText,
-      url: typeof metadata?.url === 'string' ? (metadata.url as string) : undefined,
-    })
+    const canonicalData = memoryIngestionService.canonicalizeContent(raw_text, url)
+
+    const jobData: ContentJobData = {
+      user_id,
+      raw_text,
+      metadata: metadata || {},
+    }
+
+    const [duplicateCheck, job] = await Promise.all([
+      memoryIngestionService.findDuplicateMemory({
+        userId: user_id,
+        canonicalHash: canonicalData.canonicalHash,
+        canonicalText: canonicalData.canonicalText,
+        url,
+      }),
+      addContentJob(jobData, {
+        canonicalText: canonicalData.canonicalText,
+        canonicalHash: canonicalData.canonicalHash,
+      }),
+    ])
 
     if (duplicateCheck) {
       const merged = await memoryIngestionService.mergeDuplicateMemory(
@@ -82,16 +93,6 @@ export const submitContent = async (
         },
       })
     }
-
-    const url = typeof metadata?.url === 'string' ? metadata.url : undefined
-
-    const jobData: ContentJobData = {
-      user_id,
-      raw_text,
-      metadata: metadata || {},
-    }
-
-    const job = await addContentJob(jobData)
 
     if (job.isDuplicate) {
       logger.log(
@@ -214,24 +215,8 @@ export const getPendingJobs = async (
 
     let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs, ...failedJobs]
 
-    const redis = getRedisClient()
-    const cancellationKeys = allJobs.map(item => getContentJobCancellationKey(item.job.id!))
-    const cancellationStates = cancellationKeys.length > 0 ? await redis.mget(cancellationKeys) : []
-    const cancelledJobIds = new Set<string>()
-    cancellationStates.forEach((value, index) => {
-      if (value) {
-        cancelledJobIds.add(allJobs[index].job.id!)
-      }
-    })
-
     // Filter jobs to only show current user's jobs
     const userJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)
-
-    // Calculate counts from filtered user jobs to ensure consistency
-    const userWaitingCount = userJobs.filter(item => item.status === 'waiting').length
-    const userActiveCount = userJobs.filter(item => item.status === 'active').length
-    const userDelayedCount = userJobs.filter(item => item.status === 'delayed').length
-    const userFailedCount = userJobs.filter(item => item.status === 'failed').length
 
     const jobs = userJobs
       .map(item => ({
@@ -242,23 +227,29 @@ export const getPendingJobs = async (
           (item.job.data.raw_text && item.job.data.raw_text.length > 200 ? '...' : ''),
         full_text_length: item.job.data.raw_text?.length || 0,
         metadata: item.job.data.metadata || {},
-        status: cancelledJobIds.has(item.job.id) ? 'cancelling' : item.status,
+        status: item.status,
         created_at: new Date(item.job.timestamp).toISOString(),
         processed_on: item.job.processedOn ? new Date(item.job.processedOn).toISOString() : null,
         finished_on: item.job.finishedOn ? new Date(item.job.finishedOn).toISOString() : null,
-        failed_reason: cancelledJobIds.has(item.job.id)
-          ? 'Job cancellation requested by user'
-          : item.job.failedReason || null,
+        failed_reason: item.job.failedReason || null,
         attempts: item.job.attemptsMade,
       }))
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+    // Calculate counts from jobs to ensure consistency
+    const userWaitingCount = jobs.filter(job => job.status === 'waiting').length
+    const userActiveCount = jobs.filter(job => job.status === 'active').length
+    const userDelayedCount = jobs.filter(job => job.status === 'delayed').length
+    const userFailedCount = jobs.filter(job => job.status === 'failed').length
+
+    const totalCount = jobs.length
 
     res.status(200).json({
       status: 'success',
       data: {
         jobs,
         counts: {
-          total: jobs.length,
+          total: totalCount,
           waiting: userWaitingCount,
           active: userActiveCount,
           delayed: userDelayedCount,
@@ -370,3 +361,4 @@ export const resubmitPendingJob = async (
     next(error)
   }
 }
+
