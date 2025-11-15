@@ -3,12 +3,13 @@ import { AuthenticatedRequest } from '../middleware/auth.middleware'
 import AppError from '../utils/app-error.util'
 import { searchMemories } from '../services/memory-search.service'
 import { createSearchJob, getSearchJob } from '../services/search-job.service'
+import { auditLogService } from '../services/audit-log.service'
 import { logger } from '../utils/logger.util'
 
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   let job: { id: string } | null = null
   try {
-    const { query, limit, contextOnly } = req.body || {}
+    const { query, limit, contextOnly, policy } = req.body || {}
     if (!query) return next(new AppError('query is required', 400))
 
     if (!req.user) {
@@ -31,7 +32,20 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       limit,
       contextOnly,
       jobId: undefined,
+      policy,
     })
+
+    // Log audit event for search
+    auditLogService
+      .logMemorySearch(userId, query, data.results.length, {
+        ipAddress: req.ip,
+        userAgent: req.get('user-agent'),
+      })
+      .catch(err => {
+        logger.warn('[search/controller] audit_log_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      })
 
     // Only create job and return jobId if we don't have an immediate answer (for async delivery)
     if (!contextOnly && !data.answer) {
@@ -184,6 +198,7 @@ ${bullets}`
       }>
       answer?: string
       context?: string
+      contextBlocks?: unknown[]
       citations?: Array<{
         label: number
         memory_id: string
@@ -192,6 +207,7 @@ ${bullets}`
       }>
       status?: string
       job_id?: string
+      policy?: string
     }
     const response: SearchResponse = {
       query: data.query,
@@ -199,6 +215,8 @@ ${bullets}`
       answer: data.answer,
       citations: data.citations,
       context: data.context,
+      contextBlocks: data.contextBlocks,
+      policy: data.policy,
     }
 
     // Only return jobId if we don't have an answer (meaning it's being generated async)
@@ -255,7 +273,9 @@ export const getContext = async (req: AuthenticatedRequest, res: Response, next:
     res.status(200).json({
       query: data.query,
       context: data.context || 'No relevant memories found.',
+      contextBlocks: data.contextBlocks || [],
       resultCount: data.results.length,
+      policy: data.policy,
     })
   } catch (err) {
     next(err)

@@ -18,6 +18,7 @@ type MemoryWithMetadata = Prisma.MemoryGetPayload<{
     title: true
     summary: true
     content: true
+    canonical_text: true
     url: true
     created_at: true
     page_metadata: true
@@ -109,9 +110,10 @@ export class MemoryMeshService {
 
       const embeddingPromises = []
 
-      if (memory.content) {
+      const canonicalContent = memory.canonical_text || memory.content
+      if (canonicalContent) {
         embeddingPromises.push(
-          this.createEmbedding(memoryId, memory.user_id, memory.content, 'content')
+          this.createEmbedding(memoryId, memory.user_id, canonicalContent, 'content')
         )
       }
 

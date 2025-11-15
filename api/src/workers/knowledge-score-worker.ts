@@ -3,6 +3,7 @@ import { knowledgeVelocityService } from '../services/knowledge-velocity.service
 import { knowledgeImpactService } from '../services/knowledge-impact.service'
 import { achievementService } from '../services/achievement.service'
 import { benchmarkService } from '../services/benchmark.service'
+import { memoryScoringService } from '../services/memory-scoring.service'
 import { logger } from '../utils/logger.util'
 
 export const startKnowledgeScoreWorker = async () => {
@@ -96,6 +97,15 @@ export const startKnowledgeScoreWorker = async () => {
 
         await achievementService.checkAndAwardAchievements(user.id)
         await benchmarkService.calculateUserBenchmarks(user.id)
+        try {
+          await memoryScoringService.recomputeUserScores(user.id)
+          await memoryScoringService.reweightRelations(user.id)
+        } catch (scoringError) {
+          logger.warn('[Knowledge Score Worker] Memory scoring refresh failed', {
+            userId: user.id,
+            error: scoringError instanceof Error ? scoringError.message : String(scoringError),
+          })
+        }
       } catch (error) {
         logger.error('[Knowledge Score Worker] Error processing user', {
           userId: user.id,

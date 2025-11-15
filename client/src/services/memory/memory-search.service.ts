@@ -13,7 +13,8 @@ export async function searchMemories(
   filters: SearchFilters = {},
   page: number = 1,
   limit: number = 10,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  policy?: string
 ): Promise<MemorySearchResponse> {
   try {
     requireAuthToken()
@@ -24,6 +25,7 @@ export async function searchMemories(
         query,
         limit,
         contextOnly: false,
+        policy,
       },
       undefined,
       signal
@@ -52,6 +54,9 @@ export async function searchMemories(
         answer: responseData.answer,
         citations: responseData.citations,
         job_id: responseData.job_id,
+        context: responseData.context,
+        contextBlocks: responseData.contextBlocks,
+        policy: responseData.policy,
       }
     }
     return { results: [], total: 0, page, limit, filters }

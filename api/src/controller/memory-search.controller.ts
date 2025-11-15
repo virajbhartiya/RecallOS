@@ -5,6 +5,7 @@ import { memoryMeshService } from '../services/memory-mesh.service'
 import { searchMemories } from '../services/memory-search.service'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
+import { RetrievalPolicyName } from '../services/retrieval-policy.service'
 
 type MemoryWithMetadata = {
   memory: {
@@ -29,10 +30,22 @@ type MemoryRecord = {
   page_metadata: Prisma.JsonValue
 }
 
+const VALID_POLICIES: RetrievalPolicyName[] = [
+  'chat',
+  'planning',
+  'profile',
+  'summarization',
+  'insight',
+]
+
+function isValidPolicy(policy: unknown): policy is RetrievalPolicyName {
+  return typeof policy === 'string' && VALID_POLICIES.includes(policy as RetrievalPolicyName)
+}
+
 export class MemorySearchController {
   static async searchMemories(req: AuthenticatedRequest, res: Response) {
     try {
-      const { query, limit = 20 } = req.query
+      const { query, limit = 20, policy } = req.query
 
       if (!query) {
         return res.status(400).json({
@@ -58,6 +71,7 @@ export class MemorySearchController {
         limit: parseInt(limit as string),
         enableReasoning: true,
         contextOnly: false,
+        policy: isValidPolicy(policy) ? policy : undefined,
       })
 
       const memories = searchResults.results.map(result => ({
@@ -91,6 +105,9 @@ export class MemorySearchController {
           query: searchResults.query,
           answer: searchResults.answer,
           citations: searchResults.citations,
+          context: searchResults.context,
+          contextBlocks: searchResults.contextBlocks,
+          policy: searchResults.policy,
         },
       })
     } catch (error) {

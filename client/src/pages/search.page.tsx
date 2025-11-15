@@ -17,6 +17,60 @@ import type {
   SearchFilters,
 } from "../types/memory.type"
 
+const buildExportText = (searchResults: MemorySearchResponse): string => {
+  const parts: string[] = []
+
+  if (searchResults.answer) {
+    parts.push("=== AI ANSWER ===")
+    parts.push(searchResults.answer)
+    parts.push("")
+  }
+
+  if (searchResults.citations && searchResults.citations.length > 0) {
+    parts.push("=== CITATIONS ===")
+    searchResults.citations.forEach((citation) => {
+      parts.push(`[${citation.label}] ${citation.title || "Untitled"}`)
+      if (citation.url) {
+        parts.push(`  URL: ${citation.url}`)
+      }
+    })
+    parts.push("")
+  }
+
+  if (searchResults.results && searchResults.results.length > 0) {
+    parts.push("=== MEMORIES ===")
+    searchResults.results.slice(0, 10).forEach((result, idx) => {
+      parts.push(`${idx + 1}. ${result.memory.title || "Untitled"}`)
+      if (result.memory.summary) {
+        parts.push(`   ${result.memory.summary}`)
+      }
+      if (result.memory.url) {
+        parts.push(`   URL: ${result.memory.url}`)
+      }
+    })
+  }
+
+  return parts.join("\n")
+}
+
+const copyToClipboard = async (text: string): Promise<void> => {
+  try {
+    await navigator.clipboard.writeText(text)
+    // Show a brief toast notification
+    const toast = document.createElement("div")
+    toast.className =
+      "fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50 font-mono text-sm"
+    toast.textContent = "✓ Copied to clipboard!"
+    document.body.appendChild(toast)
+    setTimeout(() => {
+      document.body.removeChild(toast)
+    }, 2000)
+  } catch (err) {
+    console.error("Failed to copy to clipboard:", err)
+    alert("Failed to copy to clipboard. Please copy manually.")
+  }
+}
+
 export const Search: React.FC = () => {
   const navigate = useNavigate()
   const [searchResults, setSearchResults] =
@@ -235,31 +289,50 @@ export const Search: React.FC = () => {
             <>
               {/* AI-Generated Summary */}
               {searchResults.answer && (
-                <div className="bg-yellow-50 border border-yellow-200 p-4">
-                  <div className="text-sm font-mono text-gray-600 mb-2">
-                    [AI SUMMARY]
+                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 p-6 rounded-lg shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="text-sm font-mono text-gray-700 font-semibold uppercase tracking-wide">
+                      [AI ANSWER SUMMARY]
+                    </div>
+                    <button
+                      onClick={() => {
+                        const exportText = buildExportText(searchResults)
+                        copyToClipboard(exportText)
+                      }}
+                      className="px-3 py-1.5 text-xs font-mono uppercase tracking-wide border border-gray-400 bg-white hover:bg-gray-50 transition-all duration-200 flex items-center gap-2"
+                      title="Export to ChatGPT/Claude"
+                    >
+                      <span>📋</span>
+                      <span>EXPORT</span>
+                    </button>
                   </div>
-                  <div className="text-sm text-gray-800 mb-3">
+                  <div className="text-base text-gray-800 leading-relaxed mb-4 whitespace-pre-wrap">
                     {searchResults.answer}
                   </div>
                   {searchResults.citations &&
                     searchResults.citations.length > 0 && (
-                      <div className="text-xs text-gray-600">
-                        <span className="font-mono">Citations:</span>{" "}
-                        {searchResults.citations.map((citation, index) => (
-                          <span key={citation.memory_id}>
+                      <div className="border-t border-yellow-300 pt-4">
+                        <div className="text-xs font-mono text-gray-600 mb-2 uppercase tracking-wide">
+                          [CITATIONS - {searchResults.citations.length}]
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {searchResults.citations.map((citation) => (
                             <a
+                              key={citation.memory_id}
                               href={citation.url || "#"}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 underline"
+                              className="text-xs text-blue-700 hover:text-blue-900 hover:underline flex items-start gap-2 p-2 bg-white rounded border border-yellow-200 hover:border-blue-300 transition-colors"
                             >
-                              [{citation.label}] {citation.title}
+                              <span className="font-mono font-semibold text-gray-600 flex-shrink-0">
+                                [{citation.label}]
+                              </span>
+                              <span className="flex-1">
+                                {citation.title || "Untitled"}
+                              </span>
                             </a>
-                            {index < searchResults.citations!.length - 1 &&
-                              ", "}
-                          </span>
-                        ))}
+                          ))}
+                        </div>
                       </div>
                     )}
                 </div>

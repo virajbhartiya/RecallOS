@@ -1,3 +1,5 @@
+export type MemoryType = "FACT" | "PREFERENCE" | "LOG_EVENT" | "REFERENCE"
+
 export interface Memory {
   id: string
   user_id: string
@@ -21,6 +23,7 @@ export interface Memory {
   importance_score?: number
   access_count: number
   last_accessed: string
+  memory_type?: MemoryType | null
 }
 
 export interface MemoryInsights {
@@ -104,6 +107,7 @@ export interface SearchFilters {
     end: string
   }
   source?: string
+  memory_type?: MemoryType | null
 }
 
 export interface SearchResult {
@@ -114,6 +118,20 @@ export interface SearchResult {
   semantic_score?: number
   blended_score?: number
   search_type?: "keyword" | "semantic" | "hybrid"
+}
+
+export interface ContextBlockItem {
+  id: string
+  title: string | null
+  summary: string | null
+  url: string | null
+  importance_score?: number | null
+  created_at?: string
+}
+
+export interface ContextBlock {
+  label: string
+  items: ContextBlockItem[]
 }
 
 export interface MemorySearchResponse {
@@ -130,6 +148,9 @@ export interface MemorySearchResponse {
     url: string | null
   }>
   job_id?: string
+  context?: string
+  contextBlocks?: ContextBlock[]
+  policy?: string
 }
 
 export interface MemoryWithRelations extends Memory {

@@ -12,7 +12,7 @@ import { prisma } from '../lib/prisma.lib'
 import { getRedisClient } from '../lib/redis.lib'
 
 import AppError from '../utils/app-error.util'
-import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
+import { memoryIngestionService } from '../services/memory-ingestion.service'
 import { logger } from '../utils/logger.util'
 
 export const submitContent = async (
@@ -47,32 +47,42 @@ export const submitContent = async (
       return next(new AppError('Content too large. Maximum 100,000 characters allowed.', 400))
     }
 
-    // Duplicate check before queueing to avoid unnecessary processing
-    const canonicalText = normalizeText(raw_text)
-    const canonicalHash = hashCanonical(canonicalText)
+    const url = typeof metadata?.url === 'string' ? metadata.url : undefined
 
-    const existingByCanonical = await prisma.memory.findFirst({
-      where: { user_id, canonical_hash: canonicalHash },
-      select: {
-        id: true,
-        title: true,
-        url: true,
-        timestamp: true,
-        created_at: true,
-        summary: true,
-        content: true,
-        source: true,
-        page_metadata: true,
-        canonical_text: true,
-        canonical_hash: true,
-      },
-    })
+    const canonicalData = memoryIngestionService.canonicalizeContent(raw_text, url)
 
-    if (existingByCanonical) {
+    const jobData: ContentJobData = {
+      user_id,
+      raw_text,
+      metadata: metadata || {},
+    }
+
+    const [duplicateCheck, job] = await Promise.all([
+      memoryIngestionService.findDuplicateMemory({
+        userId: user_id,
+        canonicalHash: canonicalData.canonicalHash,
+        canonicalText: canonicalData.canonicalText,
+        url,
+      }),
+      addContentJob(jobData, {
+        canonicalText: canonicalData.canonicalText,
+        canonicalHash: canonicalData.canonicalHash,
+      }),
+    ])
+
+    if (duplicateCheck) {
+      const merged = await memoryIngestionService.mergeDuplicateMemory(
+        duplicateCheck.memory,
+        metadata,
+        undefined
+      )
       const serializedExisting = {
-        ...existingByCanonical,
-        timestamp: existingByCanonical.timestamp ? existingByCanonical.timestamp.toString() : null,
+        ...merged,
+        timestamp: merged.timestamp ? merged.timestamp.toString() : null,
       }
+      logger.log(
+        `[Content] skip duplicate user=${user_id} memory=${merged.id} reason=${duplicateCheck.reason}`
+      )
       return res.status(200).json({
         status: 'success',
         message: 'Duplicate memory detected, returning existing record',
@@ -83,74 +93,6 @@ export const submitContent = async (
         },
       })
     }
-
-    // Fallback: Check for URL-based duplicates within the last hour (for dynamic content)
-    const url = typeof metadata?.url === 'string' ? metadata.url : undefined
-    if (url && url !== 'unknown') {
-      const normalizedUrl = normalizeUrl(url)
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-
-      const recentMemories = await prisma.memory.findMany({
-        where: {
-          user_id,
-          created_at: { gte: oneHourAgo },
-        },
-        select: {
-          id: true,
-          title: true,
-          url: true,
-          timestamp: true,
-          created_at: true,
-          summary: true,
-          content: true,
-          source: true,
-          page_metadata: true,
-          canonical_text: true,
-          canonical_hash: true,
-        },
-        orderBy: { created_at: 'desc' },
-        take: 50,
-      })
-
-      for (const existingMemory of recentMemories) {
-        const existingUrl = existingMemory.url
-        if (
-          existingUrl &&
-          typeof existingUrl === 'string' &&
-          normalizeUrl(existingUrl) === normalizedUrl
-        ) {
-          const existingCanonical = normalizeText(existingMemory.content || '')
-          const similarity = calculateSimilarity(canonicalText, existingCanonical)
-
-          if (similarity > 0.9) {
-            const serializedExisting = {
-              ...existingMemory,
-              timestamp: existingMemory.timestamp ? existingMemory.timestamp.toString() : null,
-            }
-            logger.log(
-              `[Content] skip url-duplicate user=${user_id} memory=${existingMemory.id} similarity=${similarity.toFixed(3)}`
-            )
-            return res.status(200).json({
-              status: 'success',
-              message: 'Duplicate memory detected by URL similarity, returning existing record',
-              data: {
-                userId: user_id,
-                memory: serializedExisting,
-                isDuplicate: true,
-              },
-            })
-          }
-        }
-      }
-    }
-
-    const jobData: ContentJobData = {
-      user_id,
-      raw_text,
-      metadata: metadata || {},
-    }
-
-    const job = await addContentJob(jobData)
 
     if (job.isDuplicate) {
       logger.log(
@@ -271,55 +213,58 @@ export const getPendingJobs = async (
     const delayedJobs = delayed.map(job => ({ job, status: 'delayed' as const }))
     const failedJobs = failed.map(job => ({ job, status: 'failed' as const }))
 
-    let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs, ...failedJobs]
+    const allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs, ...failedJobs]
 
-    const redis = getRedisClient()
-    const cancellationKeys = allJobs.map(item => getContentJobCancellationKey(item.job.id!))
-    const cancellationStates = cancellationKeys.length > 0 ? await redis.mget(cancellationKeys) : []
-    const cancelledJobIds = new Set<string>()
-    cancellationStates.forEach((value, index) => {
-      if (value) {
-        cancelledJobIds.add(allJobs[index].job.id!)
-      }
-    })
+    // Filter jobs to only show current user's jobs
+    const userJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)
 
-    allJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)
+    const jobs = userJobs
+      .map(item => {
+        const failedReason = item.job.failedReason || ''
+        const isCancelled =
+          failedReason.includes('cancelled') || failedReason.includes('Job cancelled')
+        const finalStatus = isCancelled ? 'cancelling' : item.status
 
-    const jobs = allJobs
-      .map(item => ({
-        id: item.job.id,
-        user_id: item.job.data.user_id,
-        raw_text:
-          item.job.data.raw_text?.substring(0, 200) +
-          (item.job.data.raw_text && item.job.data.raw_text.length > 200 ? '...' : ''),
-        full_text_length: item.job.data.raw_text?.length || 0,
-        metadata: item.job.data.metadata || {},
-        status: cancelledJobIds.has(item.job.id) ? 'cancelling' : item.status,
-        created_at: new Date(item.job.timestamp).toISOString(),
-        processed_on: item.job.processedOn ? new Date(item.job.processedOn).toISOString() : null,
-        finished_on: item.job.finishedOn ? new Date(item.job.finishedOn).toISOString() : null,
-        failed_reason: cancelledJobIds.has(item.job.id)
-          ? 'Job cancellation requested by user'
-          : item.job.failedReason || null,
-        attempts: item.job.attemptsMade,
-      }))
+        return {
+          id: item.job.id,
+          user_id: item.job.data.user_id,
+          raw_text:
+            item.job.data.raw_text?.substring(0, 200) +
+            (item.job.data.raw_text && item.job.data.raw_text.length > 200 ? '...' : ''),
+          full_text_length: item.job.data.raw_text?.length || 0,
+          metadata: item.job.data.metadata || {},
+          status: finalStatus,
+          created_at: new Date(item.job.timestamp).toISOString(),
+          processed_on: item.job.processedOn ? new Date(item.job.processedOn).toISOString() : null,
+          finished_on: item.job.finishedOn ? new Date(item.job.finishedOn).toISOString() : null,
+          failed_reason: isCancelled
+            ? 'Job cancelled by user request'
+            : item.job.failedReason || null,
+          attempts: item.job.attemptsMade,
+        }
+      })
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
-    const userWaitingCount = waiting.filter(job => job.data.user_id === req.user!.id).length
-    const userActiveCount = active.filter(job => job.data.user_id === req.user!.id).length
-    const userDelayedCount = delayed.filter(job => job.data.user_id === req.user!.id).length
-    const userFailedCount = failed.filter(job => job.data.user_id === req.user!.id).length
+    // Calculate counts from jobs to ensure consistency
+    const userWaitingCount = jobs.filter(job => job.status === 'waiting').length
+    const userActiveCount = jobs.filter(job => job.status === 'active').length
+    const userDelayedCount = jobs.filter(job => job.status === 'delayed').length
+    const userFailedCount = jobs.filter(job => job.status === 'failed').length
+    const userCancellingCount = jobs.filter(job => job.status === 'cancelling').length
+
+    const totalCount = jobs.length
 
     res.status(200).json({
       status: 'success',
       data: {
         jobs,
         counts: {
-          total: jobs.length,
+          total: totalCount,
           waiting: userWaitingCount,
           active: userActiveCount,
           delayed: userDelayedCount,
           failed: userFailedCount,
+          cancelling: userCancellingCount,
         },
       },
     })
@@ -356,7 +301,17 @@ export const deletePendingJob = async (
     if (jobState === 'active') {
       const redis = getRedisClient()
       const key = getContentJobCancellationKey(jobId)
-      await redis.set(key, '1', 'EX', 3600)
+      try {
+        await Promise.race([
+          redis.set(key, '1', 'EX', 3600),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 2000)),
+        ])
+      } catch (error) {
+        logger.warn('Redis timeout setting cancellation key, continuing anyway', {
+          jobId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
       return res.status(200).json({
         status: 'success',
         message: 'Job cancellation requested',
@@ -370,7 +325,17 @@ export const deletePendingJob = async (
     await job.remove()
 
     const redis = getRedisClient()
-    await redis.del(getContentJobCancellationKey(jobId))
+    try {
+      await Promise.race([
+        redis.del(getContentJobCancellationKey(jobId)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 2000)),
+      ])
+    } catch (error) {
+      logger.warn('Redis timeout deleting cancellation key, continuing anyway', {
+        jobId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
 
     res.status(200).json({
       status: 'success',

@@ -52,6 +52,14 @@ npm run build
   - Constants: UPPER_SNAKE_CASE
 - **Organization**: Modular files, separate concerns (controllers → services), early returns
 
+## Working with AI
+
+We all use AI tools—that's normal and expected. What sets us apart as developers isn't whether we use AI, but how we use it. There are two critical skills: (1) our ability to drive the AI effectively, and (2) our ability to review and validate its output.
+
+When we review code, we don't want to feel like we're reviewing raw AI output that we could have generated ourselves. If we're doing the same review cycles with code that we'd do with AI-generated code, then we'll wonder why we couldn't just ask our AI to do it directly.
+
+Put in the work to validate AI output. Think through the entire picture, catch problems early, and give us something that reflects human intelligence—not just polished AI output. Review the code yourself, test it thoroughly, and ensure it fits the codebase context before submitting. That's what separates good developers from great ones in an AI-assisted world.
+
 ## Commit Format
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/):

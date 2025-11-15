@@ -1,6 +1,6 @@
 import React, { memo } from "react"
 
-import type { Memory, SearchResult } from "../types/memory.type"
+import type { Memory, MemoryType, SearchResult } from "../types/memory.type"
 
 interface MemorySearchResultCardProps {
   result: SearchResult
@@ -22,6 +22,45 @@ const getScoreColor = (score?: number) => {
   if (score >= 0.8) return "text-green-600"
   if (score >= 0.6) return "text-yellow-600"
   return "text-red-600"
+}
+
+const getMemoryTypeBadge = (type?: MemoryType | null) => {
+  if (!type) return null
+
+  const badgeStyles: Record<
+    MemoryType,
+    { bg: string; text: string; border: string }
+  > = {
+    FACT: {
+      bg: "bg-green-100",
+      text: "text-green-800",
+      border: "border-green-200",
+    },
+    PREFERENCE: {
+      bg: "bg-blue-100",
+      text: "text-blue-800",
+      border: "border-blue-200",
+    },
+    LOG_EVENT: {
+      bg: "bg-orange-100",
+      text: "text-orange-800",
+      border: "border-orange-200",
+    },
+    REFERENCE: {
+      bg: "bg-gray-100",
+      text: "text-gray-800",
+      border: "border-gray-200",
+    },
+  }
+
+  const style = badgeStyles[type]
+  return (
+    <span
+      className={`text-xs font-mono ${style.bg} ${style.text} px-2 py-0.5 border ${style.border} rounded`}
+    >
+      {type.replace("_", " ")}
+    </span>
+  )
 }
 
 const getSearchTypeBadge = (type?: string) => {
@@ -61,9 +100,12 @@ const MemorySearchResultCardComponent: React.FC<
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
-          <h3 className="text-sm font-mono font-semibold text-gray-900 mb-1">
-            {memory.title || "Untitled Memory"}
-          </h3>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="text-sm font-mono font-semibold text-gray-900">
+              {memory.title || "Untitled Memory"}
+            </h3>
+            {getMemoryTypeBadge(memory.memory_type)}
+          </div>
           <div className="flex items-center space-x-2 text-xs font-mono text-gray-500">
             <span>{formatDate(memory.created_at)}</span>
             <span>•</span>

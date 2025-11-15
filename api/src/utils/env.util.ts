@@ -35,20 +35,36 @@ export function getAllowedOrigins(): Set<string> {
   return origins
 }
 
-export function getRedisConnection() {
+interface RedisConnectionOptions {
+  url?: string
+  host?: string
+  port?: number
+  username?: string
+  password?: string
+  commandTimeout?: number
+}
+
+export function getRedisConnection(): RedisConnectionOptions {
+  const connectionOptions: RedisConnectionOptions = {}
+
   if (process.env.REDIS_URL) {
-    return { url: process.env.REDIS_URL } as const
+    connectionOptions.url = process.env.REDIS_URL
+  } else {
+    connectionOptions.host = process.env.REDIS_HOST || '127.0.0.1'
+    connectionOptions.port = Number(process.env.REDIS_PORT || 6379)
+    if (process.env.REDIS_USERNAME) {
+      connectionOptions.username = process.env.REDIS_USERNAME
+    }
+    if (process.env.REDIS_PASSWORD) {
+      connectionOptions.password = process.env.REDIS_PASSWORD
+    }
   }
-  const host = process.env.REDIS_HOST || '127.0.0.1'
-  const port = Number(process.env.REDIS_PORT || 6379)
-  const username = process.env.REDIS_USERNAME
-  const password = process.env.REDIS_PASSWORD
-  return {
-    host,
-    port,
-    username,
-    password,
-  } as const
+
+  // Increase command timeout to 10 seconds to handle long-running operations
+  // This prevents "command timed out" errors during lock renewal
+  connectionOptions.commandTimeout = Number(process.env.REDIS_COMMAND_TIMEOUT_MS || 10000)
+
+  return connectionOptions
 }
 
 export function getQueueLimiter() {

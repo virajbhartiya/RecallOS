@@ -279,13 +279,20 @@ export const aiProvider = {
   async generateContent(
     prompt: string,
     isSearchRequest: boolean = false,
-    userId?: string
+    userId?: string,
+    timeoutOverride?: number,
+    isEmailDraft: boolean = false
   ): Promise<string> {
     let result: string
     let modelUsed: string | undefined
 
     if (provider === 'gemini') {
-      const response = await geminiService.generateContent(prompt, isSearchRequest)
+      const response = await geminiService.generateContent(
+        prompt,
+        isSearchRequest,
+        timeoutOverride,
+        isEmailDraft
+      )
       result = response.text
       modelUsed = response.modelUsed
     } else {

@@ -199,7 +199,9 @@ export class GeminiService {
 
   async generateContent(
     prompt: string,
-    isSearchRequest: boolean = false
+    isSearchRequest: boolean = false,
+    timeoutOverride?: number,
+    isEmailDraft: boolean = false
   ): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
     this.ensureInit()
 
@@ -219,13 +221,19 @@ Return clean, readable plain text only.`
 
     let lastError: Error | GeminiError | undefined
     const originalModelIndex = this.currentModelIndex
-    // Search requests get high priority (10), processing tasks get normal priority (0)
-    const priority = isSearchRequest ? 10 : 0
+    // Priority: Search requests (10) > Email drafts (9) > Processing tasks (0)
+    const priority = isSearchRequest ? 10 : isEmailDraft ? 9 : 0
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
-        // Use longer timeout for search requests (5 minutes) vs processing (2 minutes)
-        const timeoutMs = isSearchRequest ? 300000 : 120000
+        // Use timeout override if provided, otherwise use longer timeout for search requests (5 minutes) vs processing (4 minutes for parallel AI calls)
+        // Memory processing now runs AI calls in parallel, so we need more time (4 minutes instead of 2)
+        const timeoutMs = timeoutOverride ?? (isSearchRequest ? 300000 : 240000)
+        // For email drafts, bypass rate limit to ensure immediate processing (user-initiated, time-sensitive)
+        // For search requests, also bypass for immediate response
+        // For normal processing, use rate limiting to respect API quotas
+        const shouldBypassRateLimit = isEmailDraft || isSearchRequest
+
         const response = await runWithRateLimit(
           () =>
             this.ai.models.generateContent({
@@ -233,8 +241,8 @@ Return clean, readable plain text only.`
               contents: enhancedPrompt,
             }),
           timeoutMs,
-          false, // don't bypass rate limit
-          priority // use priority for search requests
+          shouldBypassRateLimit, // Bypass queue for user-initiated requests (email drafts, search)
+          priority // Priority: search (10) > email drafts (9) > processing (0)
         )
         if (!response.text) throw new Error('No content generated from Gemini API')
 
@@ -390,7 +398,7 @@ Raw Content: ${rawText}
               model: this.getCurrentModel(),
               contents: prompt,
             }),
-          120000 // 2 minutes timeout
+          240000 // 4 minutes timeout (increased for parallel processing)
         )
         if (!res.text) throw new Error('No summary generated from Gemini API')
 
@@ -490,7 +498,7 @@ Return ONLY the JSON object:`
               model: this.getCurrentModel(),
               contents: prompt,
             }),
-          120000 // 2 minutes timeout
+          240000 // 4 minutes timeout (increased for parallel processing)
         )
         if (!res.text) throw new Error('No metadata response from Gemini API')
 
@@ -687,7 +695,7 @@ Be strict. Avoid weak or surface matches.
               model: this.getCurrentModel(),
               contents: prompt,
             }),
-          120000 // 2 minutes timeout
+          240000 // 4 minutes timeout (increased for parallel processing)
         )
         if (!res.text) throw new Error('No relationship data from Gemini')
 

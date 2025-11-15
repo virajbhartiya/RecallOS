@@ -19,6 +19,17 @@ interface ContextData {
   content_type?: string
 }
 
+type EmailDraftPayload = {
+  subject?: string
+  thread_text: string
+  provider?: string
+  existing_draft?: string
+  participants?: string[]
+  metadata?: Record<string, unknown>
+  url?: string
+  title?: string
+}
+
 async function getApiEndpoint(): Promise<string> {
   try {
     const result = await storage.sync.get([STORAGE_KEYS.API_ENDPOINT])
@@ -178,6 +189,57 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ]).finally(() => clearTimeout(timeout)) as Promise<T>
 }
 
+async function requestEmailDraft(payload: EmailDraftPayload) {
+  const apiBase = await getApiBaseUrl()
+  const endpoint = `${apiBase}/api/content/email/draft`
+
+  let authToken: string
+  try {
+    authToken = await requireAuthToken()
+  } catch (_error) {
+    throw new Error('Authentication required. Please log in through the Cognia web client.')
+  }
+
+  // Create AbortController for timeout
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 370000) // 6.17 minutes (slightly longer than server timeout)
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '')
+      throw new Error(
+        `Draft request failed (${response.status}): ${errorText || response.statusText}`
+      )
+    }
+
+    const result = await response.json()
+    if (!result?.success || !result.data) {
+      throw new Error('Draft service returned an unexpected response.')
+    }
+
+    return result.data as { subject: string; body: string; summary?: string }
+  } catch (error) {
+    clearTimeout(timeoutId)
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Request timeout - email draft took too long to generate')
+    }
+    throw error
+  }
+}
+
 async function sendToBackend(data: ContextData): Promise<void> {
   try {
     const enabled = await isExtensionEnabled()
@@ -320,6 +382,8 @@ runtime.onMessage.addListener(
     if (message?.type === MESSAGE_TYPES.CAPTURE_CONTEXT && message.data) {
       sendToBackend(message.data)
         .then(() => {
+          // Store last capture time
+          storage.local.set({ last_capture_time: Date.now() })
           sendResponse({ success: true, message: 'Context sent to backend' })
         })
         .catch(error => {
@@ -511,6 +575,46 @@ runtime.onMessage.addListener(
         }
       })()
       return true
+    }
+
+    if (message?.type === MESSAGE_TYPES.DRAFT_EMAIL_REPLY) {
+      // Capture sendResponse before async operation - Chrome message channel timeout is ~5 minutes
+      // We need to ensure response is sent before channel closes
+      const responseCallback = sendResponse
+      let responseSent = false
+
+      // Helper to ensure response is only sent once
+      const safeSendResponse = (response: any) => {
+        if (!responseSent) {
+          responseSent = true
+          try {
+            responseCallback(response)
+          } catch (err) {
+            console.error('[Cognia] Error sending response:', err)
+          }
+        }
+      }
+
+      ;(async () => {
+        try {
+          const payload = (message as any).payload as EmailDraftPayload
+          if (!payload || typeof payload.thread_text !== 'string') {
+            safeSendResponse({ success: false, error: 'Invalid payload' })
+            return
+          }
+
+          // Start the draft request
+          const data = await requestEmailDraft(payload)
+          safeSendResponse({ success: true, data })
+        } catch (error) {
+          safeSendResponse({
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to draft email reply',
+          })
+        }
+      })()
+
+      return true // Indicates we'll send response asynchronously
     }
 
     if (message?.type === MESSAGE_TYPES.PING) {

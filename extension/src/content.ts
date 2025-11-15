@@ -1,5 +1,6 @@
 import { getUserId, requireAuthToken } from '@/lib/userId'
 import { runtime, storage } from '@/lib/browser'
+import { MESSAGE_TYPES } from '@/lib/constants'
 
 interface ContextData {
   source: string
@@ -46,6 +47,34 @@ interface ContextData {
     readability_score?: number
   }
 }
+
+type EmailDraftPayload = {
+  subject?: string
+  thread_text: string
+  provider?: string
+  existing_draft?: string
+  participants?: string[]
+  url?: string
+  title?: string
+}
+
+type EmailDraftResponse = {
+  subject: string
+  body: string
+  summary?: string
+}
+
+type EmailDraftContext = {
+  provider: 'gmail' | 'outlook' | 'unknown'
+  subject: string
+  threadText: string
+  participants: string[]
+  composeElement?: HTMLElement
+  subjectElement?: HTMLInputElement | HTMLTextAreaElement
+  existingDraft?: string
+}
+
+const EMAIL_THREAD_CHAR_LIMIT = 15000
 let lastUrl = location.href
 let lastContent = ''
 let lastTitle = ''
@@ -749,7 +778,10 @@ async function sendContextToBackground() {
       type: privacyExtensionType,
       compatibility_mode: privacyExtensionDetected,
     }
-    runtime.sendMessage({ type: 'CAPTURE_CONTEXT', data: contextData }, _response => {})
+    runtime.sendMessage({ type: 'CAPTURE_CONTEXT', data: contextData }, _response => {
+      // Show capture indicator
+      showCaptureIndicator()
+    })
     lastCaptureTime = now
   } catch (_error) {}
 }
@@ -811,6 +843,17 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
       activityLevel,
       isMonitoring: !!captureInterval,
     })
+    return true
+  }
+  if (message.type === MESSAGE_TYPES.DRAFT_EMAIL_REPLY) {
+    handleDraftEmailRequest()
+      .then(result => sendResponse(result))
+      .catch(error =>
+        sendResponse({
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to draft email reply',
+        })
+      )
     return true
   }
 })
@@ -1005,6 +1048,729 @@ document.addEventListener('mousemove', () => {
     mouseMoveTimeout = null
   }, 3000)
 })
+
+let draftToastTimeout: ReturnType<typeof setTimeout> | null = null
+let draftToastElement: HTMLDivElement | null = null
+let draftPillElement: HTMLDivElement | null = null
+let draftPillObserver: MutationObserver | null = null
+let isDrafting = false
+
+async function handleDraftEmailRequest(): Promise<{ success: boolean; error?: string }> {
+  const context = extractEmailContext()
+  if (!context) {
+    return { success: false, error: 'No supported email thread detected on this page.' }
+  }
+
+  try {
+    showDraftToast('Drafting reply...', 'info')
+    const payload: EmailDraftPayload = {
+      subject: context.subject,
+      thread_text: context.threadText,
+      provider: context.provider,
+      existing_draft: context.existingDraft,
+      participants: context.participants,
+      url: window.location.href,
+      title: document.title,
+    }
+    const draft = await requestDraftFromBackground(payload)
+    const injection = injectEmailDraft(context, draft)
+
+    if (!injection.bodyApplied) {
+      if (copyTextToClipboard(draft.body)) {
+        showDraftToast('Draft copied to clipboard. Paste it into the compose box.', 'error')
+      } else {
+        showDraftToast('Unable to insert draft automatically.', 'error')
+      }
+      return { success: false, error: 'Could not insert draft automatically.' }
+    }
+
+    const subjectMessage = injection.subjectApplied ? '' : ' (Update subject manually if needed.)'
+    showDraftToast(`Draft inserted into compose box${subjectMessage}`, 'success')
+    return { success: true }
+  } catch (error) {
+    showDraftToast('Failed to draft reply.', 'error')
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to draft reply.',
+    }
+  }
+}
+
+function extractEmailContext(): EmailDraftContext | null {
+  const host = window.location.hostname
+  if (host.includes('mail.google')) {
+    return extractGmailContext()
+  }
+  if (
+    host.includes('outlook.') ||
+    host.includes('office.com') ||
+    host.includes('live.com') ||
+    host.includes('microsoft.com')
+  ) {
+    return extractOutlookContext()
+  }
+  return null
+}
+
+function extractGmailContext(): EmailDraftContext | null {
+  const subject =
+    document.querySelector('h2.hP')?.textContent?.trim() ||
+    (
+      document.querySelector('input[name="subjectbox"]') as HTMLInputElement | null
+    )?.value?.trim() ||
+    document.title ||
+    'No subject'
+
+  const messageNodes = Array.from(document.querySelectorAll('div[data-message-id]'))
+  const threadParts = messageNodes
+    .map(node => {
+      const sender =
+        node.querySelector('.gD')?.textContent?.trim() ||
+        node.querySelector('.g2')?.textContent?.trim() ||
+        ''
+      const timestamp = node.querySelector('.g3')?.textContent?.trim() || ''
+      const body =
+        node.querySelector('.a3s')?.textContent?.trim() ||
+        node
+          .querySelector('.a3s')
+          ?.innerHTML?.replace(/<[^>]+>/g, ' ')
+          .trim() ||
+        ''
+      if (!body) {
+        return ''
+      }
+      return `From: ${sender || 'Unknown'} ${timestamp}\n${body}`
+    })
+    .filter(Boolean)
+
+  const threadText = threadParts.join('\n\n---\n\n').substring(0, EMAIL_THREAD_CHAR_LIMIT)
+  if (!threadText) {
+    return null
+  }
+
+  const composeElement = Array.from(
+    document.querySelectorAll('div[aria-label="Message Body"], div[role="textbox"]')
+  ).find(
+    el => el.getAttribute('contenteditable') === 'true' && isElementVisible(el as HTMLElement)
+  ) as HTMLElement | undefined
+
+  const subjectElement = document.querySelector(
+    'input[name="subjectbox"]'
+  ) as HTMLInputElement | null
+
+  const participantSet = new Set<string>()
+  document.querySelectorAll('span.gD, span.g2, span.go').forEach(el => {
+    const name = el.textContent?.trim()
+    if (name) {
+      participantSet.add(name)
+    }
+  })
+
+  return {
+    provider: 'gmail',
+    subject,
+    threadText,
+    participants: Array.from(participantSet),
+    composeElement,
+    subjectElement: subjectElement || undefined,
+    existingDraft: composeElement?.textContent?.trim(),
+  }
+}
+
+function extractOutlookContext(): EmailDraftContext | null {
+  const subject =
+    document.querySelector('div[role="heading"][aria-level="1"]')?.textContent?.trim() ||
+    (
+      document.querySelector('input[aria-label*="subject"]') as HTMLInputElement | null
+    )?.value?.trim() ||
+    document.title ||
+    'No subject'
+
+  const messageNodes = Array.from(
+    document.querySelectorAll('[data-testid="messageBodyContent"], div[aria-label="Message body"]')
+  )
+
+  const threadParts = messageNodes
+    .filter(node => node.getAttribute('contenteditable') !== 'true')
+    .map(node => node.textContent?.trim() || '')
+    .filter(Boolean)
+
+  const threadText = threadParts.join('\n\n---\n\n').substring(0, EMAIL_THREAD_CHAR_LIMIT)
+  if (!threadText) {
+    return null
+  }
+
+  const composeElement = Array.from(
+    document.querySelectorAll('div[aria-label="Message body"]')
+  ).find(
+    el => el.getAttribute('contenteditable') === 'true' && isElementVisible(el as HTMLElement)
+  ) as HTMLElement | undefined
+
+  const subjectElement =
+    (document.querySelector('input[aria-label*="subject"]') as HTMLInputElement | null) ||
+    (document.querySelector('input[data-testid="subjectLine"]') as HTMLInputElement | null)
+
+  const participantSet = new Set<string>()
+  document
+    .querySelectorAll('[data-testid="messageHeaderFrom"] span, span[role="presentation"]')
+    .forEach(el => {
+      const text = el.textContent?.trim()
+      if (text) {
+        participantSet.add(text)
+      }
+    })
+
+  return {
+    provider: 'outlook',
+    subject,
+    threadText,
+    participants: Array.from(participantSet),
+    composeElement,
+    subjectElement: subjectElement || undefined,
+    existingDraft: composeElement?.textContent?.trim(),
+  }
+}
+
+function isElementVisible(element?: Element | null): element is HTMLElement {
+  if (!element) return false
+  const rect = element.getBoundingClientRect()
+  const style = window.getComputedStyle(element)
+  return (
+    rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none'
+  )
+}
+
+function injectEmailDraft(
+  context: EmailDraftContext,
+  draft: EmailDraftResponse
+): { bodyApplied: boolean; subjectApplied: boolean } {
+  let subjectApplied = false
+  if (context.subjectElement && draft.subject) {
+    subjectApplied = setSubjectValue(context.subjectElement, draft.subject)
+  }
+
+  let bodyApplied = false
+  if (context.composeElement) {
+    bodyApplied = setComposeBody(context.composeElement, draft.body)
+  }
+
+  return { bodyApplied, subjectApplied }
+}
+
+function setSubjectValue(
+  element: HTMLInputElement | HTMLTextAreaElement | undefined,
+  value: string
+): boolean {
+  if (!element) {
+    return false
+  }
+  try {
+    element.focus()
+    element.value = value
+    element.dispatchEvent(new Event('input', { bubbles: true }))
+    element.dispatchEvent(new Event('change', { bubbles: true }))
+    return true
+  } catch (_error) {
+    return false
+  }
+}
+
+function setComposeBody(element: HTMLElement, body: string): boolean {
+  try {
+    element.focus()
+    const html = convertPlainTextToHtml(body)
+    element.innerHTML = html
+    const inputEvent = new Event('input', { bubbles: true })
+    element.dispatchEvent(inputEvent)
+    const changeEvent = new Event('change', { bubbles: true })
+    element.dispatchEvent(changeEvent)
+    return true
+  } catch (_error) {
+    return false
+  }
+}
+
+function convertPlainTextToHtml(text: string): string {
+  return text
+    .split('\n')
+    .map(line => {
+      if (!line.trim()) {
+        return '<div><br></div>'
+      }
+      return `<div>${escapeHtml(line)}</div>`
+    })
+    .join('')
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+}
+
+function copyTextToClipboard(text: string): boolean {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).catch(() => {})
+      return true
+    }
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    const success = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return success
+  } catch (_error) {
+    return false
+  }
+}
+
+function showCaptureIndicator(): void {
+  // Remove existing indicator if any
+  const existing = document.getElementById('cognia-capture-indicator')
+  if (existing) {
+    existing.remove()
+  }
+
+  const indicator = document.createElement('div')
+  indicator.id = 'cognia-capture-indicator'
+  indicator.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: #000;
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    z-index: 999999;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: slideIn 0.3s ease-out;
+  `
+
+  const icon = document.createElement('span')
+  icon.textContent = '✓'
+  icon.style.cssText = 'font-size: 14px;'
+
+  const text = document.createElement('span')
+  text.textContent = 'Captured'
+
+  indicator.appendChild(icon)
+  indicator.appendChild(text)
+  document.body.appendChild(indicator)
+
+  // Add animation
+  const style = document.createElement('style')
+  style.textContent = `
+    @keyframes slideIn {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+  `
+  if (!document.head.querySelector('#cognia-capture-animations')) {
+    style.id = 'cognia-capture-animations'
+    document.head.appendChild(style)
+  }
+
+  // Auto-remove after 2 seconds
+  setTimeout(() => {
+    if (indicator.parentNode) {
+      indicator.style.animation = 'slideIn 0.3s ease-out reverse'
+      setTimeout(() => {
+        if (indicator.parentNode) {
+          indicator.parentNode.removeChild(indicator)
+        }
+      }, 300)
+    }
+  }, 2000)
+}
+
+function showDraftToast(message: string, variant: 'info' | 'success' | 'error' = 'info'): void {
+  if (draftToastTimeout && draftToastElement) {
+    draftToastElement.remove()
+    draftToastElement = null
+  }
+
+  const toast = document.createElement('div')
+  const colors: Record<typeof variant, { bg: string; text: string; border: string }> = {
+    info: { bg: 'rgba(59,130,246,0.95)', text: '#ffffff', border: 'rgba(59,130,246,0.4)' },
+    success: { bg: 'rgba(16,185,129,0.95)', text: '#ffffff', border: 'rgba(16,185,129,0.4)' },
+    error: { bg: 'rgba(239,68,68,0.95)', text: '#ffffff', border: 'rgba(239,68,68,0.4)' },
+  }
+  const palette = colors[variant]
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 2147483647;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: ${palette.bg};
+    color: ${palette.text};
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    border: 1px solid ${palette.border};
+    max-width: 320px;
+  `
+  toast.textContent = message
+  document.body.appendChild(toast)
+  draftToastElement = toast
+
+  draftToastTimeout = setTimeout(() => {
+    if (toast.parentNode) {
+      toast.parentNode.removeChild(toast)
+    }
+    draftToastElement = null
+  }, 5000)
+}
+
+function requestDraftFromBackground(payload: EmailDraftPayload): Promise<EmailDraftResponse> {
+  return new Promise((resolve, reject) => {
+    // Add timeout to prevent hanging
+    const timeout = setTimeout(() => {
+      reject(new Error('Request timeout - background script did not respond'))
+    }, 6000000) // 60 second timeout
+
+    runtime.sendMessage({ type: MESSAGE_TYPES.DRAFT_EMAIL_REPLY, payload }, response => {
+      clearTimeout(timeout)
+
+      // Check for Chrome extension API errors
+      if (chrome.runtime.lastError) {
+        reject(new Error(`Extension error: ${chrome.runtime.lastError.message}`))
+        return
+      }
+
+      if (!response) {
+        reject(new Error('No response from background script.'))
+        return
+      }
+
+      if (response.success && response.data) {
+        resolve(response.data as EmailDraftResponse)
+      } else {
+        reject(new Error(response.error || 'Draft request failed.'))
+      }
+    })
+  })
+}
+
+function initEmailDraftPill(): void {
+  const host = window.location.hostname
+  const isEmailSite =
+    host.includes('mail.google') ||
+    host.includes('outlook.') ||
+    host.includes('office.com') ||
+    host.includes('live.com') ||
+    host.includes('microsoft.com')
+
+  if (!isEmailSite) {
+    return
+  }
+
+  // Watch for compose fields appearing or being focused
+  const checkForComposeField = () => {
+    const context = extractEmailContext()
+    if (context?.composeElement && isElementVisible(context.composeElement)) {
+      ensureDraftPill(context.composeElement, context)
+    } else {
+      removeDraftPill()
+    }
+  }
+
+  // Check on focus events
+  document.addEventListener(
+    'focusin',
+    e => {
+      const target = e.target as HTMLElement
+      if (
+        target &&
+        (target.contentEditable === 'true' || target.closest('[contenteditable="true"]'))
+      ) {
+        setTimeout(checkForComposeField, 100)
+      }
+    },
+    true
+  )
+
+  // Check on input events (user typing)
+  document.addEventListener(
+    'input',
+    e => {
+      const target = e.target as HTMLElement
+      if (target && target.contentEditable === 'true') {
+        setTimeout(checkForComposeField, 100)
+      }
+    },
+    true
+  )
+
+  // Watch for DOM changes (Gmail/Outlook dynamically load compose windows)
+  if (!draftPillObserver) {
+    draftPillObserver = new MutationObserver(() => {
+      checkForComposeField()
+    })
+    draftPillObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: false,
+    })
+  }
+
+  // Initial check
+  setTimeout(checkForComposeField, 500)
+}
+
+function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContext): void {
+  // Check if pill already exists for this element
+  if (draftPillElement && document.body.contains(draftPillElement)) {
+    const existingCompose = (draftPillElement as any)._composeElement
+    if (existingCompose === composeElement) {
+      return // Same element, keep existing pill
+    }
+    // Different element, remove old pill
+    removeDraftPill()
+  }
+
+  // Create pill element - ChatGPT style
+  const pill = document.createElement('div')
+  pill.className = 'cognia-draft-pill'
+
+  // ChatGPT-style pill design - compact and small
+  pill.style.cssText = `
+    position: fixed;
+    z-index: 10000;
+    background: #f0f0f0;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 2px 8px;
+    cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    color: #1a1a1a;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    user-select: none;
+    pointer-events: auto;
+    white-space: nowrap;
+    line-height: 1.2;
+    height: 20px;
+  `
+
+  // Create icon (sparkle - smaller)
+  const icon = document.createElement('span')
+  icon.innerHTML = '✨'
+  icon.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    line-height: 1;
+    margin-top: -1px;
+  `
+
+  // Create text
+  const text = document.createElement('span')
+  text.textContent = 'Draft'
+  text.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+  `
+
+  pill.appendChild(icon)
+  pill.appendChild(text)
+
+  // Hover effects - ChatGPT style
+  pill.addEventListener('mouseenter', () => {
+    pill.style.background = '#e8e8e8'
+    pill.style.borderColor = '#d0d0d0'
+    pill.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.12)'
+  })
+  pill.addEventListener('mouseleave', () => {
+    pill.style.background = '#f0f0f0'
+    pill.style.borderColor = '#e0e0e0'
+    pill.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)'
+  })
+
+  // Click handler
+  pill.addEventListener('click', async e => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (isDrafting) {
+      return
+    }
+
+    isDrafting = true
+    pill.style.opacity = '0.7'
+    pill.style.cursor = 'wait'
+    text.textContent = '...'
+
+    try {
+      const currentContext = extractEmailContext()
+      if (!currentContext) {
+        text.textContent = 'Draft'
+        showDraftToast('No email thread detected.', 'error')
+        return
+      }
+
+      const payload: EmailDraftPayload = {
+        thread_text: currentContext.threadText,
+        subject: currentContext.subject,
+        provider: currentContext.provider,
+        participants: currentContext.participants,
+        existing_draft: currentContext.existingDraft,
+        url: window.location.href,
+        title: document.title,
+      }
+
+      const draft = await requestDraftFromBackground(payload)
+      const injection = injectEmailDraft(currentContext, draft)
+
+      if (!injection.bodyApplied) {
+        if (copyTextToClipboard(draft.body)) {
+          showDraftToast('Draft copied to clipboard. Paste it into the compose box.', 'error')
+        } else {
+          showDraftToast('Unable to insert draft automatically.', 'error')
+        }
+        return
+      }
+
+      const subjectMessage = injection.subjectApplied ? ' and subject updated' : ''
+      showDraftToast(`Draft inserted${subjectMessage}`, 'success')
+
+      // Update pill to show success state briefly
+      text.textContent = '✓'
+      pill.style.background = '#e8f5e9'
+      pill.style.borderColor = '#c8e6c9'
+      pill.style.color = '#2e7d32'
+
+      // Remove pill after successful draft
+      setTimeout(() => {
+        removeDraftPill()
+      }, 2000)
+    } catch (error) {
+      text.textContent = 'Draft'
+      showDraftToast('Failed to draft reply.', 'error')
+      console.error('[Cognia] Draft error:', error)
+    } finally {
+      isDrafting = false
+      if (text.textContent !== '✓') {
+        pill.style.opacity = '1'
+        pill.style.cursor = 'pointer'
+        pill.style.background = '#f0f0f0'
+        pill.style.borderColor = '#e0e0e0'
+        pill.style.color = '#1a1a1a'
+      }
+    }
+  })
+
+  // Position the pill relative to compose element
+  // Try to find the compose element's container (Gmail/Outlook use specific containers)
+  const composeContainer =
+    composeElement.closest('[role="dialog"], .aYF, .ms-ComposeHeader, .ms-ComposeBody') ||
+    composeElement.parentElement
+
+  const positionPill = () => {
+    if (!composeElement || !isElementVisible(composeElement)) {
+      removeDraftPill()
+      return
+    }
+
+    const rect = composeElement.getBoundingClientRect()
+
+    // Position at bottom-right corner of compose field, similar to ChatGPT
+    // ChatGPT positions it just above the bottom edge, slightly inset from the right
+    pill.style.position = 'fixed'
+
+    // Position relative to compose field's bottom-right, with small offset
+    const offsetX = 12 // pixels from right edge
+    const offsetY = 8 // pixels from bottom edge
+
+    pill.style.top = `${rect.bottom - offsetY - 24}px` // 24px is approximate pill height (compact)
+    pill.style.left = `${rect.right - offsetX - 70}px` // 70px is approximate pill width (compact)
+
+    // Ensure it doesn't go off-screen
+    const pillRect = pill.getBoundingClientRect()
+    if (pillRect.right > window.innerWidth - 10) {
+      pill.style.left = `${window.innerWidth - pillRect.width - 10}px`
+    }
+    if (pillRect.left < 10) {
+      pill.style.left = '10px'
+    }
+    if (pillRect.bottom > window.innerHeight - 10) {
+      pill.style.top = `${window.innerHeight - pillRect.height - 10}px`
+    }
+    if (pillRect.top < 10) {
+      pill.style.top = `${rect.top + 10}px`
+    }
+  }
+
+  positionPill()
+
+  // Append to compose container if it exists, otherwise to body
+  if (
+    composeContainer &&
+    composeContainer !== document.body &&
+    composeContainer instanceof HTMLElement
+  ) {
+    composeContainer.style.position = 'relative'
+    composeContainer.appendChild(pill)
+  } else {
+    document.body.appendChild(pill)
+  }
+
+  draftPillElement = pill
+
+  // Reposition on scroll/resize
+  const repositionHandler = () => {
+    if (isElementVisible(composeElement)) {
+      positionPill()
+    } else {
+      removeDraftPill()
+    }
+  }
+  window.addEventListener('scroll', repositionHandler, true)
+  window.addEventListener('resize', repositionHandler)
+
+  // Store handler for cleanup
+  ;(pill as any)._repositionHandler = repositionHandler
+  ;(pill as any)._composeElement = composeElement
+}
+
+function removeDraftPill(): void {
+  if (draftPillElement) {
+    const handler = (draftPillElement as any)._repositionHandler
+    if (handler) {
+      window.removeEventListener('scroll', handler, true)
+      window.removeEventListener('resize', handler)
+    }
+    draftPillElement.remove()
+    draftPillElement = null
+  }
+}
 
 // AI Chat Platform Detection
 type AIChatPlatform = 'chatgpt' | 'claude' | 'none'
@@ -1207,7 +1973,7 @@ async function getMemorySummary(query: string): Promise<string | null> {
     const finalSummary = summaryParts.join('\n\n')
     console.log('Cognia: Final memory summary:', finalSummary.substring(0, 200) + '...')
     return finalSummary
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error in getMemorySummary:', error)
     return null
   }
@@ -1217,7 +1983,7 @@ async function getApiEndpointForMemory(): Promise<string> {
   try {
     const result = await storage.sync.get(['apiEndpoint'])
     return result.apiEndpoint || 'http://localhost:3000/api/memory/process'
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error getting API endpoint:', error)
     return 'http://localhost:3000/api/memory/process'
   }
@@ -1310,7 +2076,7 @@ async function autoInjectMemories(userText: string): Promise<void> {
         cogniaIcon.style.animation = 'none'
       }
     }
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error auto-injecting memories:', error)
     if (cogniaIcon) {
       cogniaIcon.style.color = '#ef4444'
@@ -1473,7 +2239,7 @@ async function checkExtensionEnabled(): Promise<boolean> {
         resolve(response?.success ? response.enabled : true)
       })
     })
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error checking extension enabled state:', error)
     return true
   }
@@ -1486,7 +2252,7 @@ async function checkMemoryInjectionEnabled(): Promise<boolean> {
         resolve(response?.success ? response.enabled : true)
       })
     })
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error checking memory injection enabled state:', error)
     return true
   }
@@ -1567,7 +2333,7 @@ async function showCogniaStatus(): Promise<void> {
         ${extensionEnabled ? 'Memories are automatically injected as you type (1.5s delay).' : 'Extension is disabled. Click the popup to enable.'}
       </div>
     `
-  } catch (_error) {
+  } catch (error) {
     console.error('Cognia: Error checking status:', error)
     tooltip.innerHTML = `
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -2051,6 +2817,7 @@ function debugAIChatElements(): void {
 }
 
 initAIChatIntegration()
+initEmailDraftPill()
 
 document.addEventListener(
   'input',

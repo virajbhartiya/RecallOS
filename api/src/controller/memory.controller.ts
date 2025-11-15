@@ -4,7 +4,11 @@ import { createHash } from 'crypto'
 import { prisma } from '../lib/prisma.lib'
 import { aiProvider } from '../services/ai-provider.service'
 import { memoryMeshService } from '../services/memory-mesh.service'
-import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
+import { memoryIngestionService } from '../services/memory-ingestion.service'
+import { profileUpdateService } from '../services/profile-update.service'
+import { privacyService } from '../services/privacy.service'
+import { auditLogService } from '../services/audit-log.service'
+import { memoryRedactionService } from '../services/memory-redaction.service'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 
@@ -33,7 +37,139 @@ function hashUrl(url: string): string {
   return createHash('sha256').update(url).digest('hex')
 }
 
+const PROFILE_IMPORTANCE_THRESHOLD = Number(process.env.PROFILE_IMPORTANCE_THRESHOLD || 0.7)
+
 export class MemoryController {
+  static async getMemoryInbox(req: AuthenticatedRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, error: 'User not authenticated' })
+      }
+
+      const inboxMemories = await prisma.memory.findMany({
+        where: { user_id: req.user.id },
+        orderBy: { created_at: 'desc' },
+        take: 200,
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          url: true,
+          created_at: true,
+          importance_score: true,
+          page_metadata: true,
+          memory_type: true,
+          source: true,
+        },
+      })
+
+      const pending = inboxMemories.filter(memory => {
+        const metadata = memory.page_metadata as Record<string, unknown> | null
+        const clientFlags =
+          metadata &&
+          typeof metadata === 'object' &&
+          !Array.isArray(metadata) &&
+          'client_flags' in metadata
+            ? ((metadata as Record<string, unknown>).client_flags as Record<string, unknown>)
+            : undefined
+        const reviewed = typeof clientFlags?.reviewed === 'boolean' ? clientFlags.reviewed : false
+        return !reviewed
+      })
+
+      res.status(200).json({
+        success: true,
+        data: pending.map(memory => {
+          const metadata = memory.page_metadata as Record<string, unknown> | null
+          const clientFlags =
+            metadata &&
+            typeof metadata === 'object' &&
+            !Array.isArray(metadata) &&
+            'client_flags' in metadata
+              ? ((metadata as Record<string, unknown>).client_flags as Record<string, unknown>)
+              : {}
+          return {
+            id: memory.id,
+            title: memory.title,
+            summary: memory.summary,
+            url: memory.url,
+            created_at: memory.created_at,
+            importance_score: memory.importance_score,
+            memory_type: memory.memory_type,
+            source: memory.source,
+            client_flags: clientFlags,
+          }
+        }),
+      })
+    } catch (error) {
+      logger.error('Error fetching memory inbox:', error)
+      res.status(500).json({ success: false, error: 'Failed to load memory inbox' })
+    }
+  }
+
+  static async updateMemoryFlags(req: AuthenticatedRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ success: false, error: 'User not authenticated' })
+      }
+      const { memoryId } = req.params
+      const { reviewed, pinned } = req.body as { reviewed?: boolean; pinned?: boolean }
+
+      const memory = await prisma.memory.findFirst({
+        where: { id: memoryId, user_id: req.user.id },
+        select: { page_metadata: true },
+      })
+
+      if (!memory) {
+        return res.status(404).json({ success: false, error: 'Memory not found' })
+      }
+
+      const metadata =
+        memory.page_metadata && typeof memory.page_metadata === 'object'
+          ? (memory.page_metadata as Record<string, unknown>)
+          : {}
+      const clientFlagsRaw =
+        metadata.client_flags && typeof metadata.client_flags === 'object'
+          ? (metadata.client_flags as Record<string, unknown>)
+          : {}
+
+      const updatedFlags = { ...clientFlagsRaw }
+      if (typeof reviewed === 'boolean') {
+        updatedFlags.reviewed = reviewed
+        if (reviewed) {
+          updatedFlags.reviewed_at = new Date().toISOString()
+        }
+      }
+      if (typeof pinned === 'boolean') {
+        updatedFlags.pinned = pinned
+      }
+
+      const updatedMetadata = JSON.parse(
+        JSON.stringify({
+          ...metadata,
+          client_flags: updatedFlags,
+        })
+      ) as Prisma.JsonValue
+
+      await prisma.memory.update({
+        where: { id: memoryId },
+        data: {
+          page_metadata: updatedMetadata,
+        },
+      })
+
+      res.status(200).json({
+        success: true,
+        data: {
+          memoryId,
+          client_flags: updatedFlags,
+        },
+      })
+    } catch (error) {
+      logger.error('Error updating memory flags:', error)
+      res.status(500).json({ success: false, error: 'Failed to update memory flags' })
+    }
+  }
+
   static async processRawContent(req: AuthenticatedRequest, res: Response) {
     try {
       const { content, url, title, metadata } = req.body
@@ -62,34 +198,54 @@ export class MemoryController {
         contentLen: typeof content === 'string' ? content.length : undefined,
       })
 
-      // Exact duplicate check on canonicalized content per user before expensive AI calls
-      const canonicalText = normalizeText(content)
-      const canonicalHash = hashCanonical(canonicalText)
+      // Check privacy settings for this domain
+      if (url && typeof url === 'string') {
+        const domain = privacyService.extractDomain(url)
+        const shouldBlock = await privacyService.shouldBlockCapture(userId, domain)
 
-      const existingByCanonical = await prisma.memory.findFirst({
-        where: { user_id: userId, canonical_hash: canonicalHash },
-        select: {
-          id: true,
-          title: true,
-          url: true,
-          timestamp: true,
-          created_at: true,
-          summary: true,
-          content: true,
-          source: true,
-          page_metadata: true,
-          canonical_text: true,
-          canonical_hash: true,
-        },
+        if (shouldBlock) {
+          logger.log('[memory/process] blocked_by_privacy', {
+            userId,
+            domain,
+            url: url.slice(0, 200),
+          })
+          return res.status(403).json({
+            success: false,
+            error: 'Content capture is blocked for this domain',
+            domain,
+          })
+        }
+      }
+
+      const metadataPayload =
+        metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+          ? (metadata as Record<string, unknown>)
+          : undefined
+
+      const canonicalData = memoryIngestionService.canonicalizeContent(content, url)
+
+      const duplicateCheck = await memoryIngestionService.findDuplicateMemory({
+        userId,
+        canonicalHash: canonicalData.canonicalHash,
+        canonicalText: canonicalData.canonicalText,
+        url,
       })
 
-      if (existingByCanonical) {
+      if (duplicateCheck) {
+        const merged = await memoryIngestionService.mergeDuplicateMemory(
+          duplicateCheck.memory,
+          metadataPayload,
+          undefined
+        )
         const serializedExisting = {
-          ...existingByCanonical,
-          timestamp: existingByCanonical.timestamp
-            ? existingByCanonical.timestamp.toString()
-            : null,
+          ...merged,
+          timestamp: merged.timestamp ? merged.timestamp.toString() : null,
         }
+        logger.log('[memory/process] duplicate_short_circuit', {
+          reason: duplicateCheck.reason,
+          memoryId: merged.id,
+          userId,
+        })
         return res.status(200).json({
           success: true,
           message: 'Duplicate memory detected, returning existing record',
@@ -101,75 +257,14 @@ export class MemoryController {
         })
       }
 
-      // Fallback: Check for URL-based duplicates within the last hour (for dynamic content)
-      if (url && url !== 'unknown') {
-        const normalizedUrl = normalizeUrl(url)
-        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000)
-
-        const recentMemories = await prisma.memory.findMany({
-          where: {
-            user_id: userId,
-            created_at: { gte: oneHourAgo },
-          },
-          select: {
-            id: true,
-            title: true,
-            url: true,
-            timestamp: true,
-            created_at: true,
-            summary: true,
-            content: true,
-            source: true,
-            page_metadata: true,
-            canonical_text: true,
-            canonical_hash: true,
-          },
-          orderBy: { created_at: 'desc' },
-          take: 50,
-        })
-
-        for (const existingMemory of recentMemories) {
-          const existingUrl = existingMemory.url
-          if (
-            existingUrl &&
-            typeof existingUrl === 'string' &&
-            normalizeUrl(existingUrl) === normalizedUrl
-          ) {
-            const existingCanonical = normalizeText(existingMemory.content || '')
-            const similarity = calculateSimilarity(canonicalText, existingCanonical)
-
-            if (similarity > 0.9) {
-              const serializedExisting = {
-                ...existingMemory,
-                timestamp: existingMemory.timestamp ? existingMemory.timestamp.toString() : null,
-              }
-              logger.log('[memory/process] url_duplicate_detected', {
-                existingMemoryId: existingMemory.id,
-                similarity,
-                userId: userId,
-              })
-              return res.status(200).json({
-                success: true,
-                message: 'Duplicate memory detected by URL similarity, returning existing record',
-                data: {
-                  userId: userId,
-                  memory: serializedExisting,
-                  isDuplicate: true,
-                },
-              })
-            }
-          }
-        }
-      }
-
       const aiStart = Date.now()
       logger.log('[memory/process] ai_start', {
         ts: new Date().toISOString(),
         tasks: ['summarizeContent', 'extractContentMetadata'],
       })
       const [summaryResult, extractedMetadataResult] = await Promise.all([
-        aiProvider.summarizeContent(content, metadata, userId),
-        aiProvider.extractContentMetadata(content, metadata, userId),
+        aiProvider.summarizeContent(content, metadataPayload, userId),
+        aiProvider.extractContentMetadata(content, metadataPayload, userId),
       ])
       type MetadataResult =
         | {
@@ -218,53 +313,54 @@ export class MemoryController {
 
       const urlHash = hashUrl(url || 'unknown')
 
-      const timestamp = Math.floor(Date.now() / 1000)
-
-      // Retain legacy checks but canonical already ensures exact duplicate prevention
-
       const dbCreateStart = Date.now()
       let memory
       try {
+        const extractedMetadataRecord =
+          extractedMetadata && typeof extractedMetadata === 'object'
+            ? (extractedMetadata as Record<string, unknown>)
+            : undefined
+
+        const memoryCreateInput = memoryIngestionService.buildMemoryCreatePayload({
+          userId,
+          title,
+          url,
+          source: (metadataPayload?.source as string | undefined) || undefined,
+          content,
+          summary,
+          metadata: metadataPayload,
+          extractedMetadata: extractedMetadataRecord,
+          canonicalText: canonicalData.canonicalText,
+          canonicalHash: canonicalData.canonicalHash,
+        })
+
         memory = await prisma.memory.create({
-          data: {
-            user_id: userId,
-            source: metadata?.source || 'extension',
-            url: url || 'unknown',
-            title: title || 'Untitled',
-            content: content,
-            summary: summary,
-            canonical_text: canonicalText,
-            canonical_hash: canonicalHash,
-            timestamp: BigInt(timestamp),
-            full_content: content,
-            page_metadata: {
-              ...metadata,
-              extracted_metadata: extractedMetadata,
-              topics: 'topics' in extractedMetadata ? extractedMetadata.topics : undefined,
-              categories:
-                'categories' in extractedMetadata ? extractedMetadata.categories : undefined,
-              key_points:
-                'keyPoints' in extractedMetadata ? extractedMetadata.keyPoints : undefined,
-              sentiment: 'sentiment' in extractedMetadata ? extractedMetadata.sentiment : undefined,
-              importance:
-                'importance' in extractedMetadata ? extractedMetadata.importance : undefined,
-              searchable_terms:
-                'searchableTerms' in extractedMetadata
-                  ? extractedMetadata.searchableTerms
-                  : undefined,
-            },
-          },
+          data: memoryCreateInput,
         })
         logger.log('[memory/process] db_memory_created', {
           ms: Date.now() - dbCreateStart,
           memoryId: memory.id,
           userId: userId,
         })
+
+        // Log audit event for memory capture
+        if (url && typeof url === 'string') {
+          auditLogService
+            .logMemoryCapture(userId, memory.id, url, {
+              ipAddress: req.ip,
+              userAgent: req.get('user-agent'),
+            })
+            .catch(err => {
+              logger.warn('[memory/process] audit_log_failed', {
+                error: err instanceof Error ? err.message : String(err),
+              })
+            })
+        }
       } catch (createError) {
         const error = createError as PrismaError
-        if (error.code === 'P2002') {
+        if (error.code === 'P2002' && canonicalData.canonicalHash) {
           const existingMemory = await prisma.memory.findFirst({
-            where: { user_id: userId, canonical_hash: canonicalHash },
+            where: { user_id: userId, canonical_hash: canonicalData.canonicalHash },
             select: {
               id: true,
               title: true,
@@ -303,8 +399,12 @@ export class MemoryController {
         throw createError
       }
 
+      // Return response immediately, process heavy operations in background
+      logger.log('[memory/process] done', { memoryId: memory.id })
+
+      // Process heavy operations in background (non-blocking)
       setImmediate(async () => {
-        // Always create snapshot even if mesh processing fails
+        // Create snapshot
         try {
           const snapStart = Date.now()
           const summaryHash = '0x' + createHash('sha256').update(summary).digest('hex')
@@ -325,6 +425,7 @@ export class MemoryController {
           logger.error(`Error creating snapshot for memory ${memory.id}:`, snapshotError)
         }
 
+        // Process mesh (embeddings + relations) in background
         try {
           const meshStart = Date.now()
           logger.log('[memory/process] mesh_start', { memoryId: memory.id, userId: userId })
@@ -336,8 +437,23 @@ export class MemoryController {
         } catch (meshError) {
           logger.error(`Error processing memory ${memory.id} for mesh:`, meshError)
         }
+
+        // Update profile if needed
+        try {
+          if ((memory.importance_score || 0) >= PROFILE_IMPORTANCE_THRESHOLD) {
+            const shouldUpdate = await profileUpdateService.shouldUpdateProfile(userId, 3)
+            if (shouldUpdate) {
+              logger.log('[memory/process] profile_update_triggered', {
+                memoryId: memory.id,
+                userId,
+              })
+              await profileUpdateService.updateUserProfile(userId)
+            }
+          }
+        } catch (profileError) {
+          logger.error(`[memory/process] profile update failed for ${memory.id}`, profileError)
+        }
       })
-      logger.log('[memory/process] done', { memoryId: memory.id })
       res.status(200).json({
         success: true,
         message: 'Content processed and stored successfully',
@@ -627,9 +743,72 @@ export class MemoryController {
         })
       }
 
+      const domain = memory.url ? privacyService.extractDomain(memory.url) : undefined
+
+      // Delete from Qdrant
+      try {
+        const { qdrantClient, COLLECTION_NAME } = await import('../lib/qdrant.lib')
+        await qdrantClient.delete(COLLECTION_NAME, {
+          filter: {
+            must: [{ key: 'memory_id', match: { value: memoryId } }],
+          },
+        })
+        logger.log('[memory/delete] qdrant_deleted', { memoryId })
+      } catch (qdrantError) {
+        logger.warn('[memory/delete] qdrant_delete_failed', {
+          error: qdrantError instanceof Error ? qdrantError.message : String(qdrantError),
+          memoryId,
+        })
+        // Continue with deletion even if Qdrant delete fails
+      }
+
+      // Clear search cache entries that might reference this memory
+      try {
+        const { getRedisClient } = await import('../lib/redis.lib')
+        const redis = getRedisClient()
+        // Get all cache keys (this is a simple approach - in production you might want a more efficient method)
+        const keys = await redis.keys('search_cache:*')
+        for (const key of keys) {
+          const cached = await redis.get(key)
+          if (cached) {
+            try {
+              const data = JSON.parse(cached) as { results?: Array<{ memory_id?: string }> }
+              if (data.results && Array.isArray(data.results)) {
+                const hasMemory = data.results.some(r => r.memory_id === memoryId)
+                if (hasMemory) {
+                  await redis.del(key)
+                  logger.log('[memory/delete] cache_cleared', { key, memoryId })
+                }
+              }
+            } catch {
+              // Invalid cache entry, skip
+            }
+          }
+        }
+      } catch (cacheError) {
+        logger.warn('[memory/delete] cache_clear_failed', {
+          error: cacheError instanceof Error ? cacheError.message : String(cacheError),
+          memoryId,
+        })
+        // Continue with deletion even if cache clear fails
+      }
+
+      // Delete from database
       await prisma.memory.delete({
         where: { id: memoryId },
       })
+
+      // Log audit event
+      auditLogService
+        .logMemoryDelete(req.user!.id, memoryId, domain, {
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent'),
+        })
+        .catch(err => {
+          logger.warn('[memory/delete] audit_log_failed', {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
 
       res.status(200).json({
         success: true,
@@ -643,6 +822,115 @@ export class MemoryController {
       res.status(500).json({
         success: false,
         error: error.message || 'Failed to delete memory',
+      })
+    }
+  }
+
+  static async redactMemory(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { memoryId } = req.params
+      const { fields } = req.body
+
+      if (!memoryId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Memory ID is required',
+        })
+      }
+
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Fields to redact are required (array of: url, content, title, summary)',
+        })
+      }
+
+      const validFields = ['url', 'content', 'title', 'summary']
+      const invalidFields = fields.filter(f => !validFields.includes(f))
+      if (invalidFields.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid fields: ${invalidFields.join(', ')}. Valid fields are: ${validFields.join(', ')}`,
+        })
+      }
+
+      const redacted = await memoryRedactionService.redactMemoryFields(
+        req.user!.id,
+        memoryId,
+        fields,
+        {
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent'),
+        }
+      )
+
+      res.status(200).json({
+        success: true,
+        message: 'Memory fields redacted successfully',
+        data: {
+          memoryId: redacted.id,
+          fieldsRedacted: fields,
+        },
+      })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to redact memory'
+      logger.error('Error redacting memory:', error)
+      res.status(500).json({
+        success: false,
+        error: errorMessage,
+      })
+    }
+  }
+
+  static async redactDomainMemories(req: AuthenticatedRequest, res: Response) {
+    try {
+      const { domain, fields } = req.body
+
+      if (!domain || typeof domain !== 'string') {
+        return res.status(400).json({
+          success: false,
+          error: 'Domain is required',
+        })
+      }
+
+      if (!fields || !Array.isArray(fields) || fields.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'Fields to redact are required (array of: url, content, title, summary)',
+        })
+      }
+
+      const validFields = ['url', 'content', 'title', 'summary']
+      const invalidFields = fields.filter(f => !validFields.includes(f))
+      if (invalidFields.length > 0) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid fields: ${invalidFields.join(', ')}. Valid fields are: ${validFields.join(', ')}`,
+        })
+      }
+
+      const result = await memoryRedactionService.redactDomainMemories(
+        req.user!.id,
+        domain,
+        fields,
+        {
+          ipAddress: req.ip,
+          userAgent: req.get('user-agent'),
+        }
+      )
+
+      res.status(200).json({
+        success: true,
+        message: 'Domain memories redacted successfully',
+        data: result,
+      })
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to redact domain memories'
+      logger.error('Error redacting domain memories:', error)
+      res.status(500).json({
+        success: false,
+        error: errorMessage,
       })
     }
   }

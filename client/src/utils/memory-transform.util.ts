@@ -1,4 +1,4 @@
-import type { Memory, SearchResult } from "../types/memory.type"
+import type { Memory, MemoryType, SearchResult } from "../types/memory.type"
 
 interface ApiSearchResult {
   memory_id: string
@@ -16,6 +16,7 @@ interface ApiSearchResult {
   access_count?: number
   last_accessed?: string
   score: number
+  memory_type?: MemoryType | null
 }
 
 export function transformApiSearchResult(
@@ -71,6 +72,7 @@ export function transformApiSearchResult(
       importance_score: result.importance_score,
       access_count: result.access_count || 0,
       last_accessed: result.last_accessed || new Date().toISOString(),
+      memory_type: result.memory_type || null,
     },
     similarity_score: result.score,
     relevance_score: result.score,
