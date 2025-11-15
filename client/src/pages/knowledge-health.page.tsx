@@ -172,7 +172,43 @@ export const KnowledgeHealth: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <header className="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 sm:gap-6">
+              <button
+                onClick={() => navigate("/")}
+                className="text-sm font-medium text-gray-700 hover:text-black transition-colors"
+              >
+                ← Home
+              </button>
+              <div className="h-4 w-px bg-gray-300"></div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold text-lg font-mono">
+                  K
+                </div>
+                <div className="text-sm font-medium text-gray-900">Knowledge Health</div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-wrap gap-2">
+              <button
+                onClick={() => navigate("/inbox")}
+                className="px-2 sm:px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors whitespace-nowrap"
+              >
+                Inbox
+              </button>
+              <button
+                onClick={() => navigate("/memories")}
+                className="px-2 sm:px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors whitespace-nowrap"
+              >
+                Memories
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+      <div className="h-14" aria-hidden="true" />
+      <div className="max-w-7xl mx-auto px-4 py-8 overflow-x-hidden">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-mono font-bold text-gray-900 mb-2">
@@ -203,7 +239,7 @@ export const KnowledgeHealth: React.FC = () => {
 
         {/* Key Metrics Grid */}
         {latestScore && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8 overflow-hidden">
             <div className="bg-white border border-gray-200 p-4">
               <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
                 VELOCITY
@@ -310,27 +346,27 @@ export const KnowledgeHealth: React.FC = () => {
         )}
 
         {/* Achievements */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="bg-white border border-gray-200 p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8 overflow-hidden">
+          <div className="bg-white border border-gray-200 p-6 overflow-hidden">
             <div className="text-sm font-mono text-gray-700 font-semibold uppercase tracking-wide mb-4">
               [UNLOCKED ACHIEVEMENTS] ({unlockedAchievements.length})
             </div>
             {unlockedAchievements.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-3 max-h-96 overflow-y-auto">
                 {unlockedAchievements.map((achievement) => (
                   <div
                     key={achievement.id}
-                    className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded"
+                    className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded gap-2"
                   >
-                    <div>
-                      <div className="text-sm font-mono font-semibold text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-mono font-semibold text-gray-900 truncate">
                         {achievement.badge_name}
                       </div>
-                      <div className="text-xs text-gray-600">
+                      <div className="text-xs text-gray-600 truncate">
                         {achievement.badge_type}
                       </div>
                     </div>
-                    <div className="text-xs font-mono text-gray-500">
+                    <div className="text-xs font-mono text-gray-500 flex-shrink-0">
                       {new Date(achievement.unlocked_at!).toLocaleDateString()}
                     </div>
                   </div>
@@ -343,34 +379,37 @@ export const KnowledgeHealth: React.FC = () => {
             )}
           </div>
 
-          <div className="bg-white border border-gray-200 p-6">
+          <div className="bg-white border border-gray-200 p-6 overflow-hidden">
             <div className="text-sm font-mono text-gray-700 font-semibold uppercase tracking-wide mb-4">
               [IN PROGRESS] ({inProgressAchievements.length})
             </div>
             {inProgressAchievements.length > 0 ? (
-              <div className="space-y-3">
-                {inProgressAchievements.map((achievement) => (
-                  <div
-                    key={achievement.id}
-                    className="p-3 bg-yellow-50 border border-yellow-200 rounded"
-                  >
-                    <div className="text-sm font-mono font-semibold text-gray-900 mb-1">
-                      {achievement.badge_name}
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                {inProgressAchievements.map((achievement) => {
+                  const progressPercent = Math.min(achievement.progress * 100, 100)
+                  return (
+                    <div
+                      key={achievement.id}
+                      className="p-3 bg-yellow-50 border border-yellow-200 rounded"
+                    >
+                      <div className="text-sm font-mono font-semibold text-gray-900 mb-1 truncate">
+                        {achievement.badge_name}
+                      </div>
+                      <div className="text-xs text-gray-600 mb-2 truncate">
+                        {achievement.badge_type}
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-yellow-600 h-2 rounded-full transition-all"
+                          style={{ width: `${progressPercent}%`, maxWidth: '100%' }}
+                        />
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {progressPercent.toFixed(0)}% complete
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-600 mb-2">
-                      {achievement.badge_type}
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-yellow-600 h-2 rounded-full"
-                        style={{ width: `${achievement.progress * 100}%` }}
-                      />
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {(achievement.progress * 100).toFixed(0)}% complete
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="text-sm text-gray-500 font-mono">
@@ -382,36 +421,36 @@ export const KnowledgeHealth: React.FC = () => {
 
         {/* Historical Scores Chart */}
         {historicalScores.length > 0 && (
-          <div className="bg-white border border-gray-200 p-6 mb-8">
+          <div className="bg-white border border-gray-200 p-6 mb-8 overflow-hidden">
             <div className="text-sm font-mono text-gray-700 font-semibold uppercase tracking-wide mb-4">
               [HISTORICAL TRENDS]
             </div>
-            <div className="space-y-4">
+            <div className="space-y-4 overflow-x-auto">
               {historicalScores.slice(0, 6).map((score, idx) => (
-                <div key={score.id} className="flex items-center gap-4">
-                  <div className="text-xs font-mono text-gray-600 w-24">
+                <div key={score.id} className="flex items-center gap-4 min-w-0">
+                  <div className="text-xs font-mono text-gray-600 w-24 flex-shrink-0">
                     {new Date(score.period_start).toLocaleDateString()}
                   </div>
-                  <div className="flex-1 grid grid-cols-4 gap-2">
-                    <div className="text-xs">
+                  <div className="flex-1 grid grid-cols-4 gap-2 min-w-0">
+                    <div className="text-xs truncate">
                       <span className="text-gray-500">V:</span>{" "}
                       <span className={getScoreColor(score.velocity_score)}>
                         {(score.velocity_score * 100).toFixed(0)}%
                       </span>
                     </div>
-                    <div className="text-xs">
+                    <div className="text-xs truncate">
                       <span className="text-gray-500">I:</span>{" "}
                       <span className={getScoreColor(score.impact_score)}>
                         {(score.impact_score * 100).toFixed(0)}%
                       </span>
                     </div>
-                    <div className="text-xs">
+                    <div className="text-xs truncate">
                       <span className="text-gray-500">D:</span>{" "}
                       <span className={getScoreColor(score.diversity_index)}>
                         {(score.diversity_index * 100).toFixed(0)}%
                       </span>
                     </div>
-                    <div className="text-xs">
+                    <div className="text-xs truncate">
                       <span className="text-gray-500">C:</span>{" "}
                       <span className={getScoreColor(score.consistency_score)}>
                         {(score.consistency_score * 100).toFixed(0)}%

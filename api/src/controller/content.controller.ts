@@ -213,7 +213,7 @@ export const getPendingJobs = async (
     const delayedJobs = delayed.map(job => ({ job, status: 'delayed' as const }))
     const failedJobs = failed.map(job => ({ job, status: 'failed' as const }))
 
-    let allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs, ...failedJobs]
+    const allJobs = [...waitingJobs, ...activeJobs, ...delayedJobs, ...failedJobs]
 
     // Filter jobs to only show current user's jobs
     const userJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)

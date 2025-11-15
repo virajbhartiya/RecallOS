@@ -87,15 +87,34 @@ export const Inbox = () => {
   return (
     <div className="min-h-screen bg-white">
       <header className="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
-          <button
-            onClick={() => navigate("/")}
-            className="text-sm font-medium text-gray-700 hover:text-black transition-colors"
-          >
-            ← Back
-          </button>
-          <div className="text-sm font-semibold text-gray-900">Memory Inbox</div>
-          <div className="text-xs font-mono text-gray-500">{items.length} pending</div>
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 sm:gap-6">
+              <button
+                onClick={() => navigate("/")}
+                className="text-sm font-medium text-gray-700 hover:text-black transition-colors"
+              >
+                ← Home
+              </button>
+              <div className="h-4 w-px bg-gray-300"></div>
+              <div className="text-sm font-semibold text-gray-900">Memory Inbox</div>
+              <div className="text-xs font-mono text-gray-500">{items.length} pending</div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => navigate("/knowledge-health")}
+                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
+              >
+                Knowledge Health
+              </button>
+              <button
+                onClick={() => navigate("/memories")}
+                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
+              >
+                Memories
+              </button>
+            </div>
+          </div>
         </div>
       </header>
       <div className="h-14" aria-hidden="true" />

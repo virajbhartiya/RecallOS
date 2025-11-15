@@ -115,18 +115,32 @@ export const Analytics: React.FC = () => {
                 </div>
               </div>
             </div>
-            <button
-              onClick={() => (window.location.href = "/insights")}
-              className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
-            >
-              Insights
-            </button>
-            <button
-              onClick={() => (window.location.href = "/memories")}
-              className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
-            >
-              Memories
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => (window.location.href = "/inbox")}
+                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
+              >
+                Inbox
+              </button>
+              <button
+                onClick={() => (window.location.href = "/knowledge-health")}
+                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
+              >
+                Knowledge Health
+              </button>
+              <button
+                onClick={() => (window.location.href = "/insights")}
+                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
+              >
+                Insights
+              </button>
+              <button
+                onClick={() => (window.location.href = "/memories")}
+                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
+              >
+                Memories
+              </button>
+            </div>
           </div>
         </div>
       </header>

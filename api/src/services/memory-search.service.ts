@@ -888,7 +888,7 @@ export async function searchMemories(params: {
     profileText: profileContext,
   })
 
-  let context: string | undefined = contextArtifacts.text
+  const context: string | undefined = contextArtifacts.text
   const contextBlocks = contextArtifacts.blocks
 
   if (!contextOnly) {
