@@ -1,6 +1,6 @@
 import { prisma } from '../lib/prisma.lib'
 import { logger } from '../utils/logger.util'
-import { Prisma } from '@prisma/client'
+import { Prisma, MemoryType } from '@prisma/client'
 
 export type ExportBundle = {
   version: string
@@ -253,7 +253,7 @@ export class ExportImportService {
               timestamp: BigInt(memory.timestamp),
               created_at: new Date(memory.created_at),
               page_metadata: memory.page_metadata,
-              memory_type: memory.memory_type as any,
+              memory_type: memory.memory_type as MemoryType,
               importance_score: memory.importance_score,
               confidence_score: memory.confidence_score,
               source_app: memory.source_app,

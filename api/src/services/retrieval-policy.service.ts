@@ -37,7 +37,7 @@ const POLICY_MAP: Record<RetrievalPolicyName, RetrievalPolicy> = {
     recencyHalfLifeDays: 14,
     maxResults: 15,
     timeRangeDays: 45,
-    allowedTypes: ['PROJECT', 'LOG_EVENT'],
+    allowedTypes: ['LOG_EVENT'],
     contextBudget: 2200,
   },
   profile: {
@@ -60,7 +60,7 @@ const POLICY_MAP: Record<RetrievalPolicyName, RetrievalPolicy> = {
     recencyHalfLifeDays: 10,
     maxResults: 8,
     timeRangeDays: 14,
-    allowedTypes: ['LOG_EVENT', 'PROJECT'],
+    allowedTypes: ['LOG_EVENT'],
     contextBudget: 1200,
   },
   insight: {

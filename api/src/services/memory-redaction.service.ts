@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma.lib'
 import { logger } from '../utils/logger.util'
 import { privacyService } from './privacy.service'
 import { auditLogService } from './audit-log.service'
+import { Prisma } from '@prisma/client'
 
 export class MemoryRedactionService {
   /**
@@ -21,7 +22,7 @@ export class MemoryRedactionService {
       throw new Error('Memory not found or access denied')
     }
 
-    const updates: any = {}
+    const updates: Prisma.MemoryUpdateInput = {}
 
     if (fieldsToRedact.includes('url')) {
       updates.url = '[REDACTED]'
@@ -94,7 +95,7 @@ export class MemoryRedactionService {
 
     const results = await Promise.all(
       memories.map(memory =>
-        this.redactMemoryFields(userId, memory.id, fieldsToRedact, options).catch((err): any => {
+        this.redactMemoryFields(userId, memory.id, fieldsToRedact, options).catch((err): null => {
           logger.warn('[redaction] failed_to_redact_memory', {
             memoryId: memory.id,
             error: err instanceof Error ? err.message : String(err),

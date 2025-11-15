@@ -35,8 +35,17 @@ export function getAllowedOrigins(): Set<string> {
   return origins
 }
 
-export function getRedisConnection() {
-  const connectionOptions: any = {}
+interface RedisConnectionOptions {
+  url?: string
+  host?: string
+  port?: number
+  username?: string
+  password?: string
+  commandTimeout?: number
+}
+
+export function getRedisConnection(): RedisConnectionOptions {
+  const connectionOptions: RedisConnectionOptions = {}
 
   if (process.env.REDIS_URL) {
     connectionOptions.url = process.env.REDIS_URL

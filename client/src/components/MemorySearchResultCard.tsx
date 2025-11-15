@@ -41,11 +41,6 @@ const getMemoryTypeBadge = (type?: MemoryType | null) => {
       text: "text-blue-800",
       border: "border-blue-200",
     },
-    PROJECT: {
-      bg: "bg-purple-100",
-      text: "text-purple-800",
-      border: "border-purple-200",
-    },
     LOG_EVENT: {
       bg: "bg-orange-100",
       text: "text-orange-800",

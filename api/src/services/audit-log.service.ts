@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.lib'
 import { logger } from '../utils/logger.util'
 import { privacyService } from './privacy.service'
+import { Prisma } from '@prisma/client'
 
 export type AuditEventType =
   | 'memory_capture'
@@ -47,7 +48,7 @@ export class AuditLogService {
           resource_type: data.resourceType,
           resource_id: data.resourceId,
           domain,
-          metadata: data.metadata ? (data.metadata as any) : undefined,
+          metadata: data.metadata ? (data.metadata as Prisma.InputJsonValue) : undefined,
           ip_address: data.ipAddress,
           user_agent: data.userAgent,
         },
@@ -77,7 +78,7 @@ export class AuditLogService {
       endDate?: Date
     }
   ) {
-    const where: any = { user_id: userId }
+    const where: Prisma.AuditLogWhereInput = { user_id: userId }
 
     if (options?.eventType) {
       where.event_type = options.eventType

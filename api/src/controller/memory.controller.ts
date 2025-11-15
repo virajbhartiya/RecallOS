@@ -772,9 +772,9 @@ export class MemoryController {
           const cached = await redis.get(key)
           if (cached) {
             try {
-              const data = JSON.parse(cached)
+              const data = JSON.parse(cached) as { results?: Array<{ memory_id?: string }> }
               if (data.results && Array.isArray(data.results)) {
-                const hasMemory = data.results.some((r: any) => r.memory_id === memoryId)
+                const hasMemory = data.results.some(r => r.memory_id === memoryId)
                 if (hasMemory) {
                   await redis.del(key)
                   logger.log('[memory/delete] cache_cleared', { key, memoryId })

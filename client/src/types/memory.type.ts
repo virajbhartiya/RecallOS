@@ -1,7 +1,6 @@
 export type MemoryType =
   | "FACT"
   | "PREFERENCE"
-  | "PROJECT"
   | "LOG_EVENT"
   | "REFERENCE"
 

@@ -198,7 +198,7 @@ export const startContentWorker = () => {
               if (typeof result === 'object' && result !== null && 'topics' in result) {
                 return result
               } else if (typeof result === 'object' && result !== null && 'metadata' in result) {
-                return (result as { metadata?: any }).metadata || result
+                return (result as { metadata?: Record<string, unknown> }).metadata || result
               } else {
                 return result
               }

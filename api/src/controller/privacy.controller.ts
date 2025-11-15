@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express'
 import { AuthenticatedRequest } from '../middleware/auth.middleware'
 import { privacyService } from '../services/privacy.service'
-import { auditLogService } from '../services/audit-log.service'
+import { auditLogService, AuditEventType, AuditEventCategory } from '../services/audit-log.service'
 import { logger } from '../utils/logger.util'
 import AppError from '../utils/app-error.util'
 
@@ -178,8 +178,8 @@ export class PrivacyController {
       const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined
 
       const result = await auditLogService.getUserAuditLogs(req.user.id, {
-        eventType: eventType as any,
-        eventCategory: eventCategory as any,
+        eventType: eventType as AuditEventType | undefined,
+        eventCategory: eventCategory as AuditEventCategory | undefined,
         domain,
         limit,
         offset,

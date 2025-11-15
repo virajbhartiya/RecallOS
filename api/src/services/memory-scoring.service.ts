@@ -19,16 +19,17 @@ const MS_IN_DAY = 1000 * 60 * 60 * 24
 const MEMORY_TYPE_WEIGHTS: Record<MemoryType, number> = {
   FACT: 0.95,
   PREFERENCE: 0.75,
-  PROJECT: 0.9,
   LOG_EVENT: 0.55,
   REFERENCE: 0.7,
 }
 
 const MEMORY_TYPE_HINTS: Array<{ pattern: RegExp; type: MemoryType }> = [
-  { pattern: /(todo|task|project|milestone|roadmap)/i, type: 'PROJECT' },
   { pattern: /(preference|likes|favorite|habit|routine)/i, type: 'PREFERENCE' },
   { pattern: /(fact|definition|reference|glossary)/i, type: 'FACT' },
-  { pattern: /(meeting|call|email|conversation|chat|thread)/i, type: 'LOG_EVENT' },
+  {
+    pattern: /(todo|task|project|milestone|roadmap|meeting|call|email|conversation|chat|thread)/i,
+    type: 'LOG_EVENT',
+  },
   { pattern: /(article|doc|documentation|guide|tutorial)/i, type: 'REFERENCE' },
 ]
 
@@ -85,10 +86,7 @@ export class MemoryScoringService {
       typeof metadata.content_type === 'string' ? metadata.content_type.toLowerCase() : undefined
 
     if (contentType) {
-      if (/(task|project|ticket|issue)/.test(contentType)) {
-        return 'PROJECT'
-      }
-      if (/(email|chat|message|meeting|call)/.test(contentType)) {
+      if (/(email|chat|message|meeting|call|task|project|ticket|issue)/.test(contentType)) {
         return 'LOG_EVENT'
       }
       if (/(preference|habit|routine)/.test(contentType)) {
@@ -104,10 +102,6 @@ export class MemoryScoringService {
       if (hint.pattern.test(haystack)) {
         return hint.type
       }
-    }
-
-    if (metadata?.project_id || metadata?.project) {
-      return 'PROJECT'
     }
 
     if (metadata?.is_fact === true) {

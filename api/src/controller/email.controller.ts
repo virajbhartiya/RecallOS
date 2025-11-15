@@ -32,6 +32,13 @@ const extractJson = (text: string): string | null => {
   return text.substring(firstBrace, lastBrace + 1)
 }
 
+type ParsedDraftResponse = {
+  subject?: unknown
+  body?: unknown
+  summary?: unknown
+  overview?: unknown
+}
+
 const parseDraftResponse = (raw: string): EmailDraftResult | null => {
   let parsed: unknown
   try {
@@ -52,9 +59,10 @@ const parseDraftResponse = (raw: string): EmailDraftResult | null => {
     return null
   }
 
-  const subject = sanitizeText((parsed as any).subject, 200)
-  const body = ((parsed as any).body || '').toString().trim()
-  const summary = sanitizeText((parsed as any).summary || (parsed as any).overview, 400)
+  const draft = parsed as ParsedDraftResponse
+  const subject = sanitizeText(draft.subject, 200)
+  const body = (draft.body || '').toString().trim()
+  const summary = sanitizeText(draft.summary || draft.overview, 400)
 
   if (!subject || !body) {
     return null

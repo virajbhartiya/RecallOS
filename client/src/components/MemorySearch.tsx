@@ -201,7 +201,6 @@ export const MemorySearch: React.FC<MemorySearchProps> = ({
             <option value="">All Types</option>
             <option value="FACT">Fact</option>
             <option value="PREFERENCE">Preference</option>
-            <option value="PROJECT">Project</option>
             <option value="LOG_EVENT">Log Event</option>
             <option value="REFERENCE">Reference</option>
           </select>

@@ -5,7 +5,6 @@ generator client {
 enum MemoryType {
   FACT
   PREFERENCE
-  PROJECT
   LOG_EVENT
   REFERENCE
 }

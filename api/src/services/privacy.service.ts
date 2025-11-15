@@ -1,11 +1,12 @@
 import { prisma } from '../lib/prisma.lib'
+import { Prisma } from '@prisma/client'
 
 export class PrivacyService {
   /**
    * Get privacy settings for a user, optionally filtered by domain
    */
   async getUserPrivacySettings(userId: string, domain?: string) {
-    const where: any = { user_id: userId }
+    const where: Prisma.PrivacySettingWhereInput = { user_id: userId }
     if (domain) {
       where.domain = domain
     }

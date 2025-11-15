@@ -26,7 +26,6 @@ export type ContextBlock = {
 const MEMORY_TYPE_VALUES = {
   FACT: 'FACT' as MemoryType,
   PREFERENCE: 'PREFERENCE' as MemoryType,
-  PROJECT: 'PROJECT' as MemoryType,
   LOG_EVENT: 'LOG_EVENT' as MemoryType,
 } as const
 
@@ -40,11 +39,6 @@ const DEFAULT_BLOCKS: Array<{
     predicate: item =>
       item.memory_type === MEMORY_TYPE_VALUES.FACT ||
       item.memory_type === MEMORY_TYPE_VALUES.PREFERENCE,
-    limit: 3,
-  },
-  {
-    label: 'Projects & Plans',
-    predicate: item => item.memory_type === MEMORY_TYPE_VALUES.PROJECT,
     limit: 3,
   },
   {
