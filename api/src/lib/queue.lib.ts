@@ -24,13 +24,15 @@ const queueName = 'process-content'
 const queueOptions: QueueOptions = {
   connection: getRedisConnection(),
   defaultJobOptions: {
-    removeOnComplete: 1000,
-    removeOnFail: 1000,
+    removeOnComplete: true,
+    removeOnFail: false,
     attempts: 1,
     backoff: { type: 'exponential', delay: 5000 },
     // Note: Job timeout is handled at the AI call level (4 minutes per call)
     // Since AI calls run in parallel, total job time should be ~4 minutes max
     // BullMQ will handle job timeouts through the worker's lockDuration setting
+    // Completed jobs are automatically removed to save Redis memory
+    // Failed jobs are kept for debugging and user inspection
   },
 }
 
@@ -147,60 +149,13 @@ export const cleanQueue = async (): Promise<{
 
   let removedCount = 0
 
-  for (const job of waiting) {
-    try {
-      await job.remove()
-      removedCount++
-    } catch (error) {
-      logger.warn(`Failed to remove waiting job ${job.id}`, {
-        jobId: job.id,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-
-  for (const job of active) {
-    try {
-      await job.remove()
-      removedCount++
-    } catch (error) {
-      logger.warn(`Failed to remove active job ${job.id}`, {
-        jobId: job.id,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-
-  for (const job of delayed) {
-    try {
-      await job.remove()
-      removedCount++
-    } catch (error) {
-      logger.warn(`Failed to remove delayed job ${job.id}`, {
-        jobId: job.id,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-
+  // Only remove completed jobs - keep active, delayed, failed, and waiting jobs
   for (const job of completed) {
     try {
       await job.remove()
       removedCount++
     } catch (error) {
       logger.warn(`Failed to remove completed job ${job.id}`, {
-        jobId: job.id,
-        error: error instanceof Error ? error.message : String(error),
-      })
-    }
-  }
-
-  for (const job of failed) {
-    try {
-      await job.remove()
-      removedCount++
-    } catch (error) {
-      logger.warn(`Failed to remove failed job ${job.id}`, {
         jobId: job.id,
         error: error instanceof Error ? error.message : String(error),
       })
@@ -222,7 +177,7 @@ export const cleanQueue = async (): Promise<{
     completedAfter.length +
     failedAfter.length
 
-  logger.log('Queue cleaned', {
+  logger.log('Queue cleaned - removed completed jobs only', {
     before: {
       waiting: waitingCount,
       active: activeCount,

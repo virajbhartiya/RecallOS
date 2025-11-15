@@ -219,21 +219,27 @@ export const getPendingJobs = async (
     const userJobs = allJobs.filter(item => item.job.data.user_id === req.user!.id)
 
     const jobs = userJobs
-      .map(item => ({
-        id: item.job.id,
-        user_id: item.job.data.user_id,
-        raw_text:
-          item.job.data.raw_text?.substring(0, 200) +
-          (item.job.data.raw_text && item.job.data.raw_text.length > 200 ? '...' : ''),
-        full_text_length: item.job.data.raw_text?.length || 0,
-        metadata: item.job.data.metadata || {},
-        status: item.status,
-        created_at: new Date(item.job.timestamp).toISOString(),
-        processed_on: item.job.processedOn ? new Date(item.job.processedOn).toISOString() : null,
-        finished_on: item.job.finishedOn ? new Date(item.job.finishedOn).toISOString() : null,
-        failed_reason: item.job.failedReason || null,
-        attempts: item.job.attemptsMade,
-      }))
+      .map(item => {
+        const failedReason = item.job.failedReason || ''
+        const isCancelled = failedReason.includes('cancelled') || failedReason.includes('Job cancelled')
+        const finalStatus = isCancelled ? 'cancelling' : item.status
+        
+        return {
+          id: item.job.id,
+          user_id: item.job.data.user_id,
+          raw_text:
+            item.job.data.raw_text?.substring(0, 200) +
+            (item.job.data.raw_text && item.job.data.raw_text.length > 200 ? '...' : ''),
+          full_text_length: item.job.data.raw_text?.length || 0,
+          metadata: item.job.data.metadata || {},
+          status: finalStatus,
+          created_at: new Date(item.job.timestamp).toISOString(),
+          processed_on: item.job.processedOn ? new Date(item.job.processedOn).toISOString() : null,
+          finished_on: item.job.finishedOn ? new Date(item.job.finishedOn).toISOString() : null,
+          failed_reason: isCancelled ? 'Job cancelled by user request' : (item.job.failedReason || null),
+          attempts: item.job.attemptsMade,
+        }
+      })
       .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
 
     // Calculate counts from jobs to ensure consistency
@@ -241,6 +247,7 @@ export const getPendingJobs = async (
     const userActiveCount = jobs.filter(job => job.status === 'active').length
     const userDelayedCount = jobs.filter(job => job.status === 'delayed').length
     const userFailedCount = jobs.filter(job => job.status === 'failed').length
+    const userCancellingCount = jobs.filter(job => job.status === 'cancelling').length
 
     const totalCount = jobs.length
 
@@ -254,6 +261,7 @@ export const getPendingJobs = async (
           active: userActiveCount,
           delayed: userDelayedCount,
           failed: userFailedCount,
+          cancelling: userCancellingCount,
         },
       },
     })
@@ -290,7 +298,17 @@ export const deletePendingJob = async (
     if (jobState === 'active') {
       const redis = getRedisClient()
       const key = getContentJobCancellationKey(jobId)
-      await redis.set(key, '1', 'EX', 3600)
+      try {
+        await Promise.race([
+          redis.set(key, '1', 'EX', 3600),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 2000)),
+        ])
+      } catch (error) {
+        logger.warn('Redis timeout setting cancellation key, continuing anyway', {
+          jobId,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
       return res.status(200).json({
         status: 'success',
         message: 'Job cancellation requested',
@@ -304,7 +322,17 @@ export const deletePendingJob = async (
     await job.remove()
 
     const redis = getRedisClient()
-    await redis.del(getContentJobCancellationKey(jobId))
+    try {
+      await Promise.race([
+        redis.del(getContentJobCancellationKey(jobId)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 2000)),
+      ])
+    } catch (error) {
+      logger.warn('Redis timeout deleting cancellation key, continuing anyway', {
+        jobId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
 
     res.status(200).json({
       status: 'success',
