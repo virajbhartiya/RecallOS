@@ -1,8 +1,4 @@
-export type MemoryType =
-  | "FACT"
-  | "PREFERENCE"
-  | "LOG_EVENT"
-  | "REFERENCE"
+export type MemoryType = "FACT" | "PREFERENCE" | "LOG_EVENT" | "REFERENCE"
 
 export interface Memory {
   id: string
