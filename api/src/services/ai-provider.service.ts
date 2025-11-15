@@ -287,7 +287,12 @@ export const aiProvider = {
     let modelUsed: string | undefined
 
     if (provider === 'gemini') {
-      const response = await geminiService.generateContent(prompt, isSearchRequest, timeoutOverride, isEmailDraft)
+      const response = await geminiService.generateContent(
+        prompt,
+        isSearchRequest,
+        timeoutOverride,
+        isEmailDraft
+      )
       result = response.text
       modelUsed = response.modelUsed
     } else {

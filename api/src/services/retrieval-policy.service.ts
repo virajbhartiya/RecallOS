@@ -103,7 +103,7 @@ export function applyPolicyScore(
 }
 
 export function filterMemoriesByPolicy<
-  T extends { memory_type?: MemoryType | null; timestamp?: bigint | number | null }
+  T extends { memory_type?: MemoryType | null; timestamp?: bigint | number | null },
 >(rows: T[], policy: RetrievalPolicy): T[] {
   return rows.filter(row => {
     if (policy.allowedTypes && row.memory_type && !policy.allowedTypes.includes(row.memory_type)) {
@@ -125,4 +125,3 @@ export function filterMemoriesByPolicy<
     return true
   })
 }
-

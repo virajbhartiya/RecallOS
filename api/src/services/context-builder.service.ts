@@ -132,4 +132,3 @@ export function buildContextFromResults(options: {
     text: trimmedText,
   }
 }
-

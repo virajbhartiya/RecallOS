@@ -20,7 +20,10 @@ export class ExportImportController {
       const bundle = await exportImportService.exportUserData(req.user.id)
 
       res.setHeader('Content-Type', 'application/json')
-      res.setHeader('Content-Disposition', `attachment; filename="cognia-export-${req.user.id}-${Date.now()}.json"`)
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="cognia-export-${req.user.id}-${Date.now()}.json"`
+      )
 
       res.status(200).json(bundle)
     } catch (error) {
@@ -68,4 +71,3 @@ export class ExportImportController {
     }
   }
 }
-

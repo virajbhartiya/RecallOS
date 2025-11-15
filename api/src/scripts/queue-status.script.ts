@@ -50,16 +50,19 @@ export async function getQueueStatus() {
 // CLI entry point
 if (require.main === module) {
   getQueueStatus()
-    .then((stats) => {
+    .then(stats => {
       console.log('\nQueue Status:')
       console.log(JSON.stringify(stats, null, 2))
-      console.log('\nNote: Jobs already in the queue will automatically use the optimized parallel processing code when processed.')
-      console.log('Active jobs may be using old code, but will benefit from optimizations on retry or when new jobs start.')
+      console.log(
+        '\nNote: Jobs already in the queue will automatically use the optimized parallel processing code when processed.'
+      )
+      console.log(
+        'Active jobs may be using old code, but will benefit from optimizations on retry or when new jobs start.'
+      )
       process.exit(0)
     })
-    .catch((error) => {
+    .catch(error => {
       console.error('Error getting queue status:', error)
       process.exit(1)
     })
 }
-

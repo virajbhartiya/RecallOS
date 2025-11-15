@@ -34,7 +34,11 @@ export class PrivacyController {
   /**
    * Get privacy setting for a specific domain
    */
-  static async getDomainPrivacySetting(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  static async getDomainPrivacySetting(
+    req: AuthenticatedRequest,
+    res: Response,
+    next: NextFunction
+  ) {
     try {
       if (!req.user) {
         return next(new AppError('User not authenticated', 401))
@@ -165,7 +169,8 @@ export class PrivacyController {
       }
 
       const eventType = typeof req.query.eventType === 'string' ? req.query.eventType : undefined
-      const eventCategory = typeof req.query.eventCategory === 'string' ? req.query.eventCategory : undefined
+      const eventCategory =
+        typeof req.query.eventCategory === 'string' ? req.query.eventCategory : undefined
       const domain = typeof req.query.domain === 'string' ? req.query.domain : undefined
       const limit = req.query.limit ? Number(req.query.limit) : 100
       const offset = req.query.offset ? Number(req.query.offset) : 0
@@ -195,4 +200,3 @@ export class PrivacyController {
     }
   }
 }
-

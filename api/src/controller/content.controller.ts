@@ -221,9 +221,10 @@ export const getPendingJobs = async (
     const jobs = userJobs
       .map(item => {
         const failedReason = item.job.failedReason || ''
-        const isCancelled = failedReason.includes('cancelled') || failedReason.includes('Job cancelled')
+        const isCancelled =
+          failedReason.includes('cancelled') || failedReason.includes('Job cancelled')
         const finalStatus = isCancelled ? 'cancelling' : item.status
-        
+
         return {
           id: item.job.id,
           user_id: item.job.data.user_id,
@@ -236,7 +237,9 @@ export const getPendingJobs = async (
           created_at: new Date(item.job.timestamp).toISOString(),
           processed_on: item.job.processedOn ? new Date(item.job.processedOn).toISOString() : null,
           finished_on: item.job.finishedOn ? new Date(item.job.finishedOn).toISOString() : null,
-          failed_reason: isCancelled ? 'Job cancelled by user request' : (item.job.failedReason || null),
+          failed_reason: isCancelled
+            ? 'Job cancelled by user request'
+            : item.job.failedReason || null,
           attempts: item.job.attemptsMade,
         }
       })
@@ -389,4 +392,3 @@ export const resubmitPendingJob = async (
     next(error)
   }
 }
-

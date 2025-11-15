@@ -777,20 +777,22 @@ export async function searchMemories(params: {
       const rerankMap = new Map(reranked.map(r => [r.id, r]))
 
       // Merge reranking scores with existing scores (weighted combination)
-      finalScoredRows = policyScoredRows.map(row => {
-        const rerankResult = rerankMap.get(row.id)
-        if (rerankResult) {
-          // Combine original score (70%) with rerank score (30%)
-          const combinedScore = (row.final_score || row.score) * 0.7 + rerankResult.score * 0.3
-          return {
-            ...row,
-            final_score: combinedScore,
-            rerank_rank: rerankResult.rank,
-            rerank_reasoning: rerankResult.reasoning,
+      finalScoredRows = policyScoredRows
+        .map(row => {
+          const rerankResult = rerankMap.get(row.id)
+          if (rerankResult) {
+            // Combine original score (70%) with rerank score (30%)
+            const combinedScore = (row.final_score || row.score) * 0.7 + rerankResult.score * 0.3
+            return {
+              ...row,
+              final_score: combinedScore,
+              rerank_rank: rerankResult.rank,
+              rerank_reasoning: rerankResult.reasoning,
+            }
           }
-        }
-        return row
-      }).sort((a, b) => b.final_score - a.final_score)
+          return row
+        })
+        .sort((a, b) => b.final_score - a.final_score)
 
       logger.log('[search] Reranking completed', {
         ts: new Date().toISOString(),
@@ -868,7 +870,7 @@ export async function searchMemories(params: {
     url: string | null
   }> = []
 
-    const profileContext = await profileUpdateService.getProfileContext(userId)
+  const profileContext = await profileUpdateService.getProfileContext(userId)
   const contextArtifacts = buildContextFromResults({
     items: finalScoredRows.map(row => ({
       id: row.id,
@@ -953,19 +955,19 @@ ${bullets}`
       const order = extractCitationOrder(answer)
       citations =
         order.length > 0
-        ? order
-            .map(n => allCitations.find(c => c.label === n))
-            .filter(
-              (
-                c
-              ): c is {
-                label: number
-                memory_id: string
-                title: string | null
-                url: string | null
-              } => Boolean(c)
-            )
-        : []
+          ? order
+              .map(n => allCitations.find(c => c.label === n))
+              .filter(
+                (
+                  c
+                ): c is {
+                  label: number
+                  memory_id: string
+                  title: string | null
+                  url: string | null
+                } => Boolean(c)
+              )
+          : []
     } catch (error) {
       logger.error('[search] error generating answer, using fallback', {
         ts: new Date().toISOString(),

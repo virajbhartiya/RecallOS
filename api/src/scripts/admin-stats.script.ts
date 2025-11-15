@@ -109,11 +109,11 @@ export async function getAdminStats(): Promise<AdminStats> {
     stats.memories.total = totalMemories
     stats.memories.averagePerUser = usersWithMemories > 0 ? totalMemories / usersWithMemories : 0
 
-    memoriesByType.forEach((group) => {
+    memoriesByType.forEach(group => {
       stats.memories.byType[group.memory_type || 'unknown'] = group._count
     })
 
-    memoriesBySource.forEach((group) => {
+    memoriesBySource.forEach(group => {
       stats.memories.bySource[group.source] = group._count
     })
 
@@ -202,13 +202,12 @@ export async function getAdminStats(): Promise<AdminStats> {
 // CLI entry point
 if (require.main === module) {
   getAdminStats()
-    .then((stats) => {
+    .then(stats => {
       console.log(JSON.stringify(stats, null, 2))
       process.exit(0)
     })
-    .catch((error) => {
+    .catch(error => {
       console.error('Error generating admin stats:', error)
       process.exit(1)
     })
 }
-

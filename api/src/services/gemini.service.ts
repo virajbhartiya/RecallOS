@@ -233,7 +233,7 @@ Return clean, readable plain text only.`
         // For search requests, also bypass for immediate response
         // For normal processing, use rate limiting to respect API quotas
         const shouldBypassRateLimit = isEmailDraft || isSearchRequest
-        
+
         const response = await runWithRateLimit(
           () =>
             this.ai.models.generateContent({

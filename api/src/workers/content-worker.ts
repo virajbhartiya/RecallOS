@@ -143,11 +143,14 @@ export const startContentWorker = () => {
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
               try {
                 if (attempt > 1) {
-                  logger.log(`[Redis Worker] Retrying summary (attempt ${attempt}/${maxAttempts})`, {
-                    jobId: job.id,
-                    userId: user_id,
-                    attempt,
-                  })
+                  logger.log(
+                    `[Redis Worker] Retrying summary (attempt ${attempt}/${maxAttempts})`,
+                    {
+                      jobId: job.id,
+                      userId: user_id,
+                      attempt,
+                    }
+                  )
                 }
                 const result = await aiProvider.summarizeContent(raw_text, metadata, user_id)
                 if (typeof result === 'string') {
@@ -192,17 +195,9 @@ export const startContentWorker = () => {
           (async () => {
             try {
               const result = await aiProvider.extractContentMetadata(raw_text, metadata, user_id)
-              if (
-                typeof result === 'object' &&
-                result !== null &&
-                'topics' in result
-              ) {
+              if (typeof result === 'object' && result !== null && 'topics' in result) {
                 return result
-              } else if (
-                typeof result === 'object' &&
-                result !== null &&
-                'metadata' in result
-              ) {
+              } else if (typeof result === 'object' && result !== null && 'metadata' in result) {
                 return (result as { metadata?: any }).metadata || result
               } else {
                 return result
@@ -247,7 +242,7 @@ export const startContentWorker = () => {
             existingMemory?.page_metadata,
             pageMetadata
           )
-          
+
           const summaryHash = createHash('sha256').update(summary).digest('hex')
 
           await Promise.all([
@@ -267,7 +262,7 @@ export const startContentWorker = () => {
               },
             }),
           ])
-          
+
           // Generate embeddings and relations in background (non-blocking)
           setImmediate(async () => {
             try {
@@ -308,11 +303,11 @@ export const startContentWorker = () => {
             canonicalText: canonicalData.canonicalText,
             canonicalHash: canonicalData.canonicalHash,
           })
-          
+
           let memory
           try {
             const summaryHash = '0x' + createHash('sha256').update(summary).digest('hex')
-            
+
             const [createdMemory] = await Promise.all([
               prisma.memory.create({
                 data: memoryCreateInput,

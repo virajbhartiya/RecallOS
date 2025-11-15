@@ -233,7 +233,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
       ? INSIGHTS_TIMEOUT_MS
       : isEmailDraftRequest
         ? EMAIL_DRAFT_TIMEOUT_MS
-      : REQUEST_TIMEOUT_MS
+        : REQUEST_TIMEOUT_MS
 
   const timeout = setTimeout(() => {
     if (!res.headersSent) {

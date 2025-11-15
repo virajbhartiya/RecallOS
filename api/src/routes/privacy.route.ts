@@ -12,4 +12,3 @@ router.delete('/settings/:domain', authenticateToken, PrivacyController.deletePr
 router.get('/audit-logs', authenticateToken, PrivacyController.getAuditLogs)
 
 export default router
-

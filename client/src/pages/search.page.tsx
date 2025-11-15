@@ -19,13 +19,13 @@ import type {
 
 const buildExportText = (searchResults: MemorySearchResponse): string => {
   const parts: string[] = []
-  
+
   if (searchResults.answer) {
     parts.push("=== AI ANSWER ===")
     parts.push(searchResults.answer)
     parts.push("")
   }
-  
+
   if (searchResults.citations && searchResults.citations.length > 0) {
     parts.push("=== CITATIONS ===")
     searchResults.citations.forEach((citation) => {
@@ -36,7 +36,7 @@ const buildExportText = (searchResults: MemorySearchResponse): string => {
     })
     parts.push("")
   }
-  
+
   if (searchResults.results && searchResults.results.length > 0) {
     parts.push("=== MEMORIES ===")
     searchResults.results.slice(0, 10).forEach((result, idx) => {
@@ -49,7 +49,7 @@ const buildExportText = (searchResults: MemorySearchResponse): string => {
       }
     })
   }
-  
+
   return parts.join("\n")
 }
 
@@ -58,7 +58,8 @@ const copyToClipboard = async (text: string): Promise<void> => {
     await navigator.clipboard.writeText(text)
     // Show a brief toast notification
     const toast = document.createElement("div")
-    toast.className = "fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50 font-mono text-sm"
+    toast.className =
+      "fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded shadow-lg z-50 font-mono text-sm"
     toast.textContent = "✓ Copied to clipboard!"
     document.body.appendChild(toast)
     setTimeout(() => {
@@ -326,7 +327,9 @@ export const Search: React.FC = () => {
                               <span className="font-mono font-semibold text-gray-600 flex-shrink-0">
                                 [{citation.label}]
                               </span>
-                              <span className="flex-1">{citation.title || "Untitled"}</span>
+                              <span className="flex-1">
+                                {citation.title || "Untitled"}
+                              </span>
                             </a>
                           ))}
                         </div>

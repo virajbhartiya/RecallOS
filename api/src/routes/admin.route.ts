@@ -7,4 +7,3 @@ const router = Router()
 router.get('/stats', authenticateToken, AdminController.getStats)
 
 export default router
-

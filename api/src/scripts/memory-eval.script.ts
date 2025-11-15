@@ -92,4 +92,3 @@ run().catch(error => {
   logger.error('[memory-eval] Evaluation failed', error)
   process.exit(1)
 })
-

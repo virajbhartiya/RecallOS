@@ -78,7 +78,7 @@ export class QueryClassificationService {
       /\b(show\s+me|find\s+me|get\s+me)\s+(the|that|my|our)\b/i,
       /\b(i\s+remember|i\s+think|i\s+know|i\s+saw)\b/i,
     ]
-    if (recallPatterns.some((p) => p.test(normalized))) {
+    if (recallPatterns.some(p => p.test(normalized))) {
       return {
         class: 'recall',
         confidence: 0.85,
@@ -94,7 +94,7 @@ export class QueryClassificationService {
       /\b(related\s+to|similar\s+to|about|regarding)\b/i,
       /\b(anything|everything|all|list|show\s+all)\b/i,
     ]
-    if (searchPatterns.some((p) => p.test(normalized))) {
+    if (searchPatterns.some(p => p.test(normalized))) {
       return {
         class: 'search',
         confidence: 0.85,
@@ -109,7 +109,7 @@ export class QueryClassificationService {
       /\b(prepare|organize|schedule|timeline|milestone)\b/i,
       /\b(what\s+to\s+do|what\s+needs|prioritize|focus)\b/i,
     ]
-    if (planPatterns.some((p) => p.test(normalized))) {
+    if (planPatterns.some(p => p.test(normalized))) {
       return {
         class: 'plan',
         confidence: 0.85,
@@ -124,7 +124,7 @@ export class QueryClassificationService {
       /\b(what\s+do\s+i\s+like|what\s+am\s+i\s+interested|my\s+goals|my\s+skills)\b/i,
       /\b(summarize\s+me|describe\s+me|my\s+characteristics)\b/i,
     ]
-    if (profilePatterns.some((p) => p.test(normalized))) {
+    if (profilePatterns.some(p => p.test(normalized))) {
       return {
         class: 'profile',
         confidence: 0.85,
@@ -139,7 +139,7 @@ export class QueryClassificationService {
       /\b(total|average|percentage|rate|frequency|trend)\b/i,
       /\b(most|least|top|bottom|highest|lowest)\b/i,
     ]
-    if (metricPatterns.some((p) => p.test(normalized))) {
+    if (metricPatterns.some(p => p.test(normalized))) {
       return {
         class: 'metric',
         confidence: 0.85,
@@ -157,10 +157,7 @@ export class QueryClassificationService {
     }
   }
 
-  private async aiBasedClassification(
-    query: string,
-    userId: string
-  ): Promise<QueryClassification> {
+  private async aiBasedClassification(query: string, userId: string): Promise<QueryClassification> {
     const prompt = `Classify the following user query into one of these categories:
 - recall: User is asking to recall/remember specific information they know exists
 - search: User is exploring or searching for information
@@ -213,11 +210,10 @@ Respond with ONLY a JSON object in this exact format:
       const cacheKey = getCacheKey(query)
       const client = getRedisClient()
       await client.setex(cacheKey, CLASSIFICATION_CACHE_TTL, JSON.stringify(classification))
-    } catch (error) {
+    } catch {
       // Non-critical, ignore
     }
   }
 }
 
 export const queryClassificationService = new QueryClassificationService()
-

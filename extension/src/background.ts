@@ -582,7 +582,7 @@ runtime.onMessage.addListener(
       // We need to ensure response is sent before channel closes
       const responseCallback = sendResponse
       let responseSent = false
-      
+
       // Helper to ensure response is only sent once
       const safeSendResponse = (response: any) => {
         if (!responseSent) {
@@ -594,7 +594,7 @@ runtime.onMessage.addListener(
           }
         }
       }
-      
+
       ;(async () => {
         try {
           const payload = (message as any).payload as EmailDraftPayload
@@ -602,7 +602,7 @@ runtime.onMessage.addListener(
             safeSendResponse({ success: false, error: 'Invalid payload' })
             return
           }
-          
+
           // Start the draft request
           const data = await requestEmailDraft(payload)
           safeSendResponse({ success: true, data })
@@ -613,7 +613,7 @@ runtime.onMessage.addListener(
           })
         }
       })()
-      
+
       return true // Indicates we'll send response asynchronously
     }
 

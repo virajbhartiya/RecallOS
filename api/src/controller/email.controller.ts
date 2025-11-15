@@ -151,7 +151,7 @@ export const draftEmailReply = async (
             .join('\n')
 
           relevantMemoriesContext = `\n\nRELEVANT MEMORIES FROM USER'S KNOWLEDGE BASE:\n${memorySummaries}\n\nUse these memories to provide context-aware responses. Reference specific details when relevant.`
-          
+
           logger.log('[email/draft] Found relevant memories', {
             userId: req.user.id,
             memoryCount: searchResults.results.length,
@@ -160,7 +160,10 @@ export const draftEmailReply = async (
       }
     } catch (memorySearchError) {
       logger.warn('[email/draft] Failed to search relevant memories, continuing without them', {
-        error: memorySearchError instanceof Error ? memorySearchError.message : String(memorySearchError),
+        error:
+          memorySearchError instanceof Error
+            ? memorySearchError.message
+            : String(memorySearchError),
         userId: req.user.id,
       })
       // Continue without memory search - not critical
@@ -215,14 +218,14 @@ ${threadText}`
     } catch (aiError) {
       const errorMessage = aiError instanceof Error ? aiError.message : String(aiError)
       const isTimeout = errorMessage.includes('timeout') || errorMessage === 'timeout'
-      
+
       logger.error('[email/draft] AI provider failed', {
         error: errorMessage,
         isTimeout,
         stack: aiError instanceof Error ? aiError.stack : undefined,
         userId: req.user.id,
       })
-      
+
       return next(
         new AppError(
           isTimeout
@@ -262,4 +265,3 @@ ${threadText}`
     )
   }
 }
-

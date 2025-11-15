@@ -13,7 +13,9 @@ export function getRedisClient(): Redis {
       lazyConnect: true,
       connectTimeout: 10000,
       commandTimeout: 3000,
-      ...(connection.commandTimeout && { commandTimeout: Math.min(connection.commandTimeout, 3000) }),
+      ...(connection.commandTimeout && {
+        commandTimeout: Math.min(connection.commandTimeout, 3000),
+      }),
     }
     if ('url' in connection) {
       redisClient = new Redis(connection.url, commonOptions)
@@ -26,8 +28,8 @@ export function getRedisClient(): Redis {
         ...commonOptions,
       })
     }
-    
-    redisClient.on('error', (error) => {
+
+    redisClient.on('error', error => {
       const errorMessage = error.message || String(error)
       if (errorMessage.includes('Command timed out') || errorMessage.includes('timeout')) {
         // Suppress timeout errors as they're handled in application code with Promise.race

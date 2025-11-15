@@ -36,19 +36,16 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
     })
 
     // Log audit event for search
-    auditLogService.logMemorySearch(
-      userId,
-      query,
-      data.results.length,
-      {
+    auditLogService
+      .logMemorySearch(userId, query, data.results.length, {
         ipAddress: req.ip,
         userAgent: req.get('user-agent'),
-      }
-    ).catch((err) => {
-      logger.warn('[search/controller] audit_log_failed', {
-        error: err instanceof Error ? err.message : String(err),
       })
-    })
+      .catch(err => {
+        logger.warn('[search/controller] audit_log_failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      })
 
     // Only create job and return jobId if we don't have an immediate answer (for async delivery)
     if (!contextOnly && !data.answer) {

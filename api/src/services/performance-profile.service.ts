@@ -129,4 +129,3 @@ export class PerformanceProfileService {
 }
 
 export const performanceProfileService = new PerformanceProfileService()
-

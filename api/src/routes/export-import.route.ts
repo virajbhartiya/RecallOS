@@ -8,4 +8,3 @@ router.get('/', authenticateToken, ExportImportController.exportUserData)
 router.post('/', authenticateToken, ExportImportController.importUserData)
 
 export default router
-

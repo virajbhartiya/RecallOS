@@ -1,6 +1,5 @@
 import { MemoryType, Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma.lib'
-import { logger } from '../utils/logger.util'
 
 type ScoreSignals = {
   memoryType: MemoryType
@@ -83,9 +82,7 @@ export class MemoryScoringService {
     }
 
     const contentType =
-      typeof metadata.content_type === 'string'
-        ? metadata.content_type.toLowerCase()
-        : undefined
+      typeof metadata.content_type === 'string' ? metadata.content_type.toLowerCase() : undefined
 
     if (contentType) {
       if (/(task|project|ticket|issue)/.test(contentType)) {
@@ -134,7 +131,11 @@ export class MemoryScoringService {
     )
     const typeWeight = MEMORY_TYPE_WEIGHTS[signals.memoryType] ?? 0.6
     const lengthBoost = clamp(signals.contentLength / 6000, 0, 0.35)
-    const topicalBoost = clamp(((signals.topics?.length || 0) + (signals.categories?.length || 0)) / 40, 0, 0.2)
+    const topicalBoost = clamp(
+      ((signals.topics?.length || 0) + (signals.categories?.length || 0)) / 40,
+      0,
+      0.2
+    )
     const metadataBoost = metadataImportance * 0.4
 
     const base = 0.25 + typeWeight * 0.4 + lengthBoost + topicalBoost + metadataBoost
@@ -151,13 +152,19 @@ export class MemoryScoringService {
     const typeWeight = MEMORY_TYPE_WEIGHTS[signals.memoryType] ?? 0.6
 
     const score =
-      0.35 + normalizedLength + importanceScore * 0.25 + metadataImportance * 0.15 + typeWeight * 0.1 + accessBoost
+      0.35 +
+      normalizedLength +
+      importanceScore * 0.25 +
+      metadataImportance * 0.15 +
+      typeWeight * 0.1 +
+      accessBoost
     return clamp(score, 0.1, 1)
   }
 
   calculateExpiresAt(metadata?: Record<string, unknown> | null): Date | null {
     if (!metadata) return null
-    const explicit = metadata.expires_at || metadata.expiry || metadata.valid_until || metadata.deadline
+    const explicit =
+      metadata.expires_at || metadata.expiry || metadata.valid_until || metadata.deadline
     if (typeof explicit === 'string' || explicit instanceof Date) {
       const date = new Date(explicit)
       if (!Number.isNaN(date.getTime())) {
@@ -247,7 +254,12 @@ export class MemoryScoringService {
               metadata,
             })
 
-      const decayedImportance = this.applyDecay(baseImportance, memory.last_accessed, memory.created_at, now)
+      const decayedImportance = this.applyDecay(
+        baseImportance,
+        memory.last_accessed,
+        memory.created_at,
+        now
+      )
       const confidenceScore = this.calculateConfidenceScore({
         memoryType: memory.memory_type,
         contentLength,
@@ -299,7 +311,10 @@ export class MemoryScoringService {
     })
 
     const importanceMap = new Map(
-      memories.map(m => [m.id, clamp(typeof m.importance_score === 'number' ? m.importance_score : 0.3)])
+      memories.map(m => [
+        m.id,
+        clamp(typeof m.importance_score === 'number' ? m.importance_score : 0.3),
+      ])
     )
 
     const updates: Array<Promise<unknown>> = []
@@ -340,4 +355,3 @@ export class MemoryScoringService {
 }
 
 export const memoryScoringService = new MemoryScoringService()
-

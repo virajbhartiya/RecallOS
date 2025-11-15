@@ -1,6 +1,6 @@
 import React, { memo } from "react"
 
-import type { Memory, SearchResult, MemoryType } from "../types/memory.type"
+import type { Memory, MemoryType, SearchResult } from "../types/memory.type"
 
 interface MemorySearchResultCardProps {
   result: SearchResult
@@ -26,19 +26,44 @@ const getScoreColor = (score?: number) => {
 
 const getMemoryTypeBadge = (type?: MemoryType | null) => {
   if (!type) return null
-  
-  const badgeStyles: Record<MemoryType, { bg: string; text: string; border: string }> = {
-    FACT: { bg: 'bg-green-100', text: 'text-green-800', border: 'border-green-200' },
-    PREFERENCE: { bg: 'bg-blue-100', text: 'text-blue-800', border: 'border-blue-200' },
-    PROJECT: { bg: 'bg-purple-100', text: 'text-purple-800', border: 'border-purple-200' },
-    LOG_EVENT: { bg: 'bg-orange-100', text: 'text-orange-800', border: 'border-orange-200' },
-    REFERENCE: { bg: 'bg-gray-100', text: 'text-gray-800', border: 'border-gray-200' },
+
+  const badgeStyles: Record<
+    MemoryType,
+    { bg: string; text: string; border: string }
+  > = {
+    FACT: {
+      bg: "bg-green-100",
+      text: "text-green-800",
+      border: "border-green-200",
+    },
+    PREFERENCE: {
+      bg: "bg-blue-100",
+      text: "text-blue-800",
+      border: "border-blue-200",
+    },
+    PROJECT: {
+      bg: "bg-purple-100",
+      text: "text-purple-800",
+      border: "border-purple-200",
+    },
+    LOG_EVENT: {
+      bg: "bg-orange-100",
+      text: "text-orange-800",
+      border: "border-orange-200",
+    },
+    REFERENCE: {
+      bg: "bg-gray-100",
+      text: "text-gray-800",
+      border: "border-gray-200",
+    },
   }
-  
+
   const style = badgeStyles[type]
   return (
-    <span className={`text-xs font-mono ${style.bg} ${style.text} px-2 py-0.5 border ${style.border} rounded`}>
-      {type.replace('_', ' ')}
+    <span
+      className={`text-xs font-mono ${style.bg} ${style.text} px-2 py-0.5 border ${style.border} rounded`}
+    >
+      {type.replace("_", " ")}
     </span>
   )
 }

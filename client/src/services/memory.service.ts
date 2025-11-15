@@ -1,9 +1,9 @@
 import * as MemoryApi from "./memory/memory-api.service"
+import * as MemoryInbox from "./memory/memory-inbox.service"
 import * as MemoryInsights from "./memory/memory-insights.service"
 import * as MemoryJobs from "./memory/memory-jobs.service"
 import * as MemoryMesh from "./memory/memory-mesh.service"
 import * as MemorySearch from "./memory/memory-search.service"
-import * as MemoryInbox from "./memory/memory-inbox.service"
 
 export class MemoryService {
   static async getMemoriesWithTransactionDetails(limit?: number) {
@@ -22,7 +22,14 @@ export class MemoryService {
     signal?: AbortSignal,
     policy?: string
   ) {
-    return MemorySearch.searchMemories(query, filters, page, limit, signal, policy)
+    return MemorySearch.searchMemories(
+      query,
+      filters,
+      page,
+      limit,
+      signal,
+      policy
+    )
   }
 
   static async searchMemoriesHybrid(

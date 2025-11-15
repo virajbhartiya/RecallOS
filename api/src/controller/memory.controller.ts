@@ -9,7 +9,6 @@ import { profileUpdateService } from '../services/profile-update.service'
 import { privacyService } from '../services/privacy.service'
 import { auditLogService } from '../services/audit-log.service'
 import { memoryRedactionService } from '../services/memory-redaction.service'
-import { normalizeUrl } from '../utils/text.util'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 
@@ -203,7 +202,7 @@ export class MemoryController {
       if (url && typeof url === 'string') {
         const domain = privacyService.extractDomain(url)
         const shouldBlock = await privacyService.shouldBlockCapture(userId, domain)
-        
+
         if (shouldBlock) {
           logger.log('[memory/process] blocked_by_privacy', {
             userId,
@@ -346,19 +345,16 @@ export class MemoryController {
 
         // Log audit event for memory capture
         if (url && typeof url === 'string') {
-          auditLogService.logMemoryCapture(
-            userId,
-            memory.id,
-            url,
-            {
+          auditLogService
+            .logMemoryCapture(userId, memory.id, url, {
               ipAddress: req.ip,
               userAgent: req.get('user-agent'),
-            }
-          ).catch((err) => {
-            logger.warn('[memory/process] audit_log_failed', {
-              error: err instanceof Error ? err.message : String(err),
             })
-          })
+            .catch(err => {
+              logger.warn('[memory/process] audit_log_failed', {
+                error: err instanceof Error ? err.message : String(err),
+              })
+            })
         }
       } catch (createError) {
         const error = createError as PrismaError
@@ -405,7 +401,7 @@ export class MemoryController {
 
       // Return response immediately, process heavy operations in background
       logger.log('[memory/process] done', { memoryId: memory.id })
-      
+
       // Process heavy operations in background (non-blocking)
       setImmediate(async () => {
         // Create snapshot
@@ -803,19 +799,16 @@ export class MemoryController {
       })
 
       // Log audit event
-      auditLogService.logMemoryDelete(
-        req.user!.id,
-        memoryId,
-        domain,
-        {
+      auditLogService
+        .logMemoryDelete(req.user!.id, memoryId, domain, {
           ipAddress: req.ip,
           userAgent: req.get('user-agent'),
-        }
-      ).catch((err) => {
-        logger.warn('[memory/delete] audit_log_failed', {
-          error: err instanceof Error ? err.message : String(err),
         })
-      })
+        .catch(err => {
+          logger.warn('[memory/delete] audit_log_failed', {
+            error: err instanceof Error ? err.message : String(err),
+          })
+        })
 
       res.status(200).json({
         success: true,
@@ -853,7 +846,7 @@ export class MemoryController {
       }
 
       const validFields = ['url', 'content', 'title', 'summary']
-      const invalidFields = fields.filter((f) => !validFields.includes(f))
+      const invalidFields = fields.filter(f => !validFields.includes(f))
       if (invalidFields.length > 0) {
         return res.status(400).json({
           success: false,
@@ -908,7 +901,7 @@ export class MemoryController {
       }
 
       const validFields = ['url', 'content', 'title', 'summary']
-      const invalidFields = fields.filter((f) => !validFields.includes(f))
+      const invalidFields = fields.filter(f => !validFields.includes(f))
       if (invalidFields.length > 0) {
         return res.status(400).json({
           success: false,
@@ -932,7 +925,8 @@ export class MemoryController {
         data: result,
       })
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to redact domain memories'
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to redact domain memories'
       logger.error('Error redacting domain memories:', error)
       res.status(500).json({
         success: false,

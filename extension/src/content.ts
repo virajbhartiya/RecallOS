@@ -1115,7 +1115,9 @@ function extractEmailContext(): EmailDraftContext | null {
 function extractGmailContext(): EmailDraftContext | null {
   const subject =
     document.querySelector('h2.hP')?.textContent?.trim() ||
-    (document.querySelector('input[name="subjectbox"]') as HTMLInputElement | null)?.value?.trim() ||
+    (
+      document.querySelector('input[name="subjectbox"]') as HTMLInputElement | null
+    )?.value?.trim() ||
     document.title ||
     'No subject'
 
@@ -1129,7 +1131,10 @@ function extractGmailContext(): EmailDraftContext | null {
       const timestamp = node.querySelector('.g3')?.textContent?.trim() || ''
       const body =
         node.querySelector('.a3s')?.textContent?.trim() ||
-        node.querySelector('.a3s')?.innerHTML?.replace(/<[^>]+>/g, ' ').trim() ||
+        node
+          .querySelector('.a3s')
+          ?.innerHTML?.replace(/<[^>]+>/g, ' ')
+          .trim() ||
         ''
       if (!body) {
         return ''
@@ -1149,7 +1154,9 @@ function extractGmailContext(): EmailDraftContext | null {
     el => el.getAttribute('contenteditable') === 'true' && isElementVisible(el as HTMLElement)
   ) as HTMLElement | undefined
 
-  const subjectElement = document.querySelector('input[name="subjectbox"]') as HTMLInputElement | null
+  const subjectElement = document.querySelector(
+    'input[name="subjectbox"]'
+  ) as HTMLInputElement | null
 
   const participantSet = new Set<string>()
   document.querySelectorAll('span.gD, span.g2, span.go').forEach(el => {
@@ -1172,10 +1179,10 @@ function extractGmailContext(): EmailDraftContext | null {
 
 function extractOutlookContext(): EmailDraftContext | null {
   const subject =
-    document
-      .querySelector('div[role="heading"][aria-level="1"]')
-      ?.textContent?.trim() ||
-    (document.querySelector('input[aria-label*="subject"]') as HTMLInputElement | null)?.value?.trim() ||
+    document.querySelector('div[role="heading"][aria-level="1"]')?.textContent?.trim() ||
+    (
+      document.querySelector('input[aria-label*="subject"]') as HTMLInputElement | null
+    )?.value?.trim() ||
     document.title ||
     'No subject'
 
@@ -1229,10 +1236,7 @@ function isElementVisible(element?: Element | null): element is HTMLElement {
   const rect = element.getBoundingClientRect()
   const style = window.getComputedStyle(element)
   return (
-    rect.width > 0 &&
-    rect.height > 0 &&
-    style.visibility !== 'hidden' &&
-    style.display !== 'none'
+    rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none'
   )
 }
 
@@ -1448,18 +1452,18 @@ function requestDraftFromBackground(payload: EmailDraftPayload): Promise<EmailDr
 
     runtime.sendMessage({ type: MESSAGE_TYPES.DRAFT_EMAIL_REPLY, payload }, response => {
       clearTimeout(timeout)
-      
+
       // Check for Chrome extension API errors
       if (chrome.runtime.lastError) {
         reject(new Error(`Extension error: ${chrome.runtime.lastError.message}`))
         return
       }
-      
+
       if (!response) {
         reject(new Error('No response from background script.'))
         return
       }
-      
+
       if (response.success && response.data) {
         resolve(response.data as EmailDraftResponse)
       } else {
@@ -1471,12 +1475,13 @@ function requestDraftFromBackground(payload: EmailDraftPayload): Promise<EmailDr
 
 function initEmailDraftPill(): void {
   const host = window.location.hostname
-  const isEmailSite = host.includes('mail.google') || 
-                      host.includes('outlook.') || 
-                      host.includes('office.com') || 
-                      host.includes('live.com') || 
-                      host.includes('microsoft.com')
-  
+  const isEmailSite =
+    host.includes('mail.google') ||
+    host.includes('outlook.') ||
+    host.includes('office.com') ||
+    host.includes('live.com') ||
+    host.includes('microsoft.com')
+
   if (!isEmailSite) {
     return
   }
@@ -1492,20 +1497,31 @@ function initEmailDraftPill(): void {
   }
 
   // Check on focus events
-  document.addEventListener('focusin', (e) => {
-    const target = e.target as HTMLElement
-    if (target && (target.contentEditable === 'true' || target.closest('[contenteditable="true"]'))) {
-      setTimeout(checkForComposeField, 100)
-    }
-  }, true)
+  document.addEventListener(
+    'focusin',
+    e => {
+      const target = e.target as HTMLElement
+      if (
+        target &&
+        (target.contentEditable === 'true' || target.closest('[contenteditable="true"]'))
+      ) {
+        setTimeout(checkForComposeField, 100)
+      }
+    },
+    true
+  )
 
   // Check on input events (user typing)
-  document.addEventListener('input', (e) => {
-    const target = e.target as HTMLElement
-    if (target && target.contentEditable === 'true') {
-      setTimeout(checkForComposeField, 100)
-    }
-  }, true)
+  document.addEventListener(
+    'input',
+    e => {
+      const target = e.target as HTMLElement
+      if (target && target.contentEditable === 'true') {
+        setTimeout(checkForComposeField, 100)
+      }
+    },
+    true
+  )
 
   // Watch for DOM changes (Gmail/Outlook dynamically load compose windows)
   if (!draftPillObserver) {
@@ -1523,7 +1539,7 @@ function initEmailDraftPill(): void {
   setTimeout(checkForComposeField, 500)
 }
 
-function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext): void {
+function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContext): void {
   // Check if pill already exists for this element
   if (draftPillElement && document.body.contains(draftPillElement)) {
     const existingCompose = (draftPillElement as any)._composeElement
@@ -1537,7 +1553,7 @@ function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext
   // Create pill element - ChatGPT style
   const pill = document.createElement('div')
   pill.className = 'cognia-draft-pill'
-  
+
   // ChatGPT-style pill design - compact and small
   pill.style.cssText = `
     position: fixed;
@@ -1599,10 +1615,10 @@ function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext
   })
 
   // Click handler
-  pill.addEventListener('click', async (e) => {
+  pill.addEventListener('click', async e => {
     e.preventDefault()
     e.stopPropagation()
-    
+
     if (isDrafting) {
       return
     }
@@ -1611,7 +1627,7 @@ function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext
     pill.style.opacity = '0.7'
     pill.style.cursor = 'wait'
     text.textContent = '...'
-    
+
     try {
       const currentContext = extractEmailContext()
       if (!currentContext) {
@@ -1619,7 +1635,7 @@ function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext
         showDraftToast('No email thread detected.', 'error')
         return
       }
-      
+
       const payload: EmailDraftPayload = {
         thread_text: currentContext.threadText,
         subject: currentContext.subject,
@@ -1632,7 +1648,7 @@ function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext
 
       const draft = await requestDraftFromBackground(payload)
       const injection = injectEmailDraft(currentContext, draft)
-      
+
       if (!injection.bodyApplied) {
         if (copyTextToClipboard(draft.body)) {
           showDraftToast('Draft copied to clipboard. Paste it into the compose box.', 'error')
@@ -1644,13 +1660,13 @@ function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext
 
       const subjectMessage = injection.subjectApplied ? ' and subject updated' : ''
       showDraftToast(`Draft inserted${subjectMessage}`, 'success')
-      
+
       // Update pill to show success state briefly
       text.textContent = '✓'
       pill.style.background = '#e8f5e9'
       pill.style.borderColor = '#c8e6c9'
       pill.style.color = '#2e7d32'
-      
+
       // Remove pill after successful draft
       setTimeout(() => {
         removeDraftPill()
@@ -1673,27 +1689,29 @@ function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext
 
   // Position the pill relative to compose element
   // Try to find the compose element's container (Gmail/Outlook use specific containers)
-  const composeContainer = composeElement.closest('[role="dialog"], .aYF, .ms-ComposeHeader, .ms-ComposeBody') || composeElement.parentElement
-  
+  const composeContainer =
+    composeElement.closest('[role="dialog"], .aYF, .ms-ComposeHeader, .ms-ComposeBody') ||
+    composeElement.parentElement
+
   const positionPill = () => {
     if (!composeElement || !isElementVisible(composeElement)) {
       removeDraftPill()
       return
     }
-    
+
     const rect = composeElement.getBoundingClientRect()
-    
+
     // Position at bottom-right corner of compose field, similar to ChatGPT
     // ChatGPT positions it just above the bottom edge, slightly inset from the right
     pill.style.position = 'fixed'
-    
+
     // Position relative to compose field's bottom-right, with small offset
     const offsetX = 12 // pixels from right edge
-    const offsetY = 8  // pixels from bottom edge
-    
+    const offsetY = 8 // pixels from bottom edge
+
     pill.style.top = `${rect.bottom - offsetY - 24}px` // 24px is approximate pill height (compact)
     pill.style.left = `${rect.right - offsetX - 70}px` // 70px is approximate pill width (compact)
-    
+
     // Ensure it doesn't go off-screen
     const pillRect = pill.getBoundingClientRect()
     if (pillRect.right > window.innerWidth - 10) {
@@ -1711,15 +1729,19 @@ function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext
   }
 
   positionPill()
-  
+
   // Append to compose container if it exists, otherwise to body
-  if (composeContainer && composeContainer !== document.body && composeContainer instanceof HTMLElement) {
+  if (
+    composeContainer &&
+    composeContainer !== document.body &&
+    composeContainer instanceof HTMLElement
+  ) {
     composeContainer.style.position = 'relative'
     composeContainer.appendChild(pill)
   } else {
     document.body.appendChild(pill)
   }
-  
+
   draftPillElement = pill
 
   // Reposition on scroll/resize
@@ -1732,7 +1754,7 @@ function ensureDraftPill(composeElement: HTMLElement, context: EmailDraftContext
   }
   window.addEventListener('scroll', repositionHandler, true)
   window.addEventListener('resize', repositionHandler)
-  
+
   // Store handler for cleanup
   ;(pill as any)._repositionHandler = repositionHandler
   ;(pill as any)._composeElement = composeElement

@@ -1,5 +1,4 @@
 import { prisma } from '../lib/prisma.lib'
-import { logger } from '../utils/logger.util'
 
 export class PrivacyService {
   /**
@@ -113,7 +112,7 @@ export class PrivacyService {
       return urlObj.hostname.replace(/^www\./, '')
     } catch {
       // If URL parsing fails, try to extract domain manually
-      const match = url.match(/https?:\/\/([^\/]+)/)
+      const match = url.match(/https?:\/\/([^/]+)/)
       if (match) {
         return match[1].replace(/^www\./, '')
       }
@@ -123,4 +122,3 @@ export class PrivacyService {
 }
 
 export const privacyService = new PrivacyService()
-

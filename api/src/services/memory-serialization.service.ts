@@ -55,9 +55,7 @@ export class MemorySerializationService {
             ? result.memory.last_accessed.toISOString()
             : null
         const expiresAt =
-          result.memory.expires_at instanceof Date
-            ? result.memory.expires_at.toISOString()
-            : null
+          result.memory.expires_at instanceof Date ? result.memory.expires_at.toISOString() : null
         serialized.memory = {
           ...result.memory,
           timestamp: result.memory.timestamp ? String(result.memory.timestamp) : null,

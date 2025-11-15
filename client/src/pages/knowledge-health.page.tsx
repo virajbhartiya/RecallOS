@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react"
+import { getRequest } from "@/utils/general-services.util"
 import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
-import { getRequest } from "@/utils/general-services.util"
 
 interface KnowledgeScore {
   id: string
@@ -96,8 +96,10 @@ export const KnowledgeHealth: React.FC = () => {
 
   const latestScore = data?.scores?.[0]
   const historicalScores = data?.scores?.slice(0, 12) || []
-  const unlockedAchievements = data?.achievements?.filter((a) => a.unlocked_at) || []
-  const inProgressAchievements = data?.achievements?.filter((a) => !a.unlocked_at && a.progress > 0) || []
+  const unlockedAchievements =
+    data?.achievements?.filter((a) => a.unlocked_at) || []
+  const inProgressAchievements =
+    data?.achievements?.filter((a) => !a.unlocked_at && a.progress > 0) || []
 
   const getPercentileColor = (percentile: number | null) => {
     if (!percentile) return "text-gray-500"
@@ -118,37 +120,59 @@ export const KnowledgeHealth: React.FC = () => {
     const suggestions: string[] = []
 
     if (!latestScore) {
-      suggestions.push("Start capturing more memories to generate your first knowledge score.")
+      suggestions.push(
+        "Start capturing more memories to generate your first knowledge score."
+      )
       return suggestions
     }
 
     if (latestScore.velocity_score < 0.4) {
-      suggestions.push("Your memory capture rate is low. Try browsing more diverse content to increase velocity.")
+      suggestions.push(
+        "Your memory capture rate is low. Try browsing more diverse content to increase velocity."
+      )
     }
 
     if (latestScore.impact_score < 0.4) {
-      suggestions.push("Your memories have low impact. Focus on capturing high-quality, actionable content.")
+      suggestions.push(
+        "Your memories have low impact. Focus on capturing high-quality, actionable content."
+      )
     }
 
     if (latestScore.diversity_index < 0.5) {
-      suggestions.push("Your knowledge base lacks diversity. Explore different topics and domains.")
+      suggestions.push(
+        "Your knowledge base lacks diversity. Explore different topics and domains."
+      )
     }
 
     if (unlockedAchievements.length === 0) {
-      suggestions.push("You haven't unlocked any achievements yet. Keep using Cognia to earn badges!")
+      suggestions.push(
+        "You haven't unlocked any achievements yet. Keep using Cognia to earn badges!"
+      )
     }
 
     if (data?.benchmarks) {
-      if (data.benchmarks.velocity_percentile && data.benchmarks.velocity_percentile < 25) {
-        suggestions.push("Your velocity is below average. Consider increasing your browsing activity.")
+      if (
+        data.benchmarks.velocity_percentile &&
+        data.benchmarks.velocity_percentile < 25
+      ) {
+        suggestions.push(
+          "Your velocity is below average. Consider increasing your browsing activity."
+        )
       }
-      if (data.benchmarks.impact_percentile && data.benchmarks.impact_percentile < 25) {
-        suggestions.push("Your impact score is below average. Focus on capturing more meaningful content.")
+      if (
+        data.benchmarks.impact_percentile &&
+        data.benchmarks.impact_percentile < 25
+      ) {
+        suggestions.push(
+          "Your impact score is below average. Focus on capturing more meaningful content."
+        )
       }
     }
 
     if (suggestions.length === 0) {
-      suggestions.push("Great job! Your knowledge health metrics look strong. Keep it up!")
+      suggestions.push(
+        "Great job! Your knowledge health metrics look strong. Keep it up!"
+      )
     }
 
     return suggestions
@@ -157,7 +181,9 @@ export const KnowledgeHealth: React.FC = () => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-sm font-mono text-gray-600">Loading knowledge health...</div>
+        <div className="text-sm font-mono text-gray-600">
+          Loading knowledge health...
+        </div>
       </div>
     )
   }
@@ -187,7 +213,9 @@ export const KnowledgeHealth: React.FC = () => {
                 <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold text-lg font-mono">
                   K
                 </div>
-                <div className="text-sm font-medium text-gray-900">Knowledge Health</div>
+                <div className="text-sm font-medium text-gray-900">
+                  Knowledge Health
+                </div>
               </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-3 flex-wrap gap-2">
@@ -244,7 +272,9 @@ export const KnowledgeHealth: React.FC = () => {
               <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
                 VELOCITY
               </div>
-              <div className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.velocity_score)}`}>
+              <div
+                className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.velocity_score)}`}
+              >
                 {(latestScore.velocity_score * 100).toFixed(0)}%
               </div>
               <div className="text-xs text-gray-500 mt-1">
@@ -256,43 +286,45 @@ export const KnowledgeHealth: React.FC = () => {
               <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
                 IMPACT
               </div>
-              <div className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.impact_score)}`}>
+              <div
+                className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.impact_score)}`}
+              >
                 {(latestScore.impact_score * 100).toFixed(0)}%
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Content quality
-              </div>
+              <div className="text-xs text-gray-500 mt-1">Content quality</div>
             </div>
 
             <div className="bg-white border border-gray-200 p-4">
               <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
                 DIVERSITY
               </div>
-              <div className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.diversity_index)}`}>
+              <div
+                className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.diversity_index)}`}
+              >
                 {(latestScore.diversity_index * 100).toFixed(0)}%
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Topic variety
-              </div>
+              <div className="text-xs text-gray-500 mt-1">Topic variety</div>
             </div>
 
             <div className="bg-white border border-gray-200 p-4">
               <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
                 CONSISTENCY
               </div>
-              <div className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.consistency_score)}`}>
+              <div
+                className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.consistency_score)}`}
+              >
                 {(latestScore.consistency_score * 100).toFixed(0)}%
               </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Regular usage
-              </div>
+              <div className="text-xs text-gray-500 mt-1">Regular usage</div>
             </div>
 
             <div className="bg-white border border-gray-200 p-4">
               <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-2">
                 TOPIC RATE
               </div>
-              <div className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.topic_rate)}`}>
+              <div
+                className={`text-2xl font-mono font-bold ${getScoreColor(latestScore.topic_rate)}`}
+              >
                 {latestScore.topic_rate.toFixed(1)}
               </div>
               <div className="text-xs text-gray-500 mt-1">
@@ -311,32 +343,48 @@ export const KnowledgeHealth: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               {data.benchmarks.velocity_percentile !== null && (
                 <div>
-                  <div className="text-xs font-mono text-gray-600 mb-1">Velocity</div>
-                  <div className={`text-xl font-mono font-bold ${getPercentileColor(data.benchmarks.velocity_percentile)}`}>
+                  <div className="text-xs font-mono text-gray-600 mb-1">
+                    Velocity
+                  </div>
+                  <div
+                    className={`text-xl font-mono font-bold ${getPercentileColor(data.benchmarks.velocity_percentile)}`}
+                  >
                     {data.benchmarks.velocity_percentile.toFixed(0)}th
                   </div>
                 </div>
               )}
               {data.benchmarks.impact_percentile !== null && (
                 <div>
-                  <div className="text-xs font-mono text-gray-600 mb-1">Impact</div>
-                  <div className={`text-xl font-mono font-bold ${getPercentileColor(data.benchmarks.impact_percentile)}`}>
+                  <div className="text-xs font-mono text-gray-600 mb-1">
+                    Impact
+                  </div>
+                  <div
+                    className={`text-xl font-mono font-bold ${getPercentileColor(data.benchmarks.impact_percentile)}`}
+                  >
                     {data.benchmarks.impact_percentile.toFixed(0)}th
                   </div>
                 </div>
               )}
               {data.benchmarks.connection_percentile !== null && (
                 <div>
-                  <div className="text-xs font-mono text-gray-600 mb-1">Connections</div>
-                  <div className={`text-xl font-mono font-bold ${getPercentileColor(data.benchmarks.connection_percentile)}`}>
+                  <div className="text-xs font-mono text-gray-600 mb-1">
+                    Connections
+                  </div>
+                  <div
+                    className={`text-xl font-mono font-bold ${getPercentileColor(data.benchmarks.connection_percentile)}`}
+                  >
                     {data.benchmarks.connection_percentile.toFixed(0)}th
                   </div>
                 </div>
               )}
               {data.benchmarks.diversity_percentile !== null && (
                 <div>
-                  <div className="text-xs font-mono text-gray-600 mb-1">Diversity</div>
-                  <div className={`text-xl font-mono font-bold ${getPercentileColor(data.benchmarks.diversity_percentile)}`}>
+                  <div className="text-xs font-mono text-gray-600 mb-1">
+                    Diversity
+                  </div>
+                  <div
+                    className={`text-xl font-mono font-bold ${getPercentileColor(data.benchmarks.diversity_percentile)}`}
+                  >
                     {data.benchmarks.diversity_percentile.toFixed(0)}th
                   </div>
                 </div>
@@ -386,7 +434,10 @@ export const KnowledgeHealth: React.FC = () => {
             {inProgressAchievements.length > 0 ? (
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {inProgressAchievements.map((achievement) => {
-                  const progressPercent = Math.min(achievement.progress * 100, 100)
+                  const progressPercent = Math.min(
+                    achievement.progress * 100,
+                    100
+                  )
                   return (
                     <div
                       key={achievement.id}
@@ -401,7 +452,10 @@ export const KnowledgeHealth: React.FC = () => {
                       <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                         <div
                           className="bg-yellow-600 h-2 rounded-full transition-all"
-                          style={{ width: `${progressPercent}%`, maxWidth: '100%' }}
+                          style={{
+                            width: `${progressPercent}%`,
+                            maxWidth: "100%",
+                          }}
                         />
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
@@ -426,7 +480,7 @@ export const KnowledgeHealth: React.FC = () => {
               [HISTORICAL TRENDS]
             </div>
             <div className="space-y-4 overflow-x-auto">
-              {historicalScores.slice(0, 6).map((score, idx) => (
+              {historicalScores.slice(0, 6).map((score) => (
                 <div key={score.id} className="flex items-center gap-4 min-w-0">
                   <div className="text-xs font-mono text-gray-600 w-24 flex-shrink-0">
                     {new Date(score.period_start).toLocaleDateString()}
@@ -470,7 +524,10 @@ export const KnowledgeHealth: React.FC = () => {
           </div>
           <ul className="space-y-2">
             {generateSuggestions().map((suggestion, idx) => (
-              <li key={idx} className="text-sm text-gray-800 flex items-start gap-2">
+              <li
+                key={idx}
+                className="text-sm text-gray-800 flex items-start gap-2"
+              >
                 <span className="text-blue-600">•</span>
                 <span>{suggestion}</span>
               </li>
@@ -481,4 +538,3 @@ export const KnowledgeHealth: React.FC = () => {
     </div>
   )
 }
-

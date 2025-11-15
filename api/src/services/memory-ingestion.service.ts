@@ -225,7 +225,9 @@ export class MemoryIngestionService {
       ? pageMetadata.topics.filter((topic): topic is string => typeof topic === 'string')
       : []
     const categories = Array.isArray(pageMetadata.categories)
-      ? pageMetadata.categories.filter((category): category is string => typeof category === 'string')
+      ? pageMetadata.categories.filter(
+          (category): category is string => typeof category === 'string'
+        )
       : []
 
     const memoryType = memoryScoringService.inferMemoryType({
@@ -293,4 +295,3 @@ export class MemoryIngestionService {
 }
 
 export const memoryIngestionService = new MemoryIngestionService()
-

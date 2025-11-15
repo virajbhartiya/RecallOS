@@ -87,9 +87,7 @@ export const addContentJob = async (
   }
 
   const normalizedUrl =
-    data.metadata?.url && data.metadata.url !== 'unknown'
-      ? normalizeUrl(data.metadata.url)
-      : null
+    data.metadata?.url && data.metadata.url !== 'unknown' ? normalizeUrl(data.metadata.url) : null
 
   for (const existingJob of userJobs) {
     const existingCanonicalText = normalizeText(existingJob.data.raw_text)
@@ -99,7 +97,11 @@ export const addContentJob = async (
       return { id: existingJob.id, isDuplicate: true }
     }
 
-    if (normalizedUrl && existingJob.data.metadata?.url && existingJob.data.metadata.url !== 'unknown') {
+    if (
+      normalizedUrl &&
+      existingJob.data.metadata?.url &&
+      existingJob.data.metadata.url !== 'unknown'
+    ) {
       const existingNormalizedUrl = normalizeUrl(existingJob.data.metadata.url)
 
       if (normalizedUrl === existingNormalizedUrl) {

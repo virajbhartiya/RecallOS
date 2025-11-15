@@ -26,7 +26,10 @@ type RerankedResult = {
  */
 function getRerankCacheKey(query: string, memoryIds: string[]): string {
   const queryHash = createHash('sha256').update(query).digest('hex').substring(0, 16)
-  const idsHash = createHash('sha256').update(memoryIds.sort().join(',')).digest('hex').substring(0, 16)
+  const idsHash = createHash('sha256')
+    .update(memoryIds.sort().join(','))
+    .digest('hex')
+    .substring(0, 16)
   return `${RERANK_CACHE_PREFIX}${queryHash}:${idsHash}`
 }
 
@@ -63,11 +66,16 @@ export class RerankingService {
       const cached = await redis.get(cacheKey)
 
       if (cached) {
-        logger.log('[rerank] Cache hit', { query: query.substring(0, 50), candidateCount: candidates.length })
+        logger.log('[rerank] Cache hit', {
+          query: query.substring(0, 50),
+          candidateCount: candidates.length,
+        })
         const cachedResults = JSON.parse(cached) as RerankedResult[]
         // Verify all IDs match
-        if (cachedResults.length === candidates.length && 
-            cachedResults.every(r => candidates.some(c => c.id === r.id))) {
+        if (
+          cachedResults.length === candidates.length &&
+          cachedResults.every(r => candidates.some(c => c.id === r.id))
+        ) {
           return cachedResults
         }
       }
@@ -102,7 +110,7 @@ Rules:
 - Return ONLY the JSON array, no markdown or extra text`
 
       const aiResponse = await aiProvider.generateContent(prompt, false, userId)
-      
+
       // Parse JSON from response
       let rerankedResults: RerankedResult[] = []
       try {
@@ -157,7 +165,10 @@ Rules:
       // Cache the results
       try {
         await redis.setex(cacheKey, RERANK_CACHE_TTL, JSON.stringify(validResults))
-        logger.log('[rerank] Results cached', { query: query.substring(0, 50), resultCount: validResults.length })
+        logger.log('[rerank] Results cached', {
+          query: query.substring(0, 50),
+          resultCount: validResults.length,
+        })
       } catch (cacheError) {
         logger.warn('[rerank] Failed to cache results', {
           error: cacheError instanceof Error ? cacheError.message : String(cacheError),
@@ -202,4 +213,3 @@ Rules:
 }
 
 export const rerankingService = new RerankingService()
-

@@ -1,4 +1,4 @@
-import type { Memory, SearchResult, MemoryType } from "../types/memory.type"
+import type { Memory, MemoryType, SearchResult } from "../types/memory.type"
 
 interface ApiSearchResult {
   memory_id: string

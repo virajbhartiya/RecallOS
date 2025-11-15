@@ -93,7 +93,7 @@ export class MemoryRedactionService {
     })
 
     const results = await Promise.all(
-      memories.map((memory) =>
+      memories.map(memory =>
         this.redactMemoryFields(userId, memory.id, fieldsToRedact, options).catch((err): any => {
           logger.warn('[redaction] failed_to_redact_memory', {
             memoryId: memory.id,
@@ -104,7 +104,7 @@ export class MemoryRedactionService {
       )
     )
 
-    const successful = results.filter((r) => r !== null).length
+    const successful = results.filter(r => r !== null).length
 
     logger.log('[redaction] domain_redaction_complete', {
       domain,
@@ -124,4 +124,3 @@ export class MemoryRedactionService {
 }
 
 export const memoryRedactionService = new MemoryRedactionService()
-

@@ -16,7 +16,7 @@ const Popup: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isCheckingHealth, setIsCheckingHealth] = useState(true)
   const [lastCaptureTime, setLastCaptureTime] = useState<number | null>(null)
-  const [currentDomain, setCurrentDomain] = useState<string>('')
+  const [_currentDomain, setCurrentDomain] = useState<string>('')
 
   useEffect(() => {
     loadSettings()
@@ -327,9 +327,7 @@ const Popup: React.FC = () => {
           {lastCaptureTime && (
             <div className="flex items-center justify-between py-1">
               <span className="text-xs text-gray-700">Last Capture</span>
-              <span className="text-xs text-gray-600">
-                {formatTimeAgo(lastCaptureTime)}
-              </span>
+              <span className="text-xs text-gray-600">{formatTimeAgo(lastCaptureTime)}</span>
             </div>
           )}
         </div>

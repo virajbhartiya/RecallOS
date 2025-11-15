@@ -48,13 +48,16 @@ export const Inbox = () => {
     return () => abort.abort()
   }, [navigate])
 
-  const handleUpdateFlags = async (id: string, flags: { reviewed?: boolean; pinned?: boolean }) => {
+  const handleUpdateFlags = async (
+    id: string,
+    flags: { reviewed?: boolean; pinned?: boolean }
+  ) => {
     try {
       setActioningId(id)
       await MemoryService.updateMemoryFlags(id, flags)
-      setItems(prev =>
+      setItems((prev) =>
         prev
-          .map(item =>
+          .map((item) =>
             item.id === id
               ? {
                   ...item,
@@ -65,7 +68,7 @@ export const Inbox = () => {
                 }
               : item
           )
-          .filter(item => !(flags.reviewed && item.id === id))
+          .filter((item) => !(flags.reviewed && item.id === id))
       )
       toast.success("Memory updated")
     } catch (error) {
@@ -97,8 +100,12 @@ export const Inbox = () => {
                 ← Home
               </button>
               <div className="h-4 w-px bg-gray-300"></div>
-              <div className="text-sm font-semibold text-gray-900">Memory Inbox</div>
-              <div className="text-xs font-mono text-gray-500">{items.length} pending</div>
+              <div className="text-sm font-semibold text-gray-900">
+                Memory Inbox
+              </div>
+              <div className="text-xs font-mono text-gray-500">
+                {items.length} pending
+              </div>
             </div>
             <div className="flex items-center space-x-3">
               <button
@@ -126,7 +133,7 @@ export const Inbox = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {items.map(item => (
+            {items.map((item) => (
               <article
                 key={item.id}
                 className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors"
@@ -137,20 +144,27 @@ export const Inbox = () => {
                       {item.title || "Untitled memory"}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {new Date(item.created_at).toLocaleString()} • {item.memory_type || "entry"}
+                      {new Date(item.created_at).toLocaleString()} •{" "}
+                      {item.memory_type || "entry"}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       disabled={actioningId === item.id}
-                      onClick={() => handleUpdateFlags(item.id, { pinned: !(item.client_flags?.pinned === true) })}
+                      onClick={() =>
+                        handleUpdateFlags(item.id, {
+                          pinned: !(item.client_flags?.pinned === true),
+                        })
+                      }
                       className="px-3 py-1 text-xs font-medium border border-gray-300 text-gray-600 hover:text-black hover:border-black disabled:opacity-50"
                     >
                       {item.client_flags?.pinned ? "Unpin" : "Pin"}
                     </button>
                     <button
                       disabled={actioningId === item.id}
-                      onClick={() => handleUpdateFlags(item.id, { reviewed: true })}
+                      onClick={() =>
+                        handleUpdateFlags(item.id, { reviewed: true })
+                      }
                       className="px-3 py-1 text-xs font-medium bg-black text-white hover:bg-gray-900 disabled:opacity-50"
                     >
                       Mark Reviewed
@@ -158,14 +172,18 @@ export const Inbox = () => {
                   </div>
                 </div>
                 {item.summary && (
-                  <p className="mt-3 text-sm text-gray-700 line-clamp-3">{item.summary}</p>
+                  <p className="mt-3 text-sm text-gray-700 line-clamp-3">
+                    {item.summary}
+                  </p>
                 )}
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                  {item.importance_score !== null && item.importance_score !== undefined && (
-                    <span className="px-2 py-0.5 border border-gray-200 rounded-full">
-                      Importance: {Math.round((item.importance_score || 0) * 100) / 100}
-                    </span>
-                  )}
+                  {item.importance_score !== null &&
+                    item.importance_score !== undefined && (
+                      <span className="px-2 py-0.5 border border-gray-200 rounded-full">
+                        Importance:{" "}
+                        {Math.round((item.importance_score || 0) * 100) / 100}
+                      </span>
+                    )}
                   {item.source && (
                     <span className="px-2 py-0.5 border border-gray-200 rounded-full">
                       Source: {item.source}
@@ -192,4 +210,3 @@ export const Inbox = () => {
 }
 
 export default Inbox
-

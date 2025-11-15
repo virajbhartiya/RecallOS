@@ -59,75 +59,76 @@ export class ExportImportService {
    */
   async exportUserData(userId: string): Promise<ExportBundle> {
     try {
-      const [user, memories, profile, knowledgeScores, achievements, benchmarks] = await Promise.all([
-        prisma.user.findUnique({
-          where: { id: userId },
-          select: {
-            id: true,
-            external_id: true,
-            email: true,
-          },
-        }),
-        prisma.memory.findMany({
-          where: { user_id: userId },
-          select: {
-            id: true,
-            title: true,
-            url: true,
-            content: true,
-            summary: true,
-            source: true,
-            timestamp: true,
-            created_at: true,
-            page_metadata: true,
-            memory_type: true,
-            importance_score: true,
-            confidence_score: true,
-            source_app: true,
-          },
-          orderBy: { created_at: 'desc' },
-        }),
-        prisma.userProfile.findUnique({
-          where: { user_id: userId },
-          select: {
-            static_profile_text: true,
-            dynamic_profile_text: true,
-            static_profile_json: true,
-            dynamic_profile_json: true,
-          },
-        }),
-        prisma.knowledgeScore.findMany({
-          where: { user_id: userId },
-          select: {
-            period_type: true,
-            period_start: true,
-            period_end: true,
-            velocity_score: true,
-            impact_score: true,
-          },
-          orderBy: { period_start: 'desc' },
-        }),
-        prisma.achievement.findMany({
-          where: { user_id: userId },
-          select: {
-            badge_type: true,
-            badge_name: true,
-            unlocked_at: true,
-            progress: true,
-          },
-          orderBy: { unlocked_at: 'desc' },
-        }),
-        prisma.userBenchmark.findUnique({
-          where: { user_id: userId },
-          select: {
-            velocity_percentile: true,
-            impact_percentile: true,
-            connection_percentile: true,
-            diversity_percentile: true,
-            last_calculated: true,
-          },
-        }),
-      ])
+      const [user, memories, profile, knowledgeScores, achievements, benchmarks] =
+        await Promise.all([
+          prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              id: true,
+              external_id: true,
+              email: true,
+            },
+          }),
+          prisma.memory.findMany({
+            where: { user_id: userId },
+            select: {
+              id: true,
+              title: true,
+              url: true,
+              content: true,
+              summary: true,
+              source: true,
+              timestamp: true,
+              created_at: true,
+              page_metadata: true,
+              memory_type: true,
+              importance_score: true,
+              confidence_score: true,
+              source_app: true,
+            },
+            orderBy: { created_at: 'desc' },
+          }),
+          prisma.userProfile.findUnique({
+            where: { user_id: userId },
+            select: {
+              static_profile_text: true,
+              dynamic_profile_text: true,
+              static_profile_json: true,
+              dynamic_profile_json: true,
+            },
+          }),
+          prisma.knowledgeScore.findMany({
+            where: { user_id: userId },
+            select: {
+              period_type: true,
+              period_start: true,
+              period_end: true,
+              velocity_score: true,
+              impact_score: true,
+            },
+            orderBy: { period_start: 'desc' },
+          }),
+          prisma.achievement.findMany({
+            where: { user_id: userId },
+            select: {
+              badge_type: true,
+              badge_name: true,
+              unlocked_at: true,
+              progress: true,
+            },
+            orderBy: { unlocked_at: 'desc' },
+          }),
+          prisma.userBenchmark.findUnique({
+            where: { user_id: userId },
+            select: {
+              velocity_percentile: true,
+              impact_percentile: true,
+              connection_percentile: true,
+              diversity_percentile: true,
+              last_calculated: true,
+            },
+          }),
+        ])
 
       if (!user) {
         throw new Error('User not found')
@@ -199,7 +200,10 @@ export class ExportImportService {
    * Import user data from a JSON bundle
    * This creates new records for the target user
    */
-  async importUserData(targetUserId: string, bundle: ExportBundle): Promise<{
+  async importUserData(
+    targetUserId: string,
+    bundle: ExportBundle
+  ): Promise<{
     imported: {
       memories: number
       profile: boolean
@@ -229,10 +233,7 @@ export class ExportImportService {
           const existing = await prisma.memory.findFirst({
             where: {
               user_id: targetUserId,
-              OR: [
-                { id: memory.id },
-                { url: memory.url || undefined },
-              ],
+              OR: [{ id: memory.id }, { url: memory.url || undefined }],
             },
           })
 
@@ -260,7 +261,9 @@ export class ExportImportService {
           })
           importedMemories++
         } catch (error) {
-          errors.push(`Failed to import memory ${memory.id}: ${error instanceof Error ? error.message : String(error)}`)
+          errors.push(
+            `Failed to import memory ${memory.id}: ${error instanceof Error ? error.message : String(error)}`
+          )
         }
       }
 
@@ -285,7 +288,9 @@ export class ExportImportService {
           })
           importedProfile = true
         } catch (error) {
-          errors.push(`Failed to import profile: ${error instanceof Error ? error.message : String(error)}`)
+          errors.push(
+            `Failed to import profile: ${error instanceof Error ? error.message : String(error)}`
+          )
         }
       }
 
@@ -316,7 +321,9 @@ export class ExportImportService {
           if (error instanceof Error && error.message.includes('Unique constraint')) {
             continue
           }
-          errors.push(`Failed to import knowledge score: ${error instanceof Error ? error.message : String(error)}`)
+          errors.push(
+            `Failed to import knowledge score: ${error instanceof Error ? error.message : String(error)}`
+          )
         }
       }
 
@@ -338,7 +345,9 @@ export class ExportImportService {
           if (error instanceof Error && error.message.includes('Unique constraint')) {
             continue
           }
-          errors.push(`Failed to import achievement: ${error instanceof Error ? error.message : String(error)}`)
+          errors.push(
+            `Failed to import achievement: ${error instanceof Error ? error.message : String(error)}`
+          )
         }
       }
 
@@ -365,7 +374,9 @@ export class ExportImportService {
           })
           importedBenchmarks = true
         } catch (error) {
-          errors.push(`Failed to import benchmarks: ${error instanceof Error ? error.message : String(error)}`)
+          errors.push(
+            `Failed to import benchmarks: ${error instanceof Error ? error.message : String(error)}`
+          )
         }
       }
 
@@ -387,4 +398,3 @@ export class ExportImportService {
 }
 
 export const exportImportService = new ExportImportService()
-

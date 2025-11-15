@@ -37,7 +37,7 @@ export function getAllowedOrigins(): Set<string> {
 
 export function getRedisConnection() {
   const connectionOptions: any = {}
-  
+
   if (process.env.REDIS_URL) {
     connectionOptions.url = process.env.REDIS_URL
   } else {
@@ -50,11 +50,11 @@ export function getRedisConnection() {
       connectionOptions.password = process.env.REDIS_PASSWORD
     }
   }
-  
+
   // Increase command timeout to 10 seconds to handle long-running operations
   // This prevents "command timed out" errors during lock renewal
   connectionOptions.commandTimeout = Number(process.env.REDIS_COMMAND_TIMEOUT_MS || 10000)
-  
+
   return connectionOptions
 }
 

@@ -17,4 +17,3 @@ export async function updateMemoryFlags(
   const response = await patchRequest(`${BASE_URL}/${memoryId}/flags`, flags)
   return response?.data?.data
 }
-
