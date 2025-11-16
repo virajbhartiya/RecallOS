@@ -1,4 +1,4 @@
-<img width="1572" height="273" alt="Banner-sm" src="https://github.com/user-attachments/assets/97629c69-4512-4010-a528-b0d542f03214" />
+<a href="https://cogniahq.tech" target="_blank"><img width="1572" height="273" alt="Banner-sm" src="https://github.com/user-attachments/assets/97629c69-4512-4010-a528-b0d542f03214" /></a>
 
 > An AI-powered knowledge graph for capturing, organizing, and retrieving your digital context.
 
