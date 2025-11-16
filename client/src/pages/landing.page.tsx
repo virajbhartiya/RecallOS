@@ -148,17 +148,19 @@ const MemoryNodePreview: React.FC<{
   color: string
   importance?: number
   label?: string
-}> = ({ position, color, importance = 0.5, label }) => {
+  isHighlighted?: boolean
+  pulseIntensity?: number
+}> = ({ position, color, importance = 0.5, label, isHighlighted = false, pulseIntensity = 0 }) => {
   const meshRef = useRef<THREE.Mesh>(null)
   const groupRef = useRef<THREE.Group>(null)
   const textRef = useRef<THREE.Group>(null)
   const { camera } = useThree()
   const [hovered, setHovered] = useState(false)
 
-  const baseSize = 0.008 + importance * 0.004
+  const baseSize = 0.015 + importance * 0.008
   const size = baseSize
 
-  useFrame(() => {
+  useFrame((state) => {
     if (!meshRef.current || !groupRef.current) return
     const nodePosition = groupRef.current.position
     const distance = camera.position.distanceTo(nodePosition)
@@ -172,7 +174,8 @@ const MemoryNodePreview: React.FC<{
       Math.max(0.5, distance * worldPerceivedScale * 0.1)
     )
     const hoverScale = hovered ? 1.3 : 1.0
-    meshRef.current.scale.setScalar(dynamicScale * hoverScale)
+    const pulseScale = isHighlighted ? 1 + Math.sin(state.clock.elapsedTime * 3) * pulseIntensity * 0.3 : 1.0
+    meshRef.current.scale.setScalar(dynamicScale * hoverScale * pulseScale)
 
     if (textRef.current) {
       textRef.current.lookAt(camera.position)
@@ -188,11 +191,11 @@ const MemoryNodePreview: React.FC<{
       >
         <sphereGeometry args={[size, 12, 12]} />
         <meshStandardMaterial
-          color={color}
+          color={isHighlighted ? "#3b82f6" : color}
           metalness={0.3}
           roughness={0.4}
-          emissive={color}
-          emissiveIntensity={hovered ? 0.4 : 0.2}
+          emissive={isHighlighted ? "#3b82f6" : color}
+          emissiveIntensity={isHighlighted ? 0.6 : hovered ? 0.4 : 0.2}
         />
       </mesh>
       {label && (
@@ -266,8 +269,14 @@ const RotatingMesh: React.FC<{ children: React.ReactNode }> = ({
   return <group ref={groupRef}>{children}</group>
 }
 
-const MemoryMesh3DPreview: React.FC<{ meshData: MemoryMesh }> = ({
+const MemoryMesh3DPreview: React.FC<{ 
+  meshData: MemoryMesh
+  highlightedNodes?: Set<string>
+  pulseIntensity?: number
+}> = ({
   meshData,
+  highlightedNodes = new Set(),
+  pulseIntensity = 0,
 }) => {
   const { camera } = useThree()
 
@@ -408,6 +417,8 @@ const MemoryMesh3DPreview: React.FC<{ meshData: MemoryMesh }> = ({
             color={node.color}
             importance={node.importance}
             label={node.label}
+            isHighlighted={highlightedNodes.has(node.id)}
+            pulseIntensity={highlightedNodes.has(node.id) ? pulseIntensity : 0}
           />
         ))}
 
@@ -435,8 +446,14 @@ const ControlsUpdater: React.FC<{
   return null
 }
 
-const MemoryMesh3DContainer: React.FC<{ meshData: MemoryMesh }> = ({
+const MemoryMesh3DContainer: React.FC<{ 
+  meshData: MemoryMesh
+  highlightedNodes?: Set<string>
+  pulseIntensity?: number
+}> = ({
   meshData,
+  highlightedNodes = new Set(),
+  pulseIntensity = 0,
 }) => {
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
 
@@ -452,7 +469,11 @@ const MemoryMesh3DContainer: React.FC<{ meshData: MemoryMesh }> = ({
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true }}
     >
-      <MemoryMesh3DPreview meshData={meshData} />
+      <MemoryMesh3DPreview 
+        meshData={meshData} 
+        highlightedNodes={highlightedNodes}
+        pulseIntensity={pulseIntensity}
+      />
       <OrbitControls
         ref={controlsRef}
         enablePan={true}
@@ -479,6 +500,169 @@ const MemoryMesh3DContainer: React.FC<{ meshData: MemoryMesh }> = ({
       />
       <ControlsUpdater controlsRef={controlsRef} />
     </Canvas>
+  )
+}
+
+const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({ meshData }) => {
+  const [animationPhase, setAnimationPhase] = useState<'idle' | 'typing' | 'searching' | 'result'>('idle')
+  const [query, setQuery] = useState('')
+  const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set())
+  const [pulseIntensity, setPulseIntensity] = useState(0)
+  const [resultNodes, setResultNodes] = useState<string[]>([])
+  const animationStarted = useRef(false)
+  const timeoutsRef = useRef<Array<NodeJS.Timeout>>([])
+  const intervalsRef = useRef<Array<NodeJS.Timeout>>([])
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!containerRef.current || animationStarted.current) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (entry.isIntersecting && !animationStarted.current) {
+          console.log('Section is visible, starting animation')
+          animationStarted.current = true
+          
+          // Set typing phase immediately
+          setAnimationPhase('typing')
+          console.log('Phase set to typing, starting interval in 100ms')
+          
+          // Small delay to ensure state update is processed
+          const initTimeout = setTimeout(() => {
+            const fullQuery = "How to implement authentication in React?"
+            let charIndex = 0
+            
+            console.log('Starting typing interval, fullQuery length:', fullQuery.length)
+            const typingInterval = setInterval(() => {
+              if (charIndex < fullQuery.length) {
+                const newQuery = fullQuery.substring(0, charIndex + 1)
+                console.log('Typing character:', { charIndex, char: fullQuery[charIndex], newQuery })
+                setQuery(newQuery)
+                charIndex++
+              } else {
+                console.log('Typing complete, clearing interval')
+                clearInterval(typingInterval)
+                
+                // Phase 2: Searching (highlight nodes)
+                const searchTimeout = setTimeout(() => {
+                  console.log('Setting phase to searching')
+                  setAnimationPhase('searching')
+                  const nodeIds = meshData.nodes.slice(0, 8).map(n => n.id)
+                  console.log('Highlighting nodes:', nodeIds)
+                  setHighlightedNodes(new Set(nodeIds))
+                  setPulseIntensity(1)
+                  
+                // Phase 3: Result
+                const resultTimeout = setTimeout(() => {
+                  console.log('Setting phase to result')
+                  setAnimationPhase('result')
+                  const finalResultNodes = nodeIds.slice(0, 3)
+                  setResultNodes(finalResultNodes)
+                  // Keep highlighting the result nodes, not all searched nodes
+                  setHighlightedNodes(new Set(finalResultNodes))
+                  setPulseIntensity(0.8)
+                }, 2000)
+                  timeoutsRef.current.push(resultTimeout)
+                }, 500)
+                timeoutsRef.current.push(searchTimeout)
+              }
+            }, 80)
+            
+            intervalsRef.current.push(typingInterval)
+            console.log('Typing interval created:', typingInterval)
+          }, 100)
+          
+          timeoutsRef.current.push(initTimeout)
+          
+          // Disconnect observer once animation starts
+          observer.disconnect()
+        }
+      },
+      {
+        threshold: 0.3, // Start when 30% of the section is visible
+        rootMargin: '0px'
+      }
+    )
+
+    observer.observe(containerRef.current)
+
+    return () => {
+      observer.disconnect()
+      console.log('Cleaning up animation, resetting ref')
+      timeoutsRef.current.forEach(clearTimeout)
+      intervalsRef.current.forEach(clearInterval)
+      timeoutsRef.current = []
+      intervalsRef.current = []
+    }
+  }, [meshData])
+
+  console.log('SearchAnimationDemo render:', { animationPhase, query, queryLength: query.length, highlightedNodes: highlightedNodes.size, resultNodes: resultNodes.length })
+
+  return (
+    <div ref={containerRef} className="relative w-full h-full">
+      <MemoryMesh3DContainer 
+        meshData={meshData}
+        highlightedNodes={highlightedNodes}
+        pulseIntensity={pulseIntensity}
+      />
+      
+      {/* Search Animation UI */}
+      <div className="absolute bottom-2 left-0 right-0 z-10 px-4 pointer-events-none">
+        <div className="max-w-xl mx-auto">
+          {/* Search Input */}
+          <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-xl px-4 py-2.5">
+            <div className="flex items-center gap-3">
+              <div className="text-gray-500 flex-shrink-0">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0 flex items-center">
+                <span className="text-base font-light text-gray-900 leading-normal">{query || '\u00A0'}</span>
+              </div>
+              {animationPhase === 'searching' && (
+                <div className="animate-spin text-gray-500 flex-shrink-0">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  </svg>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Result Summary - positioned to not cover mesh */}
+          {animationPhase === 'result' && resultNodes.length > 0 && (
+            <div className="mt-2 bg-white/95 backdrop-blur-md border border-gray-300/50 rounded-lg px-3 py-2">
+              <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-1.5">
+                [{resultNodes.length} {resultNodes.length === 1 ? 'RESULT' : 'RESULTS'} FOUND]
+              </div>
+              <div className="text-xs text-gray-600 mb-2 leading-relaxed">
+                Add a login API, store the returned token in httpOnly cookies, protect routes with a wrapper that checks auth state, fetch the user profile on app load, redirect to login when no valid session exists.
+              </div>
+              <div className="space-y-1">
+                {resultNodes.map((nodeId, index) => {
+                  const node = meshData.nodes.find(n => n.id === nodeId)
+                  if (!node) return null
+                  return (
+                    <div
+                      key={nodeId}
+                      className="text-xs text-gray-700 leading-relaxed"
+                      style={{
+                        animation: `slideInUp 0.5s ease-out ${index * 0.1}s both`
+                      }}
+                    >
+                      <span className="font-medium">• {node.title || node.label}</span>
+                      <span className="text-gray-500 ml-2">[{node.type}]</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1878,7 +2062,7 @@ export const Landing = () => {
 
           <div className="w-full max-w-7xl mx-auto aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9] h-[60vh] sm:h-[70vh] lg:h-[80vh] min-h-[500px] sm:min-h-[600px] relative rounded-xl overflow-hidden">
             <div className="absolute inset-0" style={{ pointerEvents: 'auto' }}>
-              <MemoryMesh3DContainer meshData={mockMeshData} />
+              <SearchAnimationDemo meshData={mockMeshData} />
             </div>
           </div>
           </div>
