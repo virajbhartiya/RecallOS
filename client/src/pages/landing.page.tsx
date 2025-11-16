@@ -1,42 +1,81 @@
-import React, { useEffect, useState, useMemo, useRef } from "react"
-import { Canvas, useFrame, useThree } from "@react-three/fiber"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Line, OrbitControls, Text } from "@react-three/drei"
+import { Canvas, useFrame, useThree } from "@react-three/fiber"
+import { addDoc, collection, serverTimestamp } from "firebase/firestore"
 import * as THREE from "three"
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 
 import { ConsoleButton, Section } from "../components/sections"
+import { db } from "../lib/firebase"
 import type { MemoryMesh, MemoryMeshEdge } from "../types/memory.type"
 
 const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
   const [email, setEmail] = useState("")
   const [submitted, setSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
     setIsSubmitting(true)
 
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      if (!db) {
+        throw new Error("Firebase is not initialized")
+      }
 
-    setSubmitted(true)
-    setIsSubmitting(false)
-    setEmail("")
+      await addDoc(collection(db, "waitlist"), {
+        email: email.trim().toLowerCase(),
+        createdAt: serverTimestamp(),
+        source: "landing_page",
+      })
+
+      setSubmitted(true)
+      setEmail("")
+    } catch (err) {
+      console.error("Error adding to waitlist:", err)
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong. Please try again."
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (submitted) {
     return (
       <div className="text-center py-6">
-        <div className="text-3xl mb-3">✓</div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          You're on the list!
+        <div className="mb-4 flex justify-center">
+          <div className="w-12 h-12 border border-gray-300 rounded-full flex items-center justify-center bg-white/50">
+            <svg
+              className="w-5 h-5 text-gray-700"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+          </div>
+        </div>
+        <h3 className="text-xl sm:text-2xl font-light font-editorial text-black mb-3">
+          Your memory awaits
         </h3>
-        <p className="text-sm text-gray-600">
-          We'll send you an email when Cognia is ready.
+        <p className="text-sm text-gray-700 leading-relaxed font-primary max-w-md mx-auto">
+          We'll notify you when Cognia is ready. Never forget what you see
+          online.
         </p>
         {!compact && (
           <button
             onClick={() => setSubmitted(false)}
-            className="mt-6 text-sm text-gray-700 hover:text-black underline"
+            className="mt-6 text-sm text-gray-600 hover:text-black underline transition-colors"
           >
             Add another email
           </button>
@@ -70,8 +109,11 @@ const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
           </ConsoleButton>
         </div>
         <p className="text-xs text-gray-500 text-center">
-          Be among the first to experience Cognia. No spam, unsubscribe anytime.
+          Be among the first to experience Cognia.
         </p>
+        {error && (
+          <p className="text-xs text-red-600 text-center mt-2">{error}</p>
+        )}
       </form>
     )
   }
@@ -107,8 +149,11 @@ const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
         <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
       </ConsoleButton>
       <p className="text-xs text-gray-500 text-center">
-        We respect your privacy. No spam, unsubscribe anytime.
+        We respect your privacy.
       </p>
+      {error && (
+        <p className="text-xs text-red-600 text-center mt-2">{error}</p>
+      )}
     </form>
   )
 }
@@ -150,7 +195,14 @@ const MemoryNodePreview: React.FC<{
   label?: string
   isHighlighted?: boolean
   pulseIntensity?: number
-}> = ({ position, color, importance = 0.5, label, isHighlighted = false, pulseIntensity = 0 }) => {
+}> = ({
+  position,
+  color,
+  importance = 0.5,
+  label,
+  isHighlighted = false,
+  pulseIntensity = 0,
+}) => {
   const meshRef = useRef<THREE.Mesh>(null)
   const groupRef = useRef<THREE.Group>(null)
   const textRef = useRef<THREE.Group>(null)
@@ -174,7 +226,9 @@ const MemoryNodePreview: React.FC<{
       Math.max(0.5, distance * worldPerceivedScale * 0.1)
     )
     const hoverScale = hovered ? 1.3 : 1.0
-    const pulseScale = isHighlighted ? 1 + Math.sin(state.clock.elapsedTime * 3) * pulseIntensity * 0.3 : 1.0
+    const pulseScale = isHighlighted
+      ? 1 + Math.sin(state.clock.elapsedTime * 3) * pulseIntensity * 0.3
+      : 1.0
     meshRef.current.scale.setScalar(dynamicScale * hoverScale * pulseScale)
 
     if (textRef.current) {
@@ -269,15 +323,11 @@ const RotatingMesh: React.FC<{ children: React.ReactNode }> = ({
   return <group ref={groupRef}>{children}</group>
 }
 
-const MemoryMesh3DPreview: React.FC<{ 
+const MemoryMesh3DPreview: React.FC<{
   meshData: MemoryMesh
   highlightedNodes?: Set<string>
   pulseIntensity?: number
-}> = ({
-  meshData,
-  highlightedNodes = new Set(),
-  pulseIntensity = 0,
-}) => {
+}> = ({ meshData, highlightedNodes = new Set(), pulseIntensity = 0 }) => {
   const { camera } = useThree()
 
   useEffect(() => {
@@ -292,15 +342,15 @@ const MemoryMesh3DPreview: React.FC<{
     const sphereRadius = 1.2
 
     const normalizedPositions: [number, number, number][] = new Array(nodeCount)
-    
+
     for (let i = 0; i < nodeCount; i++) {
       const theta = Math.acos(-1 + (2 * i) / nodeCount)
       const phi = Math.sqrt(nodeCount * Math.PI) * theta
-      
+
       const x = sphereRadius * Math.cos(phi) * Math.sin(theta)
       const y = sphereRadius * Math.sin(phi) * Math.sin(theta)
       const z = sphereRadius * Math.cos(theta)
-      
+
       normalizedPositions[i] = [x, y, z]
     }
 
@@ -446,19 +496,15 @@ const ControlsUpdater: React.FC<{
   return null
 }
 
-const MemoryMesh3DContainer: React.FC<{ 
+const MemoryMesh3DContainer: React.FC<{
   meshData: MemoryMesh
   highlightedNodes?: Set<string>
   pulseIntensity?: number
-}> = ({
-  meshData,
-  highlightedNodes = new Set(),
-  pulseIntensity = 0,
-}) => {
+}> = ({ meshData, highlightedNodes = new Set(), pulseIntensity = 0 }) => {
   const controlsRef = useRef<OrbitControlsImpl | null>(null)
 
   return (
-      <Canvas
+    <Canvas
       camera={{
         position: [0, 0, 3.5],
         fov: 50,
@@ -469,8 +515,8 @@ const MemoryMesh3DContainer: React.FC<{
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true }}
     >
-      <MemoryMesh3DPreview 
-        meshData={meshData} 
+      <MemoryMesh3DPreview
+        meshData={meshData}
         highlightedNodes={highlightedNodes}
         pulseIntensity={pulseIntensity}
       />
@@ -503,10 +549,16 @@ const MemoryMesh3DContainer: React.FC<{
   )
 }
 
-const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({ meshData }) => {
-  const [animationPhase, setAnimationPhase] = useState<'idle' | 'typing' | 'searching' | 'result'>('idle')
-  const [query, setQuery] = useState('')
-  const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set())
+const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({
+  meshData,
+}) => {
+  const [animationPhase, setAnimationPhase] = useState<
+    "idle" | "typing" | "searching" | "result"
+  >("idle")
+  const [query, setQuery] = useState("")
+  const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(
+    new Set()
+  )
   const [pulseIntensity, setPulseIntensity] = useState(0)
   const [resultNodes, setResultNodes] = useState<string[]>([])
   const animationStarted = useRef(false)
@@ -521,67 +573,74 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({ meshData }) =
       (entries) => {
         const entry = entries[0]
         if (entry.isIntersecting && !animationStarted.current) {
-          console.log('Section is visible, starting animation')
+          console.log("Section is visible, starting animation")
           animationStarted.current = true
-          
+
           // Set typing phase immediately
-          setAnimationPhase('typing')
-          console.log('Phase set to typing, starting interval in 100ms')
-          
+          setAnimationPhase("typing")
+          console.log("Phase set to typing, starting interval in 100ms")
+
           // Small delay to ensure state update is processed
           const initTimeout = setTimeout(() => {
             const fullQuery = "How to implement authentication in React?"
             let charIndex = 0
-            
-            console.log('Starting typing interval, fullQuery length:', fullQuery.length)
+
+            console.log(
+              "Starting typing interval, fullQuery length:",
+              fullQuery.length
+            )
             const typingInterval = setInterval(() => {
               if (charIndex < fullQuery.length) {
                 const newQuery = fullQuery.substring(0, charIndex + 1)
-                console.log('Typing character:', { charIndex, char: fullQuery[charIndex], newQuery })
+                console.log("Typing character:", {
+                  charIndex,
+                  char: fullQuery[charIndex],
+                  newQuery,
+                })
                 setQuery(newQuery)
                 charIndex++
               } else {
-                console.log('Typing complete, clearing interval')
+                console.log("Typing complete, clearing interval")
                 clearInterval(typingInterval)
-                
+
                 // Phase 2: Searching (highlight nodes)
                 const searchTimeout = setTimeout(() => {
-                  console.log('Setting phase to searching')
-                  setAnimationPhase('searching')
-                  const nodeIds = meshData.nodes.slice(0, 8).map(n => n.id)
-                  console.log('Highlighting nodes:', nodeIds)
+                  console.log("Setting phase to searching")
+                  setAnimationPhase("searching")
+                  const nodeIds = meshData.nodes.slice(0, 8).map((n) => n.id)
+                  console.log("Highlighting nodes:", nodeIds)
                   setHighlightedNodes(new Set(nodeIds))
                   setPulseIntensity(1)
-                  
-                // Phase 3: Result
-                const resultTimeout = setTimeout(() => {
-                  console.log('Setting phase to result')
-                  setAnimationPhase('result')
-                  const finalResultNodes = nodeIds.slice(0, 3)
-                  setResultNodes(finalResultNodes)
-                  // Keep highlighting the result nodes, not all searched nodes
-                  setHighlightedNodes(new Set(finalResultNodes))
-                  setPulseIntensity(0.8)
-                }, 2000)
+
+                  // Phase 3: Result
+                  const resultTimeout = setTimeout(() => {
+                    console.log("Setting phase to result")
+                    setAnimationPhase("result")
+                    const finalResultNodes = nodeIds.slice(0, 3)
+                    setResultNodes(finalResultNodes)
+                    // Keep highlighting the result nodes, not all searched nodes
+                    setHighlightedNodes(new Set(finalResultNodes))
+                    setPulseIntensity(0.8)
+                  }, 2000)
                   timeoutsRef.current.push(resultTimeout)
                 }, 500)
                 timeoutsRef.current.push(searchTimeout)
               }
             }, 80)
-            
+
             intervalsRef.current.push(typingInterval)
-            console.log('Typing interval created:', typingInterval)
+            console.log("Typing interval created:", typingInterval)
           }, 100)
-          
+
           timeoutsRef.current.push(initTimeout)
-          
+
           // Disconnect observer once animation starts
           observer.disconnect()
         }
       },
       {
         threshold: 0.3, // Start when 30% of the section is visible
-        rootMargin: '0px'
+        rootMargin: "0px",
       }
     )
 
@@ -589,7 +648,7 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({ meshData }) =
 
     return () => {
       observer.disconnect()
-      console.log('Cleaning up animation, resetting ref')
+      console.log("Cleaning up animation, resetting ref")
       timeoutsRef.current.forEach(clearTimeout)
       intervalsRef.current.forEach(clearInterval)
       timeoutsRef.current = []
@@ -597,16 +656,22 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({ meshData }) =
     }
   }, [meshData])
 
-  console.log('SearchAnimationDemo render:', { animationPhase, query, queryLength: query.length, highlightedNodes: highlightedNodes.size, resultNodes: resultNodes.length })
+  console.log("SearchAnimationDemo render:", {
+    animationPhase,
+    query,
+    queryLength: query.length,
+    highlightedNodes: highlightedNodes.size,
+    resultNodes: resultNodes.length,
+  })
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      <MemoryMesh3DContainer 
+      <MemoryMesh3DContainer
         meshData={meshData}
         highlightedNodes={highlightedNodes}
         pulseIntensity={pulseIntensity}
       />
-      
+
       {/* Search Animation UI */}
       <div className="absolute bottom-2 left-0 right-0 z-10 px-4 pointer-events-none">
         <div className="max-w-xl mx-auto">
@@ -614,17 +679,39 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({ meshData }) =
           <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-xl px-4 py-2.5">
             <div className="flex items-center gap-3">
               <div className="text-gray-500 flex-shrink-0">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
+                  />
                 </svg>
               </div>
               <div className="flex-1 min-w-0 flex items-center">
-                <span className="text-base font-light text-gray-900 leading-normal">{query || '\u00A0'}</span>
+                <span className="text-base font-light text-gray-900 leading-normal">
+                  {query || "\u00A0"}
+                </span>
               </div>
-              {animationPhase === 'searching' && (
+              {animationPhase === "searching" && (
                 <div className="animate-spin text-gray-500 flex-shrink-0">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"
+                    />
                   </svg>
                 </div>
               )}
@@ -632,27 +719,33 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({ meshData }) =
           </div>
 
           {/* Result Summary - positioned to not cover mesh */}
-          {animationPhase === 'result' && resultNodes.length > 0 && (
+          {animationPhase === "result" && resultNodes.length > 0 && (
             <div className="mt-2 bg-white/95 backdrop-blur-md border border-gray-300/50 rounded-lg px-3 py-2">
               <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-1.5">
-                [{resultNodes.length} {resultNodes.length === 1 ? 'RESULT' : 'RESULTS'} FOUND]
+                [{resultNodes.length}{" "}
+                {resultNodes.length === 1 ? "RESULT" : "RESULTS"} FOUND]
               </div>
               <div className="text-xs text-gray-600 mb-2 leading-relaxed">
-                Add a login API, store the returned token in httpOnly cookies, protect routes with a wrapper that checks auth state, fetch the user profile on app load, redirect to login when no valid session exists.
+                Add a login API, store the returned token in httpOnly cookies,
+                protect routes with a wrapper that checks auth state, fetch the
+                user profile on app load, redirect to login when no valid
+                session exists.
               </div>
               <div className="space-y-1">
                 {resultNodes.map((nodeId, index) => {
-                  const node = meshData.nodes.find(n => n.id === nodeId)
+                  const node = meshData.nodes.find((n) => n.id === nodeId)
                   if (!node) return null
                   return (
                     <div
                       key={nodeId}
                       className="text-xs text-gray-700 leading-relaxed"
                       style={{
-                        animation: `slideInUp 0.5s ease-out ${index * 0.1}s both`
+                        animation: `slideInUp 0.5s ease-out ${index * 0.1}s both`,
                       }}
                     >
-                      <span className="font-medium">• {node.title || node.label}</span>
+                      <span className="font-medium">
+                        • {node.title || node.label}
+                      </span>
                       <span className="text-gray-500 ml-2">[{node.type}]</span>
                     </div>
                   )
@@ -1399,13 +1492,13 @@ const mockMeshData: MemoryMesh = {
       source: "21",
       target: "30",
       relation_type: "related",
-      similarity_score: 0.70,
+      similarity_score: 0.7,
     },
     {
       source: "1",
       target: "15",
       relation_type: "related",
-      similarity_score: 0.80,
+      similarity_score: 0.8,
     },
     {
       source: "2",
@@ -1875,19 +1968,19 @@ export const Landing = () => {
       {/* Logo Header */}
       <header className="fixed top-0 inset-x-0 z-40 py-4 sm:py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
             <img
               src="/black-transparent.png"
               alt="Cognia"
               className="w-10 h-10"
             />
-              <div className="flex flex-col">
-                <span className="text-xl font-bold text-italics font-editorial text-black">
-                  Cognia
-                </span>
-                <span className="text-xs text-gray-600 font-mono -mt-1">
-                  Remember what the web showed you
-                </span>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold text-italics font-editorial text-black">
+                Cognia
+              </span>
+              <span className="text-xs text-gray-600 font-mono -mt-1">
+                Remember what the web showed you
+              </span>
             </div>
           </div>
         </div>
@@ -2072,8 +2165,8 @@ export const Landing = () => {
       </Section>
 
       {/* Product Explanation Section */}
-        <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-light font-editorial mb-4">
               How it works
@@ -2081,16 +2174,16 @@ export const Landing = () => {
             <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto">
               Cognia captures everything you see online, making it instantly
               searchable with natural language queries.
-              </p>
-            </div>
+            </p>
+          </div>
 
           <div className="w-full max-w-7xl mx-auto aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9] h-[60vh] sm:h-[70vh] lg:h-[80vh] min-h-[500px] sm:min-h-[600px] relative rounded-xl overflow-hidden">
-            <div className="absolute inset-0" style={{ pointerEvents: 'auto' }}>
+            <div className="absolute inset-0" style={{ pointerEvents: "auto" }}>
               <SearchAnimationDemo meshData={mockMeshData} />
             </div>
           </div>
-          </div>
-        </Section>
+        </div>
+      </Section>
 
       {/* Data Flow Section */}
       <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
@@ -2124,8 +2217,8 @@ export const Landing = () => {
                 Extension captures
               </h3>
               <p className="text-base text-gray-700 leading-relaxed font-primary">
-                As you browse, the extension automatically captures text,
-                links, and context from every page you visit.
+                As you browse, the extension automatically captures text, links,
+                and context from every page you visit.
               </p>
             </div>
 
@@ -2147,8 +2240,8 @@ export const Landing = () => {
                 Data aggregated
               </h3>
               <p className="text-base text-gray-700 leading-relaxed font-primary">
-                Captured data is processed, embedded, and organized by
-                relevance and context for efficient retrieval.
+                Captured data is processed, embedded, and organized by relevance
+                and context for efficient retrieval.
               </p>
             </div>
 
@@ -2170,8 +2263,8 @@ export const Landing = () => {
                 Added to memory mesh
               </h3>
               <p className="text-base text-gray-700 leading-relaxed font-primary">
-                New memories are connected to related content, building
-                an interconnected knowledge graph you can search instantly.
+                New memories are connected to related content, building an
+                interconnected knowledge graph you can search instantly.
               </p>
             </div>
           </div>
