@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getUserId, requireAuthToken, clearAuthToken } from '@/lib/userId'
 import { storage, runtime, tabs } from '@/lib/browser'
 import {

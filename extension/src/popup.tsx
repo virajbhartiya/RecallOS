@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { getAuthToken, requireAuthToken } from '@/lib/userId'

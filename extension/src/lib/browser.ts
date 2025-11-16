@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 declare const browser: typeof chrome | undefined
 
 type BrowserName = 'chrome' | 'firefox' | 'unknown'

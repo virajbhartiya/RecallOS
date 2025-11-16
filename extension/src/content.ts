@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { getUserId, requireAuthToken } from '@/lib/userId'
 import { runtime, storage } from '@/lib/browser'
 import { MESSAGE_TYPES } from '@/lib/constants'
@@ -779,8 +780,7 @@ async function sendContextToBackground() {
       compatibility_mode: privacyExtensionDetected,
     }
     runtime.sendMessage({ type: 'CAPTURE_CONTEXT', data: contextData }, _response => {
-      // Show capture indicator
-      showCaptureIndicator()
+      // Capture sent silently
     })
     lastCaptureTime = now
   } catch (_error) {}
@@ -1330,77 +1330,6 @@ function copyTextToClipboard(text: string): boolean {
   } catch (_error) {
     return false
   }
-}
-
-function showCaptureIndicator(): void {
-  // Remove existing indicator if any
-  const existing = document.getElementById('cognia-capture-indicator')
-  if (existing) {
-    existing.remove()
-  }
-
-  const indicator = document.createElement('div')
-  indicator.id = 'cognia-capture-indicator'
-  indicator.style.cssText = `
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background: #000;
-    color: #fff;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 12px;
-    font-weight: 500;
-    z-index: 999999;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    animation: slideIn 0.3s ease-out;
-  `
-
-  const icon = document.createElement('span')
-  icon.textContent = '✓'
-  icon.style.cssText = 'font-size: 14px;'
-
-  const text = document.createElement('span')
-  text.textContent = 'Captured'
-
-  indicator.appendChild(icon)
-  indicator.appendChild(text)
-  document.body.appendChild(indicator)
-
-  // Add animation
-  const style = document.createElement('style')
-  style.textContent = `
-    @keyframes slideIn {
-      from {
-        transform: translateY(20px);
-        opacity: 0;
-      }
-      to {
-        transform: translateY(0);
-        opacity: 1;
-      }
-    }
-  `
-  if (!document.head.querySelector('#cognia-capture-animations')) {
-    style.id = 'cognia-capture-animations'
-    document.head.appendChild(style)
-  }
-
-  // Auto-remove after 2 seconds
-  setTimeout(() => {
-    if (indicator.parentNode) {
-      indicator.style.animation = 'slideIn 0.3s ease-out reverse'
-      setTimeout(() => {
-        if (indicator.parentNode) {
-          indicator.parentNode.removeChild(indicator)
-        }
-      }, 300)
-    }
-  }, 2000)
 }
 
 function showDraftToast(message: string, variant: 'info' | 'success' | 'error' = 'info'): void {
