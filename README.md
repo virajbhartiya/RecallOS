@@ -1,7 +1,7 @@
-# Cognia - Personal Memory System
+<img width="1572" height="273" alt="Banner-sm" src="https://github.com/user-attachments/assets/97629c69-4512-4010-a528-b0d542f03214" />
 
 > An AI-powered knowledge graph for capturing, organizing, and retrieving your digital context.
-<img width="1582" height="976" alt="Screenshot 2025-11-04 at 2 17 22 AM" src="https://github.com/user-attachments/assets/3f42dfd1-237a-41a6-81bc-dc7635307a8e" />
+
 
 ## Quick Start
 
@@ -80,6 +80,9 @@ npm run build
 # 2. Enter API endpoint: http://localhost:3000/api/memory/process
 # 3. Extension will automatically authenticate
 ```
+
+<img width="1582" height="976" alt="Screenshot 2025-11-16 at 5 12 44 PM" src="https://github.com/user-attachments/assets/ea0d7958-e40a-4186-be5a-a8fae01b8f85" />
+
 
 ---
 
