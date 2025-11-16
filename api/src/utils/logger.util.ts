@@ -50,40 +50,55 @@ const formatMessageForConsole = (args: unknown[], color: string, label: string):
 }
 
 const shouldUseColors = process.stdout.isTTY && process.env.NO_COLOR !== '1'
-const loggerOutputMode = getLoggerOutputMode()
-const morganOutputMode = getMorganOutputMode()
-
-const logFilePath = getLogFilePath()
-const logDir = path.dirname(logFilePath)
 
 let logFileStream: fs.WriteStream | null = null
+let logFileStreamInitialized = false
 
-const needsFileStream =
-  loggerOutputMode === 'log' ||
-  loggerOutputMode === 'both' ||
-  morganOutputMode === 'log' ||
-  morganOutputMode === 'both'
+const getLoggerOutputModeValue = (): 'print' | 'log' | 'both' | 'none' => {
+  return getLoggerOutputMode()
+}
 
-if (needsFileStream) {
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true })
+const getMorganOutputModeValue = (): 'print' | 'log' | 'both' | 'none' => {
+  return getMorganOutputMode()
+}
+
+const ensureLogFileStream = () => {
+  if (logFileStreamInitialized) return
+
+  const loggerOutputMode = getLoggerOutputModeValue()
+  const morganOutputMode = getMorganOutputModeValue()
+  const logFilePath = getLogFilePath()
+  const logDir = path.dirname(logFilePath)
+
+  const needsFileStream =
+    loggerOutputMode === 'log' ||
+    loggerOutputMode === 'both' ||
+    morganOutputMode === 'log' ||
+    morganOutputMode === 'both'
+
+  if (needsFileStream) {
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true })
+    }
+
+    logFileStream = fs.createWriteStream(logFilePath, { flags: 'a' })
+
+    process.on('exit', () => {
+      logFileStream?.end()
+    })
+
+    process.on('SIGINT', () => {
+      logFileStream?.end()
+      process.exit(0)
+    })
+
+    process.on('SIGTERM', () => {
+      logFileStream?.end()
+      process.exit(0)
+    })
   }
 
-  logFileStream = fs.createWriteStream(logFilePath, { flags: 'a' })
-
-  process.on('exit', () => {
-    logFileStream?.end()
-  })
-
-  process.on('SIGINT', () => {
-    logFileStream?.end()
-    process.exit(0)
-  })
-
-  process.on('SIGTERM', () => {
-    logFileStream?.end()
-    process.exit(0)
-  })
+  logFileStreamInitialized = true
 }
 
 const writeToFile = (message: string) => {
@@ -94,6 +109,8 @@ const writeToFile = (message: string) => {
 
 export const logger = {
   log: (...args: unknown[]) => {
+    ensureLogFileStream()
+    const loggerOutputMode = getLoggerOutputModeValue()
     if (loggerOutputMode === 'none') return
 
     const fileMessage = formatMessageForFile(args, 'LOG')
@@ -115,6 +132,8 @@ export const logger = {
     }
   },
   error: (...args: unknown[]) => {
+    ensureLogFileStream()
+    const loggerOutputMode = getLoggerOutputModeValue()
     if (loggerOutputMode === 'none') return
 
     const fileMessage = formatMessageForFile(args, 'ERROR')
@@ -136,6 +155,8 @@ export const logger = {
     }
   },
   warn: (...args: unknown[]) => {
+    ensureLogFileStream()
+    const loggerOutputMode = getLoggerOutputModeValue()
     if (loggerOutputMode === 'none') return
 
     const fileMessage = formatMessageForFile(args, 'WARN')
@@ -157,6 +178,8 @@ export const logger = {
     }
   },
   info: (...args: unknown[]) => {
+    ensureLogFileStream()
+    const loggerOutputMode = getLoggerOutputModeValue()
     if (loggerOutputMode === 'none') return
 
     const fileMessage = formatMessageForFile(args, 'INFO')
@@ -178,6 +201,8 @@ export const logger = {
     }
   },
   debug: (...args: unknown[]) => {
+    ensureLogFileStream()
+    const loggerOutputMode = getLoggerOutputModeValue()
     if (loggerOutputMode === 'none') return
 
     const fileMessage = formatMessageForFile(args, 'DEBUG')
@@ -199,6 +224,7 @@ export const logger = {
     }
   },
   writeToFile: (message: string) => {
+    ensureLogFileStream()
     writeToFile(message)
   },
 }

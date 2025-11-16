@@ -634,10 +634,9 @@ export class MemoryController {
 
       // Clear search cache entries that might reference this memory
       try {
-        const { getRedisClient } = await import('../lib/redis.lib')
+        const { getRedisClient, scanKeys } = await import('../lib/redis.lib')
         const redis = getRedisClient()
-        // Get all cache keys (this is a simple approach - in production you might want a more efficient method)
-        const keys = await redis.keys('search_cache:*')
+        const keys = await scanKeys(redis, 'search_cache:*', 1000)
         for (const key of keys) {
           const cached = await redis.get(key)
           if (cached) {

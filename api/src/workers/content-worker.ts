@@ -400,9 +400,8 @@ export const startContentWorker = () => {
       limiter: getQueueLimiter(),
       stalledInterval: getQueueStalledInterval(),
       maxStalledCount: getQueueMaxStalledCount(),
-      // Lock duration is handled automatically by BullMQ
-      // Increased Redis command timeout in getRedisConnection() prevents lock renewal failures
-      // Jobs with 4-minute AI calls should complete within the default lock renewal window
+      lockDuration: 600000, // 10 minutes - jobs can take 2+ minutes to complete
+      lockRenewTime: 20000, // Renew lock every 20 seconds (more frequent to prevent timeouts)
     }
   )
 }

@@ -1,6 +1,6 @@
 import { aiProvider } from './ai-provider.service'
 import { logger } from '../utils/logger.util'
-import { getRedisClient } from '../lib/redis.lib'
+import { getRedisClient, scanKeys } from '../lib/redis.lib'
 import { createHash } from 'crypto'
 
 const RERANK_CACHE_TTL = 60 * 60 // 1 hour
@@ -200,7 +200,7 @@ Rules:
         logger.log('[rerank] Cache clear requested', { pattern })
       } else {
         // Clear all rerank cache
-        const keys = await redis.keys(`${RERANK_CACHE_PREFIX}*`)
+        const keys = await scanKeys(redis, `${RERANK_CACHE_PREFIX}*`, 1000)
         if (keys.length > 0) {
           await redis.del(...keys)
           logger.log('[rerank] Cache cleared', { keyCount: keys.length })

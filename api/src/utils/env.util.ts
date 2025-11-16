@@ -42,6 +42,12 @@ interface RedisConnectionOptions {
   username?: string
   password?: string
   commandTimeout?: number
+  maxRetriesPerRequest?: number
+  enableReadyCheck?: boolean
+  lazyConnect?: boolean
+  connectTimeout?: number
+  keepAlive?: number
+  retryStrategy?: (times: number) => number | null
 }
 
 export function getRedisConnection(): RedisConnectionOptions {
@@ -60,9 +66,21 @@ export function getRedisConnection(): RedisConnectionOptions {
     }
   }
 
-  // Increase command timeout to 10 seconds to handle long-running operations
-  // This prevents "command timed out" errors during lock renewal
-  connectionOptions.commandTimeout = Number(process.env.REDIS_COMMAND_TIMEOUT_MS || 10000)
+  // Increase command timeout to 60 seconds to handle long-running operations
+  // This prevents "command timed out" errors during lock renewal and queue operations
+  // Processes can take 2+ minutes, so we need sufficient timeout for individual Redis commands
+  connectionOptions.commandTimeout = Number(process.env.REDIS_COMMAND_TIMEOUT_MS || 60000)
+  connectionOptions.maxRetriesPerRequest = 3
+  connectionOptions.enableReadyCheck = true
+  connectionOptions.lazyConnect = false
+  connectionOptions.connectTimeout = 10000
+  connectionOptions.keepAlive = 10000
+  connectionOptions.retryStrategy = (times: number) => {
+    if (times > 3) {
+      return null
+    }
+    return Math.min(times * 200, 2000)
+  }
 
   return connectionOptions
 }

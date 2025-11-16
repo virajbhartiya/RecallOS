@@ -310,6 +310,10 @@ server.listen(port, async () => {
   logger.log('[startup] server_listening', { protocol, port })
 })
 process.on('unhandledRejection', (err: Error) => {
+  const errorMessage = err?.message || String(err) || ''
+  if (errorMessage.includes('Command timed out') || errorMessage.includes('timeout')) {
+    return
+  }
   logger.error('Unhandled Rejection! 💥 Shutting down...')
   logger.error(err.name, err.message)
   server.close(() => {
