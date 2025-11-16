@@ -1856,9 +1856,7 @@ export const Landing = () => {
               </p>
             </div>
 
-          <div className="w-full h-[60vh] relative rounded-xl overflow-hidden shadow-2xl border border-gray-200/50 bg-gradient-to-br from-white via-gray-50/50 to-white">
-            <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/5 pointer-events-none" />
-            <div className="absolute inset-0 backdrop-blur-[0.5px] pointer-events-none" />
+          <div className="w-full max-w-5xl mx-auto aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9] h-[50vh] sm:h-[60vh] lg:h-[70vh] min-h-[400px] sm:min-h-[500px] relative rounded-xl overflow-hidden">
             <MemoryMesh3DContainer meshData={mockMeshData} />
           </div>
           </div>
