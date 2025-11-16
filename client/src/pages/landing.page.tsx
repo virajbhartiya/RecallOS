@@ -252,6 +252,20 @@ const MemoryEdgePreview: React.FC<{
   )
 }
 
+const RotatingMesh: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const groupRef = useRef<THREE.Group>(null)
+
+  useFrame((_, delta) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y += delta * 0.1
+    }
+  })
+
+  return <group ref={groupRef}>{children}</group>
+}
+
 const MemoryMesh3DPreview: React.FC<{ meshData: MemoryMesh }> = ({
   meshData,
 }) => {
@@ -386,24 +400,26 @@ const MemoryMesh3DPreview: React.FC<{ meshData: MemoryMesh }> = ({
       <pointLight position={[0, 0, 0]} intensity={0.5} color="#ffffff" />
       <gridHelper args={[10, 10, "#e5e7eb", "#f3f4f6"]} position={[0, -2, 0]} />
 
-      {nodes.map((node) => (
-        <MemoryNodePreview
-          key={node.id}
-          position={node.position}
-          color={node.color}
-          importance={node.importance}
-          label={node.label}
-        />
-      ))}
+      <RotatingMesh>
+        {nodes.map((node) => (
+          <MemoryNodePreview
+            key={node.id}
+            position={node.position}
+            color={node.color}
+            importance={node.importance}
+            label={node.label}
+          />
+        ))}
 
-      {edges.map((edge, index) => (
-        <MemoryEdgePreview
-          key={`edge-${index}-${edge.start.join(",")}-${edge.end.join(",")}`}
-          start={edge.start}
-          end={edge.end}
-          similarity={edge.similarity}
-        />
-      ))}
+        {edges.map((edge, index) => (
+          <MemoryEdgePreview
+            key={`edge-${index}-${edge.start.join(",")}-${edge.end.join(",")}`}
+            start={edge.start}
+            end={edge.end}
+            similarity={edge.similarity}
+          />
+        ))}
+      </RotatingMesh>
     </>
   )
 }
@@ -440,7 +456,7 @@ const MemoryMesh3DContainer: React.FC<{ meshData: MemoryMesh }> = ({
       <OrbitControls
         ref={controlsRef}
         enablePan={true}
-        enableZoom={true}
+        enableZoom={false}
         enableRotate={true}
         zoomToCursor={true}
         minDistance={2}
@@ -455,6 +471,10 @@ const MemoryMesh3DContainer: React.FC<{ meshData: MemoryMesh }> = ({
           LEFT: THREE.MOUSE.ROTATE,
           MIDDLE: THREE.MOUSE.DOLLY,
           RIGHT: THREE.MOUSE.PAN,
+        }}
+        touches={{
+          ONE: THREE.TOUCH.ROTATE,
+          TWO: THREE.TOUCH.DOLLY_PAN,
         }}
       />
       <ControlsUpdater controlsRef={controlsRef} />
@@ -1856,8 +1876,10 @@ export const Landing = () => {
               </p>
             </div>
 
-          <div className="w-full max-w-5xl mx-auto aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9] h-[50vh] sm:h-[60vh] lg:h-[70vh] min-h-[400px] sm:min-h-[500px] relative rounded-xl overflow-hidden">
-            <MemoryMesh3DContainer meshData={mockMeshData} />
+          <div className="w-full max-w-7xl mx-auto aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9] h-[60vh] sm:h-[70vh] lg:h-[80vh] min-h-[500px] sm:min-h-[600px] relative rounded-xl overflow-hidden">
+            <div className="absolute inset-0" style={{ pointerEvents: 'auto' }}>
+              <MemoryMesh3DContainer meshData={mockMeshData} />
+            </div>
           </div>
           </div>
         </Section>
