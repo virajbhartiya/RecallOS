@@ -86,33 +86,35 @@ const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
 
   if (compact) {
     return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex flex-col sm:flex-row gap-3">
+      <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
+        <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="flex-1 border border-gray-300 px-4 py-3 text-sm outline-none focus:border-black transition-colors rounded-none bg-white/80 backdrop-blur"
+            className="flex-1 border border-gray-300 px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm outline-none focus:border-black transition-colors rounded-none bg-white/80 backdrop-blur"
             placeholder="your@email.com"
           />
           <ConsoleButton
             variant="console_key"
-            className="group relative overflow-hidden rounded-none px-6 py-3 transition-all duration-200 hover:shadow-md disabled:opacity-50 whitespace-nowrap"
+            className="group relative overflow-hidden rounded-none px-4 sm:px-6 py-2.5 sm:py-3 transition-all duration-200 hover:shadow-md disabled:opacity-50 whitespace-nowrap"
             type="submit"
             disabled={isSubmitting}
           >
-            <span className="relative z-10 text-sm font-medium">
+            <span className="relative z-10 text-xs sm:text-sm font-medium">
               {isSubmitting ? "Joining..." : "Join Waitlist"}
             </span>
             <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
           </ConsoleButton>
         </div>
-        <p className="text-xs text-gray-500 text-center">
+        <p className="text-[10px] sm:text-xs text-gray-500 text-center">
           Be among the first to experience Cognia.
         </p>
         {error && (
-          <p className="text-xs text-red-600 text-center mt-2">{error}</p>
+          <p className="text-[10px] sm:text-xs text-red-600 text-center mt-1.5 sm:mt-2">
+            {error}
+          </p>
         )}
       </form>
     )
@@ -673,14 +675,14 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({
       />
 
       {/* Search Animation UI */}
-      <div className="absolute bottom-2 left-0 right-0 z-10 px-4 pointer-events-none">
+      <div className="absolute bottom-2 sm:bottom-4 left-0 right-0 z-10 px-2 sm:px-4 pointer-events-none">
         <div className="max-w-xl mx-auto">
           {/* Search Input */}
-          <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-xl px-4 py-2.5">
-            <div className="flex items-center gap-3">
+          <div className="bg-white/80 backdrop-blur-xl border border-gray-200/60 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-2.5">
+            <div className="flex items-center gap-2 sm:gap-3">
               <div className="text-gray-500 flex-shrink-0">
                 <svg
-                  className="w-4 h-4"
+                  className="w-3.5 h-3.5 sm:w-4 sm:h-4"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -694,14 +696,14 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({
                 </svg>
               </div>
               <div className="flex-1 min-w-0 flex items-center">
-                <span className="text-base font-light text-gray-900 leading-normal">
+                <span className="text-sm sm:text-base font-light text-gray-900 leading-normal">
                   {query || "\u00A0"}
                 </span>
               </div>
               {animationPhase === "searching" && (
                 <div className="animate-spin text-gray-500 flex-shrink-0">
                   <svg
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -720,25 +722,25 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({
 
           {/* Result Summary - positioned to not cover mesh */}
           {animationPhase === "result" && resultNodes.length > 0 && (
-            <div className="mt-2 bg-white/95 backdrop-blur-md border border-gray-300/50 rounded-lg px-3 py-2">
-              <div className="text-xs font-mono text-gray-600 uppercase tracking-wide mb-1.5">
+            <div className="mt-2 bg-white/95 backdrop-blur-md border border-gray-300/50 rounded-md sm:rounded-lg px-2.5 sm:px-3 py-1.5 sm:py-2">
+              <div className="text-[10px] sm:text-xs font-mono text-gray-600 uppercase tracking-wide mb-1 sm:mb-1.5">
                 [{resultNodes.length}{" "}
                 {resultNodes.length === 1 ? "RESULT" : "RESULTS"} FOUND]
               </div>
-              <div className="text-xs text-gray-600 mb-2 leading-relaxed">
+              <div className="text-[10px] sm:text-xs text-gray-600 mb-1.5 sm:mb-2 leading-relaxed">
                 Add a login API, store the returned token in httpOnly cookies,
                 protect routes with a wrapper that checks auth state, fetch the
                 user profile on app load, redirect to login when no valid
                 session exists.
               </div>
-              <div className="space-y-1">
+              <div className="space-y-0.5 sm:space-y-1">
                 {resultNodes.map((nodeId, index) => {
                   const node = meshData.nodes.find((n) => n.id === nodeId)
                   if (!node) return null
                   return (
                     <div
                       key={nodeId}
-                      className="text-xs text-gray-700 leading-relaxed"
+                      className="text-[10px] sm:text-xs text-gray-700 leading-relaxed"
                       style={{
                         animation: `slideInUp 0.5s ease-out ${index * 0.1}s both`,
                       }}
@@ -746,7 +748,9 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({
                       <span className="font-medium">
                         • {node.title || node.label}
                       </span>
-                      <span className="text-gray-500 ml-2">[{node.type}]</span>
+                      <span className="text-gray-500 ml-1 sm:ml-2">
+                        [{node.type}]
+                      </span>
                     </div>
                   )
                 })}
@@ -1869,14 +1873,16 @@ export const Landing = () => {
       <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
         {[
           {
-            className: "absolute -top-28 -left-24 w-[28rem] h-[28rem]",
+            className:
+              "absolute -top-28 -left-24 w-[20rem] sm:w-[28rem] h-[20rem] sm:h-[28rem]",
             from: "#a5b4fc",
             via: "#fbcfe8",
             to: "#fde68a",
             opacity: 0.35,
           },
           {
-            className: "absolute -bottom-28 right-0 w-[28rem] h-[28rem]",
+            className:
+              "absolute -bottom-28 right-0 w-[20rem] sm:w-[28rem] h-[20rem] sm:h-[28rem]",
             from: "#99f6e4",
             via: "#6ee7b7",
             to: "#a7f3d0",
@@ -1966,19 +1972,48 @@ export const Landing = () => {
       `}</style>
 
       {/* Logo Header */}
-      <header className="fixed top-0 inset-x-0 z-40 py-4 sm:py-5">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 sm:gap-4">
+      <header className="fixed top-0 inset-x-0 z-40 py-3 sm:py-4 lg:py-5 relative">
+        {/* Gradient blur overlays for header */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
+          {[
+            {
+              className: "absolute -top-12 -left-12 w-32 sm:w-40 h-32 sm:h-40",
+              from: "#a5b4fc",
+              via: "#fbcfe8",
+              to: "#fde68a",
+              opacity: 0.25,
+            },
+            {
+              className: "absolute -top-8 right-0 w-24 sm:w-32 h-24 sm:h-32",
+              from: "#99f6e4",
+              via: "#6ee7b7",
+              to: "#a7f3d0",
+              opacity: 0.2,
+            },
+          ].map((b, i) => (
+            <div
+              key={i}
+              className={`${b.className} rounded-full blur-3xl`}
+              style={{
+                backgroundImage: `linear-gradient(135deg, ${b.from}, ${b.via}, ${b.to})`,
+                opacity: b.opacity as number,
+                filter: "blur(64px)",
+              }}
+            />
+          ))}
+        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="flex items-center gap-2 sm:gap-3 lg:gap-4">
             <img
               src="/black-transparent.png"
               alt="Cognia"
-              className="w-10 h-10"
+              className="w-8 h-8 sm:w-10 sm:h-10"
             />
             <div className="flex flex-col">
-              <span className="text-xl font-bold text-italics font-editorial text-black">
+              <span className="text-lg sm:text-xl font-bold text-italics font-editorial text-black">
                 Cognia
               </span>
-              <span className="text-xs text-gray-600 font-mono -mt-1">
+              <span className="text-[10px] sm:text-xs text-gray-600 font-mono -mt-0.5 sm:-mt-1">
                 Remember what the web showed you
               </span>
             </div>
@@ -1986,43 +2021,43 @@ export const Landing = () => {
         </div>
       </header>
       {/* spacer to offset fixed header height */}
-      <div className="h-20 sm:h-24" aria-hidden="true" />
+      <div className="h-16 sm:h-20 lg:h-24" aria-hidden="true" />
 
       {/* Hero Section */}
-      <Section className="min-h-screen bg-transparent relative overflow-hidden py-16 sm:py-20 lg:py-28">
+      <Section className="min-h-screen bg-transparent relative overflow-hidden py-12 sm:py-16 lg:py-20 xl:py-28">
         {/* Enhanced Animated Background */}
         <div className="absolute inset-0 pointer-events-none">
-          {/* Floating geometric shapes with enhanced animations */}
+          {/* Floating geometric shapes with enhanced animations - hidden on mobile */}
           <div
-            className="absolute top-20 left-10 w-6 h-6 border-2 border-gray-300/60 rounded-lg animate-pulse"
+            className="hidden sm:block absolute top-20 left-10 w-6 h-6 border-2 border-gray-300/60 rounded-lg animate-pulse"
             style={{
               animation:
                 "float 6s ease-in-out infinite, pulse-glow 4s ease-in-out infinite",
             }}
           />
           <div
-            className="absolute top-40 right-20 w-8 h-8 border-2 border-gray-300/60 rotate-45"
+            className="hidden sm:block absolute top-40 right-20 w-8 h-8 border-2 border-gray-300/60 rotate-45"
             style={{
               animation:
                 "float 8s ease-in-out infinite reverse, pulse-glow 3s ease-in-out infinite 1s",
             }}
           />
           <div
-            className="absolute bottom-40 left-1/4 w-4 h-4 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full"
+            className="hidden sm:block absolute bottom-40 left-1/4 w-4 h-4 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full"
             style={{
               animation:
                 "float 5s ease-in-out infinite 0.5s, pulse-glow 2s ease-in-out infinite 2s",
             }}
           />
           <div
-            className="absolute top-1/2 right-1/3 w-3 h-12 border-l-2 border-gray-300/60"
+            className="hidden sm:block absolute top-1/2 right-1/3 w-3 h-12 border-l-2 border-gray-300/60"
             style={{
               animation:
                 "float 7s ease-in-out infinite 1s, pulse-glow 3s ease-in-out infinite 0.5s",
             }}
           />
           <div
-            className="absolute top-1/3 left-1/3 w-5 h-5 border-2 border-gray-300/40 rounded-full"
+            className="hidden sm:block absolute top-1/3 left-1/3 w-5 h-5 border-2 border-gray-300/40 rounded-full"
             style={{
               animation:
                 "float 9s ease-in-out infinite 2s, pulse-glow 4s ease-in-out infinite 1.5s",
@@ -2046,7 +2081,7 @@ export const Landing = () => {
         </div>
 
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 h-full flex items-center">
-          <div className="w-full text-center space-y-8 sm:space-y-10 mx-auto">
+          <div className="w-full text-center space-y-6 sm:space-y-8 lg:space-y-10 mx-auto">
             {/* Announcement */}
             <div
               className="flex justify-center"
@@ -2056,7 +2091,7 @@ export const Landing = () => {
                   : "none",
               }}
             >
-              <div className="inline-flex items-center gap-2 rounded-full border border-gray-300/80 bg-white/80 backdrop-blur px-3 py-1 text-xs sm:text-sm text-gray-700">
+              <div className="inline-flex items-center gap-2 rounded-full border border-gray-300/80 bg-white/80 backdrop-blur px-2.5 sm:px-3 py-1 text-[11px] sm:text-xs lg:text-sm text-gray-700">
                 <span className="whitespace-nowrap">
                   Never forget what you see online
                 </span>
@@ -2065,7 +2100,7 @@ export const Landing = () => {
             {/* Headline */}
             <div className="overflow-hidden">
               <h1
-                className="text-5xl sm:text-6xl lg:text-7xl font-light leading-tight font-editorial tracking-tight"
+                className="text-3xl sm:text-5xl lg:text-6xl xl:text-7xl font-light leading-[1.1] sm:leading-tight font-editorial tracking-tight"
                 style={{
                   animation: isVisible ? "slideInUp 1s ease-out" : "none",
                 }}
@@ -2076,7 +2111,7 @@ export const Landing = () => {
                   <span className="align-baseline">memory</span>
                 </span>
                 <span
-                  className="block text-3xl sm:text-4xl lg:text-5xl font-normal mt-2"
+                  className="block text-xl sm:text-3xl lg:text-4xl xl:text-5xl font-normal mt-1 sm:mt-2"
                   style={{
                     animation: isVisible
                       ? "slideInUp 1s ease-out 0.2s both"
@@ -2086,7 +2121,7 @@ export const Landing = () => {
                   for everything you see
                 </span>
                 <span
-                  className="block text-2xl sm:text-3xl lg:text-4xl font-light mt-1"
+                  className="block text-lg sm:text-2xl lg:text-3xl xl:text-4xl font-light mt-0.5 sm:mt-1"
                   style={{
                     animation: isVisible
                       ? "slideInUp 1s ease-out 0.4s both"
@@ -2100,7 +2135,7 @@ export const Landing = () => {
 
             {/* Concise value proposition */}
             <p
-              className="mx-auto max-w-2xl text-lg sm:text-xl text-gray-800 leading-relaxed font-primary font-medium"
+              className="mx-auto max-w-2xl text-base sm:text-lg lg:text-xl text-gray-800 leading-relaxed font-primary font-medium px-2 sm:px-0"
               style={{
                 animation: isVisible
                   ? "slideInUp 1s ease-out 0.6s both"
@@ -2113,29 +2148,31 @@ export const Landing = () => {
 
             {/* Waitlist Form and Self-Host Option */}
             <div
-              className="mt-8 sm:mt-10"
+              className="mt-6 sm:mt-8 lg:mt-10"
               style={{
                 animation: isVisible
                   ? "slideInUp 1s ease-out 0.8s both"
                   : "none",
               }}
             >
-              <div className="max-w-md mx-auto space-y-4">
+              <div className="max-w-md mx-auto space-y-3 sm:space-y-4 px-2 sm:px-0">
                 <WaitlistForm compact />
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
                   <div className="flex-1 h-px bg-gray-300"></div>
-                  <span className="text-sm text-gray-500 font-primary">or</span>
+                  <span className="text-xs sm:text-sm text-gray-500 font-primary">
+                    or
+                  </span>
                   <div className="flex-1 h-px bg-gray-300"></div>
                 </div>
                 <button
                   onClick={() =>
                     window.open("https://github.com/cogniahq/Cognia", "_blank")
                   }
-                  className="w-full group relative overflow-hidden border border-gray-300 px-6 py-3 transition-all duration-200 hover:border-black hover:shadow-sm disabled:opacity-50 bg-white/80 backdrop-blur"
+                  className="w-full group relative overflow-hidden border border-gray-300 px-4 sm:px-6 py-2.5 sm:py-3 transition-all duration-200 hover:border-black hover:shadow-sm disabled:opacity-50 bg-white/80 backdrop-blur"
                 >
-                  <span className="relative z-10 text-sm font-medium text-gray-900 group-hover:text-white transition-colors duration-500 flex items-center justify-center gap-2">
+                  <span className="relative z-10 text-xs sm:text-sm font-medium text-gray-900 group-hover:text-white transition-colors duration-500 flex items-center justify-center gap-2">
                     <svg
-                      className="w-4 h-4"
+                      className="w-3.5 h-3.5 sm:w-4 sm:h-4"
                       fill="currentColor"
                       viewBox="0 0 24 24"
                     >
@@ -2156,40 +2193,40 @@ export const Landing = () => {
       </Section>
 
       {/* Product Explanation Section */}
-      <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
+      <Section className="bg-transparent py-12 sm:py-16 lg:py-20 xl:py-24">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-light font-editorial mb-4">
+          <div className="text-center mb-8 sm:mb-12 lg:mb-16">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-light font-editorial mb-3 sm:mb-4">
               How it works
             </h2>
-            <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg lg:text-xl text-gray-700 max-w-2xl mx-auto px-2 sm:px-0">
               Cognia captures everything you see online, making it instantly
               searchable with natural language queries.
             </p>
           </div>
+        </div>
 
-          <div className="w-full max-w-7xl mx-auto aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9] h-[60vh] sm:h-[70vh] lg:h-[80vh] min-h-[500px] sm:min-h-[600px] relative rounded-xl overflow-hidden">
-            <div className="absolute inset-0" style={{ pointerEvents: "auto" }}>
-              <SearchAnimationDemo meshData={mockMeshData} />
-            </div>
+        <div className="w-screen relative left-1/2 -translate-x-1/2 aspect-[4/3] sm:aspect-[16/10] lg:aspect-[16/9] h-[50vh] sm:h-[60vh] lg:h-[70vh] xl:h-[80vh] min-h-[400px] sm:min-h-[500px] lg:min-h-[600px] overflow-visible sm:overflow-hidden">
+          <div className="absolute inset-0" style={{ pointerEvents: "auto" }}>
+            <SearchAnimationDemo meshData={mockMeshData} />
           </div>
         </div>
       </Section>
 
       {/* Data Flow Section */}
-      <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
+      <Section className="bg-transparent py-12 sm:py-16 lg:py-20 xl:py-24">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16 sm:mb-20">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-light font-editorial mb-4">
+          <div className="text-center mb-10 sm:mb-16 lg:mb-20">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-light font-editorial mb-3 sm:mb-4">
               From browsing to memory
             </h2>
-            <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg lg:text-xl text-gray-700 max-w-2xl mx-auto px-2 sm:px-0">
               Your extension silently captures and organizes everything you see,
               building your searchable memory mesh in real-time.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-6 lg:gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-10 md:gap-6 lg:gap-8">
             {/* Step 1: Extension Capture */}
             <div
               className="text-center"
@@ -2199,15 +2236,17 @@ export const Landing = () => {
                   : "none",
               }}
             >
-              <div className="mb-6 flex justify-center">
-                <div className="w-20 h-20 border border-gray-300 rounded-full flex items-center justify-center bg-white/30 backdrop-blur-sm transition-all duration-500 hover:border-gray-400">
-                  <span className="text-2xl font-light text-gray-700">1</span>
+              <div className="mb-4 sm:mb-6 flex justify-center">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 border border-gray-300 rounded-full flex items-center justify-center bg-white/30 backdrop-blur-sm transition-all duration-500 hover:border-gray-400">
+                  <span className="text-xl sm:text-2xl font-light text-gray-700">
+                    1
+                  </span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl font-light font-editorial text-black mb-3">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-light font-editorial text-black mb-2 sm:mb-3">
                 Extension captures
               </h3>
-              <p className="text-base text-gray-700 leading-relaxed font-primary">
+              <p className="text-sm sm:text-base text-gray-700 leading-relaxed font-primary px-2 sm:px-0">
                 As you browse, the extension automatically captures text, links,
                 and context from every page you visit.
               </p>
@@ -2222,15 +2261,17 @@ export const Landing = () => {
                   : "none",
               }}
             >
-              <div className="mb-6 flex justify-center">
-                <div className="w-20 h-20 border border-gray-300 rounded-full flex items-center justify-center bg-white/30 backdrop-blur-sm transition-all duration-500 hover:border-gray-400">
-                  <span className="text-2xl font-light text-gray-700">2</span>
+              <div className="mb-4 sm:mb-6 flex justify-center">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 border border-gray-300 rounded-full flex items-center justify-center bg-white/30 backdrop-blur-sm transition-all duration-500 hover:border-gray-400">
+                  <span className="text-xl sm:text-2xl font-light text-gray-700">
+                    2
+                  </span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl font-light font-editorial text-black mb-3">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-light font-editorial text-black mb-2 sm:mb-3">
                 Data aggregated
               </h3>
-              <p className="text-base text-gray-700 leading-relaxed font-primary">
+              <p className="text-sm sm:text-base text-gray-700 leading-relaxed font-primary px-2 sm:px-0">
                 Captured data is processed, embedded, and organized by relevance
                 and context for efficient retrieval.
               </p>
@@ -2245,15 +2286,17 @@ export const Landing = () => {
                   : "none",
               }}
             >
-              <div className="mb-6 flex justify-center">
-                <div className="w-20 h-20 border border-gray-300 rounded-full flex items-center justify-center bg-white/30 backdrop-blur-sm transition-all duration-500 hover:border-gray-400">
-                  <span className="text-2xl font-light text-gray-700">3</span>
+              <div className="mb-4 sm:mb-6 flex justify-center">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 border border-gray-300 rounded-full flex items-center justify-center bg-white/30 backdrop-blur-sm transition-all duration-500 hover:border-gray-400">
+                  <span className="text-xl sm:text-2xl font-light text-gray-700">
+                    3
+                  </span>
                 </div>
               </div>
-              <h3 className="text-xl sm:text-2xl font-light font-editorial text-black mb-3">
+              <h3 className="text-lg sm:text-xl lg:text-2xl font-light font-editorial text-black mb-2 sm:mb-3">
                 Added to memory mesh
               </h3>
-              <p className="text-base text-gray-700 leading-relaxed font-primary">
+              <p className="text-sm sm:text-base text-gray-700 leading-relaxed font-primary px-2 sm:px-0">
                 New memories are connected to related content, building an
                 interconnected knowledge graph you can search instantly.
               </p>
@@ -2263,32 +2306,34 @@ export const Landing = () => {
       </Section>
 
       {/* Waitlist CTA Section */}
-      <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
+      <Section className="bg-transparent py-12 sm:py-16 lg:py-20 xl:py-24">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-light font-editorial mb-4">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl xl:text-5xl font-light font-editorial mb-3 sm:mb-4">
               Ready to remember everything?
             </h2>
-            <p className="text-lg sm:text-xl text-gray-700 mb-8 max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg lg:text-xl text-gray-700 mb-6 sm:mb-8 max-w-2xl mx-auto px-2 sm:px-0">
               Join the waitlist to be among the first to experience Cognia, or
               self-host it yourself.
             </p>
-            <div className="max-w-md mx-auto space-y-4">
+            <div className="max-w-md mx-auto space-y-3 sm:space-y-4 px-2 sm:px-0">
               <WaitlistForm compact />
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
                 <div className="flex-1 h-px bg-gray-300"></div>
-                <span className="text-sm text-gray-500 font-primary">or</span>
+                <span className="text-xs sm:text-sm text-gray-500 font-primary">
+                  or
+                </span>
                 <div className="flex-1 h-px bg-gray-300"></div>
               </div>
               <button
                 onClick={() =>
                   window.open("https://github.com/cogniahq/Cognia", "_blank")
                 }
-                className="w-full group relative overflow-hidden border border-gray-300 px-6 py-3 transition-all duration-200 hover:border-black hover:shadow-sm disabled:opacity-50 bg-white/80 backdrop-blur"
+                className="w-full group relative overflow-hidden border border-gray-300 px-4 sm:px-6 py-2.5 sm:py-3 transition-all duration-200 hover:border-black hover:shadow-sm disabled:opacity-50 bg-white/80 backdrop-blur"
               >
-                <span className="relative z-10 text-sm font-medium text-gray-900 group-hover:text-white transition-colors duration-500 flex items-center justify-center gap-2">
+                <span className="relative z-10 text-xs sm:text-sm font-medium text-gray-900 group-hover:text-white transition-colors duration-500 flex items-center justify-center gap-2">
                   <svg
-                    className="w-4 h-4"
+                    className="w-3.5 h-3.5 sm:w-4 sm:h-4"
                     fill="currentColor"
                     viewBox="0 0 24 24"
                   >
@@ -2308,93 +2353,71 @@ export const Landing = () => {
       </Section>
 
       {/* Footer */}
-      <footer className="bg-white/80 backdrop-blur">
-        <div className="h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
-            {/* Brand + Newsletter */}
-            <div className="lg:col-span-2 space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold text-lg font-mono">
-                  R
-                </div>
-                <div className="text-sm text-gray-800 font-medium">Cognia</div>
-              </div>
-              <p className="text-sm text-gray-600">
-                A searchable memory for everything you see online.
-              </p>
-              <div className="flex items-center gap-4 pt-2">
-                <button
-                  onClick={() =>
-                    window.open("https://github.com/cogniahq/Cognia", "_blank")
-                  }
-                  className="block text-sm text-gray-700 hover:underline text-left"
-                >
-                  GitHub
-                </button>
-                <button
-                  onClick={() => window.open("https://x.com", "_blank")}
-                  className="block text-sm text-gray-700 hover:underline text-left"
-                >
-                  X
-                </button>
+      <footer className="bg-white/80 backdrop-blur border-t border-gray-200/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 lg:py-12">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 sm:gap-8">
+            {/* Left: Brand */}
+            <div className="flex items-center gap-3 sm:gap-4">
+              <img
+                src="/black-transparent.png"
+                alt="Cognia"
+                className="w-7 h-7 sm:w-8 sm:h-8"
+              />
+              <div className="flex flex-col">
+                <span className="text-base sm:text-lg font-bold font-editorial text-black leading-tight">
+                  Cognia
+                </span>
+                <span className="text-[10px] sm:text-xs text-gray-500 font-mono -mt-0.5">
+                  Remember what the web showed you
+                </span>
               </div>
             </div>
 
-            {/* Columns (only existing routes) */}
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-700">
-                Product
-              </div>
-              <div className="mt-3 space-y-2 text-sm text-gray-700">
-                <button
-                  className="block hover:underline text-left"
-                  onClick={() => (window.location.href = "/memories")}
-                >
-                  Memories
-                </button>
-                <button
-                  className="block hover:underline text-left"
-                  onClick={() => (window.location.href = "/search")}
-                >
-                  Search
-                </button>
-                <button
-                  className="block hover:underline text-left"
-                  onClick={() => (window.location.href = "/login")}
-                >
-                  Download
-                </button>
-              </div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wider text-gray-700">
-                Resources
-              </div>
-              <div className="mt-3 space-y-2 text-sm text-gray-700">
-                <button
-                  className="block hover:underline text-left"
-                  onClick={() => (window.location.href = "/docs")}
-                >
-                  Docs
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-[12px] text-gray-600">
-            <div>
-              © {new Date().getFullYear()} Cognia. All rights reserved.
-            </div>
-            <div className="flex flex-wrap gap-4">
+            {/* Right: Links */}
+            <div className="flex items-center gap-4 sm:gap-6">
               <button
-                className="block hover:underline"
                 onClick={() =>
                   window.open("https://github.com/cogniahq/Cognia", "_blank")
                 }
+                className="flex items-center gap-2 text-sm text-gray-600 hover:text-black transition-colors group"
               >
-                GitHub
+                <svg
+                  className="w-4 h-4 group-hover:scale-110 transition-transform"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <span>GitHub</span>
               </button>
+              <button
+                onClick={() => window.open("https://x.com/cogniahq", "_blank")}
+                className="flex items-center gap-2 text-sm text-gray-600 hover:text-black transition-colors group"
+              >
+                <svg
+                  className="w-4 h-4 group-hover:scale-110 transition-transform"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Bottom: Copyright */}
+          <div className="mt-6 sm:mt-8 pt-6 sm:pt-8 border-t border-gray-200/50">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs text-gray-500">
+              <div>
+                © {new Date().getFullYear()} Cognia. All rights reserved.
+              </div>
+              <div className="text-gray-400">
+                A searchable memory for everything you see online.
+              </div>
             </div>
           </div>
         </div>
