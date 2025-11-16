@@ -1743,7 +1743,6 @@ const mockMeshData: MemoryMesh = {
 
 export const Landing = () => {
   const [isVisible, setIsVisible] = useState(false)
-  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
     // Prevent browser from restoring previous scroll position and ensure top on load
@@ -1762,15 +1761,6 @@ export const Landing = () => {
     }
 
     setIsVisible(true)
-
-    const handleMouseMove = (e: MouseEvent) => {
-      setMousePosition({ x: e.clientX, y: e.clientY })
-    }
-
-    window.addEventListener("mousemove", handleMouseMove)
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove)
-    }
   }, [])
 
   return (
@@ -1811,15 +1801,6 @@ export const Landing = () => {
           />
         ))}
       </div>
-      {/* Dynamic cursor trail */}
-      <div
-        className="fixed w-4 h-4 bg-black/5 rounded-full pointer-events-none z-50 transition-all duration-100 ease-out"
-        style={{
-          left: mousePosition.x - 8,
-          top: mousePosition.y - 8,
-          transform: `scale(${isVisible ? 1 : 0})`,
-        }}
-      />
 
       {/* Animated background grid */}
       <div className="fixed inset-0 pointer-events-none opacity-20">
@@ -1872,6 +1853,22 @@ export const Landing = () => {
         @keyframes blink {
           0%, 50% { border-color: transparent; }
           51%, 100% { border-color: currentColor; }
+        }
+        @keyframes drawLine {
+          from { height: 0; opacity: 0; }
+          to { height: 100%; opacity: 1; }
+        }
+        @keyframes circlePulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.9; }
+        }
+        @keyframes fadeInLeft {
+          from { opacity: 0; transform: translateX(-20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
         }
       `}</style>
 
@@ -2030,7 +2027,7 @@ export const Landing = () => {
               links and context as you browse so you can find it in seconds.
             </p>
 
-            {/* Waitlist Form */}
+            {/* Waitlist Form and Self-Host Option */}
             <div
               className="mt-8 sm:mt-10"
               style={{
@@ -2039,8 +2036,35 @@ export const Landing = () => {
                   : "none",
               }}
             >
-              <div className="max-w-md mx-auto">
+              <div className="max-w-md mx-auto space-y-4">
                 <WaitlistForm compact />
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 h-px bg-gray-300"></div>
+                  <span className="text-sm text-gray-500 font-primary">or</span>
+                  <div className="flex-1 h-px bg-gray-300"></div>
+                </div>
+                <button
+                  onClick={() =>
+                    window.open("https://github.com/cogniahq/Cognia", "_blank")
+                  }
+                  className="w-full group relative overflow-hidden border border-gray-300 px-6 py-3 transition-all duration-200 hover:border-black hover:shadow-sm disabled:opacity-50 bg-white/80 backdrop-blur"
+                >
+                  <span className="relative z-10 text-sm font-medium text-gray-900 group-hover:text-white transition-colors duration-500 flex items-center justify-center gap-2">
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Self-host on GitHub
+                  </span>
+                  <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
+                </button>
               </div>
             </div>
           </div>
@@ -2067,6 +2091,92 @@ export const Landing = () => {
           </div>
           </div>
         </Section>
+
+      {/* Data Flow Section */}
+      <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16 sm:mb-20">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-light font-editorial mb-4">
+              From browsing to memory
+            </h2>
+            <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto">
+              Your extension silently captures and organizes everything you see,
+              building your searchable memory mesh in real-time.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-6 lg:gap-8">
+            {/* Step 1: Extension Capture */}
+            <div
+              className="text-center"
+              style={{
+                animation: isVisible
+                  ? "slideInUp 0.8s ease-out 0.2s both"
+                  : "none",
+              }}
+            >
+              <div className="mb-6 flex justify-center">
+                <div className="w-20 h-20 border border-gray-300 rounded-full flex items-center justify-center bg-white/30 backdrop-blur-sm transition-all duration-500 hover:border-gray-400">
+                  <span className="text-2xl font-light text-gray-700">1</span>
+                </div>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-light font-editorial text-black mb-3">
+                Extension captures
+              </h3>
+              <p className="text-base text-gray-700 leading-relaxed font-primary">
+                As you browse, the extension automatically captures text,
+                links, and context from every page you visit.
+              </p>
+            </div>
+
+            {/* Step 2: Data Aggregation */}
+            <div
+              className="text-center"
+              style={{
+                animation: isVisible
+                  ? "slideInUp 0.8s ease-out 0.4s both"
+                  : "none",
+              }}
+            >
+              <div className="mb-6 flex justify-center">
+                <div className="w-20 h-20 border border-gray-300 rounded-full flex items-center justify-center bg-white/30 backdrop-blur-sm transition-all duration-500 hover:border-gray-400">
+                  <span className="text-2xl font-light text-gray-700">2</span>
+                </div>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-light font-editorial text-black mb-3">
+                Data aggregated
+              </h3>
+              <p className="text-base text-gray-700 leading-relaxed font-primary">
+                Captured data is processed, embedded, and organized by
+                relevance and context for efficient retrieval.
+              </p>
+            </div>
+
+            {/* Step 3: Memory Mesh */}
+            <div
+              className="text-center"
+              style={{
+                animation: isVisible
+                  ? "slideInUp 0.8s ease-out 0.6s both"
+                  : "none",
+              }}
+            >
+              <div className="mb-6 flex justify-center">
+                <div className="w-20 h-20 border border-gray-300 rounded-full flex items-center justify-center bg-white/30 backdrop-blur-sm transition-all duration-500 hover:border-gray-400">
+                  <span className="text-2xl font-light text-gray-700">3</span>
+                </div>
+              </div>
+              <h3 className="text-xl sm:text-2xl font-light font-editorial text-black mb-3">
+                Added to memory mesh
+              </h3>
+              <p className="text-base text-gray-700 leading-relaxed font-primary">
+                New memories are connected to related content, building
+                an interconnected knowledge graph you can search instantly.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Section>
 
       {/* Footer */}
       <footer className="bg-white/80 backdrop-blur">
