@@ -1,17 +1,16 @@
 import React from "react"
 
-interface ConsoleButtonProps {
+interface ConsoleButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode
   variant?: "console_key" | "outlined"
-  onClick?: () => void
-  className?: string
 }
 
 export const ConsoleButton: React.FC<ConsoleButtonProps> = ({
   children,
   variant = "outlined",
-  onClick,
   className = "",
+  ...props
 }) => {
   const baseClasses =
     "px-6 py-3 text-sm font-mono uppercase tracking-wide transition-all duration-200 cursor-pointer"
@@ -26,7 +25,7 @@ export const ConsoleButton: React.FC<ConsoleButtonProps> = ({
   return (
     <button
       className={`${baseClasses} ${variantClasses[variant]} ${className}`}
-      onClick={onClick}
+      {...props}
     >
       {children}
     </button>
