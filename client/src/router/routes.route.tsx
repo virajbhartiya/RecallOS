@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react"
-import { Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes } from "react-router-dom"
 
 const Landing = lazy(() =>
   import("@/pages/landing.page").then((module) => ({ default: module.Landing }))
@@ -39,17 +39,34 @@ const LoadingFallback = () => (
 )
 
 const AppRoutes = () => {
+  const enableInternalRoutes =
+    import.meta.env.VITE_ENABLE_INTERNAL_ROUTES !== "false"
+
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/memories" element={<Memories />} />
-        <Route path="/search" element={<Search />} />
-        <Route path="/docs" element={<Docs />} />
-        <Route path="/analytics" element={<Analytics />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/insights" element={<Insights />} />
+        {enableInternalRoutes ? (
+          <>
+            <Route path="/login" element={<Login />} />
+            <Route path="/memories" element={<Memories />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/docs" element={<Docs />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/insights" element={<Insights />} />
+          </>
+        ) : (
+          <>
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route path="/memories" element={<Navigate to="/" replace />} />
+            <Route path="/search" element={<Navigate to="/" replace />} />
+            <Route path="/docs" element={<Navigate to="/" replace />} />
+            <Route path="/analytics" element={<Navigate to="/" replace />} />
+            <Route path="/profile" element={<Navigate to="/" replace />} />
+            <Route path="/insights" element={<Navigate to="/" replace />} />
+          </>
+        )}
 
         <Route path="*" element={<Landing />} />
       </Routes>
