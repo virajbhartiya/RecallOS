@@ -2057,18 +2057,9 @@ export const Landing = () => {
               }}
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-gray-300/80 bg-white/80 backdrop-blur px-3 py-1 text-xs sm:text-sm text-gray-700">
-                <span className="inline-flex items-center rounded-full bg-black text-white px-2 py-0.5 text-[10px] sm:text-xs uppercase tracking-wider">
-                  New
-                </span>
                 <span className="whitespace-nowrap">
-                  Instant search for anything you saw online
+                  Never forget what you see online
                 </span>
-                <button
-                  className="underline underline-offset-2 hover:no-underline"
-                  onClick={() => (window.location.href = "/docs")}
-                >
-                  Learn more
-                </button>
               </div>
             </div>
             {/* Headline */}
