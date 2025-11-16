@@ -429,18 +429,6 @@ export const Memories: React.FC = () => {
             </div>
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => (window.location.href = "/inbox")}
-                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
-              >
-                Inbox
-              </button>
-              <button
-                onClick={() => (window.location.href = "/knowledge-health")}
-                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
-              >
-                Knowledge Health
-              </button>
-              <button
                 onClick={() => (window.location.href = "/analytics")}
                 className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
               >

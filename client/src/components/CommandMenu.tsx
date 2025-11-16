@@ -4,11 +4,9 @@ import {
   Calculator,
   Calendar,
   CreditCard,
-  Inbox,
   Search,
   Settings,
   Smile,
-  TrendingUp,
   User,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
@@ -71,14 +69,6 @@ const CommandMenuComponent = () => {
             <CommandItem onSelect={() => navigate("/memories")}>
               <Brain className="mr-2 h-4 w-4" />
               <span>Memories</span>
-            </CommandItem>
-            <CommandItem onSelect={() => navigate("/inbox")}>
-              <Inbox className="mr-2 h-4 w-4" />
-              <span>Inbox</span>
-            </CommandItem>
-            <CommandItem onSelect={() => navigate("/knowledge-health")}>
-              <TrendingUp className="mr-2 h-4 w-4" />
-              <span>Knowledge Health</span>
             </CommandItem>
           </CommandGroup>
           <CommandSeparator />

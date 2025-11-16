@@ -23,7 +23,6 @@ import { prisma } from './lib/prisma.lib'
 import { startContentWorker } from './workers/content-worker'
 import { startCyclicProfileWorker } from './workers/profile-worker'
 import { startCyclicInsightsWorker } from './workers/insights-worker'
-import { startCyclicKnowledgeScoreWorker } from './workers/knowledge-score-worker'
 import { ensureCollection } from './lib/qdrant.lib'
 import { aiProvider } from './services/ai-provider.service'
 import { logger } from './utils/logger.util'
@@ -308,8 +307,6 @@ server.listen(port, async () => {
   logger.log('[startup] profile_worker_started')
   startCyclicInsightsWorker()
   logger.log('[startup] insights_worker_started')
-  startCyclicKnowledgeScoreWorker()
-  logger.log('[startup] knowledge_score_worker_started')
   logger.log('[startup] server_listening', { protocol, port })
 })
 process.on('unhandledRejection', (err: Error) => {
