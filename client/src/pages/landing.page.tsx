@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react"
+import React, { useEffect, useState, useMemo, useRef } from "react"
+import { Canvas, useFrame, useThree } from "@react-three/fiber"
+import { Line, OrbitControls, Text } from "@react-three/drei"
+import * as THREE from "three"
+import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 
 import { ConsoleButton, Section } from "../components/sections"
+import type { MemoryMesh, MemoryMeshEdge } from "../types/memory.type"
 
 const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
   const [email, setEmail] = useState("")
@@ -106,6 +111,1428 @@ const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
       </p>
     </form>
   )
+}
+
+const nodeColors = {
+  manual: "#22c55e",
+  browser: "#3b82f6",
+  extension: "#3b82f6",
+  reasoning: "#a855f7",
+  ai: "#a855f7",
+} as Record<string, string>
+
+const resolveNodeColor = (rawType?: string, url?: string): string => {
+  const key = (rawType || "").toLowerCase()
+  const href = (url || "").toLowerCase()
+
+  if (key && nodeColors[key]) {
+    return nodeColors[key]
+  }
+
+  if (href) {
+    if (/github\.com|gitlab\.com|bitbucket\.org/.test(href)) return "#3b82f6"
+    if (/npmjs\.com|pypi\.org|crates\.io|rubygems\.org/.test(href))
+      return "#22c55e"
+    if (/docs\.|developer\.|readthedocs|mdn\.|dev\.docs|learn\./.test(href))
+      return "#22c55e"
+    if (/youtube\.com|youtu\.be|vimeo\.com/.test(href)) return "#3b82f6"
+    if (/mail\.google\.com|gmail\.com|outlook\.live\.com/.test(href))
+      return "#22c55e"
+  }
+
+  return nodeColors[key] || "#6b7280"
+}
+
+const MemoryNodePreview: React.FC<{
+  position: [number, number, number]
+  color: string
+  importance?: number
+  label?: string
+}> = ({ position, color, importance = 0.5, label }) => {
+  const meshRef = useRef<THREE.Mesh>(null)
+  const groupRef = useRef<THREE.Group>(null)
+  const textRef = useRef<THREE.Group>(null)
+  const { camera } = useThree()
+  const [hovered, setHovered] = useState(false)
+
+  const baseSize = 0.008 + importance * 0.004
+  const size = baseSize
+
+  useFrame(() => {
+    if (!meshRef.current || !groupRef.current) return
+    const nodePosition = groupRef.current.position
+    const distance = camera.position.distanceTo(nodePosition)
+    const fovRad =
+      camera instanceof THREE.PerspectiveCamera && camera.fov
+        ? (camera.fov * Math.PI) / 180
+        : (60 * Math.PI) / 180
+    const worldPerceivedScale = Math.tan(fovRad / 2) * 2
+    const dynamicScale = Math.min(
+      8,
+      Math.max(0.5, distance * worldPerceivedScale * 0.1)
+    )
+    const hoverScale = hovered ? 1.3 : 1.0
+    meshRef.current.scale.setScalar(dynamicScale * hoverScale)
+
+    if (textRef.current) {
+      textRef.current.lookAt(camera.position)
+    }
+  })
+
+  return (
+    <group ref={groupRef} position={position}>
+      <mesh
+        ref={meshRef}
+        onPointerOver={() => setHovered(true)}
+        onPointerOut={() => setHovered(false)}
+      >
+        <sphereGeometry args={[size, 12, 12]} />
+        <meshStandardMaterial
+          color={color}
+          metalness={0.3}
+          roughness={0.4}
+          emissive={color}
+          emissiveIntensity={hovered ? 0.4 : 0.2}
+        />
+      </mesh>
+      {label && (
+        <group ref={textRef}>
+          <Text
+            position={[0, size * 12, 0]}
+            fontSize={0.03}
+            color="#000000"
+            anchorX="center"
+            anchorY="middle"
+            maxWidth={5}
+            outlineWidth={0.03}
+            outlineColor="#ffffff"
+            outlineOpacity={1}
+            depthOffset={-1}
+          >
+            {label.length > 30 ? `${label.substring(0, 30)}...` : label}
+          </Text>
+        </group>
+      )}
+    </group>
+  )
+}
+
+const MemoryEdgePreview: React.FC<{
+  start: [number, number, number]
+  end: [number, number, number]
+  similarity: number
+}> = ({ start, end, similarity }) => {
+  const points = useMemo(
+    () => [new THREE.Vector3(...start), new THREE.Vector3(...end)],
+    [start, end]
+  )
+
+  const getLineColor = (similarity: number) => {
+    if (similarity > 0.85) return "#3b82f6"
+    if (similarity > 0.75) return "#38bdf8"
+    return "#9ca3af"
+  }
+
+  const color = getLineColor(similarity)
+  const opacity = similarity > 0.75 ? 0.8 : similarity > 0.5 ? 0.6 : 0.4
+  const lineWidth = similarity > 0.85 ? 0.6 : similarity > 0.75 ? 0.5 : 0.3
+
+  return (
+    <Line
+      points={points}
+      color={color}
+      lineWidth={lineWidth}
+      transparent
+      opacity={opacity}
+      dashed={false}
+      toneMapped={false}
+      depthTest={true}
+      depthWrite={false}
+    />
+  )
+}
+
+const MemoryMesh3DPreview: React.FC<{ meshData: MemoryMesh }> = ({
+  meshData,
+}) => {
+  const { camera } = useThree()
+
+  useEffect(() => {
+    camera.position.set(0, 0, 3.5)
+    camera.lookAt(0, 0, 0)
+  }, [camera])
+
+  const nodes = useMemo(() => {
+    if (!meshData?.nodes?.length) return []
+
+    const nodeCount = meshData.nodes.length
+    const sphereRadius = 1.2
+
+    const normalizedPositions: [number, number, number][] = new Array(nodeCount)
+    
+    for (let i = 0; i < nodeCount; i++) {
+      const theta = Math.acos(-1 + (2 * i) / nodeCount)
+      const phi = Math.sqrt(nodeCount * Math.PI) * theta
+      
+      const x = sphereRadius * Math.cos(phi) * Math.sin(theta)
+      const y = sphereRadius * Math.sin(phi) * Math.sin(theta)
+      const z = sphereRadius * Math.cos(theta)
+      
+      normalizedPositions[i] = [x, y, z]
+    }
+
+    let sumX = 0
+    let sumY = 0
+    let sumZ = 0
+    for (let i = 0; i < nodeCount; i++) {
+      sumX += normalizedPositions[i][0]
+      sumY += normalizedPositions[i][1]
+      sumZ += normalizedPositions[i][2]
+    }
+    const finalCenterX = sumX / nodeCount
+    const finalCenterY = sumY / nodeCount
+    const finalCenterZ = sumZ / nodeCount
+
+    const result = new Array(nodeCount)
+    for (let i = 0; i < nodeCount; i++) {
+      const n = meshData.nodes[i]
+      const pos = normalizedPositions[i]
+      const finalPos: [number, number, number] = [
+        pos[0] - finalCenterX,
+        pos[1] - finalCenterY,
+        pos[2] - finalCenterZ,
+      ]
+
+      const color = resolveNodeColor(String(n.type))
+
+      result[i] = {
+        id: n.id,
+        position: finalPos,
+        color,
+        importance: n.importance_score,
+        label: n.title || n.label || "",
+      }
+    }
+
+    return result as Array<{
+      id: string
+      position: [number, number, number]
+      color: string
+      importance?: number
+      label?: string
+    }>
+  }, [meshData])
+
+  const edges = useMemo(() => {
+    if (!meshData?.edges?.length) return []
+
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]))
+
+    const groups = new Map<string, MemoryMeshEdge[]>()
+    meshData.edges.forEach((e: MemoryMeshEdge) => {
+      if (e.source === e.target) return
+      const [a, b] =
+        e.source < e.target ? [e.source, e.target] : [e.target, e.source]
+      const key = `${a}__${b}`
+      const list = groups.get(key) || []
+      list.push(e)
+      groups.set(key, list)
+    })
+
+    const result: Array<{
+      start: [number, number, number]
+      end: [number, number, number]
+      similarity: number
+    }> = []
+
+    groups.forEach((edgesForPair: MemoryMeshEdge[]) => {
+      const best = edgesForPair.reduce<MemoryMeshEdge | undefined>(
+        (prev, curr) => {
+          if (prev == null) return curr
+          const ps =
+            typeof prev.similarity_score === "number"
+              ? prev.similarity_score
+              : -Infinity
+          const cs =
+            typeof curr.similarity_score === "number"
+              ? curr.similarity_score
+              : -Infinity
+          return cs > ps ? curr : prev
+        },
+        edgesForPair[0]
+      ) as MemoryMeshEdge
+
+      const sourceNode = nodeMap.get(best.source)
+      const targetNode = nodeMap.get(best.target)
+
+      if (sourceNode && targetNode) {
+        result.push({
+          start: sourceNode.position,
+          end: targetNode.position,
+          similarity: best.similarity_score || 0.5,
+        })
+      }
+    })
+
+    return result
+  }, [meshData, nodes])
+
+  return (
+    <>
+      <fog attach="fog" args={["#f9fafb", 1.5, 6]} />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[10, 10, 8]} intensity={1.0} />
+      <directionalLight position={[-10, -10, -8]} intensity={0.4} />
+      <pointLight position={[0, 0, 0]} intensity={0.5} color="#ffffff" />
+      <gridHelper args={[10, 10, "#e5e7eb", "#f3f4f6"]} position={[0, -2, 0]} />
+
+      {nodes.map((node) => (
+        <MemoryNodePreview
+          key={node.id}
+          position={node.position}
+          color={node.color}
+          importance={node.importance}
+          label={node.label}
+        />
+      ))}
+
+      {edges.map((edge, index) => (
+        <MemoryEdgePreview
+          key={`edge-${index}-${edge.start.join(",")}-${edge.end.join(",")}`}
+          start={edge.start}
+          end={edge.end}
+          similarity={edge.similarity}
+        />
+      ))}
+    </>
+  )
+}
+
+const ControlsUpdater: React.FC<{
+  controlsRef: React.RefObject<OrbitControlsImpl | null>
+}> = ({ controlsRef }) => {
+  useFrame(() => {
+    if (controlsRef.current) {
+      controlsRef.current.update()
+    }
+  })
+  return null
+}
+
+const MemoryMesh3DContainer: React.FC<{ meshData: MemoryMesh }> = ({
+  meshData,
+}) => {
+  const controlsRef = useRef<OrbitControlsImpl | null>(null)
+
+  return (
+      <Canvas
+      camera={{
+        position: [0, 0, 3.5],
+        fov: 50,
+        near: 0.1,
+        far: 100,
+      }}
+      style={{ background: "transparent" }}
+      dpr={[1, 2]}
+      gl={{ antialias: true, alpha: true }}
+    >
+      <MemoryMesh3DPreview meshData={meshData} />
+      <OrbitControls
+        ref={controlsRef}
+        enablePan={true}
+        enableZoom={true}
+        enableRotate={true}
+        zoomToCursor={true}
+        minDistance={2}
+        maxDistance={8}
+        zoomSpeed={1.2}
+        panSpeed={0.8}
+        rotateSpeed={0.5}
+        target={[0, 0, 0]}
+        enableDamping={true}
+        dampingFactor={0.05}
+        mouseButtons={{
+          LEFT: THREE.MOUSE.ROTATE,
+          MIDDLE: THREE.MOUSE.DOLLY,
+          RIGHT: THREE.MOUSE.PAN,
+        }}
+      />
+      <ControlsUpdater controlsRef={controlsRef} />
+    </Canvas>
+  )
+}
+
+// Mock mesh data for demonstration
+const mockMeshData: MemoryMesh = {
+  nodes: [
+    {
+      id: "1",
+      memory_id: "mem-1",
+      type: "browser",
+      label: "React Documentation",
+      x: -0.3,
+      y: 0.2,
+      title: "React Documentation",
+      importance_score: 0.8,
+      hasEmbedding: true,
+    },
+    {
+      id: "2",
+      memory_id: "mem-2",
+      type: "browser",
+      label: "TypeScript Guide",
+      x: 0.15,
+      y: -0.25,
+      title: "TypeScript Guide",
+      importance_score: 0.7,
+      hasEmbedding: true,
+    },
+    {
+      id: "3",
+      memory_id: "mem-3",
+      type: "extension",
+      label: "GitHub Repository",
+      x: 0.25,
+      y: 0.05,
+      title: "GitHub Repository",
+      importance_score: 0.9,
+      hasEmbedding: true,
+    },
+    {
+      id: "4",
+      memory_id: "mem-4",
+      type: "manual",
+      label: "Project Notes",
+      x: -0.2,
+      y: -0.15,
+      title: "Project Notes",
+      importance_score: 0.6,
+      hasEmbedding: true,
+    },
+    {
+      id: "5",
+      memory_id: "mem-5",
+      type: "browser",
+      label: "API Documentation",
+      x: 0.1,
+      y: 0.3,
+      title: "API Documentation",
+      importance_score: 0.75,
+      hasEmbedding: true,
+    },
+    {
+      id: "6",
+      memory_id: "mem-6",
+      type: "reasoning",
+      label: "Code Analysis",
+      x: -0.25,
+      y: -0.3,
+      title: "Code Analysis",
+      importance_score: 0.65,
+      hasEmbedding: true,
+    },
+    {
+      id: "7",
+      memory_id: "mem-7",
+      type: "browser",
+      label: "Design System",
+      x: 0.2,
+      y: 0.15,
+      title: "Design System",
+      importance_score: 0.7,
+      hasEmbedding: true,
+    },
+    {
+      id: "8",
+      memory_id: "mem-8",
+      type: "extension",
+      label: "Stack Overflow",
+      x: -0.15,
+      y: 0.25,
+      title: "Stack Overflow",
+      importance_score: 0.6,
+      hasEmbedding: true,
+    },
+    {
+      id: "9",
+      memory_id: "mem-9",
+      type: "browser",
+      label: "Tutorial Video",
+      x: 0.25,
+      y: -0.2,
+      title: "Tutorial Video",
+      importance_score: 0.55,
+      hasEmbedding: true,
+    },
+    {
+      id: "10",
+      memory_id: "mem-10",
+      type: "manual",
+      label: "Meeting Notes",
+      x: -0.05,
+      y: -0.05,
+      title: "Meeting Notes",
+      importance_score: 0.8,
+      hasEmbedding: true,
+    },
+    {
+      id: "11",
+      memory_id: "mem-11",
+      type: "browser",
+      label: "CSS Tricks",
+      x: 0.1,
+      y: 0.18,
+      title: "CSS Tricks",
+      importance_score: 0.65,
+      hasEmbedding: true,
+    },
+    {
+      id: "12",
+      memory_id: "mem-12",
+      type: "extension",
+      label: "MDN Web Docs",
+      x: -0.18,
+      y: 0.22,
+      title: "MDN Web Docs",
+      importance_score: 0.85,
+      hasEmbedding: true,
+    },
+    {
+      id: "13",
+      memory_id: "mem-13",
+      type: "browser",
+      label: "Stack Exchange",
+      x: 0.22,
+      y: -0.1,
+      title: "Stack Exchange",
+      importance_score: 0.7,
+      hasEmbedding: true,
+    },
+    {
+      id: "14",
+      memory_id: "mem-14",
+      type: "manual",
+      label: "Code Review",
+      x: -0.28,
+      y: 0.1,
+      title: "Code Review",
+      importance_score: 0.75,
+      hasEmbedding: true,
+    },
+    {
+      id: "15",
+      memory_id: "mem-15",
+      type: "reasoning",
+      label: "Architecture Notes",
+      x: 0.03,
+      y: -0.22,
+      title: "Architecture Notes",
+      importance_score: 0.8,
+      hasEmbedding: true,
+    },
+    {
+      id: "16",
+      memory_id: "mem-16",
+      type: "browser",
+      label: "Dev.to Article",
+      x: -0.22,
+      y: -0.16,
+      title: "Dev.to Article",
+      importance_score: 0.6,
+      hasEmbedding: true,
+    },
+    {
+      id: "17",
+      memory_id: "mem-17",
+      type: "extension",
+      label: "NPM Package",
+      x: 0.15,
+      y: 0.28,
+      title: "NPM Package",
+      importance_score: 0.7,
+      hasEmbedding: true,
+    },
+    {
+      id: "18",
+      memory_id: "mem-18",
+      type: "browser",
+      label: "YouTube Tutorial",
+      x: -0.1,
+      y: 0.35,
+      title: "YouTube Tutorial",
+      importance_score: 0.65,
+      hasEmbedding: true,
+    },
+    {
+      id: "19",
+      memory_id: "mem-19",
+      type: "manual",
+      label: "Design Patterns",
+      x: 0.28,
+      y: 0.03,
+      title: "Design Patterns",
+      importance_score: 0.75,
+      hasEmbedding: true,
+    },
+    {
+      id: "20",
+      memory_id: "mem-20",
+      type: "reasoning",
+      label: "Performance Tips",
+      x: -0.03,
+      y: 0.1,
+      title: "Performance Tips",
+      importance_score: 0.7,
+      hasEmbedding: true,
+    },
+    {
+      id: "21",
+      memory_id: "mem-21",
+      type: "browser",
+      label: "Reddit Discussion",
+      x: 0.1,
+      y: -0.28,
+      title: "Reddit Discussion",
+      importance_score: 0.55,
+      hasEmbedding: true,
+    },
+    {
+      id: "22",
+      memory_id: "mem-22",
+      type: "extension",
+      label: "CodePen Example",
+      x: -0.16,
+      y: -0.22,
+      title: "CodePen Example",
+      importance_score: 0.6,
+      hasEmbedding: true,
+    },
+    {
+      id: "23",
+      memory_id: "mem-23",
+      type: "browser",
+      label: "Blog Post",
+      x: 0.22,
+      y: 0.22,
+      title: "Blog Post",
+      importance_score: 0.65,
+      hasEmbedding: true,
+    },
+    {
+      id: "24",
+      memory_id: "mem-24",
+      type: "manual",
+      label: "Best Practices",
+      x: -0.1,
+      y: -0.1,
+      title: "Best Practices",
+      importance_score: 0.8,
+      hasEmbedding: true,
+    },
+    {
+      id: "25",
+      memory_id: "mem-25",
+      type: "reasoning",
+      label: "Debugging Guide",
+      x: 0.03,
+      y: 0.16,
+      title: "Debugging Guide",
+      importance_score: 0.7,
+      hasEmbedding: true,
+    },
+    {
+      id: "26",
+      memory_id: "mem-26",
+      type: "browser",
+      label: "Tech Conference",
+      x: -0.22,
+      y: 0.28,
+      title: "Tech Conference",
+      importance_score: 0.75,
+      hasEmbedding: true,
+    },
+    {
+      id: "27",
+      memory_id: "mem-27",
+      type: "extension",
+      label: "Library Docs",
+      x: 0.16,
+      y: -0.16,
+      title: "Library Docs",
+      importance_score: 0.65,
+      hasEmbedding: true,
+    },
+    {
+      id: "28",
+      memory_id: "mem-28",
+      type: "browser",
+      label: "Forum Thread",
+      x: -0.03,
+      y: -0.28,
+      title: "Forum Thread",
+      importance_score: 0.6,
+      hasEmbedding: true,
+    },
+    {
+      id: "29",
+      memory_id: "mem-29",
+      type: "manual",
+      label: "Team Notes",
+      x: 0.28,
+      y: 0.1,
+      title: "Team Notes",
+      importance_score: 0.7,
+      hasEmbedding: true,
+    },
+    {
+      id: "30",
+      memory_id: "mem-30",
+      type: "reasoning",
+      label: "Code Snippet",
+      x: -0.16,
+      y: 0.03,
+      title: "Code Snippet",
+      importance_score: 0.65,
+      hasEmbedding: true,
+    },
+    {
+      id: "31",
+      memory_id: "mem-31",
+      type: "browser",
+      label: "Vue.js Guide",
+      x: 0.12,
+      y: 0.08,
+      title: "Vue.js Guide",
+      importance_score: 0.68,
+      hasEmbedding: true,
+    },
+    {
+      id: "32",
+      memory_id: "mem-32",
+      type: "extension",
+      label: "Docker Docs",
+      x: -0.08,
+      y: 0.18,
+      title: "Docker Docs",
+      importance_score: 0.72,
+      hasEmbedding: true,
+    },
+    {
+      id: "33",
+      memory_id: "mem-33",
+      type: "browser",
+      label: "Kubernetes Tutorial",
+      x: 0.18,
+      y: -0.12,
+      title: "Kubernetes Tutorial",
+      importance_score: 0.7,
+      hasEmbedding: true,
+    },
+    {
+      id: "34",
+      memory_id: "mem-34",
+      type: "manual",
+      label: "Deployment Notes",
+      x: -0.12,
+      y: -0.08,
+      title: "Deployment Notes",
+      importance_score: 0.75,
+      hasEmbedding: true,
+    },
+    {
+      id: "35",
+      memory_id: "mem-35",
+      type: "reasoning",
+      label: "Security Best Practices",
+      x: 0.08,
+      y: 0.12,
+      title: "Security Best Practices",
+      importance_score: 0.78,
+      hasEmbedding: true,
+    },
+    {
+      id: "36",
+      memory_id: "mem-36",
+      type: "browser",
+      label: "AWS Documentation",
+      x: -0.18,
+      y: -0.12,
+      title: "AWS Documentation",
+      importance_score: 0.73,
+      hasEmbedding: true,
+    },
+    {
+      id: "37",
+      memory_id: "mem-37",
+      type: "extension",
+      label: "GraphQL Tutorial",
+      x: 0.14,
+      y: 0.22,
+      title: "GraphQL Tutorial",
+      importance_score: 0.67,
+      hasEmbedding: true,
+    },
+    {
+      id: "38",
+      memory_id: "mem-38",
+      type: "browser",
+      label: "REST API Design",
+      x: -0.14,
+      y: 0.14,
+      title: "REST API Design",
+      importance_score: 0.71,
+      hasEmbedding: true,
+    },
+    {
+      id: "39",
+      memory_id: "mem-39",
+      type: "manual",
+      label: "Database Schema",
+      x: 0.06,
+      y: -0.18,
+      title: "Database Schema",
+      importance_score: 0.69,
+      hasEmbedding: true,
+    },
+    {
+      id: "40",
+      memory_id: "mem-40",
+      type: "reasoning",
+      label: "System Architecture",
+      x: -0.06,
+      y: -0.14,
+      title: "System Architecture",
+      importance_score: 0.76,
+      hasEmbedding: true,
+    },
+    {
+      id: "41",
+      memory_id: "mem-41",
+      type: "browser",
+      label: "Testing Strategies",
+      x: 0.16,
+      y: 0.06,
+      title: "Testing Strategies",
+      importance_score: 0.64,
+      hasEmbedding: true,
+    },
+    {
+      id: "42",
+      memory_id: "mem-42",
+      type: "extension",
+      label: "CI/CD Pipeline",
+      x: -0.1,
+      y: 0.2,
+      title: "CI/CD Pipeline",
+      importance_score: 0.74,
+      hasEmbedding: true,
+    },
+    {
+      id: "43",
+      memory_id: "mem-43",
+      type: "browser",
+      label: "Microservices Guide",
+      x: 0.2,
+      y: -0.08,
+      title: "Microservices Guide",
+      importance_score: 0.72,
+      hasEmbedding: true,
+    },
+    {
+      id: "44",
+      memory_id: "mem-44",
+      type: "manual",
+      label: "Code Standards",
+      x: -0.04,
+      y: -0.2,
+      title: "Code Standards",
+      importance_score: 0.77,
+      hasEmbedding: true,
+    },
+    {
+      id: "45",
+      memory_id: "mem-45",
+      type: "reasoning",
+      label: "Performance Optimization",
+      x: 0.04,
+      y: 0.16,
+      title: "Performance Optimization",
+      importance_score: 0.75,
+      hasEmbedding: true,
+    },
+    {
+      id: "46",
+      memory_id: "mem-46",
+      type: "browser",
+      label: "Webpack Config",
+      x: -0.2,
+      y: -0.06,
+      title: "Webpack Config",
+      importance_score: 0.66,
+      hasEmbedding: true,
+    },
+    {
+      id: "47",
+      memory_id: "mem-47",
+      type: "extension",
+      label: "Vite Documentation",
+      x: 0.12,
+      y: 0.26,
+      title: "Vite Documentation",
+      importance_score: 0.68,
+      hasEmbedding: true,
+    },
+    {
+      id: "48",
+      memory_id: "mem-48",
+      type: "browser",
+      label: "State Management",
+      x: -0.16,
+      y: 0.16,
+      title: "State Management",
+      importance_score: 0.7,
+      hasEmbedding: true,
+    },
+    {
+      id: "49",
+      memory_id: "mem-49",
+      type: "manual",
+      label: "Component Library",
+      x: 0.08,
+      y: -0.22,
+      title: "Component Library",
+      importance_score: 0.71,
+      hasEmbedding: true,
+    },
+    {
+      id: "50",
+      memory_id: "mem-50",
+      type: "reasoning",
+      label: "Design Tokens",
+      x: -0.02,
+      y: -0.16,
+      title: "Design Tokens",
+      importance_score: 0.73,
+      hasEmbedding: true,
+    },
+  ],
+  edges: [
+    {
+      source: "1",
+      target: "2",
+      relation_type: "similar",
+      similarity_score: 0.85,
+    },
+    {
+      source: "1",
+      target: "3",
+      relation_type: "related",
+      similarity_score: 0.78,
+    },
+    {
+      source: "2",
+      target: "5",
+      relation_type: "similar",
+      similarity_score: 0.82,
+    },
+    {
+      source: "3",
+      target: "7",
+      relation_type: "related",
+      similarity_score: 0.76,
+    },
+    {
+      source: "4",
+      target: "6",
+      relation_type: "similar",
+      similarity_score: 0.79,
+    },
+    {
+      source: "5",
+      target: "7",
+      relation_type: "related",
+      similarity_score: 0.81,
+    },
+    {
+      source: "8",
+      target: "1",
+      relation_type: "similar",
+      similarity_score: 0.77,
+    },
+    {
+      source: "9",
+      target: "2",
+      relation_type: "related",
+      similarity_score: 0.74,
+    },
+    {
+      source: "10",
+      target: "4",
+      relation_type: "similar",
+      similarity_score: 0.83,
+    },
+    {
+      source: "6",
+      target: "10",
+      relation_type: "related",
+      similarity_score: 0.75,
+    },
+    {
+      source: "1",
+      target: "11",
+      relation_type: "similar",
+      similarity_score: 0.72,
+    },
+    {
+      source: "2",
+      target: "12",
+      relation_type: "related",
+      similarity_score: 0.78,
+    },
+    {
+      source: "3",
+      target: "13",
+      relation_type: "similar",
+      similarity_score: 0.76,
+    },
+    {
+      source: "4",
+      target: "14",
+      relation_type: "related",
+      similarity_score: 0.81,
+    },
+    {
+      source: "5",
+      target: "15",
+      relation_type: "similar",
+      similarity_score: 0.79,
+    },
+    {
+      source: "7",
+      target: "16",
+      relation_type: "related",
+      similarity_score: 0.73,
+    },
+    {
+      source: "8",
+      target: "17",
+      relation_type: "similar",
+      similarity_score: 0.77,
+    },
+    {
+      source: "9",
+      target: "18",
+      relation_type: "related",
+      similarity_score: 0.74,
+    },
+    {
+      source: "10",
+      target: "19",
+      relation_type: "similar",
+      similarity_score: 0.82,
+    },
+    {
+      source: "11",
+      target: "20",
+      relation_type: "related",
+      similarity_score: 0.75,
+    },
+    {
+      source: "12",
+      target: "21",
+      relation_type: "similar",
+      similarity_score: 0.71,
+    },
+    {
+      source: "13",
+      target: "22",
+      relation_type: "related",
+      similarity_score: 0.78,
+    },
+    {
+      source: "14",
+      target: "23",
+      relation_type: "similar",
+      similarity_score: 0.76,
+    },
+    {
+      source: "15",
+      target: "24",
+      relation_type: "related",
+      similarity_score: 0.84,
+    },
+    {
+      source: "16",
+      target: "25",
+      relation_type: "similar",
+      similarity_score: 0.72,
+    },
+    {
+      source: "17",
+      target: "26",
+      relation_type: "related",
+      similarity_score: 0.79,
+    },
+    {
+      source: "18",
+      target: "27",
+      relation_type: "similar",
+      similarity_score: 0.73,
+    },
+    {
+      source: "19",
+      target: "28",
+      relation_type: "related",
+      similarity_score: 0.77,
+    },
+    {
+      source: "20",
+      target: "29",
+      relation_type: "similar",
+      similarity_score: 0.75,
+    },
+    {
+      source: "21",
+      target: "30",
+      relation_type: "related",
+      similarity_score: 0.70,
+    },
+    {
+      source: "1",
+      target: "15",
+      relation_type: "related",
+      similarity_score: 0.80,
+    },
+    {
+      source: "2",
+      target: "20",
+      relation_type: "similar",
+      similarity_score: 0.76,
+    },
+    {
+      source: "3",
+      target: "17",
+      relation_type: "related",
+      similarity_score: 0.78,
+    },
+    {
+      source: "5",
+      target: "23",
+      relation_type: "similar",
+      similarity_score: 0.74,
+    },
+    {
+      source: "7",
+      target: "19",
+      relation_type: "related",
+      similarity_score: 0.81,
+    },
+    {
+      source: "11",
+      target: "13",
+      relation_type: "similar",
+      similarity_score: 0.73,
+    },
+    {
+      source: "12",
+      target: "18",
+      relation_type: "related",
+      similarity_score: 0.79,
+    },
+    {
+      source: "14",
+      target: "24",
+      relation_type: "similar",
+      similarity_score: 0.82,
+    },
+    {
+      source: "15",
+      target: "25",
+      relation_type: "related",
+      similarity_score: 0.77,
+    },
+    {
+      source: "22",
+      target: "28",
+      relation_type: "similar",
+      similarity_score: 0.71,
+    },
+    {
+      source: "24",
+      target: "29",
+      relation_type: "related",
+      similarity_score: 0.83,
+    },
+    {
+      source: "26",
+      target: "30",
+      relation_type: "similar",
+      similarity_score: 0.75,
+    },
+    {
+      source: "31",
+      target: "1",
+      relation_type: "related",
+      similarity_score: 0.76,
+    },
+    {
+      source: "32",
+      target: "33",
+      relation_type: "similar",
+      similarity_score: 0.82,
+    },
+    {
+      source: "34",
+      target: "36",
+      relation_type: "related",
+      similarity_score: 0.79,
+    },
+    {
+      source: "35",
+      target: "40",
+      relation_type: "similar",
+      similarity_score: 0.84,
+    },
+    {
+      source: "37",
+      target: "38",
+      relation_type: "related",
+      similarity_score: 0.77,
+    },
+    {
+      source: "39",
+      target: "40",
+      relation_type: "similar",
+      similarity_score: 0.81,
+    },
+    {
+      source: "41",
+      target: "42",
+      relation_type: "related",
+      similarity_score: 0.75,
+    },
+    {
+      source: "43",
+      target: "44",
+      relation_type: "similar",
+      similarity_score: 0.78,
+    },
+    {
+      source: "45",
+      target: "46",
+      relation_type: "related",
+      similarity_score: 0.73,
+    },
+    {
+      source: "47",
+      target: "48",
+      relation_type: "similar",
+      similarity_score: 0.76,
+    },
+    {
+      source: "49",
+      target: "50",
+      relation_type: "related",
+      similarity_score: 0.8,
+    },
+    {
+      source: "31",
+      target: "7",
+      relation_type: "similar",
+      similarity_score: 0.74,
+    },
+    {
+      source: "32",
+      target: "15",
+      relation_type: "related",
+      similarity_score: 0.8,
+    },
+    {
+      source: "33",
+      target: "36",
+      relation_type: "similar",
+      similarity_score: 0.83,
+    },
+    {
+      source: "35",
+      target: "24",
+      relation_type: "related",
+      similarity_score: 0.85,
+    },
+    {
+      source: "37",
+      target: "5",
+      relation_type: "similar",
+      similarity_score: 0.72,
+    },
+    {
+      source: "38",
+      target: "5",
+      relation_type: "related",
+      similarity_score: 0.78,
+    },
+    {
+      source: "39",
+      target: "15",
+      relation_type: "similar",
+      similarity_score: 0.77,
+    },
+    {
+      source: "40",
+      target: "15",
+      relation_type: "related",
+      similarity_score: 0.86,
+    },
+    {
+      source: "42",
+      target: "34",
+      relation_type: "similar",
+      similarity_score: 0.81,
+    },
+    {
+      source: "43",
+      target: "40",
+      relation_type: "related",
+      similarity_score: 0.82,
+    },
+    {
+      source: "44",
+      target: "24",
+      relation_type: "similar",
+      similarity_score: 0.84,
+    },
+    {
+      source: "45",
+      target: "20",
+      relation_type: "related",
+      similarity_score: 0.79,
+    },
+    {
+      source: "46",
+      target: "47",
+      relation_type: "similar",
+      similarity_score: 0.75,
+    },
+    {
+      source: "48",
+      target: "1",
+      relation_type: "related",
+      similarity_score: 0.77,
+    },
+    {
+      source: "49",
+      target: "7",
+      relation_type: "similar",
+      similarity_score: 0.8,
+    },
+    {
+      source: "50",
+      target: "7",
+      relation_type: "related",
+      similarity_score: 0.78,
+    },
+    {
+      source: "11",
+      target: "31",
+      relation_type: "similar",
+      similarity_score: 0.73,
+    },
+    {
+      source: "12",
+      target: "35",
+      relation_type: "related",
+      similarity_score: 0.81,
+    },
+    {
+      source: "13",
+      target: "41",
+      relation_type: "similar",
+      similarity_score: 0.74,
+    },
+    {
+      source: "14",
+      target: "44",
+      relation_type: "related",
+      similarity_score: 0.83,
+    },
+    {
+      source: "16",
+      target: "46",
+      relation_type: "similar",
+      similarity_score: 0.76,
+    },
+    {
+      source: "17",
+      target: "47",
+      relation_type: "related",
+      similarity_score: 0.79,
+    },
+    {
+      source: "19",
+      target: "49",
+      relation_type: "similar",
+      similarity_score: 0.82,
+    },
+    {
+      source: "21",
+      target: "13",
+      relation_type: "related",
+      similarity_score: 0.75,
+    },
+    {
+      source: "22",
+      target: "37",
+      relation_type: "similar",
+      similarity_score: 0.72,
+    },
+    {
+      source: "23",
+      target: "38",
+      relation_type: "related",
+      similarity_score: 0.78,
+    },
+    {
+      source: "25",
+      target: "35",
+      relation_type: "similar",
+      similarity_score: 0.8,
+    },
+    {
+      source: "27",
+      target: "3",
+      relation_type: "related",
+      similarity_score: 0.77,
+    },
+    {
+      source: "28",
+      target: "21",
+      relation_type: "similar",
+      similarity_score: 0.74,
+    },
+    {
+      source: "29",
+      target: "49",
+      relation_type: "related",
+      similarity_score: 0.81,
+    },
+    {
+      source: "30",
+      target: "25",
+      relation_type: "similar",
+      similarity_score: 0.76,
+    },
+  ],
+  clusters: {},
+  metadata: {
+    similarity_threshold: 0.4,
+    total_nodes: 50,
+    nodes_in_latent_space: 50,
+    total_edges: 80,
+    detected_clusters: 0,
+    average_connections: 3.2,
+    is_latent_space: true,
+    projection_method: "umap",
+  },
 }
 
 // Values inlined into the component for clarity
@@ -247,19 +1674,19 @@ export const Landing = () => {
       {/* Logo Header */}
       <header className="fixed top-0 inset-x-0 z-40 py-4 sm:py-5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
             <img
               src="/black-transparent.png"
               alt="Cognia"
               className="w-10 h-10"
             />
-            <div className="flex flex-col">
-              <span className="text-xl font-bold text-italics font-editorial text-black">
-                Cognia
-              </span>
-              <span className="text-xs text-gray-600 font-mono -mt-1">
-                Remember what the web showed you
-              </span>
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-italics font-editorial text-black">
+                  Cognia
+                </span>
+                <span className="text-xs text-gray-600 font-mono -mt-1">
+                  Remember what the web showed you
+                </span>
             </div>
           </div>
         </div>
@@ -417,8 +1844,8 @@ export const Landing = () => {
       </Section>
 
       {/* Product Explanation Section */}
-      <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-light font-editorial mb-4">
               How it works
@@ -426,71 +1853,16 @@ export const Landing = () => {
             <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto">
               Cognia captures everything you see online, making it instantly
               searchable with natural language queries.
-            </p>
-          </div>
+              </p>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {[
-              {
-                title: "Automatic Capture",
-                description:
-                  "As you browse, Cognia silently captures text, links, and context from every page you visit. No manual saving required—your browsing history becomes a searchable knowledge base.",
-                icon: "📸",
-              },
-              {
-                title: "Smart Indexing",
-                description:
-                  "Everything is processed and indexed locally on your device. Your data stays private while being organized for lightning-fast retrieval when you need it.",
-                icon: "🔍",
-              },
-              {
-                title: "Natural Search",
-                description:
-                  "Search like you remember—type a few words, describe what you saw, or ask a question. Cognia finds the exact page and section instantly.",
-                icon: "💭",
-              },
-              {
-                title: "Context Preservation",
-                description:
-                  "Every memory includes the full context: the page URL, surrounding text, and when you saw it. Never lose track of where information came from.",
-                icon: "🔗",
-              },
-              {
-                title: "Privacy First",
-                description:
-                  "All processing happens on your device by default. Your browsing data never leaves your computer unless you explicitly choose to sync.",
-                icon: "🔒",
-              },
-              {
-                title: "Always Available",
-                description:
-                  "Access your memories from any device. Whether you're on your laptop, phone, or tablet, your searchable memory follows you everywhere.",
-                icon: "☁️",
-              },
-            ].map((feature, i) => (
-              <div
-                key={i}
-                className="group text-left rounded-lg border border-gray-200 bg-white/80 backdrop-blur p-6 sm:p-8 shadow-sm hover:shadow-md hover:border-gray-300 transition-all"
-                style={{
-                  animation: isVisible
-                    ? `fadeInScale 0.6s ease-out ${0.1 * i + 0.2}s both`
-                    : "none",
-                }}
-              >
-                <div className="text-3xl mb-4">{feature.icon}</div>
-                <div className="space-y-2">
-                  <div className="text-lg font-semibold text-gray-900 tracking-tight">
-                    {feature.title}
-                  </div>
-                  <div className="text-sm text-gray-600 leading-relaxed">
-                    {feature.description}
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="w-full h-[60vh] relative rounded-xl overflow-hidden shadow-2xl border border-gray-200/50 bg-gradient-to-br from-white via-gray-50/50 to-white">
+            <div className="absolute inset-0 bg-gradient-to-br from-transparent via-transparent to-black/5 pointer-events-none" />
+            <div className="absolute inset-0 backdrop-blur-[0.5px] pointer-events-none" />
+            <MemoryMesh3DContainer meshData={mockMeshData} />
           </div>
-        </div>
-      </Section>
+          </div>
+        </Section>
 
       {/* Footer */}
       <footer className="bg-white/80 backdrop-blur">
