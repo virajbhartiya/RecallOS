@@ -2,12 +2,117 @@ import { useEffect, useState } from "react"
 
 import { ConsoleButton, Section } from "../components/sections"
 
+const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
+  const [email, setEmail] = useState("")
+  const [submitted, setSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+
+    setSubmitted(true)
+    setIsSubmitting(false)
+    setEmail("")
+  }
+
+  if (submitted) {
+    return (
+      <div className="text-center py-6">
+        <div className="text-3xl mb-3">✓</div>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          You're on the list!
+        </h3>
+        <p className="text-sm text-gray-600">
+          We'll send you an email when Cognia is ready.
+        </p>
+        {!compact && (
+          <button
+            onClick={() => setSubmitted(false)}
+            className="mt-6 text-sm text-gray-700 hover:text-black underline"
+          >
+            Add another email
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  if (compact) {
+    return (
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="flex-1 border border-gray-300 px-4 py-3 text-sm outline-none focus:border-black transition-colors rounded-none bg-white/80 backdrop-blur"
+            placeholder="your@email.com"
+          />
+          <ConsoleButton
+            variant="console_key"
+            className="group relative overflow-hidden rounded-none px-6 py-3 transition-all duration-200 hover:shadow-md disabled:opacity-50 whitespace-nowrap"
+            type="submit"
+            disabled={isSubmitting}
+          >
+            <span className="relative z-10 text-sm font-medium">
+              {isSubmitting ? "Joining..." : "Join Waitlist"}
+            </span>
+            <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
+          </ConsoleButton>
+        </div>
+        <p className="text-xs text-gray-500 text-center">
+          Be among the first to experience Cognia. No spam, unsubscribe anytime.
+        </p>
+      </form>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div>
+        <label
+          htmlFor="email"
+          className="block text-sm font-medium text-gray-700 mb-2"
+        >
+          Email
+        </label>
+        <input
+          id="email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="w-full border border-gray-300 px-4 py-3 text-sm outline-none focus:border-black transition-colors rounded-none bg-white"
+          placeholder="your@email.com"
+        />
+      </div>
+      <ConsoleButton
+        variant="console_key"
+        className="w-full group relative overflow-hidden rounded-none px-6 py-3 transition-all duration-200 hover:shadow-md disabled:opacity-50"
+        type="submit"
+        disabled={isSubmitting}
+      >
+        <span className="relative z-10 text-sm font-medium">
+          {isSubmitting ? "Joining..." : "Join Waitlist"}
+        </span>
+        <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
+      </ConsoleButton>
+      <p className="text-xs text-gray-500 text-center">
+        We respect your privacy. No spam, unsubscribe anytime.
+      </p>
+    </form>
+  )
+}
+
 // Values inlined into the component for clarity
 
 export const Landing = () => {
   const [isVisible, setIsVisible] = useState(false)
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-  const [headerBlurProgress, setHeaderBlurProgress] = useState(0)
 
   useEffect(() => {
     // Prevent browser from restoring previous scroll position and ensure top on load
@@ -31,18 +136,9 @@ export const Landing = () => {
       setMousePosition({ x: e.clientX, y: e.clientY })
     }
 
-    const handleScroll = () => {
-      const y = typeof window !== "undefined" ? window.scrollY || 0 : 0
-      const progress = Math.max(0, Math.min(1, y / 120))
-      setHeaderBlurProgress(progress)
-    }
-
     window.addEventListener("mousemove", handleMouseMove)
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    handleScroll()
     return () => {
       window.removeEventListener("mousemove", handleMouseMove)
-      window.removeEventListener("scroll", handleScroll)
     }
   }, [])
 
@@ -148,130 +244,28 @@ export const Landing = () => {
         }
       `}</style>
 
-      {/* Enhanced header with better navigation */}
-      <header
-        className="fixed top-0 inset-x-0 z-40 transition-all duration-300"
-        style={{
-          backgroundColor: `rgba(255,255,255, ${0.35 * headerBlurProgress})`,
-          borderBottom: `1px solid rgba(0,0,0, ${0.06 * headerBlurProgress})`,
-        }}
-      >
-        {/* Progressive blur overlay: strongest at top, fades to bottom */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            backdropFilter: `saturate(180%) blur(${Math.round(headerBlurProgress * 16)}px)`,
-            WebkitBackdropFilter: `saturate(180%) blur(${Math.round(headerBlurProgress * 16)}px)`,
-            maskImage:
-              "linear-gradient(to bottom, rgba(0,0,0,1), rgba(0,0,0,0))",
-            WebkitMaskImage:
-              "linear-gradient(to bottom, rgba(0,0,0,1), rgba(0,0,0,0))",
-            opacity: Math.min(1, headerBlurProgress * 1.2),
-          }}
-        />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
-          <div className="flex items-center justify-between">
-            {/* Enhanced Brand */}
-            <div className="flex items-center gap-3 sm:gap-4">
-              <div className="w-10 h-10 bg-black text-white flex items-center justify-center font-bold text-xl font-mono shadow-lg">
-                R
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xl font-bold text-italics font-editorial text-black">
-                  Cognia
-                </span>
-                <span className="text-xs text-gray-600 font-mono -mt-1">
-                  Remember what the web showed you
-                </span>
-              </div>
-            </div>
-
-            {/* Navigation Links */}
-            <nav className="hidden md:flex items-center gap-8">
-              <button
-                className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
-                onClick={() =>
-                  window.open(
-                    "https://github.com/cogniahq/Cognia/releases/latest",
-                    "_blank"
-                  )
-                }
-              >
-                <span className="relative z-10">Get Extension</span>
-                <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
-              </button>
-              <button
-                className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
-                onClick={() => (window.location.href = "/docs")}
-              >
-                <span className="relative z-10">See how it works</span>
-                <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
-              </button>
-              <button
-                className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
-                onClick={() => (window.location.href = "/memories")}
-              >
-                <span className="relative z-10">Memories</span>
-                <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
-              </button>
-              <button
-                className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
-                onClick={() => (window.location.href = "/pricing")}
-              >
-                <span className="relative z-10">Pricing</span>
-                <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
-              </button>
-              <button
-                className="group text-sm font-medium text-gray-700 hover:text-black transition-all duration-300 relative"
-                onClick={() => (window.location.href = "/login")}
-              >
-                <span className="relative z-10">Login</span>
-                <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
-              </button>
-            </nav>
-
-            {/* CTA Button */}
-            <div className="flex items-center gap-3">
-              <button
-                className="hidden sm:flex items-center gap-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-                onClick={() => (window.location.href = "/docs")}
-              >
-                <span>Docs</span>
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </button>
-              <ConsoleButton
-                variant="console_key"
-                className="group relative overflow-hidden rounded-none px-3 py-2 transition-all duration-200 hover:shadow-md"
-                onClick={() =>
-                  window.open(
-                    "https://github.com/cogniahq/Cognia/releases/latest",
-                    "_blank"
-                  )
-                }
-              >
-                <span className="relative z-10 text-sm font-medium">
-                  Try for Free
-                </span>
-                <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
-              </ConsoleButton>
+      {/* Logo Header */}
+      <header className="fixed top-0 inset-x-0 z-40 py-4 sm:py-5">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <img
+              src="/black-transparent.png"
+              alt="Cognia"
+              className="w-10 h-10"
+            />
+            <div className="flex flex-col">
+              <span className="text-xl font-bold text-italics font-editorial text-black">
+                Cognia
+              </span>
+              <span className="text-xs text-gray-600 font-mono -mt-1">
+                Remember what the web showed you
+              </span>
             </div>
           </div>
         </div>
       </header>
-      {/* spacer to offset fixed header height, invisible */}
-      <div className="h-14 sm:h-16" aria-hidden="true" />
+      {/* spacer to offset fixed header height */}
+      <div className="h-20 sm:h-24" aria-hidden="true" />
 
       {/* Hero Section */}
       <Section className="min-h-screen bg-transparent relative overflow-hidden py-16 sm:py-20 lg:py-28">
@@ -405,219 +399,98 @@ export const Landing = () => {
               links and context as you browse so you can find it in seconds.
             </p>
 
-            {/* CTA */}
+            {/* Waitlist Form */}
             <div
-              className="mt-2 sm:mt-4 space-y-3"
+              className="mt-8 sm:mt-10"
               style={{
                 animation: isVisible
                   ? "slideInUp 1s ease-out 0.8s both"
                   : "none",
               }}
             >
-              <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-4">
-                <ConsoleButton
-                  variant="console_key"
-                  className="group relative overflow-hidden flex-1 sm:flex-none sm:min-w-[160px] rounded-none px-4 py-2 transition-all duration-200 hover:shadow-md"
-                  onClick={() =>
-                    window.open(
-                      "https://github.com/cogniahq/Cognia/releases/latest",
-                      "_blank"
-                    )
-                  }
-                >
-                  <span className="relative z-10 whitespace-nowrap text-sm sm:text-base font-medium">
-                    Get the Extension
-                  </span>
-                  <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
-                </ConsoleButton>
-                <ConsoleButton
-                  variant="outlined"
-                  className="group relative overflow-hidden flex-1 sm:flex-none sm:min-w-[160px] rounded-none px-4 py-2 transition-all duration-200 hover:shadow-md"
-                  onClick={() => (window.location.href = "/memories")}
-                >
-                  <span className="relative z-10 whitespace-nowrap text-sm sm:text-base font-medium">
-                    Open Memories
-                  </span>
-                  <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
-                </ConsoleButton>
-              </div>
-              {/* Highlights */}
-              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-5xl mx-auto">
-                {[
-                  {
-                    title: "Automatic capture",
-                    desc: "Key text, links and context saved while you browse.",
-                  },
-                  {
-                    title: "Search like you remember",
-                    desc: "Type a few words to jump to the exact page and section.",
-                  },
-                  {
-                    title: "Private by default",
-                    desc: "Everything stays on your device unless you choose to sync.",
-                  },
-                ].map((feat, i) => (
-                  <div
-                    key={i}
-                    className="group text-left rounded-lg border border-gray-200 bg-white/80 backdrop-blur p-4 sm:p-5 shadow-sm hover:shadow-md hover:border-gray-300 transition-all"
-                  >
-                    <div className="space-y-1">
-                      <div className="text-sm font-semibold text-gray-900 tracking-tight">
-                        {feat.title}
-                      </div>
-                      <div className="text-sm text-gray-600 leading-snug">
-                        {feat.desc}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="max-w-md mx-auto">
+                <WaitlistForm compact />
               </div>
             </div>
           </div>
         </div>
       </Section>
 
-      {/* Pricing Section */}
-      <div id="pricing">
-        <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="text-center mb-10 sm:mb-12">
-              <h2 className="text-3xl sm:text-4xl font-light">Pricing</h2>
-              <p className="mt-2 text-sm sm:text-base text-gray-600">
-                Simple plans that grow with you. Billed monthly.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
-              {/* Free */}
-              <div className="relative border border-gray-200 bg-white/80 backdrop-blur shadow-sm hover:shadow-md transition-shadow">
-                <div className="p-5 sm:p-6 border-b border-gray-200">
-                  <div className="text-xs uppercase tracking-wider text-gray-600">
-                    Free
-                  </div>
-                  <div className="mt-2 flex items-end gap-1">
-                    <div className="text-2xl font-semibold text-black">$0</div>
-                    <div className="text-xs text-gray-600 mb-1">/mo</div>
-                  </div>
-                  <div className="mt-1 text-sm text-gray-600">
-                    Personal basics
-                  </div>
-                </div>
-                <ul className="p-5 sm:p-6 text-sm text-gray-700 space-y-2 border-b border-gray-200">
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Automatic
-                    capture
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Local search
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Up to 500
-                    memories
-                  </li>
-                </ul>
-                <div className="p-5 sm:p-6">
-                  <button
-                    className="w-full border border-black text-black px-4 py-2 text-sm tracking-wide hover:bg-black hover:text-white transition-colors rounded-none"
-                    onClick={() => (window.location.href = "/login")}
-                  >
-                    Get Started
-                  </button>
-                </div>
-              </div>
-
-              {/* Pro - featured */}
-              <div className="relative border-2 border-black bg-white shadow-md hover:shadow-lg transition-shadow">
-                <div className="absolute -top-3 left-4 bg-black text-white text-[10px] uppercase tracking-wider px-2 py-1">
-                  Most popular
-                </div>
-                <div className="p-6 sm:p-7 border-b border-gray-200">
-                  <div className="text-xs uppercase tracking-wider text-gray-700">
-                    Pro
-                  </div>
-                  <div className="mt-2 flex items-end gap-1">
-                    <div className="text-3xl font-semibold text-black">$8</div>
-                    <div className="text-xs text-gray-600 mb-1">/mo</div>
-                  </div>
-                  <div className="mt-1 text-sm text-gray-700">
-                    Everything you need for speed
-                  </div>
-                </div>
-                <ul className="p-6 sm:p-7 text-sm text-gray-800 space-y-2 border-b border-gray-200">
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Unlimited
-                    memories
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Faster
-                    processing
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Priority
-                    queue
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Smart search
-                    boosts
-                  </li>
-                </ul>
-                <div className="p-6 sm:p-7">
-                  <button
-                    className="w-full bg-black text-white px-4 py-2 text-sm tracking-wide hover:opacity-90 transition-opacity rounded-none"
-                    onClick={() => (window.location.href = "/login?plan=pro")}
-                  >
-                    Start Pro
-                  </button>
-                  <div className="mt-2 text-[11px] text-gray-600 text-center">
-                    7‑day money‑back guarantee
-                  </div>
-                </div>
-              </div>
-
-              {/* Teams */}
-              <div className="relative border border-gray-200 bg-white/80 backdrop-blur shadow-sm hover:shadow-md transition-shadow">
-                <div className="p-5 sm:p-6 border-b border-gray-200">
-                  <div className="text-xs uppercase tracking-wider text-gray-600">
-                    Teams
-                  </div>
-                  <div className="mt-2 flex items-end gap-1">
-                    <div className="text-2xl font-semibold text-black">$20</div>
-                    <div className="text-xs text-gray-600 mb-1">/user</div>
-                  </div>
-                  <div className="mt-1 text-sm text-gray-600">
-                    For small teams
-                  </div>
-                </div>
-                <ul className="p-5 sm:p-6 text-sm text-gray-700 space-y-2 border-b border-gray-200">
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Shared spaces
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Access
-                    controls
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="mt-1 h-1.5 w-1.5 bg-black" /> Usage
-                    analytics
-                  </li>
-                </ul>
-                <div className="p-5 sm:p-6">
-                  <button
-                    className="w-full border border-black text-black px-4 py-2 text-sm tracking-wide hover:bg-black hover:text-white transition-colors rounded-none"
-                    onClick={() => (window.location.href = "/contact")}
-                  >
-                    Contact Sales
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 text-center text-xs text-gray-600">
-              Prices shown in USD. Cancel anytime.
-            </div>
+      {/* Product Explanation Section */}
+      <Section className="bg-transparent py-16 sm:py-20 lg:py-24">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-light font-editorial mb-4">
+              How it works
+            </h2>
+            <p className="text-lg sm:text-xl text-gray-700 max-w-2xl mx-auto">
+              Cognia captures everything you see online, making it instantly
+              searchable with natural language queries.
+            </p>
           </div>
-        </Section>
-      </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            {[
+              {
+                title: "Automatic Capture",
+                description:
+                  "As you browse, Cognia silently captures text, links, and context from every page you visit. No manual saving required—your browsing history becomes a searchable knowledge base.",
+                icon: "📸",
+              },
+              {
+                title: "Smart Indexing",
+                description:
+                  "Everything is processed and indexed locally on your device. Your data stays private while being organized for lightning-fast retrieval when you need it.",
+                icon: "🔍",
+              },
+              {
+                title: "Natural Search",
+                description:
+                  "Search like you remember—type a few words, describe what you saw, or ask a question. Cognia finds the exact page and section instantly.",
+                icon: "💭",
+              },
+              {
+                title: "Context Preservation",
+                description:
+                  "Every memory includes the full context: the page URL, surrounding text, and when you saw it. Never lose track of where information came from.",
+                icon: "🔗",
+              },
+              {
+                title: "Privacy First",
+                description:
+                  "All processing happens on your device by default. Your browsing data never leaves your computer unless you explicitly choose to sync.",
+                icon: "🔒",
+              },
+              {
+                title: "Always Available",
+                description:
+                  "Access your memories from any device. Whether you're on your laptop, phone, or tablet, your searchable memory follows you everywhere.",
+                icon: "☁️",
+              },
+            ].map((feature, i) => (
+              <div
+                key={i}
+                className="group text-left rounded-lg border border-gray-200 bg-white/80 backdrop-blur p-6 sm:p-8 shadow-sm hover:shadow-md hover:border-gray-300 transition-all"
+                style={{
+                  animation: isVisible
+                    ? `fadeInScale 0.6s ease-out ${0.1 * i + 0.2}s both`
+                    : "none",
+                }}
+              >
+                <div className="text-3xl mb-4">{feature.icon}</div>
+                <div className="space-y-2">
+                  <div className="text-lg font-semibold text-gray-900 tracking-tight">
+                    {feature.title}
+                  </div>
+                  <div className="text-sm text-gray-600 leading-relaxed">
+                    {feature.description}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Section>
 
       {/* Footer */}
       <footer className="bg-white/80 backdrop-blur">
@@ -635,31 +508,6 @@ export const Landing = () => {
               <p className="text-sm text-gray-600">
                 A searchable memory for everything you see online.
               </p>
-              <div className="mt-3">
-                <div className="flex">
-                  <input
-                    type="email"
-                    placeholder="Your email"
-                    className="w-full border border-gray-300 px-3 py-2 text-sm outline-none focus:border-black rounded-none"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        window.location.href = "/login?subscribe=1"
-                      }
-                    }}
-                  />
-                  <button
-                    className="ml-2 border border-black px-3 py-2 text-sm hover:bg-black hover:text-white transition-colors rounded-none"
-                    onClick={() =>
-                      (window.location.href = "/login?subscribe=1")
-                    }
-                  >
-                    Subscribe
-                  </button>
-                </div>
-                <div className="mt-2 text-[11px] text-gray-500">
-                  Occasional updates. Unsubscribe anytime.
-                </div>
-              </div>
               <div className="flex items-center gap-4 pt-2">
                 <button
                   onClick={() =>
