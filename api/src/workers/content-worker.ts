@@ -395,7 +395,7 @@ export const startContentWorker = () => {
       }
     },
     {
-      connection: getRedisConnection(),
+      connection: getRedisConnection(true),
       concurrency: getQueueConcurrency(),
       limiter: getQueueLimiter(),
       stalledInterval: getQueueStalledInterval(),

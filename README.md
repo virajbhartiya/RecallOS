@@ -68,18 +68,19 @@ npm install
 
 # Build extension
 npm run build
-
-# Load in Chrome:
-# 1. Go to chrome://extensions/
-# 2. Enable "Developer mode"
-# 3. Click "Load unpacked"
-# 4. Select extension/dist folder
-
-# Configure extension:
-# 1. Click extension icon
-# 2. Enter API endpoint: http://localhost:3000/api/memory/process
-# 3. Extension will automatically authenticate
 ```
+
+**Load Extension in Chrome:**
+
+1. Navigate to `chrome://extensions/`
+2. Enable "Developer mode" (toggle in top-right corner)
+3. Click "Load unpacked"
+4. Select the `extension/dist` folder
+
+**Next Steps:**
+
+- Open http://localhost:5173 and create your account
+- The extension will automatically detect authentication status
 
 <img width="1582" height="976" alt="Screenshot 2025-11-16 at 5 12 44 PM" src="https://github.com/user-attachments/assets/ea0d7958-e40a-4186-be5a-a8fae01b8f85" />
 

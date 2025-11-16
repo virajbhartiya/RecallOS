@@ -28,6 +28,7 @@
     "fix": "npm run lint:fix && npm run format",
     "clean:qdrant": "node -r ts-node/register src/scripts/clean-qdrant.script.ts",
     "clean:queue": "node -r ts-node/register src/scripts/clean-queue.script.ts",
+    "reset:queue": "node -r ts-node/register src/scripts/reset-queue.script.ts",
     "clean:db": "npm run db:reset",
     "clean:all": "npm run clean:qdrant && npm run clean:db",
     "clean:docker": "docker-compose down -v",

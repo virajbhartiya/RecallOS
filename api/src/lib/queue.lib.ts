@@ -22,7 +22,7 @@ export interface ContentJobData {
 const queueName = 'process-content'
 
 const queueOptions: QueueOptions = {
-  connection: getRedisConnection(),
+  connection: getRedisConnection(true),
   defaultJobOptions: {
     removeOnComplete: true,
     removeOnFail: false,
@@ -37,7 +37,9 @@ const queueOptions: QueueOptions = {
 }
 
 export const contentQueue = new Queue<ContentJobData>(queueName, queueOptions)
-export const contentQueueEvents = new QueueEvents(queueName, { connection: getRedisConnection() })
+export const contentQueueEvents = new QueueEvents(queueName, {
+  connection: getRedisConnection(true),
+})
 
 const cancelledJobKeyPrefix = 'queue:process-content:cancelled:'
 

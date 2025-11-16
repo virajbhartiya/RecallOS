@@ -50,7 +50,7 @@ interface RedisConnectionOptions {
   retryStrategy?: (times: number) => number | null
 }
 
-export function getRedisConnection(): RedisConnectionOptions {
+export function getRedisConnection(forBullMQ: boolean = false): RedisConnectionOptions {
   const connectionOptions: RedisConnectionOptions = {}
 
   if (process.env.REDIS_URL) {
@@ -70,7 +70,8 @@ export function getRedisConnection(): RedisConnectionOptions {
   // This prevents "command timed out" errors during lock renewal and queue operations
   // Processes can take 2+ minutes, so we need sufficient timeout for individual Redis commands
   connectionOptions.commandTimeout = Number(process.env.REDIS_COMMAND_TIMEOUT_MS || 60000)
-  connectionOptions.maxRetriesPerRequest = 3
+  // BullMQ requires maxRetriesPerRequest to be null
+  connectionOptions.maxRetriesPerRequest = forBullMQ ? null : 3
   connectionOptions.enableReadyCheck = true
   connectionOptions.lazyConnect = false
   connectionOptions.connectTimeout = 10000
