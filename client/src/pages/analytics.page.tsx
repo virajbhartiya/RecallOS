@@ -138,7 +138,6 @@ export const Analytics: React.FC = () => {
             </p>
           </div>
 
-
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             <div className="bg-white border border-gray-200 rounded p-4 shadow-sm">
               <div className="text-xs text-gray-600 uppercase tracking-wider mb-1">

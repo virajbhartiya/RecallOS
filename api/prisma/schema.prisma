@@ -26,10 +26,7 @@ model User {
   token_usage      TokenUsage[]
   profile          UserProfile?
   browsing_summaries BrowsingSummary[]
-  knowledge_scores KnowledgeScore[]
-  achievements     Achievement[]
   learning_paths   LearningPath[]
-  user_benchmarks  UserBenchmark?
   privacy_settings PrivacySetting[]
   audit_logs       AuditLog[]
 
@@ -252,51 +249,6 @@ model BrowsingSummary {
   @@map("browsing_summaries")
 }
 
-model KnowledgeScore {
-  id                String   @id @default(uuid()) @db.Uuid
-  user_id           String   @db.Uuid
-  period_type       String
-  period_start      DateTime
-  period_end        DateTime
-  velocity_score    Float
-  impact_score      Float
-  topic_rate        Float
-  diversity_index   Float
-  consistency_score Float
-  depth_balance     Float
-  search_frequency  Float
-  retrieval_efficiency Float
-  connection_strength Float
-  access_quality    Float
-  created_at        DateTime @default(now())
-  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
-  @@index([period_type])
-  @@index([period_start])
-  @@index([user_id, period_type])
-  @@index([user_id, period_type, period_start])
-  @@map("knowledge_scores")
-}
-
-model Achievement {
-  id          String   @id @default(uuid()) @db.Uuid
-  user_id     String   @db.Uuid
-  badge_type  String
-  badge_name  String
-  progress    Float    @default(0.0)
-  unlocked_at DateTime?
-  created_at  DateTime @default(now())
-  updated_at  DateTime @default(now()) @updatedAt
-  user        User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@unique([user_id, badge_type])
-  @@index([user_id])
-  @@index([badge_type])
-  @@index([user_id, badge_type])
-  @@map("achievements")
-}
-
 model LearningPath {
   id              String   @id @default(uuid()) @db.Uuid
   user_id         String   @db.Uuid
@@ -313,17 +265,3 @@ model LearningPath {
   @@map("learning_paths")
 }
 
-model UserBenchmark {
-  id                String   @id @default(uuid()) @db.Uuid
-  user_id           String   @unique @db.Uuid
-  velocity_percentile Float?
-  impact_percentile   Float?
-  connection_percentile Float?
-  diversity_percentile Float?
-  last_calculated   DateTime @default(now()) @updatedAt
-  opt_in            Boolean  @default(false)
-  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
-  @@map("user_benchmarks")
-}
