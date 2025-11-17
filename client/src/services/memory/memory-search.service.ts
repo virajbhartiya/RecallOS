@@ -20,32 +20,18 @@ export async function searchMemories(
   try {
     requireAuthToken()
 
-    console.log('[FRONTEND] MemorySearch.searchMemories called', {
-      query: query.substring(0, 50),
-      embeddingOnly,
-      limit,
-      policy,
-      timestamp: new Date().toISOString(),
-    })
-
-    const requestPayload = {
-      query,
-      limit,
-      contextOnly: false,
-      policy,
-      embeddingOnly,
-    }
-
-    console.log('[FRONTEND] POST /search payload', requestPayload)
-
     const response = await postRequest(
       "/search",
-      requestPayload,
+      {
+        query,
+        limit,
+        contextOnly: false,
+        policy,
+        embeddingOnly,
+      },
       undefined,
       signal
     )
-
-    console.log('[FRONTEND] POST /search response status', response?.status)
 
     if (!response) {
       throw new Error("No response received from server")

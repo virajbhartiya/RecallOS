@@ -1,4 +1,4 @@
-import React, { memo } from "react"
+import React, { memo, useCallback, useEffect, useRef } from "react"
 import { Trash2 } from "lucide-react"
 
 import type { Memory, MemorySearchResponse } from "../types/memory.type"
@@ -84,12 +84,97 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
   onDeleteMemory,
   onSearchQueryChange,
 }) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const selectedItemRef = useRef<HTMLDivElement>(null)
+
   const sortedMemories = React.useMemo(() => {
     return [...memories].sort(
       (a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
   }, [memories])
+
+  // Get the list of memories to navigate (search results or sorted memories)
+  const memoryList = React.useMemo(() => {
+    if (searchQuery.trim() && searchResults?.results && searchResults.results.length > 0) {
+      return searchResults.results.map((result) => result.memory)
+    }
+    if (!searchQuery.trim()) {
+      return sortedMemories
+    }
+    return []
+  }, [searchQuery, searchResults, sortedMemories])
+
+  // Find current selected index
+  const selectedIndex = React.useMemo(() => {
+    if (!selectedMemory) return -1
+    return memoryList.findIndex((m) => m.id === selectedMemory.id)
+  }, [selectedMemory, memoryList])
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (selectedItemRef.current && scrollContainerRef.current) {
+      const container = scrollContainerRef.current
+      const item = selectedItemRef.current
+      
+      const containerRect = container.getBoundingClientRect()
+      const itemRect = item.getBoundingClientRect()
+      
+      // Check if item is outside visible area
+      if (itemRect.top < containerRect.top || itemRect.bottom > containerRect.bottom) {
+        item.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "nearest",
+        })
+      }
+    }
+  }, [selectedIndex])
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+
+      // Only handle arrow keys when not in an input field
+      if (isInput) return
+
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault()
+        e.stopPropagation()
+
+        if (memoryList.length === 0) return
+
+        let newIndex = selectedIndex
+
+        // If no memory is selected, start with first one
+        if (selectedIndex === -1) {
+          newIndex = 0
+        } else if (e.key === "ArrowDown") {
+          newIndex = selectedIndex < memoryList.length - 1 ? selectedIndex + 1 : 0
+        } else {
+          newIndex = selectedIndex > 0 ? selectedIndex - 1 : memoryList.length - 1
+        }
+
+        const nextMemory = memoryList[newIndex]
+        if (nextMemory) {
+          onSelectMemory(nextMemory)
+        }
+      }
+    },
+    [selectedIndex, memoryList, onSelectMemory]
+  )
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleKeyDown, true)
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true)
+    }
+  }, [handleKeyDown])
 
   return (
     <div className="w-80 border-r border-gray-200 flex flex-col bg-white">
@@ -102,7 +187,7 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
           className="w-full px-3 py-2 text-sm border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-black rounded-none"
         />
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {isSearching && (
           <div className="p-4 text-center text-sm text-gray-500">
             Searching...
@@ -112,18 +197,25 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
         searchQuery.trim() &&
         searchResults?.results &&
         searchResults.results.length > 0 ? (
-          searchResults.results.map((result) => (
-            <MemoryListItem
-              key={result.memory.id}
-              memory={result.memory}
-              isSelected={selectedMemory?.id === result.memory.id}
-              score={result.blended_score}
-              onSelect={() => {
-                onSelectMemory(result.memory)
-              }}
-              onDelete={() => onDeleteMemory(result.memory.id)}
-            />
-          ))
+          searchResults.results.map((result) => {
+            const isSelected = selectedMemory?.id === result.memory.id
+            return (
+              <div
+                key={result.memory.id}
+                ref={isSelected ? selectedItemRef : null}
+              >
+                <MemoryListItem
+                  memory={result.memory}
+                  isSelected={isSelected}
+                  score={result.blended_score}
+                  onSelect={() => {
+                    onSelectMemory(result.memory)
+                  }}
+                  onDelete={() => onDeleteMemory(result.memory.id)}
+                />
+              </div>
+            )
+          })
         ) : !isSearching &&
           searchQuery.trim() &&
           searchResults?.results &&
@@ -133,15 +225,22 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
           </div>
         ) : !searchQuery.trim() ? (
           sortedMemories.length > 0 ? (
-            sortedMemories.map((memory) => (
-              <MemoryListItem
-                key={memory.id}
-                memory={memory}
-                isSelected={selectedMemory?.id === memory.id}
-                onSelect={() => onSelectMemory(memory)}
-                onDelete={() => onDeleteMemory(memory.id)}
-              />
-            ))
+            sortedMemories.map((memory) => {
+              const isSelected = selectedMemory?.id === memory.id
+              return (
+                <div
+                  key={memory.id}
+                  ref={isSelected ? selectedItemRef : null}
+                >
+                  <MemoryListItem
+                    memory={memory}
+                    isSelected={isSelected}
+                    onSelect={() => onSelectMemory(memory)}
+                    onDelete={() => onDeleteMemory(memory.id)}
+                  />
+                </div>
+              )
+            })
           ) : (
             <div className="p-4 text-center text-sm text-gray-500">
               No memories available

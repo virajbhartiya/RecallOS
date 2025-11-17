@@ -353,8 +353,9 @@ export async function searchMemories(params: {
   const normalized = normalizeText(query)
 
   // Classify query to determine optimal policy if not explicitly provided
+  // Skip classification for embedding-only mode to avoid delays
   let effectivePolicy = policy
-  if (!policy) {
+  if (!policy && !embeddingOnly) {
     try {
       const classification = await queryClassificationService.classifyQuery(query, userId)
       if (classification.suggestedPolicy) {
@@ -436,24 +437,9 @@ export async function searchMemories(params: {
     searchStrategy: searchParams.searchStrategy,
   })
 
-  console.log('[BACKEND] Search service - processing started', {
-    query: query.slice(0, 100),
-    embeddingOnly,
-    contextOnly,
-    shouldGenerateAnswer: !contextOnly && !embeddingOnly,
-    userId,
-  })
-
   // Skip caching for contextOnly or jobId requests
   const shouldCache = !contextOnly && !embeddingOnly && !jobId
   const shouldGenerateAnswer = !contextOnly && !embeddingOnly
-
-  console.log('[BACKEND] Search service - flags determined', {
-    shouldCache,
-    shouldGenerateAnswer,
-    embeddingOnly,
-    contextOnly,
-  })
 
   if (shouldCache) {
     try {
@@ -845,10 +831,6 @@ export async function searchMemories(params: {
 
   // Fast-path for embedding-only mode: return immediately after scoring
   if (embeddingOnly) {
-    console.log('[BACKEND] Search service - EARLY RETURN (embeddingOnly mode)', {
-      resultCount: finalScoredRows.length,
-    })
-
     const results: SearchResult[] = finalScoredRows.map(r => ({
       memory_id: r.id,
       title: r.title,
@@ -955,15 +937,7 @@ export async function searchMemories(params: {
   const context: string | undefined = contextArtifacts.text
   const contextBlocks = contextArtifacts.blocks
 
-  console.log('[BACKEND] Search service - before answer generation', {
-    shouldGenerateAnswer,
-    embeddingOnly,
-    contextOnly,
-    resultCount: finalScoredRows.length,
-  })
-
   if (shouldGenerateAnswer) {
-    console.log('[BACKEND] Search service - GENERATING ANSWER (summarization enabled)')
     try {
       const bullets = finalScoredRows
         .map((r, i) => {
@@ -1069,8 +1043,6 @@ ${bullets}`
           } => Boolean(c)
         )
     }
-  } else {
-    console.log('[BACKEND] Search service - SKIPPING ANSWER GENERATION (embeddingOnly mode)')
   }
 
   const created = await prisma.queryEvent.create({
@@ -1134,14 +1106,6 @@ ${bullets}`
     hasCitations: !!citations && citations.length > 0,
     jobId,
     embeddingOnly,
-  })
-
-  console.log('[BACKEND] Search service - processing completed', {
-    resultCount: results.length,
-    hasAnswer: !!answer,
-    hasCitations: !!citations && citations.length > 0,
-    embeddingOnly,
-    shouldGenerateAnswer,
   })
 
   const searchResult = {

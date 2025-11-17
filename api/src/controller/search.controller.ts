@@ -30,15 +30,6 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       rawEmbeddingOnly: embeddingOnly,
     })
 
-    console.log('[BACKEND] Search controller - request received', {
-      query: query.slice(0, 100),
-      embeddingOnly: embeddingOnlyBool,
-      rawEmbeddingOnly: embeddingOnly,
-      limit,
-      contextOnly,
-      userId,
-    })
-
     const data = await searchMemories({
       userId: userId,
       query,
@@ -47,13 +38,6 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       embeddingOnly: embeddingOnlyBool,
       jobId: undefined,
       policy,
-    })
-
-    console.log('[BACKEND] Search controller - results returned', {
-      resultCount: data.results.length,
-      hasAnswer: !!data.answer,
-      hasCitations: !!data.citations && data.citations.length > 0,
-      embeddingOnly: embeddingOnlyBool,
     })
 
     // Log audit event for search
@@ -70,9 +54,18 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
 
     // Only create job and return jobId if we don't have an immediate answer (for async delivery)
     if (!contextOnly && !embeddingOnly && !data.answer) {
-      job = createSearchJob()
-      // Update job with initial results
-      setImmediate(async () => {
+      try {
+        job = createSearchJob()
+      } catch (jobError) {
+        job = null
+        logger.warn('[search/controller] createSearchJob_failed', {
+          error: jobError instanceof Error ? jobError.message : String(jobError),
+        })
+      }
+
+      if (job) {
+        // Update job with initial results
+        setImmediate(async () => {
         try {
           const { setSearchJobResult } = await import('../services/search-job.service')
           await setSearchJobResult(job!.id, {
@@ -202,7 +195,8 @@ ${bullets}`
             logger.error('Error updating search job status:', jobError)
           }
         }
-      })
+        })
+      }
     }
 
     // Return response with appropriate fields

@@ -262,21 +262,9 @@ export const Memories: React.FC = () => {
     dialogAbortControllerRef.current = new AbortController()
     setDialogIsSearching(true)
 
-    console.log('[FRONTEND] Dialog search triggered', {
-      query: query.trim(),
-      embeddingOnly: dialogEmbeddingOnly,
-      timestamp: new Date().toISOString(),
-    })
-
     try {
       const signal = dialogAbortControllerRef.current?.signal
       requireAuthToken()
-
-      console.log('[FRONTEND] Sending search request', {
-        query: query.trim(),
-        embeddingOnly: dialogEmbeddingOnly,
-        limit: 50,
-      })
 
       const response = await MemoryService.searchMemories(
         query,
@@ -287,13 +275,6 @@ export const Memories: React.FC = () => {
         undefined,
         dialogEmbeddingOnly
       )
-
-      console.log('[FRONTEND] Search response received', {
-        resultCount: response.results.length,
-        hasAnswer: !!response.answer,
-        hasCitations: !!response.citations && response.citations.length > 0,
-        embeddingOnly: dialogEmbeddingOnly,
-      })
 
       if (signal?.aborted) return
 
