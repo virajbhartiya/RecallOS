@@ -228,7 +228,7 @@ Return clean, readable plain text only.`
       try {
         // Use timeout override if provided, otherwise use longer timeout for search requests (5 minutes) vs processing (4 minutes for parallel AI calls)
         // Memory processing now runs AI calls in parallel, so we need more time (4 minutes instead of 2)
-        const timeoutMs = timeoutOverride ?? (isSearchRequest ? 300000 : 240000)
+        const timeoutMs = timeoutOverride ?? (isSearchRequest ? 300000 : 360000)
         // For email drafts, bypass rate limit to ensure immediate processing (user-initiated, time-sensitive)
         // For search requests, also bypass for immediate response
         // For normal processing, use rate limiting to respect API quotas
@@ -398,7 +398,7 @@ Raw Content: ${rawText}
               model: this.getCurrentModel(),
               contents: prompt,
             }),
-          240000 // 4 minutes timeout (increased for parallel processing)
+          360000 // 6 minutes timeout (increased for parallel processing)
         )
         if (!res.text) throw new Error('No summary generated from Gemini API')
 
@@ -498,7 +498,7 @@ Return ONLY the JSON object:`
               model: this.getCurrentModel(),
               contents: prompt,
             }),
-          240000 // 4 minutes timeout (increased for parallel processing)
+          360000 // 6 minutes timeout (increased for parallel processing)
         )
         if (!res.text) throw new Error('No metadata response from Gemini API')
 
@@ -695,7 +695,7 @@ Be strict. Avoid weak or surface matches.
               model: this.getCurrentModel(),
               contents: prompt,
             }),
-          240000 // 4 minutes timeout (increased for parallel processing)
+          360000 // 6 minutes timeout (increased for parallel processing)
         )
         if (!res.text) throw new Error('No relationship data from Gemini')
 

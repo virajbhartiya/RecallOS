@@ -78,6 +78,8 @@ function isAiOverloadedError(error: unknown): boolean {
   if (status === 'UNAVAILABLE') return true
   if (msg?.includes('model is overloaded')) return true
   if (msg?.includes('temporarily overloaded')) return true
+  if (msg?.includes('operation timed out')) return true
+  if (msg?.includes('timed out after')) return true
   return false
 }
 
