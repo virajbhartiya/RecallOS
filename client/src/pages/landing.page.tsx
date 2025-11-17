@@ -1,11 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Line, OrbitControls, Text } from "@react-three/drei"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import {
-  doc,
-  setDoc,
-  serverTimestamp,
-} from "firebase/firestore"
+import { doc, serverTimestamp, setDoc } from "firebase/firestore"
 import * as THREE from "three"
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 
@@ -16,6 +12,7 @@ import type { MemoryMesh, MemoryMeshEdge } from "../types/memory.type"
 const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
   const [email, setEmail] = useState("")
   const [submitted, setSubmitted] = useState(false)
+  const [isDuplicate, setIsDuplicate] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,13 +37,20 @@ const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
       })
 
       setSubmitted(true)
+      setIsDuplicate(false)
       setEmail("")
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Error adding to waitlist:", err)
-      
+
       // Check if it's a permission error (likely duplicate email)
-      if (err?.code === "permission-denied" || err?.code === "permissions-denied") {
-        setError("We already have your memory saved.")
+      const firebaseError = err as { code?: string }
+      if (
+        firebaseError?.code === "permission-denied" ||
+        firebaseError?.code === "permissions-denied"
+      ) {
+        setSubmitted(true)
+        setIsDuplicate(true)
+        setEmail("")
       } else {
         setError(
           err instanceof Error
@@ -80,15 +84,19 @@ const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
           </div>
         </div>
         <h3 className="text-xl sm:text-2xl font-light font-editorial text-black mb-3">
-          Your memory awaits
+          {isDuplicate ? "Already saved" : "Your memory awaits"}
         </h3>
         <p className="text-sm text-gray-700 leading-relaxed font-primary max-w-md mx-auto">
-          We'll notify you when Cognia is ready. Never forget what you see
-          online.
+          {isDuplicate
+            ? "We already have your memory saved. We'll notify you when Cognia is ready."
+            : "We'll notify you when Cognia is ready. Never forget what you see online."}
         </p>
         {!compact && (
           <button
-            onClick={() => setSubmitted(false)}
+            onClick={() => {
+              setSubmitted(false)
+              setIsDuplicate(false)
+            }}
             className="mt-6 text-sm text-gray-600 hover:text-black underline transition-colors"
           >
             Add another email
