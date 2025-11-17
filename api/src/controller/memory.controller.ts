@@ -9,6 +9,7 @@ import { profileUpdateService } from '../services/profile-update.service'
 import { privacyService } from '../services/privacy.service'
 import { auditLogService } from '../services/audit-log.service'
 import { memoryRedactionService } from '../services/memory-redaction.service'
+import { memoryProcessingPauseService } from '../services/memory-processing-pause.service'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 
@@ -38,6 +39,47 @@ function hashUrl(url: string): string {
 }
 
 const PROFILE_IMPORTANCE_THRESHOLD = Number(process.env.PROFILE_IMPORTANCE_THRESHOLD || 0.7)
+
+type AiErrorPayload = {
+  code?: number | string
+  status?: string
+  message?: string
+}
+
+function extractAiErrorPayload(error: unknown): AiErrorPayload {
+  if (!error || typeof error !== 'object') {
+    return {}
+  }
+
+  if ('error' in error && typeof (error as { error?: unknown }).error === 'object') {
+    const nested = (error as { error?: AiErrorPayload }).error || {}
+    return {
+      code: nested.code,
+      status: nested.status,
+      message: nested.message || (error as { message?: string }).message,
+    }
+  }
+
+  const errObj = error as Partial<AiErrorPayload> & { message?: string }
+  return {
+    code: errObj.code,
+    status: errObj.status,
+    message: errObj.message,
+  }
+}
+
+function isAiOverloadedError(error: unknown): boolean {
+  const payload = extractAiErrorPayload(error)
+  const msg = payload.message?.toLowerCase()
+  const status = payload.status?.toString().toUpperCase()
+  const code = typeof payload.code === 'string' ? parseInt(payload.code, 10) : payload.code
+
+  if (code === 503) return true
+  if (status === 'UNAVAILABLE') return true
+  if (msg?.includes('model is overloaded')) return true
+  if (msg?.includes('temporarily overloaded')) return true
+  return false
+}
 
 export class MemoryController {
   static async processRawContent(req: AuthenticatedRequest, res: Response) {
@@ -132,10 +174,43 @@ export class MemoryController {
         ts: new Date().toISOString(),
         tasks: ['summarizeContent', 'extractContentMetadata'],
       })
-      const [summaryResult, extractedMetadataResult] = await Promise.all([
-        aiProvider.summarizeContent(content, metadataPayload, userId),
-        aiProvider.extractContentMetadata(content, metadataPayload, userId),
-      ])
+      let summaryResult: unknown
+      let extractedMetadataResult: unknown
+      const maxAiAttempts = 5
+      let lastAiError: unknown
+      for (let attempt = 0; attempt < maxAiAttempts; attempt++) {
+        await memoryProcessingPauseService.waitIfPaused()
+        try {
+          ;[summaryResult, extractedMetadataResult] = await Promise.all([
+            aiProvider.summarizeContent(content, metadataPayload, userId),
+            aiProvider.extractContentMetadata(content, metadataPayload, userId),
+          ])
+          lastAiError = null
+          break
+        } catch (aiError) {
+          lastAiError = aiError
+          if (isAiOverloadedError(aiError)) {
+            const pauseInfo = memoryProcessingPauseService.pauseFor(
+              60_000,
+              extractAiErrorPayload(aiError)
+            )
+            logger.warn('[memory/process] ai_overloaded_pause', {
+              resumeAtIso: pauseInfo.resumeAtIso,
+              resumeAtPst: pauseInfo.resumeAtPst,
+              remainingMs: pauseInfo.remainingMs,
+              error: pauseInfo.metadata,
+              attempt,
+            })
+            await memoryProcessingPauseService.waitForResume()
+            continue
+          }
+          throw aiError
+        }
+      }
+
+      if (lastAiError) {
+        throw lastAiError
+      }
       type MetadataResult =
         | {
             topics?: string[]
@@ -154,7 +229,10 @@ export class MemoryController {
         summary = summaryResult
       } else {
         const result = summaryResult as { text?: string }
-        summary = result.text || summaryResult
+        summary =
+          typeof result.text === 'string' && result.text.length > 0
+            ? result.text
+            : String(summaryResult ?? '')
       }
 
       let extractedMetadata: MetadataResult
