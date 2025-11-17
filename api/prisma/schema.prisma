@@ -27,28 +27,9 @@ model User {
   profile          UserProfile?
   browsing_summaries BrowsingSummary[]
   learning_paths   LearningPath[]
-  privacy_settings PrivacySetting[]
   audit_logs       AuditLog[]
 
   @@map("users")
-}
-
-model PrivacySetting {
-  id                String   @id @default(uuid()) @db.Uuid
-  user_id           String   @db.Uuid
-  domain            String
-  block_capture     Boolean  @default(false)
-  block_search      Boolean  @default(false)
-  redact_content    Boolean  @default(false)
-  notes             String?
-  created_at        DateTime @default(now())
-  updated_at        DateTime @default(now()) @updatedAt
-  user              User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@unique([user_id, domain])
-  @@index([user_id])
-  @@index([domain])
-  @@map("privacy_settings")
 }
 
 model AuditLog {

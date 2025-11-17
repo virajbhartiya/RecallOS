@@ -6,12 +6,12 @@ import { aiProvider } from '../services/ai-provider.service'
 import { memoryMeshService } from '../services/memory-mesh.service'
 import { memoryIngestionService } from '../services/memory-ingestion.service'
 import { profileUpdateService } from '../services/profile-update.service'
-import { privacyService } from '../services/privacy.service'
 import { auditLogService } from '../services/audit-log.service'
 import { memoryRedactionService } from '../services/memory-redaction.service'
 import { memoryProcessingPauseService } from '../services/memory-processing-pause.service'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
+import { extractDomain } from '../utils/url.util'
 
 type MemorySelect = Prisma.MemoryGetPayload<{
   select: {
@@ -111,25 +111,6 @@ export class MemoryController {
         title: typeof title === 'string' ? title.slice(0, 200) : undefined,
         contentLen: typeof content === 'string' ? content.length : undefined,
       })
-
-      // Check privacy settings for this domain
-      if (url && typeof url === 'string') {
-        const domain = privacyService.extractDomain(url)
-        const shouldBlock = await privacyService.shouldBlockCapture(userId, domain)
-
-        if (shouldBlock) {
-          logger.log('[memory/process] blocked_by_privacy', {
-            userId,
-            domain,
-            url: url.slice(0, 200),
-          })
-          return res.status(403).json({
-            success: false,
-            error: 'Content capture is blocked for this domain',
-            domain,
-          })
-        }
-      }
 
       const metadataPayload =
         metadata && typeof metadata === 'object' && !Array.isArray(metadata)
@@ -693,7 +674,7 @@ export class MemoryController {
         })
       }
 
-      const domain = memory.url ? privacyService.extractDomain(memory.url) : undefined
+      const domain = extractDomain(memory.url)
 
       // Delete from Qdrant
       try {

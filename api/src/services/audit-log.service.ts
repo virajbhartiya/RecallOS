@@ -1,18 +1,17 @@
 import { prisma } from '../lib/prisma.lib'
 import { logger } from '../utils/logger.util'
-import { privacyService } from './privacy.service'
 import { Prisma } from '@prisma/client'
+import { extractDomain } from '../utils/url.util'
 
 export type AuditEventType =
   | 'memory_capture'
   | 'memory_search'
   | 'memory_delete'
   | 'memory_update'
-  | 'privacy_setting_change'
   | 'export_data'
   | 'import_data'
 
-export type AuditEventCategory = 'capture' | 'search' | 'privacy' | 'data_management'
+export type AuditEventCategory = 'capture' | 'search' | 'data_management'
 
 interface AuditLogData {
   userId: string
@@ -36,7 +35,7 @@ export class AuditLogService {
       // Extract domain from URL if provided in metadata
       let domain = data.domain
       if (!domain && data.metadata?.url && typeof data.metadata.url === 'string') {
-        domain = privacyService.extractDomain(data.metadata.url)
+        domain = extractDomain(data.metadata.url)
       }
 
       await prisma.auditLog.create({
@@ -129,7 +128,7 @@ export class AuditLogService {
     url: string,
     options?: { ipAddress?: string; userAgent?: string }
   ) {
-    const domain = privacyService.extractDomain(url)
+    const domain = extractDomain(url)
     await this.logEvent({
       userId,
       eventType: 'memory_capture',
@@ -184,28 +183,6 @@ export class AuditLogService {
       resourceType: 'memory',
       resourceId: memoryId,
       domain,
-      ipAddress: options?.ipAddress,
-      userAgent: options?.userAgent,
-    })
-  }
-
-  /**
-   * Log privacy setting change
-   */
-  async logPrivacySettingChange(
-    userId: string,
-    domain: string,
-    action: string,
-    settings: Record<string, unknown>,
-    options?: { ipAddress?: string; userAgent?: string }
-  ) {
-    await this.logEvent({
-      userId,
-      eventType: 'privacy_setting_change',
-      eventCategory: 'privacy',
-      action,
-      domain,
-      metadata: settings,
       ipAddress: options?.ipAddress,
       userAgent: options?.userAgent,
     })
