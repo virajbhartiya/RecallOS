@@ -9,7 +9,7 @@ import { logger } from '../utils/logger.util'
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   let job: { id: string } | null = null
   try {
-    const { query, limit, contextOnly, policy } = req.body || {}
+    const { query, limit, contextOnly, policy, embeddingOnly } = req.body || {}
     if (!query) return next(new AppError('query is required', 400))
 
     if (!req.user) {
@@ -18,12 +18,25 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
 
     const userId = req.user.id
 
+    const embeddingOnlyBool = Boolean(embeddingOnly)
+    
     logger.log('[search/controller] request received', {
       ts: new Date().toISOString(),
       userId: userId,
       query: query.slice(0, 100),
       limit,
       contextOnly,
+      embeddingOnly: embeddingOnlyBool,
+      rawEmbeddingOnly: embeddingOnly,
+    })
+
+    console.log('[BACKEND] Search controller - request received', {
+      query: query.slice(0, 100),
+      embeddingOnly: embeddingOnlyBool,
+      rawEmbeddingOnly: embeddingOnly,
+      limit,
+      contextOnly,
+      userId,
     })
 
     const data = await searchMemories({
@@ -31,8 +44,16 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       query,
       limit,
       contextOnly,
+      embeddingOnly: embeddingOnlyBool,
       jobId: undefined,
       policy,
+    })
+
+    console.log('[BACKEND] Search controller - results returned', {
+      resultCount: data.results.length,
+      hasAnswer: !!data.answer,
+      hasCitations: !!data.citations && data.citations.length > 0,
+      embeddingOnly: embeddingOnlyBool,
     })
 
     // Log audit event for search
@@ -48,7 +69,7 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       })
 
     // Only create job and return jobId if we don't have an immediate answer (for async delivery)
-    if (!contextOnly && !data.answer) {
+    if (!contextOnly && !embeddingOnly && !data.answer) {
       job = createSearchJob()
       // Update job with initial results
       setImmediate(async () => {

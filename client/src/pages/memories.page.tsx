@@ -50,6 +50,7 @@ export const Memories: React.FC = () => {
     null
   )
   const [dialogIsSearching, setDialogIsSearching] = useState(false)
+  const [dialogEmbeddingOnly, setDialogEmbeddingOnly] = useState(true)
   const dialogAbortControllerRef = useRef<AbortController | null>(null)
   const dialogDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -261,17 +262,38 @@ export const Memories: React.FC = () => {
     dialogAbortControllerRef.current = new AbortController()
     setDialogIsSearching(true)
 
+    console.log('[FRONTEND] Dialog search triggered', {
+      query: query.trim(),
+      embeddingOnly: dialogEmbeddingOnly,
+      timestamp: new Date().toISOString(),
+    })
+
     try {
       const signal = dialogAbortControllerRef.current?.signal
       requireAuthToken()
+
+      console.log('[FRONTEND] Sending search request', {
+        query: query.trim(),
+        embeddingOnly: dialogEmbeddingOnly,
+        limit: 50,
+      })
 
       const response = await MemoryService.searchMemories(
         query,
         {},
         1,
         50,
-        signal
+        signal,
+        undefined,
+        dialogEmbeddingOnly
       )
+
+      console.log('[FRONTEND] Search response received', {
+        resultCount: response.results.length,
+        hasAnswer: !!response.answer,
+        hasCitations: !!response.citations && response.citations.length > 0,
+        embeddingOnly: dialogEmbeddingOnly,
+      })
 
       if (signal?.aborted) return
 
@@ -294,7 +316,7 @@ export const Memories: React.FC = () => {
         setDialogIsSearching(false)
       }
     }
-  }, [])
+  }, [dialogEmbeddingOnly])
 
   // Debounced dialog search effect
   useEffect(() => {
@@ -320,7 +342,7 @@ export const Memories: React.FC = () => {
         clearTimeout(dialogDebounceTimeoutRef.current)
       }
     }
-  }, [listSearchQuery, handleDialogSearch])
+  }, [listSearchQuery, handleDialogSearch, dialogEmbeddingOnly])
 
   // Poll for async LLM answer in dialog
   useEffect(() => {
@@ -605,6 +627,8 @@ export const Memories: React.FC = () => {
           searchAnswer={dialogSearchAnswer}
           searchCitations={dialogSearchCitations}
           selectedMemory={selectedMemory}
+          isEmbeddingOnly={dialogEmbeddingOnly}
+          onEmbeddingOnlyChange={setDialogEmbeddingOnly}
           onClose={() => {
             setIsDialogOpen(false)
             setSelectedMemory(null)

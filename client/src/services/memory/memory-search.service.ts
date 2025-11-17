@@ -14,22 +14,38 @@ export async function searchMemories(
   page: number = 1,
   limit: number = 10,
   signal?: AbortSignal,
-  policy?: string
+  policy?: string,
+  embeddingOnly: boolean = false
 ): Promise<MemorySearchResponse> {
   try {
     requireAuthToken()
 
+    console.log('[FRONTEND] MemorySearch.searchMemories called', {
+      query: query.substring(0, 50),
+      embeddingOnly,
+      limit,
+      policy,
+      timestamp: new Date().toISOString(),
+    })
+
+    const requestPayload = {
+      query,
+      limit,
+      contextOnly: false,
+      policy,
+      embeddingOnly,
+    }
+
+    console.log('[FRONTEND] POST /search payload', requestPayload)
+
     const response = await postRequest(
       "/search",
-      {
-        query,
-        limit,
-        contextOnly: false,
-        policy,
-      },
+      requestPayload,
       undefined,
       signal
     )
+
+    console.log('[FRONTEND] POST /search response status', response?.status)
 
     if (!response) {
       throw new Error("No response received from server")

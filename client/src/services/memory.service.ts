@@ -19,7 +19,8 @@ export class MemoryService {
     page: number = 1,
     limit: number = 10,
     signal?: AbortSignal,
-    policy?: string
+    policy?: string,
+    embeddingOnly: boolean = false
   ) {
     return MemorySearch.searchMemories(
       query,
@@ -27,7 +28,8 @@ export class MemoryService {
       page,
       limit,
       signal,
-      policy
+      policy,
+      embeddingOnly
     )
   }
 

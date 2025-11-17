@@ -327,6 +327,7 @@ export async function searchMemories(params: {
   limit?: number
   enableReasoning?: boolean
   contextOnly?: boolean
+  embeddingOnly?: boolean
   jobId?: string
   policy?: RetrievalPolicyName
 }): Promise<{
@@ -344,6 +345,7 @@ export async function searchMemories(params: {
     limit,
     enableReasoning = process.env.SEARCH_ENABLE_REASONING !== 'false',
     contextOnly = false,
+    embeddingOnly = false,
     jobId,
     policy,
   } = params
@@ -429,12 +431,29 @@ export async function searchMemories(params: {
     limit: searchParams.maxResults,
     enableReasoning,
     contextOnly,
+    embeddingOnly,
     jobId,
     searchStrategy: searchParams.searchStrategy,
   })
 
+  console.log('[BACKEND] Search service - processing started', {
+    query: query.slice(0, 100),
+    embeddingOnly,
+    contextOnly,
+    shouldGenerateAnswer: !contextOnly && !embeddingOnly,
+    userId,
+  })
+
   // Skip caching for contextOnly or jobId requests
-  const shouldCache = !contextOnly && !jobId
+  const shouldCache = !contextOnly && !embeddingOnly && !jobId
+  const shouldGenerateAnswer = !contextOnly && !embeddingOnly
+
+  console.log('[BACKEND] Search service - flags determined', {
+    shouldCache,
+    shouldGenerateAnswer,
+    embeddingOnly,
+    contextOnly,
+  })
 
   if (shouldCache) {
     try {
@@ -753,7 +772,7 @@ export async function searchMemories(params: {
 
   // Apply reranking for small result sets (5-20 items) to improve relevance
   let finalScoredRows = policyScoredRows
-  const shouldRerank = policyScoredRows.length >= 5 && policyScoredRows.length <= 20 && !contextOnly
+  const shouldRerank = policyScoredRows.length >= 5 && policyScoredRows.length <= 20 && !contextOnly && !embeddingOnly
 
   if (shouldRerank) {
     try {
@@ -824,6 +843,49 @@ export async function searchMemories(params: {
 
   const memoryIds = finalScoredRows.map(r => r.id)
 
+  // Fast-path for embedding-only mode: return immediately after scoring
+  if (embeddingOnly) {
+    console.log('[BACKEND] Search service - EARLY RETURN (embeddingOnly mode)', {
+      resultCount: finalScoredRows.length,
+    })
+
+    const results: SearchResult[] = finalScoredRows.map(r => ({
+      memory_id: r.id,
+      title: r.title,
+      summary: r.summary,
+      url: r.url,
+      timestamp: Number(r.timestamp),
+      related_memories: [] as string[],
+      score: r.final_score,
+      memory_type: r.memory_type ?? null,
+      importance_score: r.importance_score,
+      source: r.source,
+    }))
+
+    // Minimal query event logging
+    try {
+      await prisma.queryEvent.create({
+        data: {
+          user_id: userId,
+          query: normalized,
+          embedding_hash: embeddingHash,
+        },
+      })
+    } catch {
+      // Ignore database errors
+    }
+
+    return {
+      query: normalized,
+      results,
+      answer: undefined,
+      citations: undefined,
+      context: undefined,
+      contextBlocks: [],
+      policy: retrievalPolicy.name,
+    }
+  }
+
   // Fast-path: if no matches, persist minimal query event and return immediately
   if (finalScoredRows.length === 0) {
     try {
@@ -893,7 +955,15 @@ export async function searchMemories(params: {
   const context: string | undefined = contextArtifacts.text
   const contextBlocks = contextArtifacts.blocks
 
-  if (!contextOnly) {
+  console.log('[BACKEND] Search service - before answer generation', {
+    shouldGenerateAnswer,
+    embeddingOnly,
+    contextOnly,
+    resultCount: finalScoredRows.length,
+  })
+
+  if (shouldGenerateAnswer) {
+    console.log('[BACKEND] Search service - GENERATING ANSWER (summarization enabled)')
     try {
       const bullets = finalScoredRows
         .map((r, i) => {
@@ -999,6 +1069,8 @@ ${bullets}`
           } => Boolean(c)
         )
     }
+  } else {
+    console.log('[BACKEND] Search service - SKIPPING ANSWER GENERATION (embeddingOnly mode)')
   }
 
   const created = await prisma.queryEvent.create({
@@ -1061,6 +1133,15 @@ ${bullets}`
     hasAnswer: !!answer,
     hasCitations: !!citations && citations.length > 0,
     jobId,
+    embeddingOnly,
+  })
+
+  console.log('[BACKEND] Search service - processing completed', {
+    resultCount: results.length,
+    hasAnswer: !!answer,
+    hasCitations: !!citations && citations.length > 0,
+    embeddingOnly,
+    shouldGenerateAnswer,
   })
 
   const searchResult = {
