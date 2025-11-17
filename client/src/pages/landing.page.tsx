@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Line, OrbitControls, Text } from "@react-three/drei"
 import { Canvas, useFrame, useThree } from "@react-three/fiber"
-import { addDoc, collection, serverTimestamp } from "firebase/firestore"
+import {
+  doc,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore"
 import * as THREE from "three"
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib"
 
@@ -25,21 +29,31 @@ const WaitlistForm = ({ compact = false }: { compact?: boolean }) => {
         throw new Error("Firebase is not initialized")
       }
 
-      await addDoc(collection(db, "waitlist"), {
-        email: email.trim().toLowerCase(),
+      const normalizedEmail = email.trim().toLowerCase()
+
+      // Create document with email as ID (Firestore automatically prevents duplicates)
+      const waitlistDocRef = doc(db, "waitlist", normalizedEmail)
+      await setDoc(waitlistDocRef, {
+        email: normalizedEmail,
         createdAt: serverTimestamp(),
         source: "landing_page",
       })
 
       setSubmitted(true)
       setEmail("")
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error adding to waitlist:", err)
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong. Please try again."
-      )
+      
+      // Check if it's a permission error (likely duplicate email)
+      if (err?.code === "permission-denied" || err?.code === "permissions-denied") {
+        setError("We already have your memory saved.")
+      } else {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Something went wrong. Please try again."
+        )
+      }
     } finally {
       setIsSubmitting(false)
     }
