@@ -2184,7 +2184,7 @@ export const Landing = () => {
                         clipRule="evenodd"
                       />
                     </svg>
-                    Self-host on GitHub
+                    Self-host
                   </span>
                   <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
                 </button>
@@ -2316,7 +2316,7 @@ export const Landing = () => {
             </h2>
             <p className="text-base sm:text-lg lg:text-xl text-gray-700 mb-6 sm:mb-8 max-w-2xl mx-auto px-2 sm:px-0">
               Join the waitlist to be among the first to experience Cognia, or
-              self-host it yourself.
+              deploy it yourself.
             </p>
             <div className="max-w-md mx-auto space-y-3 sm:space-y-4 px-2 sm:px-0">
               <WaitlistForm compact />
@@ -2345,7 +2345,7 @@ export const Landing = () => {
                       clipRule="evenodd"
                     />
                   </svg>
-                  Self-host on GitHub
+                  Self-host
                 </span>
                 <div className="absolute inset-0 bg-black transform scale-x-0 group-hover:scale-x-100 transition-transform duration-500 origin-left"></div>
               </button>
