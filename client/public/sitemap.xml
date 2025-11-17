@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
+        http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd
+        http://www.google.com/schemas/sitemap-image/1.1
+        http://www.google.com/schemas/sitemap-image/1.1/sitemap-image.xsd">
+  <url>
+    <loc>https://cogniahq.tech/</loc>
+    <lastmod>2025-01-16</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://cogniahq.tech/Cognia-Background-banner.png</image:loc>
+      <image:title>Cognia - A searchable memory for everything you see online</image:title>
+      <image:caption>Cognia is your photographic memory for the web, capturing text, links and context as you browse so you can find it in seconds.</image:caption>
+    </image:image>
+    <image:image>
+      <image:loc>https://cogniahq.tech/logo.png</image:loc>
+      <image:title>Cognia Logo</image:title>
+    </image:image>
+  </url>
+</urlset>
+

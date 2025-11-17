@@ -1,0 +1,15 @@
+/* TEAM */
+Developer: CogniaHQ
+Contact: https://cogniahq.tech
+Location: India
+
+/* THANKS */
+Open Source Community
+Contributors to Cognia
+
+/* SITE */
+Last update: 2025/11/16
+Standards: HTML5, CSS3, JavaScript ES6+
+Components: React, TypeScript, Vite
+Software: Node.js, PostgreSQL, Qdrant, Redis
+

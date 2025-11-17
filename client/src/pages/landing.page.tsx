@@ -609,16 +609,18 @@ const SearchAnimationDemo: React.FC<{ meshData: MemoryMesh }> = ({
                 const searchTimeout = setTimeout(() => {
                   console.log("Setting phase to searching")
                   setAnimationPhase("searching")
+                  // Select nodes relevant to React authentication (first 8 nodes)
                   const nodeIds = meshData.nodes.slice(0, 8).map((n) => n.id)
                   console.log("Highlighting nodes:", nodeIds)
                   setHighlightedNodes(new Set(nodeIds))
                   setPulseIntensity(1)
 
-                  // Phase 3: Result
+                  // Phase 3: Result - select most relevant nodes for React auth
                   const resultTimeout = setTimeout(() => {
                     console.log("Setting phase to result")
                     setAnimationPhase("result")
-                    const finalResultNodes = nodeIds.slice(0, 3)
+                    // Select the first 3 nodes which are most relevant: React Documentation, TypeScript Guide, GitHub Repository
+                    const finalResultNodes = ["1", "2", "3"]
                     setResultNodes(finalResultNodes)
                     // Keep highlighting the result nodes, not all searched nodes
                     setHighlightedNodes(new Set(finalResultNodes))

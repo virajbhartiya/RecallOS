@@ -1,2 +1,11 @@
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /login
+Disallow: /memories
+Disallow: /search
+Disallow: /analytics
+Disallow: /profile
+Disallow: /insights
+
+Sitemap: https://cogniahq.tech/sitemap.xml
