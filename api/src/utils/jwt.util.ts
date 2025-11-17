@@ -8,7 +8,6 @@ const JWT_EXPIRES_IN: StringValue | number = (process.env.JWT_EXPIRES_IN || '7d'
 export interface JWTPayload {
   userId: string
   email?: string
-  externalId?: string
 }
 
 export function generateToken(payload: JWTPayload): string {

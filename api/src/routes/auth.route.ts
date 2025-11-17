@@ -14,7 +14,6 @@ router.get('/me', authenticateToken, (req: AuthenticatedRequest, res: Response) 
     user: {
       id: req.user!.id,
       email: req.user!.email,
-      externalId: req.user!.externalId,
     },
   })
 })
@@ -44,7 +43,6 @@ router.post('/register', async (req: Request, res: Response) => {
     const token = generateToken({
       userId: user.id,
       email: user.email || undefined,
-      externalId: user.external_id || undefined,
     })
     setAuthCookie(res, token)
     return res.status(201).json({
@@ -68,7 +66,7 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const user = await prisma.user.findFirst({
       where: { email },
-      select: { id: true, email: true, external_id: true, password_hash: true },
+      select: { id: true, email: true, password_hash: true },
     })
     if (!user || !user.password_hash) {
       return res.status(401).json({ message: 'Invalid credentials' })
@@ -82,7 +80,6 @@ router.post('/login', async (req: Request, res: Response) => {
     const token = generateToken({
       userId: user.id,
       email: user.email || undefined,
-      externalId: user.external_id || undefined,
     })
     setAuthCookie(res, token)
     return res.status(200).json({
@@ -117,25 +114,21 @@ router.post('/extension-token', async (req: Request, res: Response) => {
   try {
     const { userId } = req.body
 
-    if (!userId) {
+    if (!userId || typeof userId !== 'string') {
       return res.status(400).json({ message: 'userId is required' })
     }
 
-    // Find or create user by external_id
-    let user = await prisma.user.findFirst({
-      where: { external_id: userId },
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
     })
 
     if (!user) {
-      user = await prisma.user.create({
-        data: { external_id: userId },
-      })
+      return res.status(404).json({ message: 'User not found' })
     }
 
     // Generate JWT token
     const token = generateToken({
       userId: user.id,
-      externalId: user.external_id || undefined,
     })
 
     res.status(200).json({
@@ -143,7 +136,6 @@ router.post('/extension-token', async (req: Request, res: Response) => {
       token,
       user: {
         id: user.id,
-        externalId: user.external_id,
       },
     })
   } catch (error) {

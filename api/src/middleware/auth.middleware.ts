@@ -8,7 +8,6 @@ export interface AuthenticatedRequest extends Request {
   user?: {
     id: string
     email?: string
-    externalId?: string
   }
 }
 
@@ -47,7 +46,6 @@ export async function authenticateToken(
     req.user = {
       id: user.id,
       email: user.email || undefined,
-      externalId: user.external_id || undefined,
     }
 
     next()
@@ -75,7 +73,6 @@ export function optionalAuth(req: AuthenticatedRequest, res: Response, next: Nex
     req.user = {
       id: payload.userId,
       email: payload.email,
-      externalId: payload.externalId,
     }
   }
 

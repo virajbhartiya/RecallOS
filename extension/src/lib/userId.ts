@@ -11,9 +11,6 @@ export function getAuthenticatedUserId(): string | null {
       if (payload.userId) {
         return payload.userId
       }
-      if (payload.externalId) {
-        return payload.externalId
-      }
     } catch (_e) {
       // Invalid token format
     }
@@ -46,9 +43,6 @@ export async function getUserId(): Promise<string> {
         const payload = JSON.parse(atob(token.split('.')[1]))
         if (payload.userId) {
           return payload.userId
-        }
-        if (payload.externalId) {
-          return payload.externalId
         }
       } catch (_e) {}
     }

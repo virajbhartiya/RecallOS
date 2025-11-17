@@ -56,7 +56,6 @@ export type MemorySnapshotSelect = {
 export type UserSelect = {
   id: true
   email: true
-  external_id: true
 }
 
 export interface PageMetadata {

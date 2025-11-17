@@ -380,8 +380,8 @@ export async function searchMemories(params: {
     : retrievalPolicy.maxResults
 
   // Get user to determine memory count for dynamic search
-  const user = await prisma.user.findFirst({
-    where: { OR: [{ external_id: userId }, { id: userId }] },
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
   })
   if (!user) {
     return {

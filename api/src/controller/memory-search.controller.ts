@@ -66,7 +66,7 @@ export class MemorySearchController {
       }
 
       const searchResults = await searchMemories({
-        userId: user.external_id || user.id,
+        userId: user.id,
         query: query as string,
         limit: parseInt(limit as string),
         enableReasoning: true,

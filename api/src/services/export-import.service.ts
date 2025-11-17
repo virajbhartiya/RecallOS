@@ -7,7 +7,6 @@ export type ExportBundle = {
   exportedAt: string
   user: {
     id: string
-    external_id: string | null
     email: string | null
   }
   memories: Array<{
@@ -44,7 +43,6 @@ export class ExportImportService {
           where: { id: userId },
           select: {
             id: true,
-            external_id: true,
             email: true,
           },
         }),
@@ -87,7 +85,6 @@ export class ExportImportService {
         exportedAt: new Date().toISOString(),
         user: {
           id: user.id,
-          external_id: user.external_id,
           email: user.email,
         },
         memories: memories.map(m => ({

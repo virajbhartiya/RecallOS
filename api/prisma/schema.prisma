@@ -16,7 +16,6 @@ datasource db {
 
 model User {
   id               String           @id @default(uuid()) @db.Uuid
-  external_id      String?          @unique
   email            String?          @unique
   password_hash    String?
   created_at       DateTime         @default(now())
@@ -26,7 +25,6 @@ model User {
   token_usage      TokenUsage[]
   profile          UserProfile?
   browsing_summaries BrowsingSummary[]
-  learning_paths   LearningPath[]
   audit_logs       AuditLog[]
 
   @@map("users")
@@ -228,21 +226,5 @@ model BrowsingSummary {
   @@index([user_id, period_type])
   @@index([user_id, period_type, period_start])
   @@map("browsing_summaries")
-}
-
-model LearningPath {
-  id              String   @id @default(uuid()) @db.Uuid
-  user_id         String   @db.Uuid
-  recommendations Json
-  knowledge_gaps  Json?
-  trending_topics Json?
-  generated_at    DateTime @default(now())
-  expires_at      DateTime
-  user            User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@index([user_id])
-  @@index([generated_at])
-  @@index([user_id, generated_at])
-  @@map("learning_paths")
 }
 

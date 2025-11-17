@@ -16,7 +16,7 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       return next(new AppError('User not authenticated', 401))
     }
 
-    const userId = req.user.externalId || req.user.id
+    const userId = req.user.id
 
     logger.log('[search/controller] request received', {
       ts: new Date().toISOString(),
@@ -266,7 +266,7 @@ export const getContext = async (req: AuthenticatedRequest, res: Response, next:
       return next(new AppError('User not authenticated', 401))
     }
 
-    const userId = req.user.externalId || req.user.id
+    const userId = req.user.id
 
     const data = await searchMemories({ userId: userId, query, limit, contextOnly: true })
 

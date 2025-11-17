@@ -3,7 +3,6 @@ import { prisma } from '../lib/prisma.lib'
 interface CachedUser {
   id: string
   email?: string | null
-  external_id?: string | null
   timestamp: number
 }
 
@@ -23,7 +22,6 @@ export async function getUserWithCache(userId: string): Promise<CachedUser | nul
     select: {
       id: true,
       email: true,
-      external_id: true,
     },
   })
 
@@ -34,7 +32,6 @@ export async function getUserWithCache(userId: string): Promise<CachedUser | nul
   const cachedUser: CachedUser = {
     id: user.id,
     email: user.email,
-    external_id: user.external_id,
     timestamp: now,
   }
 
