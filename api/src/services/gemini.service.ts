@@ -333,7 +333,8 @@ Return clean, readable plain text only.`
 
   async summarizeContent(
     rawText: string,
-    metadata?: ContentMetadata
+    metadata?: ContentMetadata,
+    timeoutOverride?: number
   ): Promise<{ text: string; modelUsed?: string; inputTokens?: number; outputTokens?: number }> {
     this.ensureInit()
 
@@ -392,13 +393,14 @@ Raw Content: ${rawText}
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
+        const timeoutMs = timeoutOverride ?? 360000 // Use override or default 6 minutes
         const res = await runWithRateLimit(
           () =>
             this.ai.models.generateContent({
               model: this.getCurrentModel(),
               contents: prompt,
             }),
-          360000 // 6 minutes timeout (increased for parallel processing)
+          timeoutMs
         )
         if (!res.text) throw new Error('No summary generated from Gemini API')
 
@@ -433,7 +435,8 @@ Raw Content: ${rawText}
 
   async extractContentMetadata(
     rawText: string,
-    metadata?: ContentMetadata
+    metadata?: ContentMetadata,
+    timeoutOverride?: number
   ): Promise<{
     metadata: {
       topics: string[]
@@ -492,13 +495,14 @@ Return ONLY the JSON object:`
 
     while (this.currentModelIndex < this.availableModels.length) {
       try {
+        const timeoutMs = timeoutOverride ?? 360000 // Use override or default 6 minutes
         const res = await runWithRateLimit(
           () =>
             this.ai.models.generateContent({
               model: this.getCurrentModel(),
               contents: prompt,
             }),
-          360000 // 6 minutes timeout (increased for parallel processing)
+          timeoutMs
         )
         if (!res.text) throw new Error('No metadata response from Gemini API')
 

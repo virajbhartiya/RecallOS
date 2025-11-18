@@ -332,13 +332,14 @@ export const aiProvider = {
   async summarizeContent(
     rawText: string,
     metadata?: Record<string, unknown>,
-    userId?: string
+    userId?: string,
+    timeoutOverride?: number
   ): Promise<string> {
     let result: string
     let modelUsed: string | undefined
 
     if (provider === 'gemini') {
-      const response = await geminiService.summarizeContent(rawText, metadata)
+      const response = await geminiService.summarizeContent(rawText, metadata, timeoutOverride)
       result = response.text
       modelUsed = response.modelUsed
     } else {
@@ -387,7 +388,8 @@ ${rawText}`
   async extractContentMetadata(
     rawText: string,
     metadata?: Record<string, unknown>,
-    userId?: string
+    userId?: string,
+    timeoutOverride?: number
   ): Promise<{
     topics: string[]
     categories: string[]
@@ -411,7 +413,7 @@ ${rawText}`
     let modelUsed: string | undefined
 
     if (provider === 'gemini') {
-      const response = await geminiService.extractContentMetadata(rawText, metadata)
+      const response = await geminiService.extractContentMetadata(rawText, metadata, timeoutOverride)
       result = response.metadata
       modelUsed = response.modelUsed
     } else {
