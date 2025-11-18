@@ -205,7 +205,7 @@ Can we keep the analytics module in scope or push it to early December?`,
 
 const EMAIL_DRAFT_BODY = `Hi Maya,
 
-Thanks for the update. I pulled our Notion onboarding plan plus your Oct 12 email from Cognia to verify the numbers.
+Thanks for the update. I reviewed our Notion onboarding plan and your Oct 12 email to verify the numbers.
 
 We can keep the Nov 30 launch by moving the analytics module to Dec 7. The checklist and owner matrix are attached if you need to share with Ops.`
 
