@@ -50,6 +50,7 @@ export const Memories: React.FC = () => {
     null
   )
   const [dialogIsSearching, setDialogIsSearching] = useState(false)
+  const [dialogEmbeddingOnly, setDialogEmbeddingOnly] = useState(true)
   const dialogAbortControllerRef = useRef<AbortController | null>(null)
   const dialogDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -244,57 +245,62 @@ export const Memories: React.FC = () => {
   }, [searchJobId, searchAnswer, searchResults])
 
   // Dialog search handler
-  const handleDialogSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setDialogSearchResults(null)
-      setDialogSearchAnswer(null)
-      setDialogSearchCitations(null)
-      setDialogIsSearching(false)
-      return
-    }
-
-    // Cancel any existing search
-    if (dialogAbortControllerRef.current) {
-      dialogAbortControllerRef.current.abort()
-    }
-
-    dialogAbortControllerRef.current = new AbortController()
-    setDialogIsSearching(true)
-
-    try {
-      const signal = dialogAbortControllerRef.current?.signal
-      requireAuthToken()
-
-      const response = await MemoryService.searchMemories(
-        query,
-        {},
-        1,
-        50,
-        signal
-      )
-
-      if (signal?.aborted) return
-
-      setDialogSearchResults(response)
-      setDialogSearchAnswer(response.answer || null)
-      setDialogSearchCitations(response.citations || null)
-
-      if (response.job_id && !response.answer) {
-        setDialogSearchJobId(response.job_id)
-      } else {
-        setDialogSearchJobId(null)
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
+  const handleDialogSearch = useCallback(
+    async (query: string) => {
+      if (!query.trim()) {
+        setDialogSearchResults(null)
+        setDialogSearchAnswer(null)
+        setDialogSearchCitations(null)
+        setDialogIsSearching(false)
         return
       }
-      // Error handling - could show error state here if needed
-    } finally {
-      if (!dialogAbortControllerRef.current?.signal.aborted) {
-        setDialogIsSearching(false)
+
+      // Cancel any existing search
+      if (dialogAbortControllerRef.current) {
+        dialogAbortControllerRef.current.abort()
       }
-    }
-  }, [])
+
+      dialogAbortControllerRef.current = new AbortController()
+      setDialogIsSearching(true)
+
+      try {
+        const signal = dialogAbortControllerRef.current?.signal
+        requireAuthToken()
+
+        const response = await MemoryService.searchMemories(
+          query,
+          {},
+          1,
+          50,
+          signal,
+          undefined,
+          dialogEmbeddingOnly
+        )
+
+        if (signal?.aborted) return
+
+        setDialogSearchResults(response)
+        setDialogSearchAnswer(response.answer || null)
+        setDialogSearchCitations(response.citations || null)
+
+        if (response.job_id && !response.answer) {
+          setDialogSearchJobId(response.job_id)
+        } else {
+          setDialogSearchJobId(null)
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return
+        }
+        // Error handling - could show error state here if needed
+      } finally {
+        if (!dialogAbortControllerRef.current?.signal.aborted) {
+          setDialogIsSearching(false)
+        }
+      }
+    },
+    [dialogEmbeddingOnly]
+  )
 
   // Debounced dialog search effect
   useEffect(() => {
@@ -320,7 +326,7 @@ export const Memories: React.FC = () => {
         clearTimeout(dialogDebounceTimeoutRef.current)
       }
     }
-  }, [listSearchQuery, handleDialogSearch])
+  }, [listSearchQuery, handleDialogSearch, dialogEmbeddingOnly])
 
   // Poll for async LLM answer in dialog
   useEffect(() => {
@@ -605,6 +611,8 @@ export const Memories: React.FC = () => {
           searchAnswer={dialogSearchAnswer}
           searchCitations={dialogSearchCitations}
           selectedMemory={selectedMemory}
+          isEmbeddingOnly={dialogEmbeddingOnly}
+          onEmbeddingOnlyChange={setDialogEmbeddingOnly}
           onClose={() => {
             setIsDialogOpen(false)
             setSelectedMemory(null)

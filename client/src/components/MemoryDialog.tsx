@@ -18,6 +18,8 @@ interface MemoryDialogProps {
     url: string | null
   }> | null
   selectedMemory: Memory | null
+  isEmbeddingOnly?: boolean
+  onEmbeddingOnlyChange?: (value: boolean) => void
   onClose: () => void
   onSelectMemory: (memory: Memory) => void
   onSelectMemoryById: (memoryId: string) => void
@@ -34,6 +36,8 @@ const MemoryDialogComponent: React.FC<MemoryDialogProps> = ({
   searchAnswer,
   searchCitations,
   selectedMemory,
+  isEmbeddingOnly = false,
+  onEmbeddingOnlyChange,
   onClose,
   onSelectMemory,
   onSelectMemoryById,
@@ -81,16 +85,55 @@ const MemoryDialogComponent: React.FC<MemoryDialogProps> = ({
       >
         <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-white">
           <h2 className="text-lg font-medium text-gray-900">Memory Details</h2>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onClose()
-            }}
-            className="text-gray-400 hover:text-gray-900 transition-colors text-2xl leading-none w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded"
-          >
-            ×
-          </button>
+          <div className="flex items-center gap-4">
+            {onEmbeddingOnlyChange && (
+              <div className="flex items-center gap-3">
+                <span className="text-[11px] font-mono text-gray-500 uppercase tracking-wide">
+                  Search mode
+                </span>
+                <div className="inline-flex border border-gray-200">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onEmbeddingOnlyChange(true)
+                    }}
+                    className={`px-3 py-1 text-[11px] font-mono uppercase ${
+                      isEmbeddingOnly
+                        ? "bg-black text-white"
+                        : "bg-white text-gray-600"
+                    }`}
+                  >
+                    Embedding only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onEmbeddingOnlyChange(false)
+                    }}
+                    className={`px-3 py-1 text-[11px] font-mono uppercase border-l border-gray-200 ${
+                      !isEmbeddingOnly
+                        ? "bg-black text-white"
+                        : "bg-white text-gray-600"
+                    }`}
+                  >
+                    + Summarization
+                  </button>
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onClose()
+              }}
+              className="text-gray-400 hover:text-gray-900 transition-colors text-2xl leading-none w-8 h-8 flex items-center justify-center hover:bg-gray-100 rounded"
+            >
+              ×
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden bg-white">

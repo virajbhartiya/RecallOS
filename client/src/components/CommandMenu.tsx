@@ -4,7 +4,6 @@ import {
   Calculator,
   Calendar,
   CreditCard,
-  Search,
   Settings,
   Smile,
   User,
@@ -32,16 +31,11 @@ const CommandMenuComponent = () => {
         e.preventDefault()
         setOpen((open) => !open)
       }
-      // Add search shortcut
-      if (e.key === "f" && (e.metaKey || e.ctrlKey) && e.shiftKey) {
-        e.preventDefault()
-        navigate("/search")
-      }
     }
 
     document.addEventListener("keydown", down)
     return () => document.removeEventListener("keydown", down)
-  }, [navigate])
+  }, [])
 
   return (
     <>
@@ -50,11 +44,6 @@ const CommandMenuComponent = () => {
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup heading="Search">
-            <CommandItem onSelect={() => navigate("/search")}>
-              <Search className="mr-2 h-4 w-4" />
-              <span>Search Memories</span>
-              <CommandShortcut>⌘⇧F</CommandShortcut>
-            </CommandItem>
             <CommandItem onSelect={() => navigate("/memories")}>
               <Brain className="mr-2 h-4 w-4" />
               <span>Memory Mesh</span>

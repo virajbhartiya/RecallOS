@@ -14,7 +14,8 @@ export async function searchMemories(
   page: number = 1,
   limit: number = 10,
   signal?: AbortSignal,
-  policy?: string
+  policy?: string,
+  embeddingOnly: boolean = false
 ): Promise<MemorySearchResponse> {
   try {
     requireAuthToken()
@@ -26,6 +27,7 @@ export async function searchMemories(
         limit,
         contextOnly: false,
         policy,
+        embeddingOnly,
       },
       undefined,
       signal

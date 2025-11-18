@@ -9,7 +9,7 @@ import { logger } from '../utils/logger.util'
 export const postSearch = async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   let job: { id: string } | null = null
   try {
-    const { query, limit, contextOnly, policy } = req.body || {}
+    const { query, limit, contextOnly, policy, embeddingOnly } = req.body || {}
     if (!query) return next(new AppError('query is required', 400))
 
     if (!req.user) {
@@ -18,12 +18,16 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
 
     const userId = req.user.id
 
+    const embeddingOnlyBool = Boolean(embeddingOnly)
+
     logger.log('[search/controller] request received', {
       ts: new Date().toISOString(),
       userId: userId,
       query: query.slice(0, 100),
       limit,
       contextOnly,
+      embeddingOnly: embeddingOnlyBool,
+      rawEmbeddingOnly: embeddingOnly,
     })
 
     const data = await searchMemories({
@@ -31,6 +35,7 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       query,
       limit,
       contextOnly,
+      embeddingOnly: embeddingOnlyBool,
       jobId: undefined,
       policy,
     })
@@ -48,39 +53,48 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
       })
 
     // Only create job and return jobId if we don't have an immediate answer (for async delivery)
-    if (!contextOnly && !data.answer) {
-      job = createSearchJob()
-      // Update job with initial results
-      setImmediate(async () => {
-        try {
-          const { setSearchJobResult } = await import('../services/search-job.service')
-          await setSearchJobResult(job!.id, {
-            status: 'pending',
-            results: data.results.slice(0, 10).map(r => ({
-              memory_id: r.memory_id,
-              title: r.title,
-              url: r.url,
-              score: r.score,
-            })),
-          })
-          // Generate answer asynchronously
-          const filteredRows = data.results.map(r => ({
-            id: r.memory_id,
-            title: r.title,
-            summary: r.summary,
-            url: r.url,
-            timestamp: BigInt(r.timestamp),
-            content: r.summary || '',
-          }))
-          const bullets = filteredRows
-            .map((r, i) => {
-              const date = r.timestamp
-                ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10)
-                : ''
-              return `- [${i + 1}] ${date} ${r.summary || ''}`.trim()
+    if (!contextOnly && !embeddingOnly && !data.answer) {
+      try {
+        job = createSearchJob()
+      } catch (jobError) {
+        job = null
+        logger.warn('[search/controller] createSearchJob_failed', {
+          error: jobError instanceof Error ? jobError.message : String(jobError),
+        })
+      }
+
+      if (job) {
+        // Update job with initial results
+        setImmediate(async () => {
+          try {
+            const { setSearchJobResult } = await import('../services/search-job.service')
+            await setSearchJobResult(job!.id, {
+              status: 'pending',
+              results: data.results.slice(0, 10).map(r => ({
+                memory_id: r.memory_id,
+                title: r.title,
+                url: r.url,
+                score: r.score,
+              })),
             })
-            .join('\n')
-          const ansPrompt = `You are Cognia. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
+            // Generate answer asynchronously
+            const filteredRows = data.results.map(r => ({
+              id: r.memory_id,
+              title: r.title,
+              summary: r.summary,
+              url: r.url,
+              timestamp: BigInt(r.timestamp),
+              content: r.summary || '',
+            }))
+            const bullets = filteredRows
+              .map((r, i) => {
+                const date = r.timestamp
+                  ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10)
+                  : ''
+                return `- [${i + 1}] ${date} ${r.summary || ''}`.trim()
+              })
+              .join('\n')
+            const ansPrompt = `You are Cognia. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
 
 Rules:
 - Use inline numeric citations like [1], [2].
@@ -102,86 +116,87 @@ Return clean, readable plain text only.
 User query: "${data.query}"
 Evidence notes (ordered by relevance):
 ${bullets}`
-          const { aiProvider } = await import('../services/ai-provider.service')
-          const { withTimeout } = await import('../services/memory-search.service')
-          logger.log('[search/controller] generating async answer', {
-            ts: new Date().toISOString(),
-            jobId: job.id,
-          })
-          const answerResult = await withTimeout(
-            aiProvider.generateContent(ansPrompt, true),
-            180000
-          ) // 3 minutes for async, true = search request (high priority)
-          let generatedAnswer: string
-          if (typeof answerResult === 'string') {
-            generatedAnswer = answerResult
-          } else {
-            const result = answerResult as { text?: string }
-            generatedAnswer = result.text || answerResult
-          }
-          logger.log('[search/controller] async answer generated', {
-            ts: new Date().toISOString(),
-            jobId: job.id,
-            answerLength: generatedAnswer?.length,
-          })
-          const allCitations = filteredRows.map((r, i) => ({
-            label: i + 1,
-            memory_id: r.id,
-            title: r.title,
-            url: r.url,
-          }))
-          const pickOrderFrom = (text: string | undefined) => {
-            if (!text) return [] as number[]
-            const order: number[] = []
-            const seen = new Set<number>()
-            const re = /\[([\d,\s]+)\]/g
-            let m: RegExpExecArray | null
-            while ((m = re.exec(text))) {
-              const content = m[1]
-              const numbers = content
-                .split(',')
-                .map(s => s.trim())
-                .filter(s => s.length > 0)
-                .map(s => Number(s))
-              for (const n of numbers) {
-                if (!isNaN(n) && !seen.has(n)) {
-                  seen.add(n)
-                  order.push(n)
+            const { aiProvider } = await import('../services/ai-provider.service')
+            const { withTimeout } = await import('../services/memory-search.service')
+            logger.log('[search/controller] generating async answer', {
+              ts: new Date().toISOString(),
+              jobId: job.id,
+            })
+            const answerResult = await withTimeout(
+              aiProvider.generateContent(ansPrompt, true),
+              180000
+            ) // 3 minutes for async, true = search request (high priority)
+            let generatedAnswer: string
+            if (typeof answerResult === 'string') {
+              generatedAnswer = answerResult
+            } else {
+              const result = answerResult as { text?: string }
+              generatedAnswer = result.text || answerResult
+            }
+            logger.log('[search/controller] async answer generated', {
+              ts: new Date().toISOString(),
+              jobId: job.id,
+              answerLength: generatedAnswer?.length,
+            })
+            const allCitations = filteredRows.map((r, i) => ({
+              label: i + 1,
+              memory_id: r.id,
+              title: r.title,
+              url: r.url,
+            }))
+            const pickOrderFrom = (text: string | undefined) => {
+              if (!text) return [] as number[]
+              const order: number[] = []
+              const seen = new Set<number>()
+              const re = /\[([\d,\s]+)\]/g
+              let m: RegExpExecArray | null
+              while ((m = re.exec(text))) {
+                const content = m[1]
+                const numbers = content
+                  .split(',')
+                  .map(s => s.trim())
+                  .filter(s => s.length > 0)
+                  .map(s => Number(s))
+                for (const n of numbers) {
+                  if (!isNaN(n) && !seen.has(n)) {
+                    seen.add(n)
+                    order.push(n)
+                  }
                 }
               }
+              return order
             }
-            return order
+            const order = pickOrderFrom(generatedAnswer)
+            const generatedCitations = order.length
+              ? order
+                  .map(n => allCitations.find(c => c.label === n))
+                  .filter(
+                    (
+                      c
+                    ): c is {
+                      label: number
+                      memory_id: string
+                      title: string | null
+                      url: string | null
+                    } => Boolean(c)
+                  )
+              : []
+            await setSearchJobResult(job!.id, {
+              answer: generatedAnswer,
+              citations: generatedCitations,
+              status: 'completed',
+            })
+          } catch (error) {
+            logger.error('[search] error generating async answer in controller:', error)
+            try {
+              const { setSearchJobResult } = await import('../services/search-job.service')
+              await setSearchJobResult(job!.id, { status: 'failed' })
+            } catch (jobError) {
+              logger.error('Error updating search job status:', jobError)
+            }
           }
-          const order = pickOrderFrom(generatedAnswer)
-          const generatedCitations = order.length
-            ? order
-                .map(n => allCitations.find(c => c.label === n))
-                .filter(
-                  (
-                    c
-                  ): c is {
-                    label: number
-                    memory_id: string
-                    title: string | null
-                    url: string | null
-                  } => Boolean(c)
-                )
-            : []
-          await setSearchJobResult(job!.id, {
-            answer: generatedAnswer,
-            citations: generatedCitations,
-            status: 'completed',
-          })
-        } catch (error) {
-          logger.error('[search] error generating async answer in controller:', error)
-          try {
-            const { setSearchJobResult } = await import('../services/search-job.service')
-            await setSearchJobResult(job!.id, { status: 'failed' })
-          } catch (jobError) {
-            logger.error('Error updating search job status:', jobError)
-          }
-        }
-      })
+        })
+      }
     }
 
     // Return response with appropriate fields
