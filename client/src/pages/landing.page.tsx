@@ -2324,7 +2324,7 @@ export const Landing = () => {
                 Cognia
               </span>
               <span className="text-[10px] sm:text-xs text-gray-600 font-mono -mt-0.5 sm:-mt-1">
-                Remember what the web showed you
+                We Remember What The Web Showed You
               </span>
             </div>
           </div>
@@ -2416,29 +2416,9 @@ export const Landing = () => {
                 }}
               >
                 <span className="block text-black">
-                  <span className="align-baseline">A</span>{" "}
-                  <span className="font-editorial italic">searchable</span>{" "}
-                  <span className="align-baseline">memory</span>
-                </span>
-                <span
-                  className="block text-xl sm:text-3xl lg:text-4xl xl:text-5xl font-normal mt-1 sm:mt-2"
-                  style={{
-                    animation: isVisible
-                      ? "slideInUp 1s ease-out 0.2s both"
-                      : "none",
-                  }}
-                >
-                  for everything you see
-                </span>
-                <span
-                  className="block text-lg sm:text-2xl lg:text-3xl xl:text-4xl font-light mt-0.5 sm:mt-1"
-                  style={{
-                    animation: isVisible
-                      ? "slideInUp 1s ease-out 0.4s both"
-                      : "none",
-                  }}
-                >
-                  online
+                  <span className="align-baseline">We</span>{" "}
+                  <span className="font-editorial italic">Remember</span>{" "}
+                  <span className="align-baseline">What The Web Showed You</span>
                 </span>
               </h1>
             </div>
@@ -2685,7 +2665,7 @@ export const Landing = () => {
                   Cognia
                 </span>
                 <span className="text-[10px] sm:text-xs text-gray-500 font-mono -mt-0.5">
-                  Remember what the web showed you
+                  We Remember What The Web Showed You
                 </span>
               </div>
             </div>
