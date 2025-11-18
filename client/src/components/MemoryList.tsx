@@ -96,7 +96,11 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
 
   // Get the list of memories to navigate (search results or sorted memories)
   const memoryList = React.useMemo(() => {
-    if (searchQuery.trim() && searchResults?.results && searchResults.results.length > 0) {
+    if (
+      searchQuery.trim() &&
+      searchResults?.results &&
+      searchResults.results.length > 0
+    ) {
       return searchResults.results.map((result) => result.memory)
     }
     if (!searchQuery.trim()) {
@@ -116,12 +120,15 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
     if (selectedItemRef.current && scrollContainerRef.current) {
       const container = scrollContainerRef.current
       const item = selectedItemRef.current
-      
+
       const containerRect = container.getBoundingClientRect()
       const itemRect = item.getBoundingClientRect()
-      
+
       // Check if item is outside visible area
-      if (itemRect.top < containerRect.top || itemRect.bottom > containerRect.bottom) {
+      if (
+        itemRect.top < containerRect.top ||
+        itemRect.bottom > containerRect.bottom
+      ) {
         item.scrollIntoView({
           behavior: "smooth",
           block: "nearest",
@@ -155,9 +162,11 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
         if (selectedIndex === -1) {
           newIndex = 0
         } else if (e.key === "ArrowDown") {
-          newIndex = selectedIndex < memoryList.length - 1 ? selectedIndex + 1 : 0
+          newIndex =
+            selectedIndex < memoryList.length - 1 ? selectedIndex + 1 : 0
         } else {
-          newIndex = selectedIndex > 0 ? selectedIndex - 1 : memoryList.length - 1
+          newIndex =
+            selectedIndex > 0 ? selectedIndex - 1 : memoryList.length - 1
         }
 
         const nextMemory = memoryList[newIndex]
@@ -228,10 +237,7 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
             sortedMemories.map((memory) => {
               const isSelected = selectedMemory?.id === memory.id
               return (
-                <div
-                  key={memory.id}
-                  ref={isSelected ? selectedItemRef : null}
-                >
+                <div key={memory.id} ref={isSelected ? selectedItemRef : null}>
                   <MemoryListItem
                     memory={memory}
                     isSelected={isSelected}

@@ -245,59 +245,62 @@ export const Memories: React.FC = () => {
   }, [searchJobId, searchAnswer, searchResults])
 
   // Dialog search handler
-  const handleDialogSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setDialogSearchResults(null)
-      setDialogSearchAnswer(null)
-      setDialogSearchCitations(null)
-      setDialogIsSearching(false)
-      return
-    }
-
-    // Cancel any existing search
-    if (dialogAbortControllerRef.current) {
-      dialogAbortControllerRef.current.abort()
-    }
-
-    dialogAbortControllerRef.current = new AbortController()
-    setDialogIsSearching(true)
-
-    try {
-      const signal = dialogAbortControllerRef.current?.signal
-      requireAuthToken()
-
-      const response = await MemoryService.searchMemories(
-        query,
-        {},
-        1,
-        50,
-        signal,
-        undefined,
-        dialogEmbeddingOnly
-      )
-
-      if (signal?.aborted) return
-
-      setDialogSearchResults(response)
-      setDialogSearchAnswer(response.answer || null)
-      setDialogSearchCitations(response.citations || null)
-
-      if (response.job_id && !response.answer) {
-        setDialogSearchJobId(response.job_id)
-      } else {
-        setDialogSearchJobId(null)
-      }
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") {
+  const handleDialogSearch = useCallback(
+    async (query: string) => {
+      if (!query.trim()) {
+        setDialogSearchResults(null)
+        setDialogSearchAnswer(null)
+        setDialogSearchCitations(null)
+        setDialogIsSearching(false)
         return
       }
-      // Error handling - could show error state here if needed
-    } finally {
-      if (!dialogAbortControllerRef.current?.signal.aborted) {
-        setDialogIsSearching(false)
+
+      // Cancel any existing search
+      if (dialogAbortControllerRef.current) {
+        dialogAbortControllerRef.current.abort()
       }
-    }
-  }, [dialogEmbeddingOnly])
+
+      dialogAbortControllerRef.current = new AbortController()
+      setDialogIsSearching(true)
+
+      try {
+        const signal = dialogAbortControllerRef.current?.signal
+        requireAuthToken()
+
+        const response = await MemoryService.searchMemories(
+          query,
+          {},
+          1,
+          50,
+          signal,
+          undefined,
+          dialogEmbeddingOnly
+        )
+
+        if (signal?.aborted) return
+
+        setDialogSearchResults(response)
+        setDialogSearchAnswer(response.answer || null)
+        setDialogSearchCitations(response.citations || null)
+
+        if (response.job_id && !response.answer) {
+          setDialogSearchJobId(response.job_id)
+        } else {
+          setDialogSearchJobId(null)
+        }
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          return
+        }
+        // Error handling - could show error state here if needed
+      } finally {
+        if (!dialogAbortControllerRef.current?.signal.aborted) {
+          setDialogIsSearching(false)
+        }
+      }
+    },
+    [dialogEmbeddingOnly]
+  )
 
   // Debounced dialog search effect
   useEffect(() => {

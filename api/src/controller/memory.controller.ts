@@ -187,7 +187,7 @@ export class MemoryController {
           // First attempt uses base timeout, subsequent timeout retries use exponential increase
           const timeoutMs = calculateExponentialTimeout(timeoutAttempt)
           const timeoutOverride = timeoutAttempt > 0 ? timeoutMs : undefined
-          
+
           ;[summaryResult, extractedMetadataResult] = await Promise.all([
             aiProvider.summarizeContent(content, metadataPayload, userId, timeoutOverride),
             aiProvider.extractContentMetadata(content, metadataPayload, userId, timeoutOverride),
@@ -199,7 +199,7 @@ export class MemoryController {
           lastAiError = aiError
           const isTimeout = isTimeoutError(aiError)
           const isOverloaded = isAiOverloadedError(aiError)
-          
+
           if (isOverloaded) {
             const pauseInfo = memoryProcessingPauseService.pauseFor(
               60_000,
@@ -215,11 +215,11 @@ export class MemoryController {
             await memoryProcessingPauseService.waitForResume()
             continue
           }
-          
+
           if (isTimeout && attempt < maxAiAttempts - 1) {
             // Increment timeout attempt counter for exponential timeout increase
             timeoutAttempt++
-            
+
             // Calculate exponential backoff delay
             const backoffMs = calculateExponentialBackoff(attempt)
             const nextTimeoutMs = calculateExponentialTimeout(timeoutAttempt)
@@ -235,7 +235,7 @@ export class MemoryController {
             await new Promise(resolve => setTimeout(resolve, backoffMs))
             continue
           }
-          
+
           throw aiError
         }
       }

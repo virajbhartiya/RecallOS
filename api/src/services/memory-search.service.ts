@@ -758,7 +758,8 @@ export async function searchMemories(params: {
 
   // Apply reranking for small result sets (5-20 items) to improve relevance
   let finalScoredRows = policyScoredRows
-  const shouldRerank = policyScoredRows.length >= 5 && policyScoredRows.length <= 20 && !contextOnly && !embeddingOnly
+  const shouldRerank =
+    policyScoredRows.length >= 5 && policyScoredRows.length <= 20 && !contextOnly && !embeddingOnly
 
   if (shouldRerank) {
     try {

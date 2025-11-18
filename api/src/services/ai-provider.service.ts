@@ -413,7 +413,11 @@ ${rawText}`
     let modelUsed: string | undefined
 
     if (provider === 'gemini') {
-      const response = await geminiService.extractContentMetadata(rawText, metadata, timeoutOverride)
+      const response = await geminiService.extractContentMetadata(
+        rawText,
+        metadata,
+        timeoutOverride
+      )
       result = response.metadata
       modelUsed = response.modelUsed
     } else {
