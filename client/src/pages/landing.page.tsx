@@ -207,7 +207,7 @@ const EMAIL_DRAFT_BODY = `Hi Maya,
 
 Thanks for the update. I reviewed our Notion onboarding plan and your Oct 12 email to verify the numbers.
 
-We can keep the Nov 30 launch by moving the analytics module to Dec 7. The checklist and owner matrix are attached if you need to share with Ops.`
+We can keep the Nov 30 launch by moving the analytics module to Dec 7.`
 
 const EmailDraftingDemo = () => {
   const [isInView, setIsInView] = useState(false)
