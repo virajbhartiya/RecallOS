@@ -132,8 +132,12 @@ export const Login = () => {
           <div className="max-w-md w-full">
             <div className="bg-white/80 backdrop-blur border border-gray-200 p-8 shadow-sm">
               <div className="text-center space-y-6">
-                <div className="mx-auto w-14 h-14 bg-black text-white flex items-center justify-center font-bold text-xl font-mono shadow-lg">
-                  R
+                <div className="mx-auto w-14 h-14 flex items-center justify-center">
+                  <img
+                    src="/black-transparent.png"
+                    alt="Cognia"
+                    className="w-14 h-14"
+                  />
                 </div>
                 <div>
                   <h1 className="text-2xl font-semibold text-gray-900 mb-2">
@@ -229,9 +233,11 @@ export const Login = () => {
           {/* Logo */}
           <div className="mb-8 text-center">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-black text-white flex items-center justify-center font-bold text-xl font-mono shadow-lg">
-                R
-              </div>
+              <img
+                src="/black-transparent.png"
+                alt="Cognia"
+                className="w-10 h-10"
+              />
               <div className="flex flex-col">
                 <span className="text-xl font-bold text-italics font-editorial text-black">
                   Cognia

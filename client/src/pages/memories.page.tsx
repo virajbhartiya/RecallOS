@@ -425,9 +425,11 @@ export const Memories: React.FC = () => {
               </button>
               <div className="h-4 w-px bg-gray-300"></div>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-black text-white flex items-center justify-center font-bold text-lg font-mono">
-                  R
-                </div>
+                <img
+                  src="/black-transparent.png"
+                  alt="Cognia"
+                  className="w-8 h-8"
+                />
                 <div className="text-sm font-medium text-gray-900">
                   Memory Mesh
                 </div>

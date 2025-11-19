@@ -95,6 +95,14 @@ export const Profile: React.FC = () => {
               <span className="relative z-10">← Back</span>
               <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
             </button>
+            <div className="h-4 w-px bg-gray-300"></div>
+            <div className="flex items-center gap-3">
+              <img
+                src="/black-transparent.png"
+                alt="Cognia"
+                className="w-8 h-8"
+              />
+            </div>
           </div>
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-3xl font-mono font-bold text-gray-900">

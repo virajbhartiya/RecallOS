@@ -143,9 +143,16 @@ export const Docs = () => {
             >
               ← Back to Home
             </button>
-            <h1 className="text-xl font-mono uppercase tracking-wide">
-              Cognia Documentation
-            </h1>
+            <div className="flex items-center gap-3">
+              <img
+                src="/black-transparent.png"
+                alt="Cognia"
+                className="w-8 h-8"
+              />
+              <h1 className="text-xl font-mono uppercase tracking-wide">
+                Cognia Documentation
+              </h1>
+            </div>
             <div className="w-24"></div>
           </div>
         </div>
