@@ -299,27 +299,50 @@ export const deletePendingJob = async (
     const jobState = await job.getState()
 
     if (jobState === 'active') {
-      const redis = getRedisClient()
-      const key = getContentJobCancellationKey(jobId)
       try {
-        await Promise.race([
-          redis.set(key, '1', 'EX', 3600),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 2000)),
-        ])
-      } catch (error) {
-        logger.warn('Redis timeout setting cancellation key, continuing anyway', {
-          jobId,
-          error: error instanceof Error ? error.message : String(error),
+        await job.remove()
+        const redis = getRedisClient()
+        try {
+          await Promise.race([
+            redis.del(getContentJobCancellationKey(jobId)),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 2000)),
+          ])
+        } catch (error) {
+          logger.warn('Redis timeout deleting cancellation key, continuing anyway', {
+            jobId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+        return res.status(200).json({
+          status: 'success',
+          message: 'Job deleted successfully',
+          data: {
+            jobId,
+          },
+        })
+      } catch {
+        const redis = getRedisClient()
+        const key = getContentJobCancellationKey(jobId)
+        try {
+          await Promise.race([
+            redis.set(key, '1', 'EX', 3600),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Redis timeout')), 2000)),
+          ])
+        } catch (error) {
+          logger.warn('Redis timeout setting cancellation key, continuing anyway', {
+            jobId,
+            error: error instanceof Error ? error.message : String(error),
+          })
+        }
+        return res.status(200).json({
+          status: 'success',
+          message: 'Job cancellation requested',
+          data: {
+            jobId,
+            state: 'cancelling',
+          },
         })
       }
-      return res.status(200).json({
-        status: 'success',
-        message: 'Job cancellation requested',
-        data: {
-          jobId,
-          state: 'cancelling',
-        },
-      })
     }
 
     await job.remove()

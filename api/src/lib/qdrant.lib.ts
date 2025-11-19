@@ -48,11 +48,9 @@ export async function ensureCollection(): Promise<void> {
           },
           on_disk_payload: false,
         })
-      } catch (createError: any) {
-        if (
-          createError?.status === 409 ||
-          createError?.data?.status?.error?.includes('already exists')
-        ) {
+      } catch (createError: unknown) {
+        const error = createError as { status?: number; data?: { status?: { error?: string } } }
+        if (error?.status === 409 || error?.data?.status?.error?.includes('already exists')) {
           logger.log('Qdrant collection already exists, continuing...')
         } else {
           throw createError

@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { getRedisConnection } from '../utils/env.util'
 import { logger } from '../utils/logger.util'
 import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
+import { getRedisClient } from './redis.lib'
 
 export interface ContentJobData {
   user_id: string
@@ -49,16 +50,52 @@ contentQueueEvents.on('waiting', () => {})
 contentQueueEvents.on('active', () => {})
 contentQueueEvents.on('completed', () => {})
 
-contentQueueEvents.on('failed', ({ jobId, failedReason }) => {
+contentQueueEvents.on('failed', async ({ jobId, failedReason }) => {
+  const reason = failedReason || 'Unknown error'
+  const isCancelled = reason.includes('cancelled') || reason.includes('Job cancelled')
+
+  if (isCancelled) {
+    try {
+      const job = await contentQueue.getJob(jobId)
+      if (job) {
+        await job.remove()
+      }
+    } catch (error) {
+      logger.warn(`[Redis Queue] Failed to remove cancelled job`, {
+        jobId,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+    return
+  }
+
   logger.error(`[Redis Queue] Job failed`, {
     jobId,
     state: 'failed',
-    failedReason: failedReason || 'Unknown error',
+    failedReason: reason,
   })
 })
 
 contentQueueEvents.on('progress', () => {})
-contentQueueEvents.on('stalled', ({ jobId }) => {
+contentQueueEvents.on('stalled', async ({ jobId }) => {
+  try {
+    const job = await contentQueue.getJob(jobId)
+    if (job) {
+      const redis = getRedisClient()
+      const cancellationKey = getContentJobCancellationKey(jobId)
+      const cancelled = await redis.get(cancellationKey)
+      if (cancelled) {
+        await job.remove()
+        await redis.del(cancellationKey)
+        return
+      }
+    }
+  } catch (error) {
+    logger.warn(`[Redis Queue] Error checking stalled job cancellation`, {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+  }
   logger.warn(`[Redis Queue] Job stalled`, { jobId })
 })
 contentQueueEvents.on('delayed', () => {})
