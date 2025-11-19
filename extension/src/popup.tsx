@@ -5,7 +5,6 @@ import { createRoot } from 'react-dom/client'
 import { getAuthToken, requireAuthToken } from '@/lib/userId'
 import { runtime, storage, tabs } from '@/lib/browser'
 
-
 const Popup: React.FC = () => {
   const [extensionEnabled, setExtensionEnabled] = useState(true)
   const [memoryInjectionEnabled, setMemoryInjectionEnabled] = useState(true)
@@ -228,8 +227,6 @@ const Popup: React.FC = () => {
     }
   }
 
-
-
   const formatTimeAgo = (timestamp: number): string => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000)
     if (seconds < 60) return `${seconds}s ago`
@@ -319,10 +316,11 @@ const Popup: React.FC = () => {
             <button
               onClick={toggleExtension}
               disabled={isLoading}
-              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${extensionEnabled
+              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${
+                extensionEnabled
                   ? 'border-black bg-black text-white hover:bg-gray-800'
                   : 'border-gray-300 bg-white text-black hover:bg-gray-50'
-                }`}
+              }`}
             >
               {isLoading ? '...' : extensionEnabled ? 'Disable' : 'Enable'}
             </button>
@@ -341,10 +339,11 @@ const Popup: React.FC = () => {
             <button
               onClick={toggleMemoryInjection}
               disabled={isLoading}
-              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${memoryInjectionEnabled
+              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${
+                memoryInjectionEnabled
                   ? 'border-black bg-black text-white hover:bg-gray-800'
                   : 'border-gray-300 bg-white text-black hover:bg-gray-50'
-                }`}
+              }`}
             >
               {isLoading ? '...' : memoryInjectionEnabled ? 'Disable' : 'Enable'}
             </button>
@@ -409,8 +408,6 @@ const Popup: React.FC = () => {
             <div className="text-xs text-gray-500 text-center py-2">No websites blocked</div>
           )}
         </div>
-
-
       </div>
     </div>
   )

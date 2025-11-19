@@ -845,17 +845,6 @@ runtime.onMessage.addListener((message, sender, sendResponse) => {
     })
     return true
   }
-  if (message.type === MESSAGE_TYPES.DRAFT_EMAIL_REPLY) {
-    handleDraftEmailRequest()
-      .then(result => sendResponse(result))
-      .catch(error =>
-        sendResponse({
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to draft email reply',
-        })
-      )
-    return true
-  }
 })
 function calculateContentHash(content: string): string {
   let hash = 0
@@ -1054,47 +1043,6 @@ let draftToastElement: HTMLDivElement | null = null
 let draftPillElement: HTMLDivElement | null = null
 let draftPillObserver: MutationObserver | null = null
 let isDrafting = false
-
-async function handleDraftEmailRequest(): Promise<{ success: boolean; error?: string }> {
-  const context = extractEmailContext()
-  if (!context) {
-    return { success: false, error: 'No supported email thread detected on this page.' }
-  }
-
-  try {
-    showDraftToast('Drafting reply...', 'info')
-    const payload: EmailDraftPayload = {
-      subject: context.subject,
-      thread_text: context.threadText,
-      provider: context.provider,
-      existing_draft: context.existingDraft,
-      participants: context.participants,
-      url: window.location.href,
-      title: document.title,
-    }
-    const draft = await requestDraftFromBackground(payload)
-    const injection = injectEmailDraft(context, draft)
-
-    if (!injection.bodyApplied) {
-      if (copyTextToClipboard(draft.body)) {
-        showDraftToast('Draft copied to clipboard. Paste it into the compose box.', 'error')
-      } else {
-        showDraftToast('Unable to insert draft automatically.', 'error')
-      }
-      return { success: false, error: 'Could not insert draft automatically.' }
-    }
-
-    const subjectMessage = injection.subjectApplied ? '' : ' (Update subject manually if needed.)'
-    showDraftToast(`Draft inserted into compose box${subjectMessage}`, 'success')
-    return { success: true }
-  } catch (error) {
-    showDraftToast('Failed to draft reply.', 'error')
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to draft reply.',
-    }
-  }
-}
 
 function extractEmailContext(): EmailDraftContext | null {
   const host = window.location.hostname
