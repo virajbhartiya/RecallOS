@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react"
 import { getAnalytics, type AnalyticsData } from "@/services/analytics.service"
 import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
+
 import { PageHeader } from "@/components/PageHeader"
 
 export const Analytics: React.FC = () => {
@@ -93,9 +94,7 @@ export const Analytics: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="space-y-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">
-              Analytics
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">Analytics</h1>
             <p className="text-xs text-gray-600">
               Comprehensive statistics about your memories and usage
             </p>

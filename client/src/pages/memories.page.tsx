@@ -12,8 +12,8 @@ import type {
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { MemoryDialog } from "@/components/MemoryDialog"
 import { MemoryMesh3D } from "@/components/MemoryMesh3D"
-import { PendingJobsPanel } from "@/components/PendingJobsPanel"
 import { PageHeader } from "@/components/PageHeader"
+import { PendingJobsPanel } from "@/components/PendingJobsPanel"
 
 export const Memories: React.FC = () => {
   const navigate = useNavigate()
