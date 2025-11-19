@@ -1437,34 +1437,34 @@ function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContex
     z-index: 10000;
     background: #f0f0f0;
     border: 1px solid #e0e0e0;
-    border-radius: 12px;
-    padding: 2px 8px;
+    border-radius: 16px;
+    padding: 6px 12px;
     cursor: pointer;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-    font-size: 11px;
-    font-weight: 500;
+    font-size: 13px;
+    font-weight: 600;
     color: #1a1a1a;
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    transition: all 0.15s ease;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+    gap: 6px;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
     user-select: none;
     pointer-events: auto;
     white-space: nowrap;
     line-height: 1.2;
-    height: 20px;
+    height: 28px;
   `
 
-  // Create icon (sparkle - smaller)
-  const icon = document.createElement('span')
-  icon.innerHTML = '✨'
+  // Create icon (Cognia logo)
+  const icon = document.createElement('img')
+  icon.src = chrome.runtime.getURL('black-transparent.svg')
   icon.style.cssText = `
-    display: inline-flex;
-    align-items: center;
-    font-size: 11px;
-    line-height: 1;
+    width: 16px;
+    height: 16px;
+    display: inline-block;
     margin-top: -1px;
+    transition: transform 0.3s ease;
   `
 
   // Create text
@@ -1473,7 +1473,7 @@ function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContex
   text.style.cssText = `
     display: inline-flex;
     align-items: center;
-    font-size: 11px;
+    font-size: 13px;
   `
 
   pill.appendChild(icon)
@@ -1501,9 +1501,17 @@ function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContex
     }
 
     isDrafting = true
-    pill.style.opacity = '0.7'
+    pill.style.opacity = '0.9'
     pill.style.cursor = 'wait'
-    text.textContent = '...'
+
+    // Start spinning animation
+    icon.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], {
+      duration: 1000,
+      iterations: Infinity,
+      easing: 'linear',
+    })
+
+    text.textContent = 'Drafting...'
 
     try {
       const currentContext = extractEmailContext()
@@ -1555,6 +1563,9 @@ function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContex
     } finally {
       isDrafting = false
       if (text.textContent !== '✓') {
+        // Stop spinning animation
+        icon.getAnimations().forEach(anim => anim.cancel())
+
         pill.style.opacity = '1'
         pill.style.cursor = 'pointer'
         pill.style.background = '#f0f0f0'
@@ -1576,10 +1587,23 @@ function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContex
       return
     }
 
+    // If we have a container, use absolute positioning relative to it
+    if (
+      composeContainer &&
+      composeContainer !== document.body &&
+      composeContainer instanceof HTMLElement
+    ) {
+      pill.style.position = 'absolute'
+      pill.style.bottom = '12px'
+      pill.style.right = '12px'
+      pill.style.top = 'auto'
+      pill.style.left = 'auto'
+      return
+    }
+
+    // Fallback to fixed positioning relative to viewport
     const rect = composeElement.getBoundingClientRect()
 
-    // Position at bottom-right corner of compose field, similar to ChatGPT
-    // ChatGPT positions it just above the bottom edge, slightly inset from the right
     pill.style.position = 'fixed'
 
     // Position relative to compose field's bottom-right, with small offset
@@ -1605,19 +1629,24 @@ function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContex
     }
   }
 
-  positionPill()
-
   // Append to compose container if it exists, otherwise to body
   if (
     composeContainer &&
     composeContainer !== document.body &&
     composeContainer instanceof HTMLElement
   ) {
-    composeContainer.style.position = 'relative'
+    // Ensure container is positioned so absolute child works
+    const containerStyle = window.getComputedStyle(composeContainer)
+    if (containerStyle.position === 'static') {
+      composeContainer.style.position = 'relative'
+    }
     composeContainer.appendChild(pill)
   } else {
     document.body.appendChild(pill)
   }
+
+  // Initial position
+  positionPill()
 
   draftPillElement = pill
 

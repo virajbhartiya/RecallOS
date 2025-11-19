@@ -191,9 +191,11 @@ export class GeminiService {
     const error = err as GeminiError
     return (
       error?.status === 429 ||
+      error?.status === 503 ||
       error?.message?.toLowerCase().includes('quota') ||
       error?.message?.toLowerCase().includes('rate limit') ||
-      error?.message?.toLowerCase().includes('too many requests')
+      error?.message?.toLowerCase().includes('too many requests') ||
+      error?.message?.toLowerCase().includes('overloaded')
     )
   }
 

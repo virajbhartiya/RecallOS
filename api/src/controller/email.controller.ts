@@ -214,34 +214,62 @@ ${threadText}`
     })
 
     let aiResponse: string
-    try {
-      // Use 5.5 minute timeout (330000ms) for email drafts - pass timeout override and high priority flag
-      // Email drafts get priority 9 (below search but above normal processing) to ensure fast response
-      // Timeout is slightly less than middleware timeout (6 minutes) to allow for cleanup
-      aiResponse = await aiProvider.generateContent(prompt, false, req.user.id, 330000, true)
-      logger.log('[email/draft] AI response received', {
-        userId: req.user.id,
-        responseLength: aiResponse?.length || 0,
-      })
-    } catch (aiError) {
-      const errorMessage = aiError instanceof Error ? aiError.message : String(aiError)
-      const isTimeout = errorMessage.includes('timeout') || errorMessage === 'timeout'
+    let attempts = 0
+    const maxAttempts = 5
 
-      logger.error('[email/draft] AI provider failed', {
-        error: errorMessage,
-        isTimeout,
-        stack: aiError instanceof Error ? aiError.stack : undefined,
-        userId: req.user.id,
-      })
+    while (attempts <= maxAttempts) {
+      try {
+        attempts++
+        // Use 5.5 minute timeout (330000ms) for email drafts - pass timeout override and high priority flag
+        // Email drafts get priority 9 (below search but above normal processing) to ensure fast response
+        // Timeout is slightly less than middleware timeout (6 minutes) to allow for cleanup
+        aiResponse = await aiProvider.generateContent(prompt, false, req.user.id, 330000, true)
+        logger.log('[email/draft] AI response received', {
+          userId: req.user.id,
+          responseLength: aiResponse?.length || 0,
+        })
+        break
+      } catch (aiError) {
+        const errorMessage = aiError instanceof Error ? aiError.message : String(aiError)
+        const isRetryable =
+          errorMessage.includes('UNAVAILABLE') ||
+          errorMessage.includes('503') ||
+          errorMessage.includes('overloaded') ||
+          errorMessage.includes('The model is overloaded')
 
-      return next(
-        new AppError(
-          isTimeout
-            ? 'AI provider timed out. Please try again with a shorter email thread.'
-            : `AI provider failed: ${errorMessage}`,
-          isTimeout ? 504 : 502
+        if (isRetryable && attempts < maxAttempts) {
+          const backoffMs = Math.pow(2, attempts) * 2000 // 4s, 8s, 16s, 32s
+          logger.warn(
+            `[email/draft] AI provider unavailable, retrying (attempt ${attempts}/${maxAttempts})`,
+            {
+              userId: req.user.id,
+              backoffMs,
+              error: errorMessage,
+            }
+          )
+          await new Promise(resolve => setTimeout(resolve, backoffMs))
+          continue
+        }
+
+        const isTimeout = errorMessage.includes('timeout') || errorMessage === 'timeout'
+
+        logger.error('[email/draft] AI provider failed', {
+          error: errorMessage,
+          isTimeout,
+          stack: aiError instanceof Error ? aiError.stack : undefined,
+          userId: req.user.id,
+          attempts,
+        })
+
+        return next(
+          new AppError(
+            isTimeout
+              ? 'AI provider timed out. Please try again with a shorter email thread.'
+              : `AI provider failed: ${errorMessage}`,
+            isTimeout ? 504 : 502
+          )
         )
-      )
+      }
     }
 
     const parsed = parseDraftResponse(aiResponse)

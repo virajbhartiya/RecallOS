@@ -45,7 +45,12 @@
     "*://anthropic.com/*",
     "*://*.anthropic.com/*"
   ],
-  "web_accessible_resources": [],
+  "web_accessible_resources": [
+    {
+      "resources": ["black-transparent.svg"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "cognia@cognia.com",
