@@ -201,6 +201,20 @@ const MemoryEdgeComponent: React.FC<MemoryEdgeProps> = ({
 
 const MemoryEdge = memo(MemoryEdgeComponent)
 
+const RotatingMesh: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const groupRef = useRef<THREE.Group>(null)
+
+  useFrame((_, delta) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y += delta * 0.1
+    }
+  })
+
+  return <group ref={groupRef}>{children}</group>
+}
+
 interface SceneProps {
   meshData: MemoryMesh
   selectedMemoryId?: string
@@ -224,9 +238,9 @@ const SceneComponent: React.FC<SceneProps> = ({
 
   useEffect(() => {
     if (isCompactView) {
-      camera.position.set(1.0, 1.0, 1.0)
+      camera.position.set(0.8, 0.8, 0.8)
     } else {
-      camera.position.set(1.4, 1.4, 1.4)
+      camera.position.set(1.1, 1.1, 1.1)
     }
     camera.lookAt(0, 0, 0)
   }, [camera, isCompactView])
@@ -477,29 +491,31 @@ const SceneComponent: React.FC<SceneProps> = ({
       <directionalLight position={[8, 8, 6]} intensity={0.4} />
       <pointLight position={[0, 0, 0]} intensity={0.2} color="#ffffff" />
 
-      {visibleData.nodes.map((node) => (
-        <MemoryNode
-          key={node.id}
-          position={node.position}
-          memoryId={node.memoryId}
-          color={node.color}
-          isSelected={node.isSelected}
-          isHighlighted={node.isHighlighted}
-          importance={node.importance}
-          inLatentSpace={node.inLatentSpace}
-          onClick={onNodeClick}
-        />
-      ))}
+      <RotatingMesh>
+        {visibleData.nodes.map((node) => (
+          <MemoryNode
+            key={node.id}
+            position={node.position}
+            memoryId={node.memoryId}
+            color={node.color}
+            isSelected={node.isSelected}
+            isHighlighted={node.isHighlighted}
+            importance={node.importance}
+            inLatentSpace={node.inLatentSpace}
+            onClick={onNodeClick}
+          />
+        ))}
 
-      {visibleData.edges.map((edge, index) => (
-        <MemoryEdge
-          key={`edge-${index}-${edge.start.join(",")}-${edge.end.join(",")}`}
-          start={edge.start}
-          end={edge.end}
-          similarity={edge.similarity}
-          relationType={edge.relationType}
-        />
-      ))}
+        {visibleData.edges.map((edge, index) => (
+          <MemoryEdge
+            key={`edge-${index}-${edge.start.join(",")}-${edge.end.join(",")}`}
+            start={edge.start}
+            end={edge.end}
+            similarity={edge.similarity}
+            relationType={edge.relationType}
+          />
+        ))}
+      </RotatingMesh>
     </>
   )
 }
@@ -620,7 +636,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
       <div className="w-full h-full overflow-hidden relative bg-transparent">
         <Canvas
           camera={{
-            position: isCompactView ? [1.0, 1.0, 1.0] : [1.4, 1.4, 1.4],
+            position: isCompactView ? [0.8, 0.8, 0.8] : [1.1, 1.1, 1.1],
             fov: isCompactView ? 75 : 60,
             near: 0.0001,
             far: 1000000000,
