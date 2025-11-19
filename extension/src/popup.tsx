@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { getAuthToken, requireAuthToken } from '@/lib/userId'
 import { runtime, storage, tabs } from '@/lib/browser'
-import { MESSAGE_TYPES } from '@/lib/constants'
+
 
 const Popup: React.FC = () => {
   const [extensionEnabled, setExtensionEnabled] = useState(true)
@@ -12,8 +12,6 @@ const Popup: React.FC = () => {
   const [blockedWebsites, setBlockedWebsites] = useState<string[]>([])
   const [newBlockedWebsite, setNewBlockedWebsite] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  const [isDraftingEmail, setIsDraftingEmail] = useState(false)
-  const [draftStatus, setDraftStatus] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isCheckingHealth, setIsCheckingHealth] = useState(true)
@@ -230,32 +228,7 @@ const Popup: React.FC = () => {
     }
   }
 
-  const handleDraftEmail = async () => {
-    setDraftStatus(null)
-    setIsDraftingEmail(true)
-    try {
-      const activeTabs = await tabs.query({ active: true, currentWindow: true })
-      if (activeTabs.length === 0 || !activeTabs[0].id) {
-        setDraftStatus('No active tab detected.')
-        return
-      }
 
-      await new Promise(resolve => {
-        tabs.sendMessage(activeTabs[0].id!, { type: MESSAGE_TYPES.DRAFT_EMAIL_REPLY }, response => {
-          if (response?.success) {
-            setDraftStatus('Draft inserted into the compose box.')
-          } else {
-            setDraftStatus(response?.error || 'Unable to draft reply on this page.')
-          }
-          resolve(null)
-        })
-      })
-    } catch (_error) {
-      setDraftStatus('Draft request failed.')
-    } finally {
-      setIsDraftingEmail(false)
-    }
-  }
 
   const formatTimeAgo = (timestamp: number): string => {
     const seconds = Math.floor((Date.now() - timestamp) / 1000)
@@ -346,11 +319,10 @@ const Popup: React.FC = () => {
             <button
               onClick={toggleExtension}
               disabled={isLoading}
-              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${
-                extensionEnabled
+              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${extensionEnabled
                   ? 'border-black bg-black text-white hover:bg-gray-800'
                   : 'border-gray-300 bg-white text-black hover:bg-gray-50'
-              }`}
+                }`}
             >
               {isLoading ? '...' : extensionEnabled ? 'Disable' : 'Enable'}
             </button>
@@ -369,11 +341,10 @@ const Popup: React.FC = () => {
             <button
               onClick={toggleMemoryInjection}
               disabled={isLoading}
-              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${
-                memoryInjectionEnabled
+              className={`px-4 py-1.5 text-xs font-medium border transition-colors ${memoryInjectionEnabled
                   ? 'border-black bg-black text-white hover:bg-gray-800'
                   : 'border-gray-300 bg-white text-black hover:bg-gray-50'
-              }`}
+                }`}
             >
               {isLoading ? '...' : memoryInjectionEnabled ? 'Disable' : 'Enable'}
             </button>
@@ -439,29 +410,7 @@ const Popup: React.FC = () => {
           )}
         </div>
 
-        {/* Email Drafting */}
-        <div className="border border-gray-200 bg-white p-3 space-y-2">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium text-black">Smart Email Reply</div>
-              <div className="text-xs text-gray-600">
-                Draft a reply for the current Gmail or Outlook thread.
-              </div>
-            </div>
-            <button
-              onClick={handleDraftEmail}
-              disabled={isDraftingEmail}
-              className="px-3 py-1.5 text-xs font-medium border border-black bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isDraftingEmail ? 'Drafting…' : 'Draft Reply'}
-            </button>
-          </div>
-          {draftStatus && (
-            <div className="text-xs text-gray-600" data-testid="draft-status">
-              {draftStatus}
-            </div>
-          )}
-        </div>
+
       </div>
     </div>
   )
