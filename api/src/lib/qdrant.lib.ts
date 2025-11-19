@@ -32,21 +32,32 @@ export async function ensureCollection(): Promise<void> {
     const collectionExists = collections.collections.some(c => c.name === COLLECTION_NAME)
 
     if (!collectionExists) {
-      await qdrantClient.createCollection(COLLECTION_NAME, {
-        vectors: {
-          size: EMBEDDING_DIMENSION,
-          distance: 'Cosine',
-        },
-        optimizers_config: {
-          default_segment_number: 2,
-        },
-        hnsw_config: {
-          m: 16,
-          ef_construct: 100,
-          full_scan_threshold: 10000,
-        },
-        on_disk_payload: false,
-      })
+      try {
+        await qdrantClient.createCollection(COLLECTION_NAME, {
+          vectors: {
+            size: EMBEDDING_DIMENSION,
+            distance: 'Cosine',
+          },
+          optimizers_config: {
+            default_segment_number: 2,
+          },
+          hnsw_config: {
+            m: 16,
+            ef_construct: 100,
+            full_scan_threshold: 10000,
+          },
+          on_disk_payload: false,
+        })
+      } catch (createError: any) {
+        if (
+          createError?.status === 409 ||
+          createError?.data?.status?.error?.includes('already exists')
+        ) {
+          logger.log('Qdrant collection already exists, continuing...')
+        } else {
+          throw createError
+        }
+      }
     }
 
     try {
