@@ -8,6 +8,7 @@ import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
 
 import { EmptyState, ErrorMessage } from "../components/ui/loading-spinner"
+import { PageHeader } from "@/components/PageHeader"
 
 export const Profile: React.FC = () => {
   const navigate = useNavigate()
@@ -84,67 +85,52 @@ export const Profile: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <button
-              onClick={() => navigate("/")}
-              className="text-sm font-medium text-gray-700 hover:text-black transition-colors relative group"
-            >
-              <span className="relative z-10">← Back</span>
-              <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
-            </button>
-            <div className="h-4 w-px bg-gray-300"></div>
-            <div className="flex items-center gap-3">
-              <img
-                src="/black-transparent.png"
-                alt="Cognia"
-                className="w-8 h-8"
-              />
+      <PageHeader pageName="Profile" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="space-y-6">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <h1 className="text-2xl font-bold text-gray-900">
+                Profile
+              </h1>
+              <div className="flex items-center gap-2">
+                {profile && (
+                  <div className="text-xs font-mono text-gray-500">
+                    v{profile.version}
+                  </div>
+                )}
+                <button
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isRefreshing ? "Refreshing..." : "Refresh"}
+                </button>
+              </div>
             </div>
+            <p className="text-xs text-gray-600">
+              Your automatically maintained profile based on processed content
+            </p>
           </div>
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-mono font-bold text-gray-900">
-              [USER PROFILE]
-            </h1>
-            <div className="flex items-center gap-2">
-              {profile && (
-                <div className="text-xs font-mono text-gray-500">
-                  v{profile.version}
-                </div>
-              )}
-              <button
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="px-4 py-2 text-xs font-mono uppercase tracking-wide border border-black bg-white hover:bg-black hover:text-white transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isRefreshing ? "REFRESHING..." : "REFRESH PROFILE"}
-              </button>
-            </div>
-          </div>
-          <p className="text-gray-600 font-mono">
-            Your automatically maintained profile based on processed content
-          </p>
-        </div>
 
-        {error && (
-          <ErrorMessage message={error} onRetry={() => setError(null)} />
-        )}
+          {error && (
+            <ErrorMessage message={error} onRetry={() => setError(null)} />
+          )}
 
-        {!profile && !error && (
-          <EmptyState
-            title="No profile available"
-            description="Process some content to generate your profile"
-            action={{
-              label: "Go to Memories",
-              onClick: () => navigate("/memories"),
-            }}
-          />
-        )}
+          {!profile && !error && (
+            <EmptyState
+              title="No profile available"
+              description="Process some content to generate your profile"
+              action={{
+                label: "Go to Memories",
+                onClick: () => navigate("/memories"),
+              }}
+            />
+          )}
 
-        {profile && (
-          <div className="space-y-6">
+          {profile && (
+            <div className="space-y-6">
             {/* Profile Metadata */}
             <div className="bg-white border border-gray-200 p-4">
               <div className="text-sm font-mono text-gray-600 mb-2 uppercase tracking-wide">
@@ -1030,7 +1016,8 @@ export const Profile: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { useNavigate } from "react-router-dom"
+import { PageHeader } from "@/components/PageHeader"
 
 const TableOfContents: React.FC<{ onSectionClick: (id: string) => void }> = ({
   onSectionClick,
@@ -20,7 +21,7 @@ const TableOfContents: React.FC<{ onSectionClick: (id: string) => void }> = ({
   ]
 
   return (
-    <div className="sticky top-4 bg-white border border-gray-200 p-4">
+    <div className="sticky top-20 bg-white border border-gray-200 p-4 max-h-[calc(100vh-5rem)] overflow-y-auto">
       <h3 className="text-sm font-mono uppercase tracking-wide text-gray-900 mb-4">
         Table of Contents
       </h3>
@@ -134,29 +135,7 @@ export const Docs = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="border-b border-gray-200 bg-white sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={() => navigate("/")}
-              className="text-sm font-mono text-gray-600 hover:text-black transition-colors"
-            >
-              ← Back to Home
-            </button>
-            <div className="flex items-center gap-3">
-              <img
-                src="/black-transparent.png"
-                alt="Cognia"
-                className="w-8 h-8"
-              />
-              <h1 className="text-xl font-mono uppercase tracking-wide">
-                Cognia Documentation
-              </h1>
-            </div>
-            <div className="w-24"></div>
-          </div>
-        </div>
-      </header>
+      <PageHeader pageName="Documentation" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

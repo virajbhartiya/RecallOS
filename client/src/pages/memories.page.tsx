@@ -13,6 +13,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog"
 import { MemoryDialog } from "@/components/MemoryDialog"
 import { MemoryMesh3D } from "@/components/MemoryMesh3D"
 import { PendingJobsPanel } from "@/components/PendingJobsPanel"
+import { PageHeader } from "@/components/PageHeader"
 
 export const Memories: React.FC = () => {
   const navigate = useNavigate()
@@ -411,66 +412,23 @@ export const Memories: React.FC = () => {
         backgroundImage: "linear-gradient(135deg, #f9fafb, #ffffff, #f3f4f6)",
       }}
     >
-      {/* Header */}
-      <header className="fixed top-0 inset-x-0 z-40 bg-white/80 backdrop-blur-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4 sm:gap-6">
-              <button
-                onClick={() => (window.location.href = "/")}
-                className="text-sm font-medium text-gray-700 hover:text-black transition-colors relative group"
-              >
-                <span className="relative z-10">← Home</span>
-                <div className="absolute inset-0 bg-gray-100 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left -z-10 rounded"></div>
-              </button>
-              <div className="h-4 w-px bg-gray-300"></div>
-              <div className="flex items-center gap-3">
-                <img
-                  src="/black-transparent.png"
-                  alt="Cognia"
-                  className="w-8 h-8"
-                />
-                <div className="text-sm font-medium text-gray-900">
-                  Memory Mesh
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={() => (window.location.href = "/analytics")}
-                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
-              >
-                Analytics
-              </button>
-              <button
-                onClick={() => (window.location.href = "/insights")}
-                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
-              >
-                Insights
-              </button>
-              <button
-                onClick={() => (window.location.href = "/profile")}
-                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
-              >
-                Profile
-              </button>
-              <button
-                onClick={() => setIsPendingJobsOpen(true)}
-                className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
-              >
-                Pending Jobs
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-      <div className="h-16 sm:h-20" aria-hidden="true" />
+      <PageHeader
+        pageName="Memories"
+        rightActions={
+          <button
+            onClick={() => setIsPendingJobsOpen(true)}
+            className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
+          >
+            Pending Jobs
+          </button>
+        }
+      />
 
       {/* Main Content */}
-      <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] sm:h-[calc(100vh-5rem)] relative">
+      <div className="flex flex-col md:flex-row h-[calc(100vh-3.5rem)] relative">
         {/* Left Panel - Memory Mesh */}
         <div
-          className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-auto md:min-h-[calc(100vh-4rem)] sm:md:min-h-[calc(100vh-5rem)] border-b md:border-b-0 bg-white"
+          className="flex-1 relative order-2 md:order-1 h-[50vh] md:h-auto md:min-h-[calc(100vh-3.5rem)] border-b md:border-b-0 bg-white"
           style={{
             backgroundImage: `
               linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px),
