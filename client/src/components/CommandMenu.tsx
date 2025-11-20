@@ -1,14 +1,17 @@
 import { memo, useEffect, useState } from "react"
 import {
+  ArrowLeft,
+  BarChart3,
+  BookOpen,
   Brain,
-  Calculator,
   Calendar,
-  CreditCard,
-  Settings,
-  Smile,
+  Lightbulb,
+  RefreshCw,
+  Search,
+  Sparkles,
   User,
 } from "lucide-react"
-import { useNavigate } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 
 import {
   CommandDialog,
@@ -24,18 +27,142 @@ import {
 const CommandMenuComponent = () => {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+  const enableInternalRoutes =
+    import.meta.env.VITE_ENABLE_INTERNAL_ROUTES !== "false"
 
   useEffect(() => {
+    if (!enableInternalRoutes) {
+      return
+    }
     const down = (e: KeyboardEvent) => {
-      if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
+      const target = e.target as HTMLElement
+      const isInput =
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+
+      const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0
+      const modKey = isMac ? e.metaKey : e.ctrlKey
+
+      if (e.key === "Escape" && open) {
+        e.preventDefault()
+        setOpen(false)
+        return
+      }
+
+      if (e.key === "/" && !isInput && !modKey) {
+        e.preventDefault()
+        const searchInput = document.querySelector(
+          'input[type="search"], input[placeholder*="search" i], input[placeholder*="Search"]'
+        ) as HTMLInputElement
+        if (searchInput) {
+          searchInput.focus()
+          searchInput.select()
+        } else {
+          setOpen(true)
+        }
+        return
+      }
+
+      if (isInput && !(e.key === "j" && modKey) && !(e.key === "k" && modKey)) {
+        return
+      }
+
+      if (e.key === "j" && modKey) {
         e.preventDefault()
         setOpen((open) => !open)
+        return
+      }
+
+      if (e.key === "k" && modKey) {
+        e.preventDefault()
+        setOpen((open) => !open)
+        return
+      }
+
+      if (!modKey) return
+
+      switch (e.key.toLowerCase()) {
+        case "p":
+          e.preventDefault()
+          navigate("/profile")
+          break
+        case "m":
+          e.preventDefault()
+          navigate("/memories")
+          break
+        case "a":
+          e.preventDefault()
+          navigate("/analytics")
+          break
+        case "i":
+          e.preventDefault()
+          navigate("/insights")
+          break
+        case "d":
+          e.preventDefault()
+          navigate("/docs")
+          break
+        case "h":
+          e.preventDefault()
+          navigate("/")
+          break
+        case "r":
+          e.preventDefault()
+          if (location.pathname === "/profile") {
+            const buttons = Array.from(document.querySelectorAll("button"))
+            const refreshButton = buttons.find(
+              (btn) =>
+                btn.textContent?.trim() === "Refresh" ||
+                btn.textContent?.trim() === "Refreshing..."
+            ) as HTMLButtonElement
+            if (refreshButton && !refreshButton.disabled) {
+              refreshButton.click()
+            }
+          } else {
+            window.location.reload()
+          }
+          break
+        case "g":
+          e.preventDefault()
+          if (location.pathname === "/insights") {
+            const buttons = Array.from(document.querySelectorAll("button"))
+            const generateButton = buttons.find(
+              (btn) =>
+                (btn.textContent?.trim() === "Generate" ||
+                  btn.textContent?.trim() === "Generate Summary" ||
+                  btn.textContent?.trim() === "Generating...") &&
+                !btn.disabled
+            ) as HTMLButtonElement
+            if (generateButton) {
+              generateButton.click()
+            }
+          }
+          break
+        case "[":
+          e.preventDefault()
+          if (window.history.length > 1) {
+            navigate(-1)
+          }
+          break
+      }
+
+      if (e.key === "ArrowLeft" && modKey) {
+        e.preventDefault()
+        if (window.history.length > 1) {
+          navigate(-1)
+        }
       }
     }
 
     document.addEventListener("keydown", down)
     return () => document.removeEventListener("keydown", down)
-  }, [])
+  }, [navigate, location.pathname, open, enableInternalRoutes])
+
+  if (!enableInternalRoutes) {
+    return null
+  }
 
   return (
     <>
@@ -43,33 +170,117 @@ const CommandMenuComponent = () => {
         <CommandInput placeholder="Type a command or search..." />
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
-          <CommandGroup heading="Search">
-            <CommandItem onSelect={() => navigate("/memories")}>
-              <Brain className="mr-2 h-4 w-4" />
-              <span>Memory Mesh</span>
-            </CommandItem>
-          </CommandGroup>
-          <CommandSeparator />
           <CommandGroup heading="Navigation">
             <CommandItem onSelect={() => navigate("/")}>
               <Calendar className="mr-2 h-4 w-4" />
               <span>Home</span>
+              <CommandShortcut>⌘H</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => navigate("/memories")}>
               <Brain className="mr-2 h-4 w-4" />
               <span>Memories</span>
+              <CommandShortcut>⌘M</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => navigate("/analytics")}>
+              <BarChart3 className="mr-2 h-4 w-4" />
+              <span>Analytics</span>
+              <CommandShortcut>⌘A</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => navigate("/insights")}>
+              <Lightbulb className="mr-2 h-4 w-4" />
+              <span>Insights</span>
+              <CommandShortcut>⌘I</CommandShortcut>
+            </CommandItem>
+            <CommandItem onSelect={() => navigate("/docs")}>
+              <BookOpen className="mr-2 h-4 w-4" />
+              <span>Documentation</span>
+              <CommandShortcut>⌘D</CommandShortcut>
+            </CommandItem>
+            <CommandItem
+              onSelect={() => {
+                if (window.history.length > 1) {
+                  navigate(-1)
+                }
+              }}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              <span>Go Back</span>
+              <CommandShortcut>⌘[</CommandShortcut>
             </CommandItem>
           </CommandGroup>
           <CommandSeparator />
-          <CommandGroup heading="Tools">
-            <CommandItem>
-              <Calculator className="mr-2 h-4 w-4" />
-              <span>Calculator</span>
+          <CommandGroup heading="Actions">
+            <CommandItem
+              onSelect={() => {
+                const searchInput = document.querySelector(
+                  'input[type="search"], input[placeholder*="search" i], input[placeholder*="Search"]'
+                ) as HTMLInputElement
+                if (searchInput) {
+                  searchInput.focus()
+                  searchInput.select()
+                }
+              }}
+            >
+              <Search className="mr-2 h-4 w-4" />
+              <span>Focus Search</span>
+              <CommandShortcut>/</CommandShortcut>
             </CommandItem>
-            <CommandItem>
-              <Smile className="mr-2 h-4 w-4" />
-              <span>Search Emoji</span>
-            </CommandItem>
+            {location.pathname === "/profile" && (
+              <CommandItem
+                onSelect={() => {
+                  const buttons = Array.from(
+                    document.querySelectorAll("button")
+                  )
+                  const refreshButton = buttons.find(
+                    (btn) =>
+                      btn.textContent?.trim() === "Refresh" ||
+                      btn.textContent?.trim() === "Refreshing..."
+                  ) as HTMLButtonElement
+                  if (refreshButton && !refreshButton.disabled) {
+                    refreshButton.click()
+                  }
+                }}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                <span>Refresh Profile</span>
+                <CommandShortcut>⌘R</CommandShortcut>
+              </CommandItem>
+            )}
+            {location.pathname === "/insights" && (
+              <CommandItem
+                onSelect={() => {
+                  const buttons = Array.from(
+                    document.querySelectorAll("button")
+                  )
+                  const generateButton = buttons.find(
+                    (btn) =>
+                      (btn.textContent?.trim() === "Generate" ||
+                        btn.textContent?.trim() === "Generate Summary" ||
+                        btn.textContent?.trim() === "Generating...") &&
+                      !btn.disabled
+                  ) as HTMLButtonElement
+                  if (generateButton) {
+                    generateButton.click()
+                  }
+                }}
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                <span>Generate Summary</span>
+                <CommandShortcut>⌘G</CommandShortcut>
+              </CommandItem>
+            )}
+            {location.pathname !== "/profile" &&
+              location.pathname !== "/insights" && (
+                <CommandItem
+                  onSelect={() => {
+                    window.location.reload()
+                  }}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  <span>Refresh Page</span>
+                  <CommandShortcut>⌘R</CommandShortcut>
+                </CommandItem>
+              )}
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Settings">
@@ -77,16 +288,6 @@ const CommandMenuComponent = () => {
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
               <CommandShortcut>⌘P</CommandShortcut>
-            </CommandItem>
-            <CommandItem>
-              <CreditCard className="mr-2 h-4 w-4" />
-              <span>Billing</span>
-              <CommandShortcut>⌘B</CommandShortcut>
-            </CommandItem>
-            <CommandItem>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-              <CommandShortcut>⌘S</CommandShortcut>
             </CommandItem>
           </CommandGroup>
         </CommandList>
