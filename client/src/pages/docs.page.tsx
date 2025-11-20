@@ -233,9 +233,9 @@ export const Docs = () => {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white border border-gray-200 p-4">
-                  <h3 className="font-medium mb-2">AI Metadata & Embeddings</h3>
+                  <h3 className="font-medium mb-2">Semantic Embeddings</h3>
                   <p className="text-sm text-gray-600">
-                    Each memory is analyzed for key insights, metadata, and semantic embeddings so it can be searched and linked without storing extra summaries.
+                    Each memory is stored with high-quality embeddings so it can be searched and linked without extra summaries or AI metadata.
                   </p>
                 </div>
                 <div className="bg-white border border-gray-200 p-4">
@@ -645,13 +645,14 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                     similarity threshold
                   </li>
                   <li>
-                    <strong>AI Processing:</strong> Extracts content metadata
-                    using Google Gemini or Ollama
+                    <strong>AI Processing:</strong> (Disabled) Metadata extraction
+                    is skipped to keep ingestion lightweight—only canonicalization
+                    and embeddings run.
                   </li>
                   <li>
                     <strong>Database Storage:</strong> Creates memory record in
-                    PostgreSQL with content, canonical_hash, and enriched
-                    page_metadata (topics, categories, sentiment, etc.)
+                    PostgreSQL with content, canonical_hash, and any metadata
+                    provided directly by the source.
                   </li>
                   <li>
                     <strong>Async Processing:</strong> Uses setImmediate() to
@@ -753,8 +754,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                   </li>
                   <li>
                     <strong>Token Tracking:</strong> Records token usage per
-                    user for embeddings, summarization, metadata extraction, and
-                    search operations
+                    user for embedding generation and search operations
                   </li>
                 </ul>
 

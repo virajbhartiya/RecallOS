@@ -1,6 +1,5 @@
 import { Worker } from 'bullmq'
 import { ContentJobData, getContentJobCancellationKey } from '../lib/queue.lib'
-import { aiProvider } from '../services/ai-provider.service'
 import { memoryMeshService } from '../services/memory-mesh.service'
 import { profileUpdateService } from '../services/profile-update.service'
 import { prisma } from '../lib/prisma.lib'
@@ -20,12 +19,6 @@ type PrismaError = {
   code?: string
   message?: string
   status?: number
-}
-
-type RetryableError = {
-  message?: string
-  status?: number
-  code?: number | string
 }
 
 const PROFILE_IMPORTANCE_THRESHOLD = Number(process.env.PROFILE_IMPORTANCE_THRESHOLD || 0.7)
@@ -86,11 +79,10 @@ export const startContentWorker = () => {
           ])
 
           if (duplicateCheck) {
-            const merged = await memoryIngestionService.mergeDuplicateMemory(
-              duplicateCheck.memory,
-              metadata,
-              undefined
-            )
+          const merged = await memoryIngestionService.mergeDuplicateMemory(
+            duplicateCheck.memory,
+            metadata
+          )
             logger.log(`[Redis Worker] Duplicate detected, skipping processing`, {
               jobId: job.id,
               userId: user_id,
@@ -114,61 +106,8 @@ export const startContentWorker = () => {
           }
         }
 
-        const isRetryableError = (err: unknown): boolean => {
-          const error = err as RetryableError
-          const msg = String(error?.message || '').toLowerCase()
-          const status = Number((error?.status ?? error?.code) || 0)
-          return (
-            status === 429 ||
-            status === 500 ||
-            status === 502 ||
-            status === 503 ||
-            status === 504 ||
-            msg.includes('overloaded') ||
-            msg.includes('unavailable') ||
-            msg.includes('rate limit') ||
-            msg.includes('quota')
-          )
-        }
-
-        // Extract metadata with retries
-        const extractedMetadataResult = await (async () => {
-          try {
-            const result = await aiProvider.extractContentMetadata(raw_text, metadata, user_id)
-            if (typeof result === 'object' && result !== null && 'topics' in result) {
-              return result
-            }
-            if (typeof result === 'object' && result !== null && 'metadata' in result) {
-              return (result as { metadata?: Record<string, unknown> }).metadata || result
-            }
-            return result
-          } catch (metadataError) {
-            const error = metadataError as Error | undefined
-            if (error && error.name === 'JobCancelledError') {
-              throw error
-            }
-            logger.warn(`[Redis Worker] Failed to extract metadata, continuing without it`, {
-              jobId: job.id,
-              userId: user_id,
-              error: metadataError?.message || String(metadataError),
-            })
-            return {}
-          }
-        })()
-
-        const extractedMetadata = extractedMetadataResult as {
-          topics?: string[]
-          categories?: string[]
-          keyPoints?: string[]
-          sentiment?: string
-          importance?: number
-          usefulness?: number
-          searchableTerms?: string[]
-          contextRelevance?: string[]
-        }
-
         if (metadata?.memory_id) {
-          const pageMetadata = memoryIngestionService.buildPageMetadata(metadata, extractedMetadata)
+          const pageMetadata = memoryIngestionService.buildPageMetadata(metadata)
           const [existingMemory] = await Promise.all([
             prisma.memory.findUnique({
               where: { id: metadata.memory_id },
@@ -219,10 +158,6 @@ export const startContentWorker = () => {
           if (!canonicalData) {
             canonicalData = memoryIngestionService.canonicalizeContent(raw_text, baseUrl)
           }
-          const extractedMetadataRecord =
-            extractedMetadata && typeof extractedMetadata === 'object'
-              ? (extractedMetadata as Record<string, unknown>)
-              : undefined
           const memoryCreateInput = memoryIngestionService.buildMemoryCreatePayload({
             userId: user_id,
             title: metadata?.title as string | undefined,
@@ -231,7 +166,6 @@ export const startContentWorker = () => {
             content: raw_text,
             contentPreview: raw_text.slice(0, 400),
             metadata,
-            extractedMetadata: extractedMetadataRecord,
             canonicalText: canonicalData.canonicalText,
             canonicalHash: canonicalData.canonicalHash,
           })

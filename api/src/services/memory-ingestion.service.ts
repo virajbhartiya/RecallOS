@@ -43,7 +43,6 @@ type MemoryCreatePayload = {
   content: string
   contentPreview?: string
   metadata?: MetadataRecord
-  extractedMetadata?: MetadataRecord | null
   canonicalText: string
   canonicalHash: string
 }
@@ -136,12 +135,11 @@ export class MemoryIngestionService {
 
   async mergeDuplicateMemory(
     duplicate: DuplicateMemory,
-    metadata: MetadataRecord | undefined,
-    extractedMetadata: MetadataRecord | undefined
+    metadata: MetadataRecord | undefined
   ): Promise<DuplicateMemory> {
     const mergedMetadata = memoryScoringService.mergeMetadata(
       duplicate.page_metadata,
-      this.buildPageMetadata(metadata, extractedMetadata)
+      this.buildPageMetadata(metadata)
     )
 
     const boostedImportance = Math.min(1, (duplicate.importance_score ?? 0.35) + 0.05)
@@ -177,46 +175,15 @@ export class MemoryIngestionService {
     return updated
   }
 
-  buildPageMetadata(
-    metadata?: MetadataRecord,
-    extractedMetadata?: MetadataRecord | null
-  ): MetadataRecord {
-    const base: MetadataRecord = {
+  buildPageMetadata(metadata?: MetadataRecord): MetadataRecord {
+    return {
       ...(metadata || {}),
     }
-
-    if (extractedMetadata) {
-      base.extracted_metadata = extractedMetadata
-      if (extractedMetadata.topics) {
-        base.topics = extractedMetadata.topics
-      }
-      if (extractedMetadata.categories) {
-        base.categories = extractedMetadata.categories
-      }
-      if (extractedMetadata.keyPoints) {
-        base.key_points = extractedMetadata.keyPoints
-      }
-      if (extractedMetadata.sentiment) {
-        base.sentiment = extractedMetadata.sentiment
-      }
-      if (extractedMetadata.importance) {
-        base.importance = extractedMetadata.importance
-      }
-      if (extractedMetadata.searchableTerms) {
-        base.searchable_terms = extractedMetadata.searchableTerms
-      }
-      if (extractedMetadata.contextRelevance) {
-        base.context_relevance = extractedMetadata.contextRelevance
-      }
-    }
-
-    return base
   }
 
   buildMemoryCreatePayload(payload: MemoryCreatePayload): Prisma.MemoryCreateInput {
     const metadata = payload.metadata || {}
-    const extractedMetadata = payload.extractedMetadata || undefined
-    const pageMetadata = this.buildPageMetadata(metadata, extractedMetadata)
+    const pageMetadata = this.buildPageMetadata(metadata)
     const topics = Array.isArray(pageMetadata.topics)
       ? pageMetadata.topics.filter((topic): topic is string => typeof topic === 'string')
       : []
@@ -233,13 +200,18 @@ export class MemoryIngestionService {
       contentPreview: payload.contentPreview,
     })
 
+    const pageImportance =
+      typeof (pageMetadata as { importance?: unknown }).importance === 'number'
+        ? ((pageMetadata as { importance?: number }).importance as number)
+        : undefined
+
     const importanceScore = memoryScoringService.calculateImportanceScore({
       memoryType,
       contentLength: payload.content.length,
       topics,
       categories,
       metadata,
-      extractedImportance: extractedMetadata?.importance as number | undefined,
+      extractedImportance: pageImportance,
     })
 
     const confidenceScore = memoryScoringService.calculateConfidenceScore({
@@ -248,7 +220,7 @@ export class MemoryIngestionService {
       topics,
       categories,
       metadata,
-      extractedImportance: extractedMetadata?.importance as number | undefined,
+      extractedImportance: pageImportance,
       importanceScore,
     })
 

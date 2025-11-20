@@ -2,13 +2,11 @@ import { Request, Response } from 'express'
 import { AuthenticatedRequest } from '../middleware/auth.middleware'
 import { createHash } from 'crypto'
 import { prisma } from '../lib/prisma.lib'
-import { aiProvider } from '../services/ai-provider.service'
 import { memoryMeshService } from '../services/memory-mesh.service'
 import { memoryIngestionService } from '../services/memory-ingestion.service'
 import { profileUpdateService } from '../services/profile-update.service'
 import { auditLogService } from '../services/audit-log.service'
 import { memoryRedactionService } from '../services/memory-redaction.service'
-import { memoryProcessingPauseService } from '../services/memory-processing-pause.service'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 import { extractDomain } from '../utils/url.util'
@@ -38,67 +36,6 @@ function hashUrl(url: string): string {
 }
 
 const PROFILE_IMPORTANCE_THRESHOLD = Number(process.env.PROFILE_IMPORTANCE_THRESHOLD || 0.7)
-
-type AiErrorPayload = {
-  code?: number | string
-  status?: string
-  message?: string
-}
-
-function extractAiErrorPayload(error: unknown): AiErrorPayload {
-  if (!error || typeof error !== 'object') {
-    return {}
-  }
-
-  if ('error' in error && typeof (error as { error?: unknown }).error === 'object') {
-    const nested = (error as { error?: AiErrorPayload }).error || {}
-    return {
-      code: nested.code,
-      status: nested.status,
-      message: nested.message || (error as { message?: string }).message,
-    }
-  }
-
-  const errObj = error as Partial<AiErrorPayload> & { message?: string }
-  return {
-    code: errObj.code,
-    status: errObj.status,
-    message: errObj.message,
-  }
-}
-
-function isAiOverloadedError(error: unknown): boolean {
-  const payload = extractAiErrorPayload(error)
-  const msg = payload.message?.toLowerCase()
-  const status = payload.status?.toString().toUpperCase()
-  const code = typeof payload.code === 'string' ? parseInt(payload.code, 10) : payload.code
-
-  if (code === 503) return true
-  if (status === 'UNAVAILABLE') return true
-  if (msg?.includes('model is overloaded')) return true
-  if (msg?.includes('temporarily overloaded')) return true
-  if (msg?.includes('operation timed out')) return true
-  if (msg?.includes('timed out after')) return true
-  return false
-}
-
-function isTimeoutError(error: unknown): boolean {
-  const errorMessage = error instanceof Error ? error.message : String(error)
-  const msg = errorMessage.toLowerCase()
-  return msg.includes('timeout') || msg.includes('timed out')
-}
-
-function calculateExponentialBackoff(attempt: number, baseDelayMs: number = 5000): number {
-  // Exponential backoff: baseDelayMs * 2^(attempt)
-  // Cap at 5 minutes (300000ms)
-  return Math.min(baseDelayMs * Math.pow(2, attempt), 300000)
-}
-
-function calculateExponentialTimeout(attempt: number, baseTimeoutMs: number = 360000): number {
-  // Exponential timeout increase: baseTimeoutMs * 2^(attempt)
-  // Cap at 30 minutes (1800000ms)
-  return Math.min(baseTimeoutMs * Math.pow(2, attempt), 1800000)
-}
 
 export class MemoryController {
   static async processRawContent(req: AuthenticatedRequest, res: Response) {
@@ -146,8 +83,7 @@ export class MemoryController {
       if (duplicateCheck) {
         const merged = await memoryIngestionService.mergeDuplicateMemory(
           duplicateCheck.memory,
-          metadataPayload,
-          undefined
+          metadataPayload
         )
         const serializedExisting = {
           ...merged,
@@ -169,126 +105,11 @@ export class MemoryController {
         })
       }
 
-      const aiStart = Date.now()
-      logger.log('[memory/process] ai_start', {
-        ts: new Date().toISOString(),
-        tasks: ['extractContentMetadata'],
-      })
-      let extractedMetadataResult: unknown
-      const maxAiAttempts = 5
-      let lastAiError: unknown
-      let timeoutAttempt = 0 // Track consecutive timeout attempts for exponential increase
-      for (let attempt = 0; attempt < maxAiAttempts; attempt++) {
-        await memoryProcessingPauseService.waitIfPaused()
-        try {
-          // Calculate exponential timeout for this attempt
-          // First attempt uses base timeout, subsequent timeout retries use exponential increase
-          const timeoutMs = calculateExponentialTimeout(timeoutAttempt)
-          const timeoutOverride = timeoutAttempt > 0 ? timeoutMs : undefined
-
-          extractedMetadataResult = await aiProvider.extractContentMetadata(
-            content,
-            metadataPayload,
-            userId,
-            timeoutOverride
-          )
-          lastAiError = null
-          timeoutAttempt = 0 // Reset timeout attempt counter on success
-          break
-        } catch (aiError) {
-          lastAiError = aiError
-          const isTimeout = isTimeoutError(aiError)
-          const isOverloaded = isAiOverloadedError(aiError)
-
-          if (isOverloaded) {
-            const pauseInfo = memoryProcessingPauseService.pauseFor(
-              60_000,
-              extractAiErrorPayload(aiError)
-            )
-            logger.warn('[memory/process] ai_overloaded_pause', {
-              resumeAtIso: pauseInfo.resumeAtIso,
-              resumeAtPst: pauseInfo.resumeAtPst,
-              remainingMs: pauseInfo.remainingMs,
-              error: pauseInfo.metadata,
-              attempt,
-            })
-            await memoryProcessingPauseService.waitForResume()
-            continue
-          }
-
-          if (isTimeout && attempt < maxAiAttempts - 1) {
-            // Increment timeout attempt counter for exponential timeout increase
-            timeoutAttempt++
-
-            // Calculate exponential backoff delay
-            const backoffMs = calculateExponentialBackoff(attempt)
-            const nextTimeoutMs = calculateExponentialTimeout(timeoutAttempt)
-            logger.warn('[memory/process] timeout_retry', {
-              attempt: attempt + 1,
-              maxAttempts: maxAiAttempts,
-              backoffMs,
-              nextTimeoutMs,
-              timeoutAttempt,
-              error: aiError instanceof Error ? aiError.message : String(aiError),
-            })
-            // Wait before retrying with exponential backoff
-            await new Promise(resolve => setTimeout(resolve, backoffMs))
-            continue
-          }
-
-          throw aiError
-        }
-      }
-
-      if (lastAiError) {
-        throw lastAiError
-      }
-      type MetadataResult =
-        | {
-            topics?: string[]
-            categories?: string[]
-            keyPoints?: string[]
-            sentiment?: string
-            importance?: number
-            usefulness?: number
-            searchableTerms?: string[]
-            contextRelevance?: string[]
-          }
-        | { metadata?: MetadataResult }
-
-      let extractedMetadata: MetadataResult
-      if (
-        typeof extractedMetadataResult === 'object' &&
-        extractedMetadataResult !== null &&
-        'topics' in extractedMetadataResult
-      ) {
-        extractedMetadata = extractedMetadataResult as MetadataResult
-      } else if (
-        typeof extractedMetadataResult === 'object' &&
-        extractedMetadataResult !== null &&
-        'metadata' in extractedMetadataResult
-      ) {
-        extractedMetadata =
-          (extractedMetadataResult as { metadata?: MetadataResult }).metadata ||
-          (extractedMetadataResult as MetadataResult)
-      } else {
-        extractedMetadata = extractedMetadataResult as MetadataResult
-      }
-      logger.log('[memory/process] ai_done', {
-        ms: Date.now() - aiStart,
-        hasExtracted: !!extractedMetadata,
-      })
-
       const urlHash = hashUrl(url || 'unknown')
 
       const dbCreateStart = Date.now()
       let memory
       try {
-        const extractedMetadataRecord =
-          extractedMetadata && typeof extractedMetadata === 'object'
-            ? (extractedMetadata as Record<string, unknown>)
-            : undefined
-
         const memoryCreateInput = memoryIngestionService.buildMemoryCreatePayload({
           userId,
           title,
@@ -297,7 +118,6 @@ export class MemoryController {
           content,
           contentPreview: content.slice(0, 400),
           metadata: metadataPayload,
-          extractedMetadata: extractedMetadataRecord,
           canonicalText: canonicalData.canonicalText,
           canonicalHash: canonicalData.canonicalHash,
         })

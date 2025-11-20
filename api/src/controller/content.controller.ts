@@ -74,8 +74,7 @@ export const submitContent = async (
     if (duplicateCheck) {
       const merged = await memoryIngestionService.mergeDuplicateMemory(
         duplicateCheck.memory,
-        metadata,
-        undefined
+        metadata
       )
       const serializedExisting = {
         ...merged,

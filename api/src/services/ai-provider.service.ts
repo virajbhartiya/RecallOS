@@ -329,62 +329,6 @@ export const aiProvider = {
     return result
   },
 
-  async summarizeContent(
-    rawText: string,
-    metadata?: Record<string, unknown>,
-    userId?: string,
-    timeoutOverride?: number
-  ): Promise<string> {
-    let result: string
-    let modelUsed: string | undefined
-
-    if (provider === 'gemini') {
-      const response = await geminiService.summarizeContent(rawText, metadata, timeoutOverride)
-      result = response.text
-      modelUsed = response.modelUsed
-    } else {
-      const contentType = metadata?.content_type || 'web_page'
-      const title = metadata?.title || ''
-      const url = metadata?.url || ''
-      const contextSummary = metadata?.content_summary || ''
-      const prompt = `Summarize the following ${contentType} for storage in a personal memory graph. Be concise (<=200 words), capture key ideas, why it matters, and any actionable takeaways.
-
-CRITICAL: Return ONLY plain text content. Do not use any markdown formatting including:
-- No asterisks (*) for bold or italic text
-- No underscores (_) for emphasis
-- No backticks for code blocks
-- No hash symbols (#) for headers
-- No brackets [] or parentheses () for links
-- No special characters for formatting
-- No bullet points with dashes or asterisks
-- No numbered lists with special formatting
-
-Return clean, readable plain text only.
-
-Title: ${title}
-URL: ${url}
-Existing Summary: ${contextSummary}
-
-Text:
-${rawText}`
-      result = await this.generateContent(prompt, false, userId)
-    }
-
-    if (userId) {
-      const inputTokens = tokenTracking.estimateTokens(rawText)
-      const outputTokens = tokenTracking.estimateTokens(result)
-      await tokenTracking.recordTokenUsage({
-        userId,
-        operationType: 'generate_content',
-        inputTokens,
-        outputTokens,
-        modelUsed,
-      })
-    }
-
-    return result
-  },
-
   async extractContentMetadata(
     rawText: string,
     metadata?: Record<string, unknown>,
@@ -491,7 +435,7 @@ JSON ONLY:`
       const outputTokens = tokenTracking.estimateTokens(JSON.stringify(result))
       await tokenTracking.recordTokenUsage({
         userId,
-        operationType: 'extract_metadata',
+        operationType: 'generate_content',
         inputTokens,
         outputTokens,
         modelUsed,

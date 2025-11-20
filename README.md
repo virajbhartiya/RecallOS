@@ -218,7 +218,7 @@ Cognia provides multiple ways to capture and interact with your knowledge:
 - **Web Client**: Manual memory entry with rich editing and visualization tools
 - **SDK/MCP Integration**: Programmatic access for custom integrations and automation
 
-Once captured, memories are automatically processed with AI-powered summarization, metadata extraction, and vector embeddings. The system builds a knowledge graph connecting related memories through semantic, topical, and temporal relationships.
+Once captured, memories are automatically processed with canonicalization and vector embeddings. The system builds a knowledge graph connecting related memories through semantic, topical, and temporal relationships without storing separate summaries or AI-generated metadata.
 
 Search your knowledge base using natural language queries. The system performs semantic search across vector embeddings and generates AI-powered answers with inline citations to source memories. Results can be exported for use with ChatGPT or Claude.
 

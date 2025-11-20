@@ -21,12 +21,8 @@ const steps = [
     color: "green",
     title: "AI Understands",
     description:
-      "Our AI reads and understands the content, extracting key insights, metadata, and embeddings.",
-    features: [
-      "Rich metadata extraction",
-      "Key insights detection",
-      "Context understanding",
-    ],
+      "Our AI reads and understands the content, generating high-quality embeddings so everything stays searchable.",
+    features: ["Semantic embeddings", "Duplicate detection", "Context understanding"],
   },
   {
     number: 3,
@@ -45,8 +41,8 @@ const steps = [
     color: "orange",
     title: "Organizes Knowledge",
     description:
-      "Memories are structured with concise previews, metadata, and connections to related content.",
-    features: ["Clear previews", "Rich metadata", "Connected ideas"],
+      "Memories are structured with concise previews and connections to related content.",
+    features: ["Clear previews", "Connected ideas", "Fast lookup"],
   },
   {
     number: 5,
