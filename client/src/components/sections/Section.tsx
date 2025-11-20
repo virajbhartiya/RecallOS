@@ -18,7 +18,7 @@ export const Section: React.FC<SectionProps> = ({
   return (
     <section
       ref={ref}
-      className={`py-16 border-b border-gray-200 transition-all duration-1000 ${
+      className={`py-16 transition-all duration-1000 ${
         animate && isVisible
           ? "opacity-100 translate-y-0"
           : "opacity-0 translate-y-8"
