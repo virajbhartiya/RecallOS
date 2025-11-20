@@ -54,7 +54,6 @@ export class ProfileUpdateService {
         select: {
           id: true,
           title: true,
-          summary: true,
           content: true,
           created_at: true,
           page_metadata: true,

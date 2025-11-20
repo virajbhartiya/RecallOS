@@ -14,7 +14,6 @@ export type ExportBundle = {
     title: string | null
     url: string | null
     content: string
-    summary: string | null
     source: string
     timestamp: string
     created_at: string
@@ -53,7 +52,6 @@ export class ExportImportService {
             title: true,
             url: true,
             content: true,
-            summary: true,
             source: true,
             timestamp: true,
             created_at: true,
@@ -92,7 +90,6 @@ export class ExportImportService {
           title: m.title,
           url: m.url,
           content: m.content,
-          summary: m.summary,
           source: m.source,
           timestamp: m.timestamp.toString(),
           created_at: m.created_at.toISOString(),
@@ -165,7 +162,6 @@ export class ExportImportService {
               title: memory.title,
               url: memory.url,
               content: memory.content,
-              summary: memory.summary,
               source: memory.source,
               timestamp: BigInt(memory.timestamp),
               created_at: new Date(memory.created_at),

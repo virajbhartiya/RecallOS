@@ -15,7 +15,6 @@ export type Memory = {
   tx_status?: string | null
   blockchain_network?: string | null
   confirmed_at?: string | null
-  summary?: string | null
   content?: string | null
   source?: string | null
   page_metadata?: any
@@ -25,13 +24,13 @@ export type MemoryWithStats = Memory & { relation_stats?: { outgoing_relations: 
 
 export type MemoryMesh = { nodes: any[]; edges: any[]; clusters: Record<string, string[]>; metadata: { similarity_threshold: number; total_nodes: number; total_edges: number; average_connections: number } }
 
-export type MemorySnapshot = { id: string; summary: string; summary_hash: string; created_at: string; raw_text?: string; raw_text_length?: number }
+export type MemorySnapshot = { id: string; created_at: string; raw_text: string; raw_text_length?: number }
 
 export type Insights = { totalMemories: number; topTopics: Array<{ topic: string; count: number }>; topCategories: Array<{ category: string; count: number }>; sentimentDistribution: Record<string, number>; sourceDistribution: Record<string, number>; transactionStatusDistribution: Record<string, number>; averageImportance: number; insights: { mostActiveCategory: string; mostCommonTopic: string; dominantSentiment: string } }
 
 export type TransactionStats = Record<string, number>
 
-export type SearchPostResponse = { query: string; results: Array<{ memory_id: string; title: string | null; summary: string | null; url: string | null; timestamp: number; related_memories: string[]; score: number }>; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; job_id: string }
+export type SearchPostResponse = { query: string; results: Array<{ memory_id: string; title: string | null; content_preview: string; url: string | null; timestamp: number; related_memories: string[]; score: number }>; meta_summary?: string; answer?: string; citations?: Array<{ label: number; memory_id: string; title: string | null; url: string | null }>; job_id: string }
 
 export type SearchJob = { id: string; status: 'pending' | 'completed' | 'failed'; answer?: string; meta_summary?: string; created_at: number }
 

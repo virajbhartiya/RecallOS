@@ -635,8 +635,8 @@ Return ONLY the JSON object:`
   }
 
   async evaluateMemoryRelationship(
-    memoryA: { title?: string; summary?: string; topics?: string[]; categories?: string[] },
-    memoryB: { title?: string; summary?: string; topics?: string[]; categories?: string[] }
+    memoryA: { title?: string; content?: string; topics?: string[]; categories?: string[] },
+    memoryB: { title?: string; content?: string; topics?: string[]; categories?: string[] }
   ): Promise<{
     isRelevant: boolean
     relevanceScore: number
@@ -652,13 +652,13 @@ Cognia Memory Relationship Evaluation
 
 Memory A:
 Title: ${memoryA.title || 'N/A'}
-Summary: ${memoryA.summary || 'N/A'}
+Content: ${memoryA.content || 'N/A'}
 Topics: ${memoryA.topics?.join(', ') || 'N/A'}
 Categories: ${memoryA.categories?.join(', ') || 'N/A'}
 
 Memory B:
 Title: ${memoryB.title || 'N/A'}
-Summary: ${memoryB.summary || 'N/A'}
+Content: ${memoryB.content || 'N/A'}
 Topics: ${memoryB.topics?.join(', ') || 'N/A'}
 Categories: ${memoryB.categories?.join(', ') || 'N/A'}
 

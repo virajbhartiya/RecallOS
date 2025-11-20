@@ -9,7 +9,7 @@ export class ContentClient {
   }
 
   getSummarizedContent(userId: string, opts?: { page?: number; limit?: number }) {
-    return this.http.get<ApiResponse<{ content: Array<{ id: string; summary: string; created_at: string; original_text: string; original_text_length: number; title?: string | null; url?: string | null }>; pagination: Pagination }>>(`/api/content/user/${encodeURIComponent(userId)}`, opts as any)
+    return this.http.get<ApiResponse<{ content: Array<{ id: string; created_at: string; original_text: string; original_text_length: number; preview: string; title?: string | null; url?: string | null }>; pagination: Pagination }>>(`/api/content/user/${encodeURIComponent(userId)}`, opts as any)
   }
 }
 

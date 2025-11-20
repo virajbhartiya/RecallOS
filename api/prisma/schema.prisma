@@ -61,7 +61,6 @@ model Memory {
   url                    String?
   title                  String?
   content                String
-  summary                String?
   canonical_text         String?
   canonical_hash         String?
   memory_type            MemoryType           @default(LOG_EVENT)
@@ -111,8 +110,6 @@ model MemorySnapshot {
   id           String   @id @default(uuid()) @db.Uuid
   user_id      String   @db.Uuid
   raw_text     String
-  summary      String
-  summary_hash String   @unique
   created_at   DateTime @default(now())
   user         User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 

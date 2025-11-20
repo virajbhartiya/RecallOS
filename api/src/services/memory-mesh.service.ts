@@ -11,12 +11,12 @@ import {
 import { randomUUID } from 'crypto'
 import { logger } from '../utils/logger.util'
 import { GEMINI_EMBED_MODEL } from './gemini.service'
+import { buildContentPreview } from '../utils/text.util'
 
 type MemoryWithMetadata = Prisma.MemoryGetPayload<{
   select: {
     id: true
     title: true
-    summary: true
     content: true
     canonical_text: true
     url: true
@@ -66,7 +66,7 @@ type BatchData = {
   memoryB: {
     id: string
     title: string
-    summary: string
+    preview: string
     topics?: string[]
     categories?: string[]
   }
@@ -114,12 +114,6 @@ export class MemoryMeshService {
       if (canonicalContent) {
         embeddingPromises.push(
           this.createEmbedding(memoryId, memory.user_id, canonicalContent, 'content')
-        )
-      }
-
-      if (memory.summary) {
-        embeddingPromises.push(
-          this.createEmbedding(memoryId, memory.user_id, memory.summary, 'summary')
         )
       }
 
@@ -920,9 +914,12 @@ export class MemoryMeshService {
     try {
       // Batch evaluation to reduce API calls
       const memoryMetadata = memory.page_metadata as Record<string, unknown> | null
+      const memoryPreview = buildContentPreview(
+        memory.canonical_text || memory.content || memory.title || ''
+      )
       const memoryA = {
         title: memory.title || '',
-        summary: memory.summary || '',
+        preview: memoryPreview,
         topics: (Array.isArray(memoryMetadata?.topics) ? memoryMetadata.topics : []) as string[],
         categories: (Array.isArray(memoryMetadata?.categories)
           ? memoryMetadata.categories
@@ -935,7 +932,12 @@ export class MemoryMeshService {
           memoryB: {
             id: candidate.memory.id,
             title: candidate.memory.title || '',
-            summary: candidate.memory.summary || '',
+            preview: buildContentPreview(
+              candidate.memory.canonical_text ||
+                candidate.memory.content ||
+                candidate.memory.title ||
+                ''
+            ),
             topics: (Array.isArray(candidateMetadata?.topics)
               ? candidateMetadata.topics
               : []) as string[],
@@ -972,7 +974,7 @@ export class MemoryMeshService {
   }
 
   private async batchEvaluateRelationships(
-    memoryA: { title: string; summary: string; topics?: string[]; categories?: string[] },
+    memoryA: { title: string; preview: string; topics?: string[]; categories?: string[] },
     batchData: BatchData[]
   ): Promise<RelationshipEvaluation[]> {
     if (!aiProvider.isInitialized) {
@@ -1046,7 +1048,7 @@ export class MemoryMeshService {
   }
 
   private async callAIForBatch(
-    memoryA: { title: string; summary: string; topics?: string[]; categories?: string[] },
+    memoryA: { title: string; preview: string; topics?: string[]; categories?: string[] },
     batchData: BatchData[]
   ): Promise<RelationshipEvaluation[]> {
     try {
@@ -1056,7 +1058,7 @@ CRITICAL: Return ONLY valid JSON. No explanations, no markdown formatting, no co
 
 Source Memory:
 Title: ${memoryA.title || 'N/A'}
-Summary: ${memoryA.summary || 'N/A'}
+Content: ${memoryA.preview || 'N/A'}
 Topics: ${memoryA.topics?.join(', ') || 'N/A'}
 Categories: ${memoryA.categories?.join(', ') || 'N/A'}
 
@@ -1066,7 +1068,7 @@ ${batchData
     (item, index) => `
 ${index + 1}. Memory ID: ${item.memoryB.id}
    Title: ${item.memoryB.title || 'N/A'}
-   Summary: ${item.memoryB.summary || 'N/A'}
+   Content: ${item.memoryB.preview || 'N/A'}
    Topics: ${item.memoryB.topics?.join(', ') || 'N/A'}
    Categories: ${item.memoryB.categories?.join(', ') || 'N/A'}
 `
@@ -1461,7 +1463,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           title: boolean
           url: boolean
           created_at: boolean
-          summary: boolean
           source: boolean
           timestamp: boolean
           importance_score: boolean
@@ -1478,7 +1479,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           title: true,
           url: true,
           created_at: true,
-          summary: true,
           source: true,
           timestamp: true,
           importance_score: true,
@@ -1526,13 +1526,17 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           z = jz * 300
         }
 
+        const preview = buildContentPreview(
+          memory.canonical_text || memory.content || memory.title || ''
+        )
+
         return {
           id: memory.id,
           type: memory.source || 'extension',
-          label: memory.title || memory.summary?.substring(0, 20) || 'Memory',
+          label: memory.title || preview.substring(0, 20) || 'Memory',
           memory_id: memory.id,
           title: memory.title,
-          summary: memory.summary,
+          preview,
           url: memory.url,
           source: memory.source || 'extension',
           timestamp: memory.timestamp,
@@ -1847,7 +1851,7 @@ Be strict about relevance - only mark as relevant if there's substantial concept
           title: n.title,
           url: n.url,
           source: n.source,
-          summary: n.summary,
+          preview: n.preview,
           importance_score: n.importance_score,
           hasEmbedding: n.hasEmbedding,
           clusterId: n.clusterId,
@@ -1942,7 +1946,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
             if (!fullMemory) return null
 
             const title = (fullMemory.title || '').toLowerCase()
-            const summary = (fullMemory.summary || '').toLowerCase()
             const content = (fullMemory.content || '').toLowerCase()
 
             let keywordBonus = 0
@@ -1954,12 +1957,8 @@ Be strict about relevance - only mark as relevant if there's substantial concept
                 keywordBonus += 0.15
                 matchedTokens++
               }
-              if (tokenRegex.test(summary)) {
-                keywordBonus += 0.1
-                matchedTokens++
-              }
               if (tokenRegex.test(content)) {
-                keywordBonus += 0.05
+                keywordBonus += 0.1
                 matchedTokens++
               }
             }
@@ -1986,13 +1985,13 @@ Be strict about relevance - only mark as relevant if there's substantial concept
         return scoredResults
       }
 
-      // Fallback: keyword search on metadata/title/summary
+      // Fallback: keyword search on metadata/title/content
       const memories = await prisma.memory.findMany({
         where: {
           user_id: userId,
           OR: [
             { title: { contains: query, mode: 'insensitive' } },
-            { summary: { contains: query, mode: 'insensitive' } },
+            { content: { contains: query, mode: 'insensitive' } },
             { page_metadata: { path: ['topics'], array_contains: [query] } },
             { page_metadata: { path: ['categories'], array_contains: [query] } },
             { page_metadata: { path: ['searchableTerms'], array_contains: [query] } },
@@ -2035,7 +2034,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
                   title: true,
                   url: true,
                   created_at: true,
-                  summary: true,
                   page_metadata: true,
                 },
               },
@@ -2050,7 +2048,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
                   title: true,
                   url: true,
                   created_at: true,
-                  summary: true,
                   page_metadata: true,
                 },
               },
@@ -2119,7 +2116,6 @@ Be strict about relevance - only mark as relevant if there's substantial concept
                     title: true,
                     url: true,
                     created_at: true,
-                    summary: true,
                   },
                 },
               },

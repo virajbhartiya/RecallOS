@@ -4,7 +4,7 @@ import { RetrievalPolicy } from './retrieval-policy.service'
 export type ContextItem = {
   id: string
   title: string | null
-  summary: string | null
+  preview: string | null
   url: string | null
   memory_type: MemoryType | null
   importance_score?: number | null
@@ -16,7 +16,7 @@ export type ContextBlock = {
   items: Array<{
     id: string
     title: string | null
-    summary: string | null
+    preview: string | null
     url: string | null
     importance_score?: number | null
     created_at?: Date
@@ -75,7 +75,7 @@ export function buildContextFromResults(options: {
         items: blockItems.map(item => ({
           id: item.id,
           title: item.title,
-          summary: item.summary,
+          preview: item.preview,
           url: item.url,
           importance_score: item.importance_score,
           created_at: item.created_at,
@@ -90,7 +90,7 @@ export function buildContextFromResults(options: {
       items: sorted.slice(0, policy.maxResults).map(item => ({
         id: item.id,
         title: item.title,
-        summary: item.summary,
+        preview: item.preview,
         url: item.url,
         importance_score: item.importance_score,
         created_at: item.created_at,
@@ -108,8 +108,8 @@ export function buildContextFromResults(options: {
       .map((item, idx) => {
         const dateText = item.created_at ? ` (${item.created_at.toISOString().slice(0, 10)})` : ''
         const title = item.title ? `${item.title}` : 'Untitled'
-        const summary = item.summary || ''
-        return `${idx + 1}. ${title}${dateText} — ${summary}`
+        const preview = item.preview || ''
+        return `${idx + 1}. ${title}${dateText} — ${preview}`
       })
       .join('\n')
     contextParts.push(`${block.label}:\n${blockText}`)

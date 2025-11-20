@@ -82,7 +82,7 @@ export class ProfileExtractionService {
     memories: Array<{
       id: string
       title: string | null
-      summary: string | null
+      content_preview?: string | null
       content: string
       created_at: Date
       page_metadata: Prisma.JsonValue
@@ -126,7 +126,7 @@ export class ProfileExtractionService {
     memories: Array<{
       id: string
       title: string | null
-      summary: string | null
+      content_preview?: string | null
       content: string
       created_at: Date
       page_metadata: Prisma.JsonValue
@@ -147,12 +147,12 @@ export class ProfileExtractionService {
           ? metadata.categories.filter((c): c is string => typeof c === 'string').join(', ')
           : 'N/A'
 
+        const preview = m.content_preview || m.content.substring(0, 200)
         return `Memory ${idx + 1} (${daysAgo} days ago${isRecent ? ', RECENT' : ''}):
 Title: ${m.title || 'Untitled'}
-Summary: ${m.summary || 'No summary'}
 Topics: ${topics}
 Categories: ${categories}
-Content preview: ${m.content.substring(0, 200)}...`
+Content preview: ${preview}...`
       })
       .join('\n\n')
 
@@ -482,7 +482,7 @@ Return ONLY the JSON object:`
     memories: Array<{
       id: string
       title: string | null
-      summary: string | null
+      content_preview?: string | null
       content: string
       created_at: Date
       page_metadata: Prisma.JsonValue

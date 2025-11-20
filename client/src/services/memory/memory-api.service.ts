@@ -9,7 +9,6 @@ interface ApiMemoryResponse {
   timestamp: string | number
   created_at?: string
   title?: string
-  summary?: string
   content?: string
   source?: string
   url?: string
@@ -71,10 +70,6 @@ export async function getRecentMemories(count: number = 10): Promise<Memory[]> {
         return {
           ...transformed,
           hash: mem.hash || transformed.hash,
-          summary:
-            mem.summary ||
-            transformed.summary ||
-            `Memory stored at ${new Date((typeof mem.timestamp === "string" ? parseInt(mem.timestamp) : mem.timestamp) * 1000).toLocaleDateString()}`,
         }
       })
     }

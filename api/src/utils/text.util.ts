@@ -54,3 +54,8 @@ export function calculateSimilarity(text1: string, text2: string): number {
 
   return intersection.size / union.size
 }
+
+export function buildContentPreview(text: string | null | undefined, length: number = 400): string {
+  if (!text) return ''
+  return text.replace(/\s+/g, ' ').trim().slice(0, length)
+}

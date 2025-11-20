@@ -11,7 +11,7 @@ export class MemoryRedactionService {
   async redactMemoryFields(
     userId: string,
     memoryId: string,
-    fieldsToRedact: Array<'url' | 'content' | 'title' | 'summary'>,
+    fieldsToRedact: Array<'url' | 'content' | 'title'>,
     options?: { ipAddress?: string; userAgent?: string }
   ) {
     const memory = await prisma.memory.findUnique({
@@ -30,10 +30,6 @@ export class MemoryRedactionService {
 
     if (fieldsToRedact.includes('title')) {
       updates.title = '[REDACTED]'
-    }
-
-    if (fieldsToRedact.includes('summary')) {
-      updates.summary = '[REDACTED]'
     }
 
     if (fieldsToRedact.includes('content')) {
@@ -80,7 +76,7 @@ export class MemoryRedactionService {
   async redactDomainMemories(
     userId: string,
     domain: string,
-    fieldsToRedact: Array<'url' | 'content' | 'title' | 'summary'>,
+    fieldsToRedact: Array<'url' | 'content' | 'title'>,
     options?: { ipAddress?: string; userAgent?: string }
   ) {
     const memories = await prisma.memory.findMany({

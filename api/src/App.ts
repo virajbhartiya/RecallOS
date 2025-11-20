@@ -9,8 +9,6 @@ import compression from 'compression'
 import cookieParser from 'cookie-parser'
 
 import http from 'http'
-import fs from 'fs'
-import https from 'https'
 
 import dotenv from 'dotenv'
 
@@ -43,22 +41,7 @@ app.get('/health', (_req: Request, res: Response) => {
   })
 })
 
-let server: http.Server | https.Server
-if (process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true') {
-  try {
-    const keyPath = process.env.HTTPS_KEY_PATH || './certs/api.cognia.test+3-key.pem'
-    const certPath = process.env.HTTPS_CERT_PATH || './certs/api.cognia.test+3.pem'
-    const httpsOptions = {
-      key: fs.readFileSync(keyPath),
-      cert: fs.readFileSync(certPath),
-    }
-    server = https.createServer(httpsOptions, app)
-  } catch {
-    server = http.createServer(app)
-  }
-} else {
-  server = http.createServer(app)
-}
+const server = http.createServer(app)
 
 const port = process.env.PORT || 3000
 
@@ -289,8 +272,7 @@ async function testDatabaseConnection() {
 }
 
 server.listen(port, async () => {
-  const protocol =
-    process.env.NODE_ENV !== 'production' && process.env.HTTPS_ENABLE === 'true' ? 'https' : 'http'
+  const protocol = 'http'
   await testDatabaseConnection()
   logger.log('[startup] database_connected')
   try {

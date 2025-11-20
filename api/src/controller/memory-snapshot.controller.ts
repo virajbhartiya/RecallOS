@@ -1,6 +1,5 @@
 import { Response } from 'express'
 import { AuthenticatedRequest } from '../middleware/auth.middleware'
-import { createHash } from 'crypto'
 import { prisma } from '../lib/prisma.lib'
 import { logger } from '../utils/logger.util'
 
@@ -30,8 +29,6 @@ export class MemorySnapshotController {
           take: Number(limit),
           select: {
             id: true,
-            summary: true,
-            summary_hash: true,
             created_at: true,
             raw_text: true,
           },
@@ -94,8 +91,6 @@ export class MemorySnapshotController {
         },
         select: {
           id: true,
-          summary: true,
-          summary_hash: true,
           created_at: true,
           raw_text: true,
         },
@@ -140,12 +135,10 @@ export class MemorySnapshotController {
       const memoriesWithoutSnapshots = await prisma.memory.findMany({
         where: {
           user_id: user.id,
-          summary: { not: null },
         },
         select: {
           id: true,
           content: true,
-          summary: true,
         },
       })
 
@@ -158,19 +151,15 @@ export class MemorySnapshotController {
           const existingSnapshot = await prisma.memorySnapshot.findFirst({
             where: {
               user_id: user.id,
-              summary: memory.summary,
+              raw_text: memory.content,
             },
           })
 
           if (!existingSnapshot) {
-            const summaryHash = '0x' + createHash('sha256').update(memory.summary!).digest('hex')
-
             await prisma.memorySnapshot.create({
               data: {
                 user_id: user.id,
                 raw_text: memory.content,
-                summary: memory.summary!,
-                summary_hash: summaryHash,
               },
             })
             createdCount++

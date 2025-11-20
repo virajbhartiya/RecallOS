@@ -11,7 +11,7 @@ import { requireAuthToken } from "../utils/user-id.util"
 type ApiSearchResult = {
   memory_id: string
   title: string | null
-  summary: string | null
+  content_preview: string | null
   url: string | null
   timestamp: number
   related_memories: string[]
@@ -124,7 +124,6 @@ export class SearchService {
           url: r.url || undefined,
           title: r.title || "Untitled Memory",
           content: "",
-          summary: r.summary || undefined,
           timestamp: r.timestamp,
           created_at: createdAtIso,
           page_metadata: undefined,

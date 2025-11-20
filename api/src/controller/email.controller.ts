@@ -154,7 +154,7 @@ export const draftEmailReply = async (
               const date = mem.timestamp
                 ? new Date(mem.timestamp * 1000).toISOString().slice(0, 10)
                 : ''
-              return `[${idx + 1}] ${date}: ${mem.title || 'Untitled'} - ${mem.summary || ''}`
+              return `[${idx + 1}] ${date}: ${mem.title || 'Untitled'} - ${mem.content_preview || ''}`
             })
             .join('\n')
 

@@ -4,16 +4,11 @@ import { SearchService } from "@/services/search.service"
 import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
 
-import type {
-  Memory,
-  MemorySearchResponse,
-  SearchFilters,
-} from "@/types/memory.type"
-import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { MemoryDialog } from "@/components/MemoryDialog"
+import type { Memory, MemorySearchResponse } from "@/types/memory.type"
 import { MemoryMesh3D } from "@/components/MemoryMesh3D"
 import { PageHeader } from "@/components/PageHeader"
 import { PendingJobsPanel } from "@/components/PendingJobsPanel"
+import { SpotlightSearch } from "@/components/SpotlightSearch"
 
 export const Memories: React.FC = () => {
   const navigate = useNavigate()
@@ -33,46 +28,28 @@ export const Memories: React.FC = () => {
   const similarityThreshold = 0.3
   const [clickedNodeId, setClickedNodeId] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isSpotlightOpen, setIsSpotlightOpen] = useState(false)
   const [isPendingJobsOpen, setIsPendingJobsOpen] = useState(false)
-  const [listSearchQuery, setListSearchQuery] = useState("")
-  const [dialogSearchResults, setDialogSearchResults] =
+  const [spotlightSearchQuery, setSpotlightSearchQuery] = useState("")
+  const [spotlightSearchResults, setSpotlightSearchResults] =
     useState<MemorySearchResponse | null>(null)
-  const [dialogSearchAnswer, setDialogSearchAnswer] = useState<string | null>(
-    null
-  )
-  const [dialogSearchCitations, setDialogSearchCitations] = useState<Array<{
-    label: number
-    memory_id: string
-    title: string | null
-    url: string | null
-  }> | null>(null)
-  const [dialogSearchJobId, setDialogSearchJobId] = useState<string | null>(
-    null
-  )
-  const [dialogIsSearching, setDialogIsSearching] = useState(false)
-  const [dialogEmbeddingOnly, setDialogEmbeddingOnly] = useState(true)
-  const dialogAbortControllerRef = useRef<AbortController | null>(null)
-  const dialogDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-
-  const [searchResults, setSearchResults] =
-    useState<MemorySearchResponse | null>(null)
-  const [searchAnswer, setSearchAnswer] = useState<string | null>(null)
-
-  const [searchJobId, setSearchJobId] = useState<string | null>(null)
-  const [isSearchMode, setIsSearchMode] = useState(false)
-
-  const [searchQuery, setSearchQuery] = useState<string>("")
-  const [deleteConfirm, setDeleteConfirm] = useState<{
-    isOpen: boolean
-    memoryId: string | null
-  }>({
-    isOpen: false,
-    memoryId: null,
-  })
-
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const abortControllerRef = useRef<AbortController | null>(null)
+  const [spotlightSearchAnswer, setSpotlightSearchAnswer] = useState<
+    string | null
+  >(null)
+  const [spotlightSearchCitations, setSpotlightSearchCitations] =
+    useState<Array<{
+      label: number
+      memory_id: string
+      title: string | null
+      url: string | null
+    }> | null>(null)
+  const [spotlightSearchJobId, setSpotlightSearchJobId] = useState<
+    string | null
+  >(null)
+  const [spotlightIsSearching, setSpotlightIsSearching] = useState(false)
+  const [spotlightEmbeddingOnly, setSpotlightEmbeddingOnly] = useState(true)
+  const spotlightAbortControllerRef = useRef<AbortController | null>(null)
+  const spotlightDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchMemories = useCallback(async () => {
     try {
@@ -91,181 +68,38 @@ export const Memories: React.FC = () => {
     }
   }, [])
 
-  const handleDeleteMemoryClick = useCallback((memoryId: string) => {
-    setDeleteConfirm({ isOpen: true, memoryId })
-  }, [])
-
-  const handleDeleteMemoryConfirm = useCallback(async () => {
-    if (!deleteConfirm.memoryId) return
-
-    const memoryId = deleteConfirm.memoryId
-    setDeleteConfirm({ isOpen: false, memoryId: null })
-
-    try {
-      requireAuthToken()
-      await MemoryService.deleteMemory(memoryId)
-
-      if (selectedMemory?.id === memoryId) {
-        setSelectedMemory(null)
-        setClickedNodeId(null)
-      }
-
-      await fetchMemories()
-    } catch (err) {
-      const error = err as { message?: string }
-      console.error("Error deleting memory:", err)
-      alert(error.message || "Failed to delete memory")
-    }
-  }, [deleteConfirm.memoryId, selectedMemory, fetchMemories])
-
   const handleNodeClick = useCallback(
     (memoryId: string) => {
       const memoryInfo = memories.find((m) => m.id === memoryId)
       if (memoryInfo) {
         setSelectedMemory(memoryInfo)
-        setIsDialogOpen(true)
-        setListSearchQuery("")
-        setDialogSearchResults(null)
-        setDialogSearchAnswer(null)
-        setDialogSearchCitations(null)
       }
       setClickedNodeId(memoryId)
     },
     [memories]
   )
 
-  const selectMemoryById = useCallback(
-    (memoryId: string) => {
-      const mem =
-        memories.find((m) => m.id === memoryId) ||
-        dialogSearchResults?.results?.find((r) => r.memory.id === memoryId)
-          ?.memory
-      if (mem) {
-        setSelectedMemory(mem)
-        setClickedNodeId(mem.id)
-      }
-    },
-    [memories, dialogSearchResults]
-  )
-
-  const handleSearch = useCallback(
-    async (query: string, filters: SearchFilters) => {
-      if (!query.trim()) return
-
-      // Cancel any existing search
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-
-      abortControllerRef.current = new AbortController()
-
-      setSearchResults(null)
-      setIsSearchMode(true)
-      setSearchAnswer(null)
-
-      try {
-        const signal = abortControllerRef.current?.signal
-
-        // Require authentication
-        requireAuthToken()
-
-        // Use the working /api/search endpoint for all searches
-        const response = await MemoryService.searchMemories(
-          query,
-          filters,
-          1,
-          50,
-          signal
-        )
-
-        // Check if the search was aborted before setting results
-        if (signal?.aborted) return
-
-        // Set all the response data immediately
-        setSearchResults(response)
-        setSearchAnswer(response.answer || null)
-
-        // Only set job_id for polling if we don't have an immediate answer
-        if (response.job_id && !response.answer) {
-          setSearchJobId(response.job_id)
-        } else {
-          setSearchJobId(null)
-        }
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
-          return
-        }
-        // Only set error if not aborted
-        if (!abortControllerRef.current?.signal.aborted) {
-          // Error handling can be added here if needed
-        }
-      } finally {
-        // Only set searching to false if not aborted
-        if (!abortControllerRef.current?.signal.aborted) {
-          // Cleanup can be added here if needed
-        }
-      }
-    },
-    []
-  )
-
-  const handleClearSearch = useCallback(() => {
-    setSearchResults(null)
-    setSearchAnswer(null)
-    setSearchJobId(null)
-    setIsSearchMode(false)
-    setSearchQuery("")
-  }, [])
-
-  // Poll for async LLM answer if job id present (only if answer not already available)
-  useEffect(() => {
-    if (!searchJobId || searchAnswer) return
-    let cancelled = false
-    const interval = setInterval(async () => {
-      try {
-        const status = await SearchService.getJob(searchJobId)
-        if (cancelled) return
-        if (status.status === "completed") {
-          if (status.answer) {
-            setSearchAnswer(status.answer)
-          }
-          clearInterval(interval)
-          setSearchJobId(null)
-        } else if (status.status === "failed") {
-          clearInterval(interval)
-          setSearchJobId(null)
-        }
-      } catch {
-        // ignore polling errors
-      }
-    }, 1500)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [searchJobId, searchAnswer, searchResults])
-
-  // Dialog search handler
-  const handleDialogSearch = useCallback(
+  // Spotlight search handler
+  const handleSpotlightSearch = useCallback(
     async (query: string) => {
       if (!query.trim()) {
-        setDialogSearchResults(null)
-        setDialogSearchAnswer(null)
-        setDialogSearchCitations(null)
-        setDialogIsSearching(false)
+        setSpotlightSearchResults(null)
+        setSpotlightSearchAnswer(null)
+        setSpotlightSearchCitations(null)
+        setSpotlightIsSearching(false)
         return
       }
 
       // Cancel any existing search
-      if (dialogAbortControllerRef.current) {
-        dialogAbortControllerRef.current.abort()
+      if (spotlightAbortControllerRef.current) {
+        spotlightAbortControllerRef.current.abort()
       }
 
-      dialogAbortControllerRef.current = new AbortController()
-      setDialogIsSearching(true)
+      spotlightAbortControllerRef.current = new AbortController()
+      setSpotlightIsSearching(true)
 
       try {
-        const signal = dialogAbortControllerRef.current?.signal
+        const signal = spotlightAbortControllerRef.current?.signal
         requireAuthToken()
 
         const response = await MemoryService.searchMemories(
@@ -275,19 +109,19 @@ export const Memories: React.FC = () => {
           50,
           signal,
           undefined,
-          dialogEmbeddingOnly
+          spotlightEmbeddingOnly
         )
 
         if (signal?.aborted) return
 
-        setDialogSearchResults(response)
-        setDialogSearchAnswer(response.answer || null)
-        setDialogSearchCitations(response.citations || null)
+        setSpotlightSearchResults(response)
+        setSpotlightSearchAnswer(response.answer || null)
+        setSpotlightSearchCitations(response.citations || null)
 
         if (response.job_id && !response.answer) {
-          setDialogSearchJobId(response.job_id)
+          setSpotlightSearchJobId(response.job_id)
         } else {
-          setDialogSearchJobId(null)
+          setSpotlightSearchJobId(null)
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
@@ -295,56 +129,56 @@ export const Memories: React.FC = () => {
         }
         // Error handling - could show error state here if needed
       } finally {
-        if (!dialogAbortControllerRef.current?.signal.aborted) {
-          setDialogIsSearching(false)
+        if (!spotlightAbortControllerRef.current?.signal.aborted) {
+          setSpotlightIsSearching(false)
         }
       }
     },
-    [dialogEmbeddingOnly]
+    [spotlightEmbeddingOnly]
   )
 
-  // Debounced dialog search effect
+  // Debounced spotlight search effect
   useEffect(() => {
-    if (dialogDebounceTimeoutRef.current) {
-      clearTimeout(dialogDebounceTimeoutRef.current)
+    if (spotlightDebounceTimeoutRef.current) {
+      clearTimeout(spotlightDebounceTimeoutRef.current)
     }
 
-    if (!listSearchQuery.trim()) {
-      setDialogSearchResults(null)
-      setDialogSearchAnswer(null)
-      setDialogSearchCitations(null)
+    if (!spotlightSearchQuery.trim()) {
+      setSpotlightSearchResults(null)
+      setSpotlightSearchAnswer(null)
+      setSpotlightSearchCitations(null)
       return
     }
 
-    dialogDebounceTimeoutRef.current = setTimeout(() => {
-      if (listSearchQuery.trim()) {
-        handleDialogSearch(listSearchQuery.trim())
+    spotlightDebounceTimeoutRef.current = setTimeout(() => {
+      if (spotlightSearchQuery.trim()) {
+        handleSpotlightSearch(spotlightSearchQuery.trim())
       }
     }, 800)
 
     return () => {
-      if (dialogDebounceTimeoutRef.current) {
-        clearTimeout(dialogDebounceTimeoutRef.current)
+      if (spotlightDebounceTimeoutRef.current) {
+        clearTimeout(spotlightDebounceTimeoutRef.current)
       }
     }
-  }, [listSearchQuery, handleDialogSearch, dialogEmbeddingOnly])
+  }, [spotlightSearchQuery, handleSpotlightSearch, spotlightEmbeddingOnly])
 
-  // Poll for async LLM answer in dialog
+  // Poll for async LLM answer in spotlight
   useEffect(() => {
-    if (!dialogSearchJobId || dialogSearchAnswer) return
+    if (!spotlightSearchJobId || spotlightSearchAnswer) return
     let cancelled = false
     const interval = setInterval(async () => {
       try {
-        const status = await SearchService.getJob(dialogSearchJobId)
+        const status = await SearchService.getJob(spotlightSearchJobId)
         if (cancelled) return
         if (status.status === "completed") {
-          if (status.answer) setDialogSearchAnswer(status.answer)
-          if (status.citations) setDialogSearchCitations(status.citations)
+          if (status.answer) setSpotlightSearchAnswer(status.answer)
+          if (status.citations) setSpotlightSearchCitations(status.citations)
           clearInterval(interval)
-          setDialogSearchJobId(null)
+          setSpotlightSearchJobId(null)
         } else if (status.status === "failed") {
           clearInterval(interval)
-          setDialogSearchJobId(null)
+          setSpotlightSearchJobId(null)
         }
       } catch {
         // ignore polling errors
@@ -354,49 +188,31 @@ export const Memories: React.FC = () => {
       cancelled = true
       clearInterval(interval)
     }
-  }, [dialogSearchJobId, dialogSearchAnswer])
-
-  // Debounced search effect
-  useEffect(() => {
-    // Clear existing timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current)
-    }
-
-    // If search query is empty, clear search immediately
-    if (!searchQuery.trim()) {
-      handleClearSearch()
-      return
-    }
-
-    // Set new timeout for debounced search
-    debounceTimeoutRef.current = setTimeout(() => {
-      // Only search if the query is still non-empty (user hasn't cleared it)
-      if (searchQuery.trim()) {
-        handleSearch(searchQuery.trim(), {})
-      }
-    }, 800) // Increased debounce time to 800ms for better UX
-
-    // Cleanup function
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current)
-      }
-    }
-  }, [searchQuery, handleSearch, handleClearSearch])
+  }, [spotlightSearchJobId, spotlightSearchAnswer])
 
   useEffect(() => {
     fetchMemories()
   }, [fetchMemories])
 
+  // Keyboard shortcut to open spotlight (Cmd+K or Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        setIsSpotlightOpen(true)
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown)
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [])
+
   // Cleanup effect to cancel any pending requests when component unmounts
   useEffect(() => {
     return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort()
-      }
-      if (dialogAbortControllerRef.current) {
-        dialogAbortControllerRef.current.abort()
+      if (spotlightAbortControllerRef.current) {
+        spotlightAbortControllerRef.current.abort()
       }
     }
   }, [])
@@ -444,9 +260,9 @@ export const Memories: React.FC = () => {
             similarityThreshold={similarityThreshold}
             selectedMemoryId={clickedNodeId || undefined}
             highlightedMemoryIds={[
-              ...(isSearchMode && searchResults && searchResults.results
-                ? searchResults.results.map((r) => r.memory.id)
-                : []),
+              ...(spotlightSearchResults?.results || []).map(
+                (r) => r.memory.id
+              ),
               ...(clickedNodeId ? [clickedNodeId] : []),
               ...(selectedMemory ? [selectedMemory.id] : []),
             ]}
@@ -455,7 +271,7 @@ export const Memories: React.FC = () => {
                 memories.map((m) => [m.id, m.source || ""])
               ),
               ...Object.fromEntries(
-                (searchResults?.results || []).map((r) => [
+                (spotlightSearchResults?.results || []).map((r) => [
                   r.memory.id,
                   r.memory.source || "",
                 ])
@@ -464,7 +280,7 @@ export const Memories: React.FC = () => {
             memoryUrls={{
               ...Object.fromEntries(memories.map((m) => [m.id, m.url || ""])),
               ...Object.fromEntries(
-                (searchResults?.results || []).map((r) => [
+                (spotlightSearchResults?.results || []).map((r) => [
                   r.memory.id,
                   r.memory.url || "",
                 ])
@@ -486,17 +302,15 @@ export const Memories: React.FC = () => {
                 </span>
                 <button
                   onClick={() => {
-                    setIsDialogOpen(true)
-                    setListSearchQuery("")
-                    setDialogSearchResults(null)
-                    setDialogSearchAnswer(null)
-                    setDialogSearchCitations(null)
-                    setSelectedMemory(null)
-                    setClickedNodeId(null)
+                    setIsSpotlightOpen(true)
+                    setSpotlightSearchQuery("")
+                    setSpotlightSearchResults(null)
+                    setSpotlightSearchAnswer(null)
+                    setSpotlightSearchCitations(null)
                   }}
                   className="text-xs font-medium text-gray-700 hover:text-black px-2 py-1 border border-gray-300 hover:border-black hover:bg-black hover:text-white transition-all rounded-none"
                 >
-                  Browse
+                  Search
                 </button>
               </div>
               <div className="space-y-3">
@@ -510,11 +324,11 @@ export const Memories: React.FC = () => {
                       {totalMemoryCount || memories.length}
                     </span>
                   </div>
-                  {searchResults && searchResults.results && (
+                  {spotlightSearchResults && spotlightSearchResults.results && (
                     <div className="flex items-center justify-between text-xs text-gray-900">
                       <span>Connections</span>
                       <span className="font-mono font-semibold">
-                        {searchResults.results.length}
+                        {spotlightSearchResults.results.length}
                       </span>
                     </div>
                   )}
@@ -562,44 +376,33 @@ export const Memories: React.FC = () => {
           </div>
         </div>
 
-        <MemoryDialog
-          isOpen={isDialogOpen}
-          memories={memories}
-          searchQuery={listSearchQuery}
-          searchResults={dialogSearchResults}
-          isSearching={dialogIsSearching}
-          searchAnswer={dialogSearchAnswer}
-          searchCitations={dialogSearchCitations}
-          selectedMemory={selectedMemory}
-          isEmbeddingOnly={dialogEmbeddingOnly}
-          onEmbeddingOnlyChange={setDialogEmbeddingOnly}
-          onClose={() => {
-            setIsDialogOpen(false)
-            setSelectedMemory(null)
-            setClickedNodeId(null)
-          }}
+        <SpotlightSearch
+          isOpen={isSpotlightOpen}
+          searchQuery={spotlightSearchQuery}
+          searchResults={spotlightSearchResults}
+          isSearching={spotlightIsSearching}
+          searchAnswer={spotlightSearchAnswer}
+          searchCitations={spotlightSearchCitations}
+          isEmbeddingOnly={spotlightEmbeddingOnly}
+          onEmbeddingOnlyChange={setSpotlightEmbeddingOnly}
+          onSearchQueryChange={setSpotlightSearchQuery}
           onSelectMemory={(memory) => {
             setSelectedMemory(memory)
             setClickedNodeId(memory.id)
+            setIsSpotlightOpen(false)
           }}
-          onSelectMemoryById={selectMemoryById}
-          onDeleteMemory={handleDeleteMemoryClick}
-          onSearchQueryChange={setListSearchQuery}
+          onClose={() => {
+            setIsSpotlightOpen(false)
+            setSpotlightSearchQuery("")
+            setSpotlightSearchResults(null)
+            setSpotlightSearchAnswer(null)
+            setSpotlightSearchCitations(null)
+          }}
         />
 
         <PendingJobsPanel
           isOpen={isPendingJobsOpen}
           onClose={() => setIsPendingJobsOpen(false)}
-        />
-
-        <ConfirmDialog
-          isOpen={deleteConfirm.isOpen}
-          title="Delete Memory"
-          message="Are you sure you want to delete this memory? This action cannot be undone."
-          confirmLabel="Delete"
-          cancelLabel="Cancel"
-          onConfirm={handleDeleteMemoryConfirm}
-          onCancel={() => setDeleteConfirm({ isOpen: false, memoryId: null })}
         />
       </div>
     </div>
