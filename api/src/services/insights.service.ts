@@ -139,7 +139,11 @@ export const insightsService = {
 
     try {
       logger.log('[Insights Service] Starting narrative summary generation', { userId })
-      const narrativePromise = aiProvider.generateNarrativeSummary(memoriesWithPreview, stats, userId)
+      const narrativePromise = aiProvider.generateNarrativeSummary(
+        memoriesWithPreview,
+        stats,
+        userId
+      )
       const timeoutPromise = new Promise<string>((_, reject) => {
         setTimeout(
           () => reject(new Error('Narrative summary generation timed out after 5 minutes')),

@@ -30,7 +30,9 @@ export function transformApiSearchResult(
       url: result.url,
       title: result.title,
       content: result.content || result.content_preview || "",
-      preview: result.content_preview || (result.content ? result.content.slice(0, 200) : ""),
+      preview:
+        result.content_preview ||
+        (result.content ? result.content.slice(0, 200) : ""),
       timestamp: result.timestamp,
       created_at:
         result.created_at || new Date(result.timestamp * 1000).toISOString(),

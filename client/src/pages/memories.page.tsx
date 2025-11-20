@@ -10,10 +10,10 @@ import type {
   SearchFilters,
 } from "@/types/memory.type"
 import { ConfirmDialog } from "@/components/ui/confirm-dialog"
-import { SpotlightSearch } from "@/components/SpotlightSearch"
 import { MemoryMesh3D } from "@/components/MemoryMesh3D"
 import { PageHeader } from "@/components/PageHeader"
 import { PendingJobsPanel } from "@/components/PendingJobsPanel"
+import { SpotlightSearch } from "@/components/SpotlightSearch"
 
 export const Memories: React.FC = () => {
   const navigate = useNavigate()
@@ -38,18 +38,19 @@ export const Memories: React.FC = () => {
   const [spotlightSearchQuery, setSpotlightSearchQuery] = useState("")
   const [spotlightSearchResults, setSpotlightSearchResults] =
     useState<MemorySearchResponse | null>(null)
-  const [spotlightSearchAnswer, setSpotlightSearchAnswer] = useState<string | null>(
-    null
-  )
-  const [spotlightSearchCitations, setSpotlightSearchCitations] = useState<Array<{
-    label: number
-    memory_id: string
-    title: string | null
-    url: string | null
-  }> | null>(null)
-  const [spotlightSearchJobId, setSpotlightSearchJobId] = useState<string | null>(
-    null
-  )
+  const [spotlightSearchAnswer, setSpotlightSearchAnswer] = useState<
+    string | null
+  >(null)
+  const [spotlightSearchCitations, setSpotlightSearchCitations] =
+    useState<Array<{
+      label: number
+      memory_id: string
+      title: string | null
+      url: string | null
+    }> | null>(null)
+  const [spotlightSearchJobId, setSpotlightSearchJobId] = useState<
+    string | null
+  >(null)
   const [spotlightIsSearching, setSpotlightIsSearching] = useState(false)
   const [spotlightEmbeddingOnly, setSpotlightEmbeddingOnly] = useState(true)
   const spotlightAbortControllerRef = useRef<AbortController | null>(null)
@@ -91,10 +92,6 @@ export const Memories: React.FC = () => {
     }
   }, [])
 
-  const handleDeleteMemoryClick = useCallback((memoryId: string) => {
-    setDeleteConfirm({ isOpen: true, memoryId })
-  }, [])
-
   const handleDeleteMemoryConfirm = useCallback(async () => {
     if (!deleteConfirm.memoryId) return
 
@@ -128,7 +125,6 @@ export const Memories: React.FC = () => {
     },
     [memories]
   )
-
 
   const handleSearch = useCallback(
     async (query: string, filters: SearchFilters) => {

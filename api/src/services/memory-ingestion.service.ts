@@ -121,10 +121,7 @@ export class MemoryIngestionService {
     for (const existing of recentMemories) {
       if (!existing.url) continue
       if (normalizeUrl(existing.url) !== normalizedUrl) continue
-      const similarity = calculateSimilarity(
-        canonicalText,
-        normalizeText(existing.content || '')
-      )
+      const similarity = calculateSimilarity(canonicalText, normalizeText(existing.content || ''))
       if (similarity >= 0.9) {
         return { memory: existing, reason: 'url' }
       }

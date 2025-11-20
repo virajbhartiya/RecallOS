@@ -762,9 +762,9 @@ export async function searchMemories(params: {
   // Skip reranking if we're generating an answer (answer generation already uses the best results)
   let finalScoredRows = policyScoredRows
   const shouldRerank =
-    policyScoredRows.length >= 5 && 
-    policyScoredRows.length <= 20 && 
-    !contextOnly && 
+    policyScoredRows.length >= 5 &&
+    policyScoredRows.length <= 20 &&
+    !contextOnly &&
     !embeddingOnly &&
     !shouldGenerateAnswer // Skip reranking when answer will be generated
 

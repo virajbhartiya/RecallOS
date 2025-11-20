@@ -79,10 +79,10 @@ export const startContentWorker = () => {
           ])
 
           if (duplicateCheck) {
-          const merged = await memoryIngestionService.mergeDuplicateMemory(
-            duplicateCheck.memory,
-            metadata
-          )
+            const merged = await memoryIngestionService.mergeDuplicateMemory(
+              duplicateCheck.memory,
+              metadata
+            )
             logger.log(`[Redis Worker] Duplicate detected, skipping processing`, {
               jobId: job.id,
               userId: user_id,

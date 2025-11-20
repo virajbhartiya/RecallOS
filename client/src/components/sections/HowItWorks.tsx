@@ -22,7 +22,11 @@ const steps = [
     title: "AI Understands",
     description:
       "Our AI reads and understands the content, generating high-quality embeddings so everything stays searchable.",
-    features: ["Semantic embeddings", "Duplicate detection", "Context understanding"],
+    features: [
+      "Semantic embeddings",
+      "Duplicate detection",
+      "Context understanding",
+    ],
   },
   {
     number: 3,
