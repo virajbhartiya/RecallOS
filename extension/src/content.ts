@@ -1259,27 +1259,6 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;')
 }
 
-function copyTextToClipboard(text: string): boolean {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text).catch(() => {})
-      return true
-    }
-    const textarea = document.createElement('textarea')
-    textarea.value = text
-    textarea.style.position = 'fixed'
-    textarea.style.opacity = '0'
-    document.body.appendChild(textarea)
-    textarea.focus()
-    textarea.select()
-    const success = document.execCommand('copy')
-    document.body.removeChild(textarea)
-    return success
-  } catch (_error) {
-    return false
-  }
-}
-
 function showDraftToast(message: string, variant: 'info' | 'success' | 'error' = 'info'): void {
   if (draftToastTimeout && draftToastElement) {
     draftToastElement.remove()
@@ -1535,11 +1514,7 @@ function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContex
       const injection = injectEmailDraft(currentContext, draft)
 
       if (!injection.bodyApplied) {
-        if (copyTextToClipboard(draft.body)) {
-          showDraftToast('Draft copied to clipboard. Paste it into the compose box.', 'error')
-        } else {
-          showDraftToast('Unable to insert draft automatically.', 'error')
-        }
+        showDraftToast('Unable to insert draft automatically.', 'error')
         return
       }
 

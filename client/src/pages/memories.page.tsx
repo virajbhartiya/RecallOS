@@ -4,10 +4,7 @@ import { SearchService } from "@/services/search.service"
 import { requireAuthToken } from "@/utils/user-id.util"
 import { useNavigate } from "react-router-dom"
 
-import type {
-  Memory,
-  MemorySearchResponse,
-} from "@/types/memory.type"
+import type { Memory, MemorySearchResponse } from "@/types/memory.type"
 import { MemoryMesh3D } from "@/components/MemoryMesh3D"
 import { PageHeader } from "@/components/PageHeader"
 import { PendingJobsPanel } from "@/components/PendingJobsPanel"
@@ -54,8 +51,6 @@ export const Memories: React.FC = () => {
   const spotlightAbortControllerRef = useRef<AbortController | null>(null)
   const spotlightDebounceTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-
-
   const fetchMemories = useCallback(async () => {
     try {
       // Require authentication
@@ -73,7 +68,6 @@ export const Memories: React.FC = () => {
     }
   }, [])
 
-
   const handleNodeClick = useCallback(
     (memoryId: string) => {
       const memoryInfo = memories.find((m) => m.id === memoryId)
@@ -84,7 +78,6 @@ export const Memories: React.FC = () => {
     },
     [memories]
   )
-
 
   // Spotlight search handler
   const handleSpotlightSearch = useCallback(
@@ -197,7 +190,6 @@ export const Memories: React.FC = () => {
     }
   }, [spotlightSearchJobId, spotlightSearchAnswer])
 
-
   useEffect(() => {
     fetchMemories()
   }, [fetchMemories])
@@ -268,7 +260,9 @@ export const Memories: React.FC = () => {
             similarityThreshold={similarityThreshold}
             selectedMemoryId={clickedNodeId || undefined}
             highlightedMemoryIds={[
-              ...(spotlightSearchResults?.results || []).map((r) => r.memory.id),
+              ...(spotlightSearchResults?.results || []).map(
+                (r) => r.memory.id
+              ),
               ...(clickedNodeId ? [clickedNodeId] : []),
               ...(selectedMemory ? [selectedMemory.id] : []),
             ]}
@@ -410,7 +404,6 @@ export const Memories: React.FC = () => {
           isOpen={isPendingJobsOpen}
           onClose={() => setIsPendingJobsOpen(false)}
         />
-
       </div>
     </div>
   )
