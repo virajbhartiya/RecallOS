@@ -9,6 +9,8 @@ interface MemoryListProps {
   searchResults: MemorySearchResponse | null
   isSearching: boolean
   selectedMemory: Memory | null
+  isEmbeddingOnly?: boolean
+  onEmbeddingOnlyChange?: (value: boolean) => void
   onSelectMemory: (memory: Memory) => void
   onDeleteMemory: (memoryId: string) => void
   onSearchQueryChange: (query: string) => void
@@ -51,13 +53,6 @@ const MemoryListItem: React.FC<{
           : "NO DATE"}{" "}
         • {memory.source || "UNKNOWN"}
       </div>
-      {(memory.preview || memory.content) && (
-        <div
-          className={`text-[10px] mt-1 line-clamp-2 ${isSelected ? "text-gray-300" : "text-gray-600"}`}
-        >
-          {memory.preview || memory.content}
-        </div>
-      )}
     </button>
     <button
       onClick={(e) => {
@@ -80,6 +75,8 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
   searchResults,
   isSearching,
   selectedMemory,
+  isEmbeddingOnly = true,
+  onEmbeddingOnlyChange,
   onSelectMemory,
   onDeleteMemory,
   onSearchQueryChange,
@@ -187,7 +184,7 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
 
   return (
     <div className="w-80 border-r border-gray-200 flex flex-col bg-white">
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-gray-200 space-y-3">
         <input
           type="text"
           placeholder="Search memories..."
@@ -195,6 +192,37 @@ const MemoryListComponent: React.FC<MemoryListProps> = ({
           onChange={(e) => onSearchQueryChange(e.target.value)}
           className="w-full px-3 py-2 text-sm border border-gray-300 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-black rounded-none"
         />
+        {onEmbeddingOnlyChange && (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-gray-500 uppercase tracking-wide">
+              Mode:
+            </span>
+            <div className="inline-flex border border-gray-200">
+              <button
+                type="button"
+                onClick={() => onEmbeddingOnlyChange(true)}
+                className={`px-3 py-1 text-[11px] font-mono uppercase ${
+                  isEmbeddingOnly
+                    ? "bg-black text-white"
+                    : "bg-white text-gray-600"
+                }`}
+              >
+                Embedding
+              </button>
+              <button
+                type="button"
+                onClick={() => onEmbeddingOnlyChange(false)}
+                className={`px-3 py-1 text-[11px] font-mono uppercase border-l border-gray-200 ${
+                  !isEmbeddingOnly
+                    ? "bg-black text-white"
+                    : "bg-white text-gray-600"
+                }`}
+              >
+                Summarized
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto">
         {isSearching && (
