@@ -20,7 +20,6 @@ type MemorySelect = Prisma.MemoryGetPayload<{
     url: true
     timestamp: true
     created_at: true
-    summary: true
     content: true
     source: true
     page_metadata: true
@@ -173,9 +172,8 @@ export class MemoryController {
       const aiStart = Date.now()
       logger.log('[memory/process] ai_start', {
         ts: new Date().toISOString(),
-        tasks: ['summarizeContent', 'extractContentMetadata'],
+        tasks: ['extractContentMetadata'],
       })
-      let summaryResult: unknown
       let extractedMetadataResult: unknown
       const maxAiAttempts = 5
       let lastAiError: unknown
@@ -188,10 +186,12 @@ export class MemoryController {
           const timeoutMs = calculateExponentialTimeout(timeoutAttempt)
           const timeoutOverride = timeoutAttempt > 0 ? timeoutMs : undefined
 
-          ;[summaryResult, extractedMetadataResult] = await Promise.all([
-            aiProvider.summarizeContent(content, metadataPayload, userId, timeoutOverride),
-            aiProvider.extractContentMetadata(content, metadataPayload, userId, timeoutOverride),
-          ])
+          extractedMetadataResult = await aiProvider.extractContentMetadata(
+            content,
+            metadataPayload,
+            userId,
+            timeoutOverride
+          )
           lastAiError = null
           timeoutAttempt = 0 // Reset timeout attempt counter on success
           break
@@ -256,17 +256,6 @@ export class MemoryController {
           }
         | { metadata?: MetadataResult }
 
-      let summary: string
-      if (typeof summaryResult === 'string') {
-        summary = summaryResult
-      } else {
-        const result = summaryResult as { text?: string }
-        summary =
-          typeof result.text === 'string' && result.text.length > 0
-            ? result.text
-            : String(summaryResult ?? '')
-      }
-
       let extractedMetadata: MetadataResult
       if (
         typeof extractedMetadataResult === 'object' &&
@@ -287,7 +276,6 @@ export class MemoryController {
       }
       logger.log('[memory/process] ai_done', {
         ms: Date.now() - aiStart,
-        hasSummary: !!summary,
         hasExtracted: !!extractedMetadata,
       })
 
@@ -307,7 +295,7 @@ export class MemoryController {
           url,
           source: (metadataPayload?.source as string | undefined) || undefined,
           content,
-          summary,
+          contentPreview: content.slice(0, 400),
           metadata: metadataPayload,
           extractedMetadata: extractedMetadataRecord,
           canonicalText: canonicalData.canonicalText,
@@ -347,7 +335,6 @@ export class MemoryController {
               url: true,
               timestamp: true,
               created_at: true,
-              summary: true,
               content: true,
               source: true,
               page_metadata: true,
@@ -387,14 +374,10 @@ export class MemoryController {
         // Create snapshot
         try {
           const snapStart = Date.now()
-          const summaryHash = '0x' + createHash('sha256').update(summary).digest('hex')
-
           await prisma.memorySnapshot.create({
             data: {
               user_id: userId,
               raw_text: content,
-              summary: summary,
-              summary_hash: summaryHash,
             },
           })
           logger.log('[memory/process] snapshot_created', {
@@ -475,7 +458,6 @@ export class MemoryController {
           url: true,
           timestamp: true,
           created_at: true,
-          summary: true,
           content: true,
           source: true,
           page_metadata: true,
@@ -820,11 +802,11 @@ export class MemoryController {
       if (!fields || !Array.isArray(fields) || fields.length === 0) {
         return res.status(400).json({
           success: false,
-          error: 'Fields to redact are required (array of: url, content, title, summary)',
+          error: 'Fields to redact are required (array of: url, content, title)',
         })
       }
 
-      const validFields = ['url', 'content', 'title', 'summary']
+      const validFields = ['url', 'content', 'title']
       const invalidFields = fields.filter(f => !validFields.includes(f))
       if (invalidFields.length > 0) {
         return res.status(400).json({
@@ -875,11 +857,11 @@ export class MemoryController {
       if (!fields || !Array.isArray(fields) || fields.length === 0) {
         return res.status(400).json({
           success: false,
-          error: 'Fields to redact are required (array of: url, content, title, summary)',
+          error: 'Fields to redact are required (array of: url, content, title)',
         })
       }
 
-      const validFields = ['url', 'content', 'title', 'summary']
+      const validFields = ['url', 'content', 'title']
       const invalidFields = fields.filter(f => !validFields.includes(f))
       if (invalidFields.length > 0) {
         return res.status(400).json({

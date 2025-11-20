@@ -7,7 +7,7 @@ export interface Memory {
   url?: string
   title?: string
   content: string
-  summary?: string
+  preview?: string
   hash?: string
   timestamp: number
   created_at: string
@@ -56,7 +56,7 @@ export interface MemoryMeshNode {
   y: number
   memory_id: string
   title?: string
-  summary?: string
+  preview?: string
   content?: string
   full_content?: string
   importance_score?: number
@@ -123,7 +123,7 @@ export interface SearchResult {
 export interface ContextBlockItem {
   id: string
   title: string | null
-  summary: string | null
+  preview: string | null
   url: string | null
   importance_score?: number | null
   created_at?: string

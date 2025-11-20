@@ -3,7 +3,6 @@ import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
 
 export type OperationType =
-  | 'summarize'
   | 'extract_metadata'
   | 'generate_content'
   | 'generate_embedding'

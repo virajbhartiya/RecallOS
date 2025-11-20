@@ -52,16 +52,7 @@ const MemoryDetailContent: React.FC<{
       </h3>
     </div>
 
-    {memory.summary ? (
-      <div>
-        <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
-          Summary
-        </div>
-        <p className="text-sm text-gray-800 leading-relaxed break-words">
-          {memory.summary}
-        </p>
-      </div>
-    ) : memory.content ? (
+    {memory.content ? (
       <div>
         <div className="text-xs font-semibold uppercase tracking-wider text-gray-600 mb-2">
           Content

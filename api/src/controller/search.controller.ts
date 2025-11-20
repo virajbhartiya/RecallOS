@@ -81,17 +81,17 @@ export const postSearch = async (req: AuthenticatedRequest, res: Response, next:
             const filteredRows = data.results.map(r => ({
               id: r.memory_id,
               title: r.title,
-              summary: r.summary,
+              preview: r.content_preview,
               url: r.url,
               timestamp: BigInt(r.timestamp),
-              content: r.summary || '',
+              content: r.content_preview || '',
             }))
             const bullets = filteredRows
               .map((r, i) => {
                 const date = r.timestamp
                   ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10)
                   : ''
-                return `- [${i + 1}] ${date} ${r.summary || ''}`.trim()
+                return `- [${i + 1}] ${date} ${r.preview || ''}`.trim()
               })
               .join('\n')
             const ansPrompt = `You are Cognia. Answer the user's query using the evidence notes, and insert bracketed numeric citations wherever you use a note.
@@ -205,7 +205,7 @@ ${bullets}`
       results: Array<{
         memory_id: string
         title: string | null
-        summary: string | null
+        content_preview: string
         url: string | null
         timestamp: number
         related_memories: string[]

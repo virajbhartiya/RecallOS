@@ -4,7 +4,6 @@ import { aiProvider } from '../services/ai-provider.service'
 import { memoryMeshService } from '../services/memory-mesh.service'
 import { profileUpdateService } from '../services/profile-update.service'
 import { prisma } from '../lib/prisma.lib'
-import { createHash } from 'crypto'
 import {
   getQueueConcurrency,
   getRedisConnection,
@@ -98,11 +97,15 @@ export const startContentWorker = () => {
               existingMemoryId: merged.id,
               reason: duplicateCheck.reason,
             })
+            const preview =
+              (merged.content || '').substring(0, 100) ||
+              (metadata?.title as string | undefined) ||
+              'Duplicate memory'
             return {
               success: true,
               contentId: merged.id,
               memoryId: merged.id,
-              summary: merged.summary?.substring(0, 100) + '...' || 'Duplicate memory',
+              preview,
             }
           }
 
@@ -128,96 +131,31 @@ export const startContentWorker = () => {
           )
         }
 
-        const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-
-        const maxAttempts = 3
-        const baseDelayMs = 2000
-        const maxDelayMs = 60_000
-
-        // Run AI calls in parallel for faster processing
-        // Note: This optimization applies to all jobs in the queue, including those
-        // queued before this implementation, as the worker code is loaded at runtime.
-        const [summaryResult, extractedMetadataResult] = await Promise.all([
-          (async () => {
-            let summary: string | null = null
-            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-              try {
-                if (attempt > 1) {
-                  logger.log(
-                    `[Redis Worker] Retrying summary (attempt ${attempt}/${maxAttempts})`,
-                    {
-                      jobId: job.id,
-                      userId: user_id,
-                      attempt,
-                    }
-                  )
-                }
-                const result = await aiProvider.summarizeContent(raw_text, metadata, user_id)
-                if (typeof result === 'string') {
-                  summary = result
-                } else {
-                  const res = result as { text?: string }
-                  summary = res.text || result
-                }
-                break
-              } catch (err) {
-                const error = err as Error | undefined
-                if (error && error.name === 'JobCancelledError') {
-                  throw error
-                }
-                if (!isRetryableError(err) || attempt === maxAttempts) {
-                  logger.error(`[Redis Worker] Summary failed permanently`, {
-                    jobId: job.id,
-                    userId: user_id,
-                    attempt,
-                    error: err?.message || String(err),
-                    isRetryable: isRetryableError(err),
-                  })
-                  throw err
-                }
-                const backoff = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs)
-                const jitter = Math.floor(Math.random() * 500)
-                logger.warn(`[Redis Worker] Summary retryable error, backing off`, {
-                  jobId: job.id,
-                  userId: user_id,
-                  attempt,
-                  backoffMs: backoff + jitter,
-                  error: err?.message || String(err),
-                })
-                await sleep(backoff + jitter)
-              }
+        // Extract metadata with retries
+        const extractedMetadataResult = await (async () => {
+          try {
+            const result = await aiProvider.extractContentMetadata(raw_text, metadata, user_id)
+            if (typeof result === 'object' && result !== null && 'topics' in result) {
+              return result
             }
-            if (!summary) {
-              throw new Error('Failed to generate summary after retries')
+            if (typeof result === 'object' && result !== null && 'metadata' in result) {
+              return (result as { metadata?: Record<string, unknown> }).metadata || result
             }
-            return summary
-          })(),
-          (async () => {
-            try {
-              const result = await aiProvider.extractContentMetadata(raw_text, metadata, user_id)
-              if (typeof result === 'object' && result !== null && 'topics' in result) {
-                return result
-              } else if (typeof result === 'object' && result !== null && 'metadata' in result) {
-                return (result as { metadata?: Record<string, unknown> }).metadata || result
-              } else {
-                return result
-              }
-            } catch (metadataError) {
-              const error = metadataError as Error | undefined
-              if (error && error.name === 'JobCancelledError') {
-                throw error
-              }
-              logger.warn(`[Redis Worker] Failed to extract metadata, continuing without it`, {
-                jobId: job.id,
-                userId: user_id,
-                error: metadataError?.message || String(metadataError),
-              })
-              return {}
+            return result
+          } catch (metadataError) {
+            const error = metadataError as Error | undefined
+            if (error && error.name === 'JobCancelledError') {
+              throw error
             }
-          })(),
-        ])
+            logger.warn(`[Redis Worker] Failed to extract metadata, continuing without it`, {
+              jobId: job.id,
+              userId: user_id,
+              error: metadataError?.message || String(metadataError),
+            })
+            return {}
+          }
+        })()
 
-        const summary = summaryResult
         const extractedMetadata = extractedMetadataResult as {
           topics?: string[]
           categories?: string[]
@@ -243,25 +181,19 @@ export const startContentWorker = () => {
             pageMetadata
           )
 
-          const summaryHash = createHash('sha256').update(summary).digest('hex')
+          await prisma.memory.update({
+            where: { id: metadata.memory_id },
+            data: {
+              page_metadata: mergedMetadata,
+            },
+          })
 
-          await Promise.all([
-            prisma.memory.update({
-              where: { id: metadata.memory_id },
-              data: {
-                summary: summary,
-                page_metadata: mergedMetadata,
-              },
-            }),
-            prisma.memorySnapshot.create({
-              data: {
-                user_id,
-                raw_text,
-                summary,
-                summary_hash: summaryHash,
-              },
-            }),
-          ])
+          await prisma.memorySnapshot.create({
+            data: {
+              user_id,
+              raw_text,
+            },
+          })
 
           // Generate embeddings and relations in background (non-blocking)
           setImmediate(async () => {
@@ -297,7 +229,7 @@ export const startContentWorker = () => {
             url: baseUrl,
             source: (metadata?.source as string | undefined) || undefined,
             content: raw_text,
-            summary,
+            contentPreview: raw_text.slice(0, 400),
             metadata,
             extractedMetadata: extractedMetadataRecord,
             canonicalText: canonicalData.canonicalText,
@@ -306,8 +238,6 @@ export const startContentWorker = () => {
 
           let memory
           try {
-            const summaryHash = '0x' + createHash('sha256').update(summary).digest('hex')
-
             const [createdMemory] = await Promise.all([
               prisma.memory.create({
                 data: memoryCreateInput,
@@ -316,8 +246,6 @@ export const startContentWorker = () => {
                 data: {
                   user_id,
                   raw_text,
-                  summary,
-                  summary_hash: summaryHash,
                 },
               }),
               ensureNotCancelled(),
@@ -331,11 +259,15 @@ export const startContentWorker = () => {
               })
 
               if (existingByCanonical) {
+                const preview =
+                  (existingByCanonical.content || '').substring(0, 100) ||
+                  (metadata?.title as string | undefined) ||
+                  'Duplicate memory'
                 return {
                   success: true,
                   contentId: existingByCanonical.id,
                   memoryId: existingByCanonical.id,
-                  summary: summary.substring(0, 100) + '...',
+                  preview,
                 }
               }
             }
@@ -385,7 +317,7 @@ export const startContentWorker = () => {
           success: true,
           contentId: metadata?.memory_id || 'memory_processed',
           memoryId: metadata?.memory_id || null,
-          summary: summary.substring(0, 100) + '...',
+          preview: raw_text.substring(0, 100) + '...',
         }
 
         return result

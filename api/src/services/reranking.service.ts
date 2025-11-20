@@ -9,7 +9,7 @@ const RERANK_CACHE_PREFIX = 'rerank_cache:'
 type MemoryCandidate = {
   id: string
   title: string | null
-  summary: string | null
+  preview: string
   content: string
   score: number
 }
@@ -83,8 +83,8 @@ export class RerankingService {
       // Build prompt for reranking
       const candidatesText = candidates
         .map((c, idx) => {
-          const preview = (c.summary || c.content || '').substring(0, 200)
-          return `[${idx + 1}] ID: ${c.id}\nTitle: ${c.title || 'Untitled'}\nContent: ${preview}...`
+          const previewText = (c.preview || c.content || '').substring(0, 200)
+          return `[${idx + 1}] ID: ${c.id}\nTitle: ${c.title || 'Untitled'}\nContent: ${previewText}...`
         })
         .join('\n\n')
 

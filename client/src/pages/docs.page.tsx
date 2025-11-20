@@ -233,10 +233,9 @@ export const Docs = () => {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="bg-white border border-gray-200 p-4">
-                  <h3 className="font-medium mb-2">AI Summarization</h3>
+                  <h3 className="font-medium mb-2">AI Metadata & Embeddings</h3>
                   <p className="text-sm text-gray-600">
-                    Every memory gets an AI-generated summary using Google
-                    Gemini, highlighting key points and actionable insights.
+                    Each memory is analyzed for key insights, metadata, and semantic embeddings so it can be searched and linked without storing extra summaries.
                   </p>
                 </div>
                 <div className="bg-white border border-gray-200 p-4">
@@ -397,9 +396,8 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                     thresholds based on query analysis
                   </li>
                   <li>
-                    Keyword search matches tokens in titles (0.5 weight),
-                    summaries (0.3 weight), and content (0.2 weight) using
-                    Prisma
+                    Keyword search matches tokens in titles (0.5 weight) and
+                    normalized content (0.5 weight) using Prisma
                   </li>
                   <li>
                     Results are scored and blended: 60% semantic score + 40%
@@ -411,7 +409,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                   </li>
                   <li>
                     AI generates contextual answers using Google Gemini with
-                    profile context and memory summaries, extracting citations
+                    profile context and memory previews, extracting citations
                     from [n] references
                   </li>
                   <li>
@@ -427,10 +425,9 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                       Keyword Search
                     </h4>
                     <p className="text-xs text-blue-800 mt-1">
-                      Tokenizes query, matches against title/summary/content
-                      with weighted scoring. Filters by category, topic,
-                      sentiment, date range. Calculates coverage ratio for query
-                      tokens.
+                      Tokenizes query, matches against title/content with
+                      weighted scoring. Filters by category, topic, sentiment,
+                      date range. Calculates coverage ratio for query tokens.
                     </p>
                   </div>
                   <div className="bg-purple-50 border border-purple-200 p-3">
@@ -546,9 +543,9 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                 <ol className="list-decimal list-inside space-y-2 text-gray-700">
                   <li>
                     <strong>Embedding Generation:</strong> Creates vector
-                    embeddings for content, summary, and title using Google
-                    Gemini embeddings, stores in Qdrant with metadata
-                    (memory_id, user_id, embedding_type, model_name)
+                    embeddings for content and title using Google Gemini
+                    embeddings, stores in Qdrant with metadata (memory_id,
+                    user_id, embedding_type, model_name)
                   </li>
                   <li>
                     <strong>Relation Discovery:</strong> Finds semantic (top
@@ -648,13 +645,12 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                     similarity threshold
                   </li>
                   <li>
-                    <strong>AI Processing:</strong> Runs in parallel:
-                    summarizeContent() and extractContentMetadata() using Google
-                    Gemini or Ollama
+                    <strong>AI Processing:</strong> Extracts content metadata
+                    using Google Gemini or Ollama
                   </li>
                   <li>
                     <strong>Database Storage:</strong> Creates memory record in
-                    PostgreSQL with content, summary, canonical_hash,
+                    PostgreSQL with content, canonical_hash, and enriched
                     page_metadata (topics, categories, sentiment, etc.)
                   </li>
                   <li>
@@ -664,7 +660,7 @@ ChatGPT Integration: Automatic (1.5s delay)`}
                   </li>
                   <li>
                     <strong>Embedding Generation:</strong> Generates vector
-                    embeddings for content, summary, and title, stores in Qdrant
+                    embeddings for content and title, storing them in Qdrant
                     with payload metadata
                   </li>
                   <li>

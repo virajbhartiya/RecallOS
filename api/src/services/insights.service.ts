@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma.lib'
 import { aiProvider } from './ai-provider.service'
 import { logger } from '../utils/logger.util'
+import { buildContentPreview } from '../utils/text.util'
 
 type PeriodType = 'daily' | 'weekly'
 
@@ -8,7 +9,8 @@ interface MemoryData {
   id: string
   title: string | null
   url: string | null
-  summary: string | null
+  content: string
+  content_preview: string
   page_metadata: unknown
   created_at: Date
 }
@@ -57,7 +59,7 @@ function aggregateStats(memories: MemoryData[]): AggregatedStats {
       })
     }
 
-    const estimatedTime = 2 + Math.min(10, (memory.summary?.length || 0) / 100)
+    const estimatedTime = 2 + Math.min(10, (memory.content_preview?.length || 0) / 100)
     timeEstimates[domain] = (timeEstimates[domain] || 0) + estimatedTime
   })
 
@@ -84,7 +86,7 @@ export const insightsService = {
         id: true,
         title: true,
         url: true,
-        summary: true,
+        content: true,
         page_metadata: true,
         created_at: true,
       },
@@ -101,7 +103,12 @@ export const insightsService = {
       return null
     }
 
-    const stats = aggregateStats(memories)
+    const memoriesWithPreview: MemoryData[] = memories.map(memory => ({
+      ...memory,
+      content_preview: buildContentPreview(memory.content),
+    }))
+
+    const stats = aggregateStats(memoriesWithPreview)
 
     let wowFacts: string[] = []
     let narrativeSummary: string = 'No summary available.'
@@ -112,7 +119,7 @@ export const insightsService = {
         userId,
         memoryCount: memories.length,
       })
-      const wowFactsPromise = aiProvider.generateWowFacts(memories, stats, userId)
+      const wowFactsPromise = aiProvider.generateWowFacts(memoriesWithPreview, stats, userId)
       const timeoutPromise = new Promise<string[]>((_, reject) => {
         setTimeout(
           () => reject(new Error('Wow facts generation timed out after 5 minutes')),
@@ -132,7 +139,7 @@ export const insightsService = {
 
     try {
       logger.log('[Insights Service] Starting narrative summary generation', { userId })
-      const narrativePromise = aiProvider.generateNarrativeSummary(memories, stats, userId)
+      const narrativePromise = aiProvider.generateNarrativeSummary(memoriesWithPreview, stats, userId)
       const timeoutPromise = new Promise<string>((_, reject) => {
         setTimeout(
           () => reject(new Error('Narrative summary generation timed out after 5 minutes')),
@@ -156,7 +163,7 @@ export const insightsService = {
 
     try {
       logger.log('[Insights Service] Starting key insights generation', { userId })
-      const insightsPromise = aiProvider.generateKeyInsights(memories, stats, userId)
+      const insightsPromise = aiProvider.generateKeyInsights(memoriesWithPreview, stats, userId)
       const timeoutPromise = new Promise<string[]>((_, reject) => {
         setTimeout(
           () => reject(new Error('Key insights generation timed out after 5 minutes')),
@@ -196,7 +203,7 @@ export const insightsService = {
           categories_explored: stats.categories,
           time_estimates: stats.timeEstimates,
           key_insights: keyInsights,
-          memory_ids: memories.map(m => m.id),
+          memory_ids: memoriesWithPreview.map(m => m.id),
         },
       })
       logger.log('[Insights Service] Summary saved successfully', {

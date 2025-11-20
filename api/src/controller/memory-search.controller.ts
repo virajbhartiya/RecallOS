@@ -13,7 +13,6 @@ type MemoryWithMetadata = {
     title: string | null
     url: string | null
     content: string
-    summary: string | null
     timestamp: bigint
     page_metadata: Prisma.JsonValue
   }
@@ -26,7 +25,6 @@ type MemoryRecord = {
   title: string | null
   url: string | null
   content: string
-  summary: string | null
   page_metadata: Prisma.JsonValue
 }
 
@@ -77,10 +75,9 @@ export class MemorySearchController {
       const memories = searchResults.results.map(result => ({
         id: result.memory_id,
         title: result.title,
-        summary: result.summary,
         url: result.url,
         timestamp: result.timestamp,
-        content: result.summary,
+        content: result.content_preview,
         source: 'browser',
         user_id: user.id,
         created_at: new Date(result.timestamp * 1000).toISOString(),
@@ -337,7 +334,6 @@ export class MemorySearchController {
 
       const tokenConditions = queryTokens.flatMap(token => [
         { content: { contains: token, mode: 'insensitive' as const } },
-        { summary: { contains: token, mode: 'insensitive' as const } },
         { title: { contains: token, mode: 'insensitive' as const } },
         { url: { contains: token, mode: 'insensitive' as const } },
       ])
@@ -351,7 +347,6 @@ export class MemorySearchController {
                 ? tokenConditions
                 : [
                     { content: { contains: query as string, mode: 'insensitive' } },
-                    { summary: { contains: query as string, mode: 'insensitive' } },
                     { title: { contains: query as string, mode: 'insensitive' } },
                     { url: { contains: query as string, mode: 'insensitive' } },
                   ],
@@ -500,7 +495,6 @@ export class MemorySearchController {
     let matchedTokens = 0
 
     const title = (memory.title || '').toLowerCase()
-    const summary = (memory.summary || '').toLowerCase()
     const content = (memory.content || '').toLowerCase()
 
     for (const token of queryTokens) {
@@ -511,13 +505,8 @@ export class MemorySearchController {
         matchedTokens++
       }
 
-      if (tokenRegex.test(summary)) {
-        score += 0.3
-        matchedTokens++
-      }
-
       if (tokenRegex.test(content)) {
-        score += 0.2
+        score += 0.5
         matchedTokens++
       }
     }
@@ -530,10 +519,6 @@ export class MemorySearchController {
 
     if (exactPhraseRegex.test(title)) {
       score += 0.2
-    }
-
-    if (exactPhraseRegex.test(summary)) {
-      score += 0.15
     }
 
     const coverageRatio = queryTokens.length > 0 ? matchedTokens / queryTokens.length : 0

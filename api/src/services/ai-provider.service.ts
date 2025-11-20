@@ -375,7 +375,7 @@ ${rawText}`
       const outputTokens = tokenTracking.estimateTokens(result)
       await tokenTracking.recordTokenUsage({
         userId,
-        operationType: 'summarize',
+        operationType: 'generate_content',
         inputTokens,
         outputTokens,
         modelUsed,
@@ -789,7 +789,7 @@ JSON ONLY:`
     memories: Array<{
       title?: string | null
       url?: string | null
-      summary?: string | null
+      content_preview?: string | null
       page_metadata?: unknown
       created_at: Date
     }>,
@@ -803,7 +803,7 @@ JSON ONLY:`
   ): Promise<string[]> {
     const memorySummaries = memories
       .slice(0, 20)
-      .map(m => `- ${m.title || 'Untitled'}: ${m.summary || 'No summary'}`)
+      .map(m => `- ${m.title || 'Untitled'}: ${m.content_preview || 'No preview available'}`)
       .join('\n')
 
     const topDomains = Object.entries(stats.domainStats)
@@ -930,7 +930,7 @@ JSON array only:`
     memories: Array<{
       title?: string | null
       url?: string | null
-      summary?: string | null
+      content_preview?: string | null
       page_metadata?: unknown
       created_at: Date
     }>,
@@ -944,7 +944,7 @@ JSON array only:`
   ): Promise<string> {
     const memorySummaries = memories
       .slice(0, 30)
-      .map(m => `- ${m.title || 'Untitled'}: ${m.summary || 'No summary'}`)
+      .map(m => `- ${m.title || 'Untitled'}: ${m.content_preview || 'No preview available'}`)
       .join('\n')
 
     const topDomains = Object.entries(stats.domainStats)
@@ -1011,7 +1011,7 @@ Narrative summary:`
     memories: Array<{
       title?: string | null
       url?: string | null
-      summary?: string | null
+      content_preview?: string | null
       page_metadata?: unknown
       created_at: Date
     }>,
@@ -1025,7 +1025,7 @@ Narrative summary:`
   ): Promise<string[]> {
     const memorySummaries = memories
       .slice(0, 20)
-      .map(m => `- ${m.title || 'Untitled'}: ${m.summary || 'No summary'}`)
+      .map(m => `- ${m.title || 'Untitled'}: ${m.content_preview || 'No preview available'}`)
       .join('\n')
 
     const topDomains = Object.entries(stats.domainStats)

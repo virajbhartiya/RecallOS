@@ -51,11 +51,11 @@ const MemoryListItem: React.FC<{
           : "NO DATE"}{" "}
         • {memory.source || "UNKNOWN"}
       </div>
-      {memory.summary && (
+      {(memory.preview || memory.content) && (
         <div
           className={`text-[10px] mt-1 line-clamp-2 ${isSelected ? "text-gray-300" : "text-gray-600"}`}
         >
-          {memory.summary}
+          {memory.preview || memory.content}
         </div>
       )}
     </button>

@@ -10,7 +10,6 @@ export type MemoryWithRelations = Prisma.MemoryGetPayload<{
             title: true
             url: true
             created_at: true
-            summary: true
             page_metadata: true
           }
         }
@@ -24,7 +23,6 @@ export type MemoryWithRelations = Prisma.MemoryGetPayload<{
             title: true
             url: true
             created_at: true
-            summary: true
             page_metadata: true
           }
         }
@@ -39,7 +37,6 @@ export type MemorySelect = {
   url: true
   timestamp: true
   created_at: true
-  summary: true
   content: true
   source: true
   page_metadata: true
@@ -47,8 +44,6 @@ export type MemorySelect = {
 
 export type MemorySnapshotSelect = {
   id: true
-  summary: true
-  summary_hash: true
   created_at: true
   raw_text: true
 }

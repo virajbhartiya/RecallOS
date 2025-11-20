@@ -6,6 +6,7 @@ import { setSearchJobResult } from './search-job.service'
 import { qdrantClient, COLLECTION_NAME, ensureCollection } from '../lib/qdrant.lib'
 import { profileUpdateService } from './profile-update.service'
 import { logger } from '../utils/logger.util'
+import { buildContentPreview } from '../utils/text.util'
 import { getRedisClient } from '../lib/redis.lib'
 import { GEMINI_EMBED_MODEL } from './gemini.service'
 import {
@@ -21,7 +22,7 @@ import { queryClassificationService } from './query-classification.service'
 type SearchResult = {
   memory_id: string
   title: string | null
-  summary: string | null
+  content_preview: string
   url: string | null
   timestamp: number
   related_memories: string[]
@@ -632,13 +633,14 @@ export async function searchMemories(params: {
     .map(([memoryId, semanticScore]) => {
       const memory = memoryMap.get(memoryId)
       if (!memory) return null
+      const previewSource = memory.content || memory.canonical_text || memory.title || ''
       return {
         id: memory.id,
         title: memory.title,
-        summary: memory.summary,
         url: memory.url,
         timestamp: memory.timestamp,
         content: memory.content,
+        content_preview: buildContentPreview(previewSource),
         score: semanticScore,
         memory_type: memory.memory_type,
         importance_score: memory.importance_score,
@@ -651,7 +653,7 @@ export async function searchMemories(params: {
   // Calculate hybrid scores combining semantic and keyword matching
   const scoredRows = rows.map(row => {
     const title = (row.title || '').toLowerCase()
-    const summary = (row.summary || '').toLowerCase()
+    const preview = (row.content_preview || '').toLowerCase()
     const content = (row.content || '').toLowerCase()
 
     // Calculate keyword match score using token-based matching
@@ -667,8 +669,8 @@ export async function searchMemories(params: {
         matchedTokens++
       }
 
-      // Check summary (medium weight)
-      if (tokenRegex.test(summary)) {
+      // Check preview (medium weight)
+      if (tokenRegex.test(preview)) {
         keywordScore += 0.3
         matchedTokens++
       }
@@ -772,7 +774,7 @@ export async function searchMemories(params: {
       const candidates = policyScoredRows.map(row => ({
         id: row.id,
         title: row.title,
-        summary: row.summary,
+        preview: row.content_preview,
         content: row.content,
         score: row.final_score || row.score,
       }))
@@ -835,7 +837,7 @@ export async function searchMemories(params: {
     const results: SearchResult[] = finalScoredRows.map(r => ({
       memory_id: r.id,
       title: r.title,
-      summary: r.summary,
+      content_preview: r.content_preview,
       url: r.url,
       timestamp: Number(r.timestamp),
       related_memories: [] as string[],
@@ -920,7 +922,7 @@ export async function searchMemories(params: {
     items: finalScoredRows.map(row => ({
       id: row.id,
       title: row.title,
-      summary: row.summary,
+      preview: row.content_preview,
       url: row.url,
       memory_type: row.memory_type ?? null,
       importance_score: row.importance_score,
@@ -945,7 +947,7 @@ export async function searchMemories(params: {
           const date = r.timestamp
             ? new Date(Number(r.timestamp) * 1000).toISOString().slice(0, 10)
             : ''
-          return `- [${i + 1}] ${date} ${r.summary || ''}`.trim()
+          return `- [${i + 1}] ${date} ${r.content_preview || ''}`.trim()
         })
         .join('\n')
 
@@ -1069,7 +1071,7 @@ ${bullets}`
   const results: SearchResult[] = finalScoredRows.map(r => ({
     memory_id: r.id,
     title: r.title,
-    summary: r.summary,
+    content_preview: r.content_preview,
     url: r.url,
     timestamp: Number(r.timestamp),
     related_memories: relatedById.get(r.id) || [],

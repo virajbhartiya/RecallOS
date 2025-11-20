@@ -219,7 +219,6 @@ export class MemoryScoringService {
         created_at: true,
         page_metadata: true,
         content: true,
-        summary: true,
       },
     })
 
@@ -236,7 +235,7 @@ export class MemoryScoringService {
       const categories = Array.isArray(metadata.categories)
         ? metadata.categories.filter((category): category is string => typeof category === 'string')
         : []
-      const contentLength = memory.content?.length || memory.summary?.length || 0
+      const contentLength = memory.content?.length || 0
       const baseImportance =
         typeof memory.importance_score === 'number' && Number.isFinite(memory.importance_score)
           ? clamp(memory.importance_score)

@@ -7,7 +7,7 @@ interface ApiSearchResult {
   url?: string
   title?: string
   content?: string
-  summary?: string
+  content_preview?: string
   timestamp: number
   created_at?: string
   full_content?: string
@@ -29,8 +29,8 @@ export function transformApiSearchResult(
       source: result.source || (result.url ? "browser" : "extension"),
       url: result.url,
       title: result.title,
-      content: result.content || result.summary || "",
-      summary: result.summary,
+      content: result.content || result.content_preview || "",
+      preview: result.content_preview || (result.content ? result.content.slice(0, 200) : ""),
       timestamp: result.timestamp,
       created_at:
         result.created_at || new Date(result.timestamp * 1000).toISOString(),
@@ -87,7 +87,6 @@ export function transformApiMemoryResponse(mem: {
   timestamp: string | number
   created_at?: string
   title?: string
-  summary?: string
   content?: string
   source?: string
   url?: string
@@ -107,8 +106,8 @@ export function transformApiMemoryResponse(mem: {
           : 0,
     created_at: mem.created_at || new Date().toISOString(),
     title: mem.title || "Memory",
-    summary: mem.summary || "",
     content: mem.content || "",
+    preview: mem.content ? mem.content.slice(0, 200) : undefined,
     source: mem.source || "extension",
     url: mem.url,
     page_metadata: mem.page_metadata

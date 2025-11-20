@@ -12,7 +12,6 @@ type DuplicateMemory = Prisma.MemoryGetPayload<{
     url: true
     timestamp: true
     created_at: true
-    summary: true
     content: true
     source: true
     page_metadata: true
@@ -42,7 +41,7 @@ type MemoryCreatePayload = {
   url?: string | null
   source?: string | null
   content: string
-  summary: string
+  contentPreview?: string
   metadata?: MetadataRecord
   extractedMetadata?: MetadataRecord | null
   canonicalText: string
@@ -73,7 +72,6 @@ export class MemoryIngestionService {
         url: true,
         timestamp: true,
         created_at: true,
-        summary: true,
         content: true,
         source: true,
         page_metadata: true,
@@ -107,7 +105,6 @@ export class MemoryIngestionService {
         url: true,
         timestamp: true,
         created_at: true,
-        summary: true,
         content: true,
         source: true,
         page_metadata: true,
@@ -127,7 +124,7 @@ export class MemoryIngestionService {
       if (normalizeUrl(existing.url) !== normalizedUrl) continue
       const similarity = calculateSimilarity(
         canonicalText,
-        normalizeText(existing.content || existing.summary || '')
+        normalizeText(existing.content || '')
       )
       if (similarity >= 0.9) {
         return { memory: existing, reason: 'url' }
@@ -165,7 +162,6 @@ export class MemoryIngestionService {
         url: true,
         timestamp: true,
         created_at: true,
-        summary: true,
         content: true,
         source: true,
         page_metadata: true,
@@ -234,7 +230,7 @@ export class MemoryIngestionService {
       explicitType: metadata.memory_type as string | undefined,
       metadata,
       title: payload.title,
-      contentPreview: payload.summary,
+      contentPreview: payload.contentPreview,
     })
 
     const importanceScore = memoryScoringService.calculateImportanceScore({
@@ -266,7 +262,6 @@ export class MemoryIngestionService {
       url: payload.url || 'unknown',
       title: payload.title || (typeof metadata.title === 'string' ? metadata.title : 'Untitled'),
       content: payload.content,
-      summary: payload.summary,
       canonical_text: payload.canonicalText,
       canonical_hash: payload.canonicalHash,
       timestamp: BigInt(Math.floor(Date.now() / 1000)),

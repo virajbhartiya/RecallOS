@@ -14,6 +14,7 @@ import { getRedisClient } from '../lib/redis.lib'
 import AppError from '../utils/app-error.util'
 import { memoryIngestionService } from '../services/memory-ingestion.service'
 import { logger } from '../utils/logger.util'
+import { buildContentPreview } from '../utils/text.util'
 
 export const submitContent = async (
   req: AuthenticatedRequest,
@@ -157,7 +158,6 @@ export const getSummarizedContent = async (
         take: limitNum,
         select: {
           id: true,
-          summary: true,
           created_at: true,
           content: true,
           title: true,
@@ -174,10 +174,10 @@ export const getSummarizedContent = async (
       data: {
         content: memories.map(memory => ({
           id: memory.id,
-          summary: memory.summary,
           created_at: memory.created_at,
           original_text: memory.content,
           original_text_length: memory.content.length,
+          preview: buildContentPreview(memory.content),
           title: memory.title,
           url: memory.url,
         })),
