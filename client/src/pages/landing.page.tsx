@@ -53,22 +53,6 @@ export const Landing = () => {
           },
           {
             className:
-              "absolute top-[20%] -right-20 w-[24rem] sm:w-[32rem] h-[24rem] sm:h-[32rem]",
-            from: "#38bdf8",
-            via: "#818cf8",
-            to: "#c084fc",
-            opacity: 0.5,
-          },
-          {
-            className:
-              "absolute top-[50%] -left-20 w-[26rem] sm:w-[34rem] h-[26rem] sm:h-[34rem]",
-            from: "#facc15",
-            via: "#fb923c",
-            to: "#f87171",
-            opacity: 0.45,
-          },
-          {
-            className:
               "absolute -bottom-28 right-0 w-[28rem] sm:w-[36rem] h-[28rem] sm:h-[36rem]",
             from: "#2dd4bf",
             via: "#34d399",
