@@ -10,7 +10,7 @@ const SENSITIVE_PATTERNS = {
   ssn: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g,
   bankAccount: /\b\d{8,17}\b/g,
   cvv: /\b\d{3,4}\b(?=.*(?:cvv|cvc|security|code))/gi,
-  apiKey: /\b(?:api[_-]?key|apikey|access[_-]?token|secret[_-]?key)\s*[:=]\s*['"]?([a-zA-Z0-9_\-]{20,})['"]?/gi,
+  apiKey: /\b(?:api[_-]?key|apikey|access[_-]?token|secret[_-]?key)\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?/gi,
   emailPassword: /password\s*[:=]\s*['"]?([^\s'"]+)['"]?/gi,
 }
 
@@ -123,7 +123,11 @@ export function sanitizeContextData(data: {
   full_content?: string
   meaningful_content?: string
   content_summary?: string
-  [key: string]: any
+  page_structure?: {
+    forms?: string[]
+    [key: string]: unknown
+  }
+  [key: string]: unknown
 }): typeof data {
   const sanitized = { ...data }
 
@@ -140,12 +144,10 @@ export function sanitizeContextData(data: {
     sanitized.content_summary = sanitizeText(sanitized.content_summary)
   }
 
-  if (sanitized.page_structure) {
-    if (Array.isArray(sanitized.page_structure.forms)) {
-      sanitized.page_structure.forms = sanitized.page_structure.forms.map((form: string) =>
-        sanitizeText(form)
-      )
-    }
+  if (sanitized.page_structure && Array.isArray(sanitized.page_structure.forms)) {
+    sanitized.page_structure.forms = sanitized.page_structure.forms.map((form: string) =>
+      sanitizeText(form)
+    )
   }
 
   return sanitized

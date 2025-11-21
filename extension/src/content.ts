@@ -344,26 +344,6 @@ function extractMeaningfulContent(): string {
     return extractVisibleText()
   }
 }
-function cleanAndExtractText(element: Element): string {
-  if (!element) return ''
-  try {
-    const scripts = element.querySelectorAll('script, style, noscript')
-    scripts.forEach(el => {
-      try {
-        el.remove()
-      } catch (_error) {}
-    })
-    removeSensitiveElements(element)
-    const text = element.textContent || ''
-    return sanitizeText(cleanText(text))
-  } catch (_error) {
-    try {
-      return sanitizeText(cleanText(element.textContent || ''))
-    } catch (_fallbackError) {
-      return ''
-    }
-  }
-}
 function cleanText(text: string): string {
   return text
     .replace(/\s+/g, ' ')
