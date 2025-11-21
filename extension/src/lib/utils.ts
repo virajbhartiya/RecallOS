@@ -10,7 +10,8 @@ const SENSITIVE_PATTERNS = {
   ssn: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g,
   bankAccount: /\b\d{8,17}\b/g,
   cvv: /\b\d{3,4}\b(?=.*(?:cvv|cvc|security|code))/gi,
-  apiKey: /\b(?:api[_-]?key|apikey|access[_-]?token|secret[_-]?key)\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?/gi,
+  apiKey:
+    /\b(?:api[_-]?key|apikey|access[_-]?token|secret[_-]?key)\s*[:=]\s*['"]?([a-zA-Z0-9_-]{20,})['"]?/gi,
   emailPassword: /password\s*[:=]\s*['"]?([^\s'"]+)['"]?/gi,
 }
 
@@ -63,10 +64,12 @@ export function sanitizeText(text: string): string {
   if (bankAccountMatches) {
     bankAccountMatches.forEach(match => {
       if (match.length >= 8 && match.length <= 17) {
-        const context = sanitized.substring(
-          Math.max(0, sanitized.indexOf(match) - 20),
-          Math.min(sanitized.length, sanitized.indexOf(match) + match.length + 20)
-        ).toLowerCase()
+        const context = sanitized
+          .substring(
+            Math.max(0, sanitized.indexOf(match) - 20),
+            Math.min(sanitized.length, sanitized.indexOf(match) + match.length + 20)
+          )
+          .toLowerCase()
         if (
           context.includes('account') ||
           context.includes('routing') ||
@@ -101,8 +104,7 @@ export function removeSensitiveElements(element: Element | Document): void {
           }
         }
       })
-    } catch (_error) {
-    }
+    } catch (_error) {}
   })
 }
 

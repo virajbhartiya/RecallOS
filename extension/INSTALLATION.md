@@ -73,11 +73,12 @@ Cognia is a browser extension that automatically captures and processes your web
 #### Step 2: Get the Source Code
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/cogniahq/Cognia.git
    cd Cognia/extension
    ```
-   
+
    Or download the source code from GitHub and extract it
 
 #### Step 3: Install Dependencies
@@ -213,6 +214,7 @@ If you encounter issues not covered in this guide:
 ### Installation Checklist
 
 **For Pre-built Release:**
+
 - [ ] Downloaded extension from GitHub releases
 - [ ] Extracted zip file to a folder
 - [ ] Located the `dist` folder
@@ -224,6 +226,7 @@ If you encounter issues not covered in this guide:
 - [ ] Started browsing to test capture
 
 **For Building from Source:**
+
 - [ ] Cloned/downloaded source code
 - [ ] Installed dependencies (`npm install`)
 - [ ] Built the extension (`npm run build`)
@@ -238,12 +241,15 @@ If you encounter issues not covered in this guide:
 ### Common Commands
 
 **Browser Extension Page:**
+
 - Chrome: `chrome://extensions/`
 
 **Developer Mode:**
+
 - Chrome: Toggle in top-right corner
 
 **Build Commands (from source):**
+
 - Install dependencies: `npm install`
 - Build extension: `npm run build`
 - Watch mode (development): `npm run watch`
@@ -273,6 +279,7 @@ If you're contributing to the extension or want to modify it:
 7. **Full check**: `npm run check` (runs lint, format, and build)
 
 The extension is built using:
+
 - TypeScript
 - React 18
 - Tailwind CSS
