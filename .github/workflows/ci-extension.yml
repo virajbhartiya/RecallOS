@@ -4,12 +4,10 @@ on:
   push:
     branches: [main]
     paths:
-      - 'extension/**'
       - '.github/workflows/ci-extension.yml'
   pull_request:
     branches: [main]
     paths:
-      - 'extension/**'
       - '.github/workflows/ci-extension.yml'
 
 jobs:

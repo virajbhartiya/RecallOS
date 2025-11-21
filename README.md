@@ -128,6 +128,16 @@ npm run build
 - **Memory Stats**: Total count, processing status
 - **Topic Analysis**: Top topics, categories, sentiment distribution
 - **Processing Monitoring**: Track processing states and status
+- **Browsing Summaries**: AI-generated daily/weekly/monthly summaries of your browsing activity
+
+### 7. Data Management
+- **Privacy Controls**: Audit logs for account activity tracking
+- **Profile Management**: User profile with preferences and settings
+
+### 8. Additional Features
+- **Email Drafting**: AI-powered email reply generation based on your memories
+- **Command Menu**: Quick navigation and actions via keyboard shortcuts (Cmd/Ctrl+K)
+- **Dark Mode**: Theme switching with system preference detection
 
 ---
 
@@ -137,8 +147,11 @@ npm run build
 - React 18 with TypeScript
 - Vite build tool
 - Tailwind CSS
-- Three.js + React Three Fiber for 3D graph
-- @xyflow/react for 2D graph
+- Three.js + React Three Fiber for 3D graph visualization
+- Radix UI for accessible components
+- React Router for navigation
+- cmdk for command menu
+- sonner for toast notifications
 
 ### Backend
 - Node.js + Express.js
@@ -147,6 +160,7 @@ npm run build
 - BullMQ (Redis) for job queue
 - JWT for authentication
 - bcryptjs for password hashing
+- Background workers for content processing, insights generation, and profile updates
 
 ### Database
 - PostgreSQL 14+ (relational data only)
@@ -162,6 +176,8 @@ npm run build
 - ESBuild (extension bundling)
 - Jest (API testing)
 - Prettier (code formatting)
+- ESLint for code quality
+- TypeScript for type safety
 
 ---
 
@@ -172,11 +188,24 @@ Cognia provides multiple ways to capture and interact with your knowledge:
 - **Browser Extension**: Automatically captures web content as you browse, with smart deduplication and privacy-aware detection
 - **Web Client**: Manual memory entry with rich editing and visualization tools
 
-Once captured, memories are automatically processed with canonicalization and vector embeddings. The system builds a knowledge graph connecting related memories through semantic, topical, and temporal relationships without storing separate summaries or AI-generated metadata.
+### Web Client Pages
 
-Search your knowledge base using natural language queries. The system performs semantic search across vector embeddings and generates AI-powered answers with inline citations to source memories. Results can be exported for use with ChatGPT or Claude.
+- **Landing**: Welcome page with product overview
+- **Memories**: Browse all memories with filters, search, and interactive 3D memory mesh visualization
+- **Analytics**: Comprehensive analytics dashboard with memory statistics, topic analysis, and processing monitoring
+- **Insights**: AI-generated browsing summaries (daily/weekly/monthly) with key learnings and patterns
+- **Profile**: User profile management with preferences and settings
+- **Docs**: Complete documentation and API reference
 
-Visualize your knowledge as an interactive 3D force-directed graph, where nodes represent memories and edges show relationships. The graph is color-coded by source type and edge thickness indicates relationship strength.
+### Key Workflows
+
+**Capturing Memories**: Once captured (via extension or manual entry), memories are automatically processed with canonicalization and vector embeddings. The system builds a knowledge graph connecting related memories through semantic, topical, and temporal relationships.
+
+**Searching**: Use natural language queries to search your knowledge base. The system performs semantic search across vector embeddings and generates AI-powered answers with inline citations to source memories. Access search via spotlight (Cmd/Ctrl+K) or in the Memories page. Results can be exported for use with ChatGPT or Claude.
+
+**Visualizing**: Explore your knowledge as an interactive 3D force-directed graph, where nodes represent memories and edges show relationships. The graph is color-coded by source type and edge thickness indicates relationship strength.
+
+**Insights**: Generate AI-powered summaries of your browsing activity to discover patterns, key learnings, and trends over time.
 
 ---
 
