@@ -86,19 +86,7 @@ export class MemoryService {
     return MemoryApi.healthCheck()
   }
 
-  static async getPendingJobs() {
-    return MemoryJobs.getPendingJobs()
-  }
-
   static async deleteMemory(memoryId: string) {
     return MemoryApi.deleteMemory(memoryId)
-  }
-
-  static async deletePendingJob(jobId: string) {
-    return MemoryJobs.deletePendingJob(jobId)
-  }
-
-  static async resubmitPendingJob(jobId: string) {
-    return MemoryJobs.resubmitPendingJob(jobId)
   }
 }

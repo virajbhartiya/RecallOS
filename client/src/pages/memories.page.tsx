@@ -7,7 +7,6 @@ import { useNavigate } from "react-router-dom"
 import type { Memory, MemorySearchResponse } from "@/types/memory.type"
 import { MemoryMesh3D } from "@/components/MemoryMesh3D"
 import { PageHeader } from "@/components/PageHeader"
-import { PendingJobsPanel } from "@/components/PendingJobsPanel"
 import { SpotlightSearch } from "@/components/SpotlightSearch"
 
 export const Memories: React.FC = () => {
@@ -29,7 +28,6 @@ export const Memories: React.FC = () => {
   const [clickedNodeId, setClickedNodeId] = useState<string | null>(null)
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null)
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false)
-  const [isPendingJobsOpen, setIsPendingJobsOpen] = useState(false)
   const [spotlightSearchQuery, setSpotlightSearchQuery] = useState("")
   const [spotlightSearchResults, setSpotlightSearchResults] =
     useState<MemorySearchResponse | null>(null)
@@ -228,17 +226,7 @@ export const Memories: React.FC = () => {
         backgroundImage: "linear-gradient(135deg, #f9fafb, #ffffff, #f3f4f6)",
       }}
     >
-      <PageHeader
-        pageName="Memories"
-        rightActions={
-          <button
-            onClick={() => setIsPendingJobsOpen(true)}
-            className="px-3 py-1.5 text-xs font-mono text-gray-600 hover:text-gray-900 hover:bg-gray-100 border border-gray-300 transition-colors"
-          >
-            Pending Jobs
-          </button>
-        }
-      />
+      <PageHeader pageName="Memories" />
 
       {/* Main Content */}
       <div className="flex flex-col md:flex-row h-[calc(100vh-3.5rem)] relative">
@@ -398,11 +386,6 @@ export const Memories: React.FC = () => {
             setSpotlightSearchAnswer(null)
             setSpotlightSearchCitations(null)
           }}
-        />
-
-        <PendingJobsPanel
-          isOpen={isPendingJobsOpen}
-          onClose={() => setIsPendingJobsOpen(false)}
         />
       </div>
     </div>
