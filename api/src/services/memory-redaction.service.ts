@@ -2,7 +2,6 @@ import { prisma } from '../lib/prisma.lib'
 import { logger } from '../utils/logger.util'
 import { auditLogService } from './audit-log.service'
 import { Prisma } from '@prisma/client'
-import { extractDomain } from '../utils/url.util'
 
 export class MemoryRedactionService {
   /**
@@ -51,10 +50,8 @@ export class MemoryRedactionService {
       eventType: 'memory_update',
       eventCategory: 'data_management',
       action: 'redacted',
-      resourceType: 'memory',
-      resourceId: memoryId,
-      domain: extractDomain(memory.url),
       metadata: {
+        memoryId,
         fieldsRedacted: fieldsToRedact,
       },
       ipAddress: options?.ipAddress,
