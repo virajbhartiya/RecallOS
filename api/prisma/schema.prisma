@@ -35,9 +35,6 @@ model AuditLog {
   user_id           String   @db.Uuid
   event_type        String
   event_category    String
-  resource_type     String?
-  resource_id       String?
-  domain            String?
   action            String
   metadata          Json?
   ip_address        String?
@@ -49,7 +46,6 @@ model AuditLog {
   @@index([event_type])
   @@index([event_category])
   @@index([created_at])
-  @@index([domain])
   @@map("audit_logs")
 }
 
@@ -57,7 +53,6 @@ model Memory {
   id                     String               @id @default(uuid()) @db.Uuid
   user_id                String               @db.Uuid
   source                 String
-  source_app             String?
   url                    String?
   title                  String?
   content                String
@@ -67,7 +62,6 @@ model Memory {
   confidence_score       Float                @default(0.5)
   timestamp              BigInt
   created_at             DateTime             @default(now())
-  expires_at             DateTime?
   full_content           String?
   page_metadata          Json?
   importance_score       Float?               @default(0.0)
@@ -124,7 +118,6 @@ model QueryEvent {
   user_id        String
   query          String
   embedding_hash String
-  meta_summary   String?
   created_at     DateTime             @default(now())
   related        QueryRelatedMemory[]
 
@@ -146,22 +139,6 @@ model QueryRelatedMemory {
 
   @@unique([query_event_id, memory_id])
   @@map("query_related_memories")
-}
-
-model SearchCache {
-  id           String   @id @default(uuid()) @db.Uuid
-  user_id      String
-  query        String
-  query_hash   String   @unique
-  results      Json
-  meta_summary String?
-  answer       String?
-  citations    Json?
-  job_id       String?
-  created_at   DateTime @default(now())
-  expires_at   DateTime
-
-  @@map("search_cache")
 }
 
 model TokenUsage {

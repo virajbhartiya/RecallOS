@@ -9,7 +9,6 @@ import { auditLogService } from '../services/audit-log.service'
 import { memoryRedactionService } from '../services/memory-redaction.service'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
-import { extractDomain } from '../utils/url.util'
 
 type MemorySelect = Prisma.MemoryGetPayload<{
   select: {
@@ -525,8 +524,6 @@ export class MemoryController {
         })
       }
 
-      const domain = extractDomain(memory.url)
-
       // Delete from Qdrant
       try {
         const { qdrantClient, COLLECTION_NAME } = await import('../lib/qdrant.lib')
@@ -581,7 +578,7 @@ export class MemoryController {
 
       // Log audit event
       auditLogService
-        .logMemoryDelete(req.user!.id, memoryId, domain, {
+        .logMemoryDelete(req.user!.id, memoryId, {
           ipAddress: req.ip,
           userAgent: req.get('user-agent'),
         })

@@ -190,17 +190,28 @@ export const cleanQueue = async (): Promise<{
 
   let removedCount = 0
 
-  // Only remove completed jobs - keep active, delayed, failed, and waiting jobs
-  for (const job of completed) {
+  // Remove all jobs from all states
+  const allJobs = [...waiting, ...active, ...delayed, ...completed, ...failed]
+  for (const job of allJobs) {
     try {
       await job.remove()
       removedCount++
     } catch (error) {
-      logger.warn(`Failed to remove completed job ${job.id}`, {
+      logger.warn(`Failed to remove job ${job.id}`, {
         jobId: job.id,
         error: error instanceof Error ? error.message : String(error),
       })
     }
+  }
+
+  // Use obliterate to clean all BullMQ internal keys (stalled-check, meta, events, etc.)
+  try {
+    await contentQueue.obliterate({ force: true })
+    logger.log('Queue obliterated - all internal keys cleaned')
+  } catch (error) {
+    logger.warn('Failed to obliterate queue', {
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 
   const [waitingAfter, activeAfter, delayedAfter, completedAfter, failedAfter] = await Promise.all([
@@ -218,7 +229,7 @@ export const cleanQueue = async (): Promise<{
     completedAfter.length +
     failedAfter.length
 
-  logger.log('Queue cleaned - removed completed jobs only', {
+  logger.log('Queue cleaned - removed all jobs and internal keys', {
     before: {
       waiting: waitingCount,
       active: activeCount,

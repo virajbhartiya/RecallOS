@@ -17,7 +17,6 @@ export class PrivacyController {
       const eventType = typeof req.query.eventType === 'string' ? req.query.eventType : undefined
       const eventCategory =
         typeof req.query.eventCategory === 'string' ? req.query.eventCategory : undefined
-      const domain = typeof req.query.domain === 'string' ? req.query.domain : undefined
       const limit = req.query.limit ? Number(req.query.limit) : 100
       const offset = req.query.offset ? Number(req.query.offset) : 0
       const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined
@@ -26,7 +25,6 @@ export class PrivacyController {
       const result = await auditLogService.getUserAuditLogs(req.user.id, {
         eventType: eventType as AuditEventType | undefined,
         eventCategory: eventCategory as AuditEventCategory | undefined,
-        domain,
         limit,
         offset,
         startDate,

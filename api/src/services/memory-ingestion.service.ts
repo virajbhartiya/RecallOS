@@ -221,13 +221,9 @@ export class MemoryIngestionService {
       importanceScore,
     })
 
-    const expiresAt = memoryScoringService.calculateExpiresAt(pageMetadata)
-    const sourceApp = this.detectSourceApp(metadata)
-
     return {
       user: { connect: { id: payload.userId } },
       source: (metadata.source as string | undefined) || payload.source || 'extension',
-      source_app: sourceApp,
       url: payload.url || 'unknown',
       title: payload.title || (typeof metadata.title === 'string' ? metadata.title : 'Untitled'),
       content: payload.content,
@@ -238,23 +234,8 @@ export class MemoryIngestionService {
       page_metadata: pageMetadata as Prisma.InputJsonValue,
       importance_score: importanceScore,
       confidence_score: confidenceScore,
-      expires_at: expiresAt ?? undefined,
       memory_type: memoryType,
     }
-  }
-
-  detectSourceApp(metadata?: MetadataRecord): string | undefined {
-    if (!metadata) return undefined
-    const directApp = metadata.source_app || metadata.app || metadata.application
-    if (typeof directApp === 'string' && directApp.trim().length > 0) {
-      return directApp.trim()
-    }
-    if (metadata.source && typeof metadata.source === 'string') {
-      if (/gmail/i.test(metadata.source)) return 'gmail'
-      if (/outlook/i.test(metadata.source)) return 'outlook'
-      if (/slack/i.test(metadata.source)) return 'slack'
-    }
-    return undefined
   }
 }
 

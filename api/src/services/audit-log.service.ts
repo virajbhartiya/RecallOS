@@ -1,7 +1,6 @@
 import { prisma } from '../lib/prisma.lib'
 import { logger } from '../utils/logger.util'
 import { Prisma } from '@prisma/client'
-import { extractDomain } from '../utils/url.util'
 
 export type AuditEventType =
   | 'memory_capture'
@@ -18,9 +17,6 @@ interface AuditLogData {
   eventType: AuditEventType
   eventCategory: AuditEventCategory
   action: string
-  resourceType?: string
-  resourceId?: string
-  domain?: string
   metadata?: Record<string, unknown>
   ipAddress?: string
   userAgent?: string
@@ -32,21 +28,12 @@ export class AuditLogService {
    */
   async logEvent(data: AuditLogData): Promise<void> {
     try {
-      // Extract domain from URL if provided in metadata
-      let domain = data.domain
-      if (!domain && data.metadata?.url && typeof data.metadata.url === 'string') {
-        domain = extractDomain(data.metadata.url)
-      }
-
       await prisma.auditLog.create({
         data: {
           user_id: data.userId,
           event_type: data.eventType,
           event_category: data.eventCategory,
           action: data.action,
-          resource_type: data.resourceType,
-          resource_id: data.resourceId,
-          domain,
           metadata: data.metadata ? (data.metadata as Prisma.InputJsonValue) : undefined,
           ip_address: data.ipAddress,
           user_agent: data.userAgent,
@@ -70,7 +57,6 @@ export class AuditLogService {
     options?: {
       eventType?: AuditEventType
       eventCategory?: AuditEventCategory
-      domain?: string
       limit?: number
       offset?: number
       startDate?: Date
@@ -85,10 +71,6 @@ export class AuditLogService {
 
     if (options?.eventCategory) {
       where.event_category = options.eventCategory
-    }
-
-    if (options?.domain) {
-      where.domain = options.domain
     }
 
     if (options?.startDate || options?.endDate) {
@@ -128,16 +110,12 @@ export class AuditLogService {
     url: string,
     options?: { ipAddress?: string; userAgent?: string }
   ) {
-    const domain = extractDomain(url)
     await this.logEvent({
       userId,
       eventType: 'memory_capture',
       eventCategory: 'capture',
       action: 'captured',
-      resourceType: 'memory',
-      resourceId: memoryId,
-      domain,
-      metadata: { url },
+      metadata: { url, memoryId },
       ipAddress: options?.ipAddress,
       userAgent: options?.userAgent,
     })
@@ -172,7 +150,6 @@ export class AuditLogService {
   async logMemoryDelete(
     userId: string,
     memoryId: string,
-    domain?: string,
     options?: { ipAddress?: string; userAgent?: string }
   ) {
     await this.logEvent({
@@ -180,9 +157,7 @@ export class AuditLogService {
       eventType: 'memory_delete',
       eventCategory: 'data_management',
       action: 'deleted',
-      resourceType: 'memory',
-      resourceId: memoryId,
-      domain,
+      metadata: { memoryId },
       ipAddress: options?.ipAddress,
       userAgent: options?.userAgent,
     })

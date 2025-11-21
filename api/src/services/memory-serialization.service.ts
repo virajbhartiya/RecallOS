@@ -6,7 +6,6 @@ type MemoryWithTimestamp = {
 type SerializedMemory = {
   timestamp: string | null
   last_accessed?: string | null
-  expires_at?: string | null
   [key: string]: unknown
 }
 
@@ -30,10 +29,6 @@ export class MemorySerializationService {
       const value = memory.last_accessed as Date | null | undefined
       serialized.last_accessed = value instanceof Date ? value.toISOString() : null
     }
-    if ('expires_at' in memory) {
-      const value = memory.expires_at as Date | null | undefined
-      serialized.expires_at = value instanceof Date ? value.toISOString() : null
-    }
     return serialized
   }
 
@@ -54,13 +49,10 @@ export class MemorySerializationService {
           result.memory.last_accessed instanceof Date
             ? result.memory.last_accessed.toISOString()
             : null
-        const expiresAt =
-          result.memory.expires_at instanceof Date ? result.memory.expires_at.toISOString() : null
         serialized.memory = {
           ...result.memory,
           timestamp: result.memory.timestamp ? String(result.memory.timestamp) : null,
           last_accessed: lastAccessed,
-          expires_at: expiresAt,
         }
       }
       return serialized

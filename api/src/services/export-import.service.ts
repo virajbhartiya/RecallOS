@@ -21,7 +21,6 @@ export type ExportBundle = {
     memory_type: string
     importance_score: number | null
     confidence_score: number | null
-    source_app: string | null
   }>
   profile: {
     static_profile_text: string | null
@@ -59,7 +58,6 @@ export class ExportImportService {
             memory_type: true,
             importance_score: true,
             confidence_score: true,
-            source_app: true,
           },
           orderBy: { created_at: 'desc' },
         }),
@@ -97,7 +95,6 @@ export class ExportImportService {
           memory_type: m.memory_type,
           importance_score: m.importance_score,
           confidence_score: m.confidence_score,
-          source_app: m.source_app,
         })),
         profile: profile
           ? {
@@ -169,7 +166,6 @@ export class ExportImportService {
               memory_type: memory.memory_type as MemoryType,
               importance_score: memory.importance_score,
               confidence_score: memory.confidence_score,
-              source_app: memory.source_app,
             },
           })
           importedMemories++

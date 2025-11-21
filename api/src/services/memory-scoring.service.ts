@@ -155,31 +155,6 @@ export class MemoryScoringService {
     return clamp(score, 0.1, 1)
   }
 
-  calculateExpiresAt(metadata?: Record<string, unknown> | null): Date | null {
-    if (!metadata) return null
-    const explicit =
-      metadata.expires_at || metadata.expiry || metadata.valid_until || metadata.deadline
-    if (typeof explicit === 'string' || explicit instanceof Date) {
-      const date = new Date(explicit)
-      if (!Number.isNaN(date.getTime())) {
-        return date
-      }
-    }
-    if (metadata.period_end) {
-      const date = new Date(metadata.period_end as string)
-      if (!Number.isNaN(date.getTime())) {
-        return date
-      }
-    }
-    if (metadata.content_type === 'calendar_event' && metadata.event_end) {
-      const date = new Date(metadata.event_end as string)
-      if (!Number.isNaN(date.getTime())) {
-        return date
-      }
-    }
-    return null
-  }
-
   mergeMetadata(
     existing: Prisma.JsonValue | null | undefined,
     incoming: Record<string, unknown>
