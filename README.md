@@ -90,58 +90,13 @@ npm run build
 
 ---
 
-## System Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        USER INTERFACES                          │
-├─────────────────────────────────────────────────────────────────┤
-│  Browser Extension  │   Web Client (React)    │   SDK/MCP       │
-└──────────┬──────────┴────────────┬────────────┴──────────┬──────┘
-           │                       │                       │
-           └───────────────────────┼───────────────────────┘
-                                   │
-                     ┌─────────────▼─────────────┐
-                     │   Express.js API Server   │
-                     │  (Controllers & Routes)   │
-                     │   Authentication (JWT)    │
-                     └─────────────┬─────────────┘
-                                   │
-         ┌─────────────┬───────────┼───────────┐
-         │             │           │           │             
-     ┌────▼─────┐ ┌────▼─────┐┌────▼─────┐ ┌────▼─────┐
-     │ Memory   │ │ Search   ││ Content  │ │   Auth   │
-     │Controller│ │Controller││Controller│ │Controller│
-     └────┬─────┘ └────┬─────┘└────┬─────┘ └────┬─────┘
-          │            │           │            │
-          └────────────┴───────────┴────────────┘
-                                   │
-         ┌─────────────┬───────────┼───────────┐
-         │             │           │           │             
-    ┌────▼────┐  ┌────▼────┐ ┌────▼────┐ ┌────▼─────┐
-    │   AI    │  │ Memory  │ │ Memory  │ │   JWT    │
-    │Provider │  │  Mesh   │ │ Search  │ │  Utils   │
-    └────┬────┘  └────┬────┘ └────┬────┘ └────┬─────┘
-         │            │           │           │
-         └────────────┴───────────┴───────────┘
-                        │
-          ┌─────────────┬───────────┐
-          │             │           │
-     ┌────▼─────┐  ┌────▼─────┐ ┌────▼────┐
-     │PostgreSQL│  │ Qdrant   │ │  Redis  │
-     │ Database │  │Vectors   │ │ Queue   │
-     └──────────┘  └──────────┘ └─────────┘
-```
-
----
-
 ## Core Features
 
 ### 1. Intelligent Capture
 - **Browser Extension**: Automatic capture of web content as you browse
 - **Smart Deduplication**: Prevents storing the same content twice
 - **Privacy-Aware**: Detects and adapts to privacy extensions
-- **Multi-Source**: Extension, web client, SDK, or MCP integration
+- **Multi-Source**: Extension or web client
 
 ### 2. AI-Powered Processing
 - **Hybrid AI**: Gemini (cloud) → Ollama (local) → Deterministic fallback
@@ -216,7 +171,6 @@ Cognia provides multiple ways to capture and interact with your knowledge:
 
 - **Browser Extension**: Automatically captures web content as you browse, with smart deduplication and privacy-aware detection
 - **Web Client**: Manual memory entry with rich editing and visualization tools
-- **SDK/MCP Integration**: Programmatic access for custom integrations and automation
 
 Once captured, memories are automatically processed with canonicalization and vector embeddings. The system builds a knowledge graph connecting related memories through semantic, topical, and temporal relationships without storing separate summaries or AI-generated metadata.
 

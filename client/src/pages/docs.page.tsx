@@ -100,7 +100,7 @@ export const Docs = () => {
     {
       question: "Can I export my memories?",
       answer:
-        "Yes! You can export your memories as JSON data at any time. You can also use our SDK to programmatically access all your memories.",
+        "Yes! You can export your memories as JSON data at any time.",
     },
     {
       question: "Does the extension slow down my browser?",
@@ -270,8 +270,8 @@ export const Docs = () => {
                 How to Use
               </h2>
               <p className="text-gray-700 mb-4">
-                Cognia can be used in three ways: Browser Extension (automatic),
-                Web Client (manual), or SDK (programmatic).
+                Cognia can be used in two ways: Browser Extension (automatic) or
+                Web Client (manual).
               </p>
             </section>
 
