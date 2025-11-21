@@ -11,7 +11,7 @@ interface ImportMeta {
     VITE_FIREBASE_STORAGE_BUCKET: string
     VITE_FIREBASE_MESSAGING_SENDER_ID: string
     VITE_FIREBASE_APP_ID: string
-    VITE_FIREBASE_MEASURMENT_ID: string
+    VITE_FIREBASE_MEASUREMENT_ID: string
   }
 }
 
