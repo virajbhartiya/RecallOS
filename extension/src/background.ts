@@ -263,7 +263,8 @@ async function sendToBackend(data: ContextData): Promise<void> {
       content &&
       content.length > 50 &&
       !content.includes('Content extraction failed') &&
-      !content.includes('No content available')
+      !content.includes('No content available') &&
+      !content.includes('[REDACTED:')
 
     if (!isValidContent) {
       return

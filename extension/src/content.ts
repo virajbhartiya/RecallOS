@@ -2,6 +2,12 @@
 import { getUserId, requireAuthToken } from '@/lib/userId'
 import { runtime, storage } from '@/lib/browser'
 import { MESSAGE_TYPES } from '@/lib/constants'
+import {
+  sanitizeText,
+  removeSensitiveElements,
+  sanitizeElementContent,
+  sanitizeContextData,
+} from '@/lib/utils'
 
 interface ContextData {
   source: string
@@ -138,8 +144,9 @@ detectPrivacyExtensions()
 function extractVisibleText(): string {
   try {
     if (!document.body || !document.body.textContent) {
-      return document.documentElement?.textContent || document.title || ''
+      return sanitizeText(document.documentElement?.textContent || document.title || '')
     }
+    removeSensitiveElements(document.body)
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
       acceptNode: node => {
         try {
@@ -147,6 +154,9 @@ function extractVisibleText(): string {
           if (!parent) return NodeFilter.FILTER_REJECT
           const style = window.getComputedStyle(parent)
           if (style.display === 'none' || style.visibility === 'hidden') {
+            return NodeFilter.FILTER_REJECT
+          }
+          if (parent.closest('input[type="password"], input[autocomplete*="password"]')) {
             return NodeFilter.FILTER_REJECT
           }
           return NodeFilter.FILTER_ACCEPT
@@ -167,14 +177,14 @@ function extractVisibleText(): string {
         continue
       }
     }
-    return textNodes.join(' ')
+    return sanitizeText(textNodes.join(' '))
   } catch (_error) {
     try {
-      return (
+      const text =
         document.body?.textContent || document.documentElement?.textContent || document.title || ''
-      )
+      return sanitizeText(text)
     } catch (_fallbackError) {
-      return document.title || window.location.href
+      return sanitizeText(document.title || window.location.href)
     }
   }
 }
@@ -255,6 +265,7 @@ function extractMeaningfulContent(): string {
     } catch (_error) {
       tempDiv.textContent = document.body.textContent || ''
     }
+    removeSensitiveElements(tempDiv)
     boilerplateSelectors.forEach(selector => {
       try {
         const elements = tempDiv.querySelectorAll(selector)
@@ -291,7 +302,7 @@ function extractMeaningfulContent(): string {
       try {
         const element = tempDiv.querySelector(selector)
         if (element) {
-          const text = cleanAndExtractText(element)
+          const text = sanitizeElementContent(element)
           if (text && text.length > 100) {
             meaningfulContent = text
             break
@@ -309,7 +320,7 @@ function extractMeaningfulContent(): string {
         const paragraphs = Array.from(meaningfulElements)
           .map(el => {
             try {
-              return cleanAndExtractText(el)
+              return sanitizeElementContent(el)
             } catch (_error) {
               return ''
             }
@@ -323,12 +334,12 @@ function extractMeaningfulContent(): string {
     }
     if (!meaningfulContent) {
       try {
-        meaningfulContent = cleanAndExtractText(tempDiv)
+        meaningfulContent = sanitizeElementContent(tempDiv)
       } catch (_error) {
         meaningfulContent = extractVisibleText()
       }
     }
-    return cleanText(meaningfulContent).substring(0, 50000)
+    return sanitizeText(cleanText(meaningfulContent).substring(0, 50000))
   } catch (_error) {
     return extractVisibleText()
   }
@@ -342,11 +353,12 @@ function cleanAndExtractText(element: Element): string {
         el.remove()
       } catch (_error) {}
     })
+    removeSensitiveElements(element)
     const text = element.textContent || ''
-    return cleanText(text)
+    return sanitizeText(cleanText(text))
   } catch (_error) {
     try {
-      return cleanText(element.textContent || '')
+      return sanitizeText(cleanText(element.textContent || ''))
     } catch (_fallbackError) {
       return ''
     }
@@ -388,24 +400,28 @@ function isBoilerplateText(text: string): boolean {
   return boilerplatePatterns.some(pattern => pattern.test(shortText))
 }
 function extractContentSummary(): string {
-  const title = document.title
-  const metaDescription =
+  const title = sanitizeText(document.title)
+  const metaDescription = sanitizeText(
     document.querySelector('meta[name="description"]')?.getAttribute('content') || ''
-  const ogDescription =
+  )
+  const ogDescription = sanitizeText(
     document.querySelector('meta[property="og:description"]')?.getAttribute('content') || ''
-  const twitterDescription =
+  )
+  const twitterDescription = sanitizeText(
     document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') || ''
-  const mainHeading =
+  )
+  const mainHeading = sanitizeText(
     document.querySelector('h1')?.textContent?.trim() ||
-    document.querySelector('h2')?.textContent?.trim() ||
-    document.querySelector('h3')?.textContent?.trim() ||
-    ''
+      document.querySelector('h2')?.textContent?.trim() ||
+      document.querySelector('h3')?.textContent?.trim() ||
+      ''
+  )
   const paragraphs = Array.from(document.querySelectorAll('p'))
-    .map(p => p.textContent?.trim())
+    .map(p => sanitizeText(p.textContent?.trim() || ''))
     .filter(text => text && text.length > 50 && !isBoilerplateText(text))
   const firstParagraph = paragraphs[0] || ''
   const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
-    .map(h => h.textContent?.trim())
+    .map(h => sanitizeText(h.textContent?.trim() || ''))
     .filter(text => text && text.length > 0 && text.length < 100)
     .slice(0, 3)
   const summaryParts = [
@@ -415,7 +431,7 @@ function extractContentSummary(): string {
     firstParagraph,
     ...headings,
   ].filter(text => text && text.length > 0)
-  return summaryParts.join(' | ').substring(0, 800)
+  return sanitizeText(summaryParts.join(' | ').substring(0, 800))
 }
 function extractContentType(): string {
   const url = window.location.href
@@ -548,7 +564,8 @@ function extractReadingTime(): number {
 }
 function extractFullContent(): string {
   const fullText = extractVisibleText()
-  return fullText.length > 5000 ? fullText.substring(0, 5000) + '...' : fullText
+  const truncated = fullText.length > 5000 ? fullText.substring(0, 5000) + '...' : fullText
+  return sanitizeText(truncated)
 }
 function extractPageMetadata() {
   const meta = document.querySelector('meta[name="description"]') as HTMLMetaElement
@@ -575,13 +592,13 @@ function extractPageMetadata() {
 }
 function extractPageStructure() {
   const headings = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'))
-    .map(h => h.textContent?.trim())
+    .map(h => sanitizeText(h.textContent?.trim() || ''))
     .filter(text => text && text.length > 0)
     .slice(0, 20)
   const links = Array.from(document.querySelectorAll('a[href]'))
     .map(a => {
       const href = (a as HTMLAnchorElement).href
-      const text = a.textContent?.trim()
+      const text = sanitizeText(a.textContent?.trim() || '')
       return text ? `${text} (${href})` : href
     })
     .filter(link => link.length > 0)
@@ -589,7 +606,7 @@ function extractPageStructure() {
   const images = Array.from(document.querySelectorAll('img[src]'))
     .map(img => {
       const src = (img as HTMLImageElement).src
-      const alt = (img as HTMLImageElement).alt
+      const alt = sanitizeText((img as HTMLImageElement).alt || '')
       return alt ? `${alt} (${src})` : src
     })
     .filter(img => img.length > 0)
@@ -597,23 +614,43 @@ function extractPageStructure() {
   const forms = Array.from(document.querySelectorAll('form'))
     .map(form => {
       const inputs = Array.from(form.querySelectorAll('input, textarea, select'))
-        .map(
-          input => (input as HTMLInputElement).name || (input as HTMLInputElement).type || 'input'
-        )
+        .map(input => {
+          const inputEl = input as HTMLInputElement
+          if (
+            inputEl.type === 'password' ||
+            inputEl.autocomplete?.includes('password') ||
+            inputEl.name?.toLowerCase().includes('password') ||
+            inputEl.id?.toLowerCase().includes('password')
+          ) {
+            return '[REDACTED: Password Field]'
+          }
+          if (
+            inputEl.autocomplete?.includes('credit-card') ||
+            inputEl.name?.toLowerCase().includes('card') ||
+            inputEl.name?.toLowerCase().includes('credit') ||
+            inputEl.id?.toLowerCase().includes('card') ||
+            inputEl.id?.toLowerCase().includes('credit')
+          ) {
+            return '[REDACTED: Credit Card Field]'
+          }
+          return inputEl.name || inputEl.type || 'input'
+        })
         .join(', ')
-      return inputs ? `Form with: ${inputs}` : 'Form'
+      return inputs ? sanitizeText(`Form with: ${inputs}`) : 'Form'
     })
     .slice(0, 10)
   const codeBlocks = Array.from(document.querySelectorAll('pre, code'))
-    .map(code => code.textContent?.trim())
+    .map(code => sanitizeText(code.textContent?.trim() || ''))
     .filter(code => code && code.length > 10)
     .slice(0, 10)
   const tables = Array.from(document.querySelectorAll('table'))
     .map(table => {
       const headers = Array.from(table.querySelectorAll('th'))
-        .map(th => th.textContent?.trim())
+        .map(th => sanitizeText(th.textContent?.trim() || ''))
         .filter(text => text && text.length > 0)
-      return headers.length > 0 ? `Table with columns: ${headers.join(', ')}` : 'Table'
+      return headers.length > 0
+        ? sanitizeText(`Table with columns: ${headers.join(', ')}`)
+        : 'Table'
     })
     .slice(0, 5)
   return { headings, links, images, forms, code_blocks: codeBlocks, tables }
@@ -650,10 +687,10 @@ function extractUserActivity() {
 function captureContext(): ContextData {
   try {
     const url = window.location.href
-    const title = document.title || ''
+    const title = sanitizeText(document.title || '')
     const meaningfulContent = extractMeaningfulContent()
     const content_snippet = meaningfulContent.substring(0, 500)
-    return {
+    const contextData = {
       source: 'extension',
       url,
       title,
@@ -670,10 +707,11 @@ function captureContext(): ContextData {
       user_activity: extractUserActivity(),
       content_quality: extractContentQuality(),
     }
+    return sanitizeContextData(contextData) as ContextData
   } catch (_error) {
-    const basicTitle = document.title || 'Untitled Page'
+    const basicTitle = sanitizeText(document.title || 'Untitled Page')
     const basicUrl = window.location.href
-    const basicContent = `Page: ${basicTitle} | URL: ${basicUrl}`
+    const basicContent = sanitizeText(`Page: ${basicTitle} | URL: ${basicUrl}`)
 
     return {
       source: 'extension',
@@ -683,7 +721,7 @@ function captureContext(): ContextData {
       timestamp: Date.now(),
       full_content: basicContent,
       meaningful_content: basicContent,
-      content_summary: `Basic page information for ${basicTitle}`,
+      content_summary: sanitizeText(`Basic page information for ${basicTitle}`),
       content_type: 'web_page',
       key_topics: [],
       reading_time: 0,
@@ -1061,29 +1099,32 @@ function extractEmailContext(): EmailDraftContext | null {
 }
 
 function extractGmailContext(): EmailDraftContext | null {
-  const subject =
+  const subject = sanitizeText(
     document.querySelector('h2.hP')?.textContent?.trim() ||
-    (
-      document.querySelector('input[name="subjectbox"]') as HTMLInputElement | null
-    )?.value?.trim() ||
-    document.title ||
-    'No subject'
+      (
+        document.querySelector('input[name="subjectbox"]') as HTMLInputElement | null
+      )?.value?.trim() ||
+      document.title ||
+      'No subject'
+  )
 
   const messageNodes = Array.from(document.querySelectorAll('div[data-message-id]'))
   const threadParts = messageNodes
     .map(node => {
-      const sender =
+      const sender = sanitizeText(
         node.querySelector('.gD')?.textContent?.trim() ||
-        node.querySelector('.g2')?.textContent?.trim() ||
-        ''
-      const timestamp = node.querySelector('.g3')?.textContent?.trim() || ''
-      const body =
+          node.querySelector('.g2')?.textContent?.trim() ||
+          ''
+      )
+      const timestamp = sanitizeText(node.querySelector('.g3')?.textContent?.trim() || '')
+      const body = sanitizeText(
         node.querySelector('.a3s')?.textContent?.trim() ||
-        node
-          .querySelector('.a3s')
-          ?.innerHTML?.replace(/<[^>]+>/g, ' ')
-          .trim() ||
-        ''
+          node
+            .querySelector('.a3s')
+            ?.innerHTML?.replace(/<[^>]+>/g, ' ')
+            .trim() ||
+          ''
+      )
       if (!body) {
         return ''
       }
@@ -1091,7 +1132,9 @@ function extractGmailContext(): EmailDraftContext | null {
     })
     .filter(Boolean)
 
-  const threadText = threadParts.join('\n\n---\n\n').substring(0, EMAIL_THREAD_CHAR_LIMIT)
+  const threadText = sanitizeText(
+    threadParts.join('\n\n---\n\n').substring(0, EMAIL_THREAD_CHAR_LIMIT)
+  )
   if (!threadText) {
     return null
   }
@@ -1126,13 +1169,14 @@ function extractGmailContext(): EmailDraftContext | null {
 }
 
 function extractOutlookContext(): EmailDraftContext | null {
-  const subject =
+  const subject = sanitizeText(
     document.querySelector('div[role="heading"][aria-level="1"]')?.textContent?.trim() ||
-    (
-      document.querySelector('input[aria-label*="subject"]') as HTMLInputElement | null
-    )?.value?.trim() ||
-    document.title ||
-    'No subject'
+      (
+        document.querySelector('input[aria-label*="subject"]') as HTMLInputElement | null
+      )?.value?.trim() ||
+      document.title ||
+      'No subject'
+  )
 
   const messageNodes = Array.from(
     document.querySelectorAll('[data-testid="messageBodyContent"], div[aria-label="Message body"]')
@@ -1140,10 +1184,12 @@ function extractOutlookContext(): EmailDraftContext | null {
 
   const threadParts = messageNodes
     .filter(node => node.getAttribute('contenteditable') !== 'true')
-    .map(node => node.textContent?.trim() || '')
+    .map(node => sanitizeText(node.textContent?.trim() || ''))
     .filter(Boolean)
 
-  const threadText = threadParts.join('\n\n---\n\n').substring(0, EMAIL_THREAD_CHAR_LIMIT)
+  const threadText = sanitizeText(
+    threadParts.join('\n\n---\n\n').substring(0, EMAIL_THREAD_CHAR_LIMIT)
+  )
   if (!threadText) {
     return null
   }
@@ -1501,13 +1547,15 @@ function ensureDraftPill(composeElement: HTMLElement, _context: EmailDraftContex
       }
 
       const payload: EmailDraftPayload = {
-        thread_text: currentContext.threadText,
-        subject: currentContext.subject,
+        thread_text: sanitizeText(currentContext.threadText),
+        subject: sanitizeText(currentContext.subject),
         provider: currentContext.provider,
-        participants: currentContext.participants,
-        existing_draft: currentContext.existingDraft,
+        participants: currentContext.participants.map(p => sanitizeText(p)),
+        existing_draft: currentContext.existingDraft
+          ? sanitizeText(currentContext.existingDraft)
+          : undefined,
         url: window.location.href,
-        title: document.title,
+        title: sanitizeText(document.title),
       }
 
       const draft = await requestDraftFromBackground(payload)
