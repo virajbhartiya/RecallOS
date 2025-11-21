@@ -68,11 +68,13 @@
     @apply bg-background text-foreground;
     font-family: "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-weight: 300;
+    overscroll-behavior: none;
   }
 }
 
 html {
   scroll-behavior: smooth;
+  overscroll-behavior: none;
 }
 
 /* Custom font classes for design system */

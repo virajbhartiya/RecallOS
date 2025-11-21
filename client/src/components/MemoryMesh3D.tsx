@@ -83,8 +83,7 @@ const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null)
   const { camera } = useThree()
   const [hovered, setHovered] = useState(false)
-
-  // Supermemory-like tiny nodes
+  
   const baseSize = 0.0035 + importance * 0.0015
   const size = baseSize
   const opacity = inLatentSpace ? 0.95 : 0.75
@@ -204,15 +203,7 @@ const MemoryEdge = memo(MemoryEdgeComponent)
 const RotatingMesh: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const groupRef = useRef<THREE.Group>(null)
-
-  useFrame((_, delta) => {
-    if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.1
-    }
-  })
-
-  return <group ref={groupRef}>{children}</group>
+  return <group>{children}</group>
 }
 
 interface SceneProps {
