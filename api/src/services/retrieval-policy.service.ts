@@ -1,6 +1,6 @@
 import { MemoryType } from '@prisma/client'
 
-export type RetrievalPolicyName = 'chat' | 'planning' | 'profile' | 'summarization' | 'insight'
+export type RetrievalPolicyName = 'chat' | 'planning' | 'profile' | 'summarization'
 
 export type RetrievalPolicy = {
   name: RetrievalPolicyName
@@ -62,16 +62,6 @@ const POLICY_MAP: Record<RetrievalPolicyName, RetrievalPolicy> = {
     timeRangeDays: 14,
     allowedTypes: ['LOG_EVENT'],
     contextBudget: 1200,
-  },
-  insight: {
-    name: 'insight',
-    description: 'Blend diverse memory types for insights/analytics',
-    semanticWeight: 0.5,
-    keywordWeight: 0.2,
-    importanceWeight: 0.3,
-    recencyHalfLifeDays: 30,
-    maxResults: 20,
-    contextBudget: 2500,
   },
 }
 

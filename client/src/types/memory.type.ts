@@ -26,28 +26,6 @@ export interface Memory {
   memory_type?: MemoryType | null
 }
 
-export interface MemoryInsights {
-  total_memories: number
-  categories: {
-    [category: string]: number
-  }
-  sentiment_distribution: {
-    positive: number
-    negative: number
-    neutral: number
-  }
-  topology: {
-    total_nodes: number
-    total_edges: number
-    average_connections: number
-    largest_cluster_size: number
-  }
-  recent_activity: {
-    last_7_days: number
-    last_30_days: number
-  }
-}
-
 export interface MemoryMeshNode {
   id: string
   type: "manual" | "browser" | "extension" | "reasoning"

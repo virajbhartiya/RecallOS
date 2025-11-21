@@ -16,7 +16,6 @@ export interface PerformanceConfig {
 
   // Visualization features
   enableVisualizations: boolean
-  enableInsights: boolean
 
   // Worker settings
   workerConcurrency: number
@@ -33,7 +32,6 @@ const profiles: Record<PerformanceProfile, PerformanceConfig> = {
     enableReranking: true,
     maxSearchResults: 100,
     enableVisualizations: true,
-    enableInsights: true,
     workerConcurrency: 2,
     batchSize: 10,
   },
@@ -46,7 +44,6 @@ const profiles: Record<PerformanceProfile, PerformanceConfig> = {
     enableReranking: false,
     maxSearchResults: 20,
     enableVisualizations: false,
-    enableInsights: false,
     workerConcurrency: 1,
     batchSize: 5,
   },
@@ -59,7 +56,6 @@ const profiles: Record<PerformanceProfile, PerformanceConfig> = {
     enableReranking: true,
     maxSearchResults: 1000,
     enableVisualizations: true,
-    enableInsights: true,
     workerConcurrency: 5,
     batchSize: 50,
   },
@@ -113,10 +109,6 @@ export class PerformanceProfileService {
 
   shouldEnableVisualizations(): boolean {
     return this.config.enableVisualizations
-  }
-
-  shouldEnableInsights(): boolean {
-    return this.config.enableInsights
   }
 
   getWorkerConcurrency(): number {

@@ -9,7 +9,6 @@ export type OperationType =
   | 'evaluate_relationship'
   | 'generate_wow_facts'
   | 'generate_narrative_summary'
-  | 'generate_key_insights'
 
 export interface TokenUsageRecord {
   userId: string

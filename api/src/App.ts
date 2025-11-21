@@ -20,7 +20,6 @@ import { prisma } from './lib/prisma.lib'
 
 import { startContentWorker } from './workers/content-worker'
 import { startCyclicProfileWorker } from './workers/profile-worker'
-import { startCyclicInsightsWorker } from './workers/insights-worker'
 import { ensureCollection } from './lib/qdrant.lib'
 import { aiProvider } from './services/ai-provider.service'
 import { logger } from './utils/logger.util'
@@ -202,20 +201,16 @@ app.use(validateRequestSize(10 * 1024 * 1024)) // 10MB limit
 
 const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS || 60000) // 60 seconds default
 const SEARCH_TIMEOUT_MS = Number(process.env.SEARCH_TIMEOUT_MS || 360000) // 6 minutes for search requests
-const INSIGHTS_TIMEOUT_MS = Number(process.env.INSIGHTS_TIMEOUT_MS || 360000) // 6 minutes for insights generation
 const EMAIL_DRAFT_TIMEOUT_MS = Number(process.env.EMAIL_DRAFT_TIMEOUT_MS || 360000) // 6 minutes for email drafts (allows for queue delays)
 
 app.use((req: Request, res: Response, next: NextFunction) => {
   const isSearchRequest = req.path === '/api/search' && req.method === 'POST'
-  const isInsightsRequest = req.path === '/api/insights/summaries/generate' && req.method === 'POST'
   const isEmailDraftRequest = req.path === '/api/content/email/draft' && req.method === 'POST'
   const timeoutMs = isSearchRequest
     ? SEARCH_TIMEOUT_MS
-    : isInsightsRequest
-      ? INSIGHTS_TIMEOUT_MS
-      : isEmailDraftRequest
-        ? EMAIL_DRAFT_TIMEOUT_MS
-        : REQUEST_TIMEOUT_MS
+    : isEmailDraftRequest
+      ? EMAIL_DRAFT_TIMEOUT_MS
+      : REQUEST_TIMEOUT_MS
 
   const timeout = setTimeout(() => {
     if (!res.headersSent) {
@@ -287,8 +282,6 @@ server.listen(port, async () => {
   logger.log('[startup] content_worker_started')
   startCyclicProfileWorker()
   logger.log('[startup] profile_worker_started')
-  startCyclicInsightsWorker()
-  logger.log('[startup] insights_worker_started')
   logger.log('[startup] server_listening', { protocol, port })
 })
 process.on('unhandledRejection', (err: Error) => {

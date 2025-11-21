@@ -364,14 +364,6 @@ export const Docs = () => {
                     </p>
                   </div>
                   <div className="bg-white border border-gray-200 p-3">
-                    <h4 className="font-medium text-sm">Insights</h4>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Get AI-generated summaries of your browsing - see what you
-                      learned today, this week, or this month, with key patterns
-                      and takeaways.
-                    </p>
-                  </div>
-                  <div className="bg-white border border-gray-200 p-3">
                     <h4 className="font-medium text-sm">Profile</h4>
                     <p className="text-xs text-gray-600 mt-1">
                       Manage your account settings and see your profile
@@ -800,10 +792,6 @@ export const Docs = () => {
                         count
                       </p>
                       <p>
-                        <code>GET /api/memory/insights</code> - Get memory
-                        analytics (topics, categories, sentiment)
-                      </p>
-                      <p>
                         <code>DELETE /api/memory/:memoryId</code> - Delete a
                         memory
                       </p>
@@ -850,21 +838,11 @@ export const Docs = () => {
                     </div>
                   </div>
                   <div className="bg-white border border-gray-200 p-3">
-                    <h4 className="font-medium text-sm">
-                      Analytics & Insights
-                    </h4>
+                    <h4 className="font-medium text-sm">Analytics</h4>
                     <div className="text-xs text-gray-600 mt-1 space-y-1">
                       <p>
                         <code>GET /api/analytics</code> - Get analytics data
                         (memory stats, topics, categories)
-                      </p>
-                      <p>
-                        <code>GET /api/insights</code> - Get browsing summaries
-                        (query: periodType: daily/weekly/monthly)
-                      </p>
-                      <p>
-                        <code>POST /api/insights/generate</code> - Generate new
-                        summary for a period
                       </p>
                     </div>
                   </div>

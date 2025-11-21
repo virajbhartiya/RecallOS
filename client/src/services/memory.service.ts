@@ -1,5 +1,4 @@
 import * as MemoryApi from "./memory/memory-api.service"
-import * as MemoryInsights from "./memory/memory-insights.service"
 import * as MemoryJobs from "./memory/memory-jobs.service"
 import * as MemoryMesh from "./memory/memory-mesh.service"
 import * as MemorySearch from "./memory/memory-search.service"
@@ -40,10 +39,6 @@ export class MemoryService {
     limit: number = 10
   ) {
     return MemorySearch.searchMemoriesHybrid(query, filters, page, limit)
-  }
-
-  static async getMemoryInsights() {
-    return MemoryInsights.getMemoryInsights()
   }
 
   static async getRecentMemories(count: number = 10) {

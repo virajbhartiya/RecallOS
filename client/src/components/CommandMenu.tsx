@@ -5,10 +5,8 @@ import {
   BookOpen,
   Brain,
   Calendar,
-  Lightbulb,
   RefreshCw,
   Search,
-  Sparkles,
   User,
 } from "lucide-react"
 import { useLocation, useNavigate } from "react-router-dom"
@@ -96,10 +94,6 @@ const CommandMenuComponent = () => {
           e.preventDefault()
           navigate("/analytics")
           break
-        case "i":
-          e.preventDefault()
-          navigate("/insights")
-          break
         case "d":
           e.preventDefault()
           navigate("/docs")
@@ -122,22 +116,6 @@ const CommandMenuComponent = () => {
             }
           } else {
             window.location.reload()
-          }
-          break
-        case "g":
-          e.preventDefault()
-          if (location.pathname === "/insights") {
-            const buttons = Array.from(document.querySelectorAll("button"))
-            const generateButton = buttons.find(
-              (btn) =>
-                (btn.textContent?.trim() === "Generate" ||
-                  btn.textContent?.trim() === "Generate Summary" ||
-                  btn.textContent?.trim() === "Generating...") &&
-                !btn.disabled
-            ) as HTMLButtonElement
-            if (generateButton) {
-              generateButton.click()
-            }
           }
           break
         case "[":
@@ -185,11 +163,6 @@ const CommandMenuComponent = () => {
               <BarChart3 className="mr-2 h-4 w-4" />
               <span>Analytics</span>
               <CommandShortcut>⌘A</CommandShortcut>
-            </CommandItem>
-            <CommandItem onSelect={() => navigate("/insights")}>
-              <Lightbulb className="mr-2 h-4 w-4" />
-              <span>Insights</span>
-              <CommandShortcut>⌘I</CommandShortcut>
             </CommandItem>
             <CommandItem onSelect={() => navigate("/docs")}>
               <BookOpen className="mr-2 h-4 w-4" />
@@ -246,41 +219,17 @@ const CommandMenuComponent = () => {
                 <CommandShortcut>⌘R</CommandShortcut>
               </CommandItem>
             )}
-            {location.pathname === "/insights" && (
+            {location.pathname !== "/profile" && (
               <CommandItem
                 onSelect={() => {
-                  const buttons = Array.from(
-                    document.querySelectorAll("button")
-                  )
-                  const generateButton = buttons.find(
-                    (btn) =>
-                      (btn.textContent?.trim() === "Generate" ||
-                        btn.textContent?.trim() === "Generate Summary" ||
-                        btn.textContent?.trim() === "Generating...") &&
-                      !btn.disabled
-                  ) as HTMLButtonElement
-                  if (generateButton) {
-                    generateButton.click()
-                  }
+                  window.location.reload()
                 }}
               >
-                <Sparkles className="mr-2 h-4 w-4" />
-                <span>Generate Summary</span>
-                <CommandShortcut>⌘G</CommandShortcut>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                <span>Refresh Page</span>
+                <CommandShortcut>⌘R</CommandShortcut>
               </CommandItem>
             )}
-            {location.pathname !== "/profile" &&
-              location.pathname !== "/insights" && (
-                <CommandItem
-                  onSelect={() => {
-                    window.location.reload()
-                  }}
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  <span>Refresh Page</span>
-                  <CommandShortcut>⌘R</CommandShortcut>
-                </CommandItem>
-              )}
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Settings">

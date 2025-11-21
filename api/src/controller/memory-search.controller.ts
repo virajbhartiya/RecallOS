@@ -28,13 +28,7 @@ type MemoryRecord = {
   page_metadata: Prisma.JsonValue
 }
 
-const VALID_POLICIES: RetrievalPolicyName[] = [
-  'chat',
-  'planning',
-  'profile',
-  'summarization',
-  'insight',
-]
+const VALID_POLICIES: RetrievalPolicyName[] = ['chat', 'planning', 'profile', 'summarization']
 
 function isValidPolicy(policy: unknown): policy is RetrievalPolicyName {
   return typeof policy === 'string' && VALID_POLICIES.includes(policy as RetrievalPolicyName)
