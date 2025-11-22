@@ -51,6 +51,24 @@ const SpotlightSearchComponent: React.FC<SpotlightSearchProps> = ({
     setSelectedIndex(-1)
   }, [isEmbeddingOnly])
 
+  // Handle global Escape key when spotlight is open
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleGlobalEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault()
+        e.stopPropagation()
+        onClose()
+      }
+    }
+
+    document.addEventListener("keydown", handleGlobalEscape, true)
+    return () => {
+      document.removeEventListener("keydown", handleGlobalEscape, true)
+    }
+  }, [isOpen, onClose])
+
   // Handle keyboard navigation (only in Embedding mode)
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -110,6 +128,99 @@ const SpotlightSearchComponent: React.FC<SpotlightSearchProps> = ({
   if (!isOpen) return null
 
   const results = searchResults?.results || []
+
+  // Deduplicate citations and create label mapping
+  const getDeduplicatedCitations = () => {
+    if (!searchCitations || searchCitations.length === 0) {
+      return { uniqueCitations: [], labelMap: new Map<number, number>() }
+    }
+
+    const urlToFirstLabel = new Map<string, number>()
+    const memoryIdToFirstLabel = new Map<string, number>()
+    const uniqueCitations: typeof searchCitations = []
+    const labelMap = new Map<number, number>()
+
+    searchCitations.forEach((citation) => {
+      const url =
+        citation.url && citation.url !== "unknown" ? citation.url : null
+      const originalLabel = citation.label ?? 0
+
+      if (url) {
+        const firstLabel = urlToFirstLabel.get(url)
+        if (firstLabel !== undefined) {
+          // This URL was seen before, map to the first occurrence's label
+          labelMap.set(originalLabel, firstLabel)
+        } else {
+          // First time seeing this URL
+          const newLabel = uniqueCitations.length + 1
+          urlToFirstLabel.set(url, newLabel)
+          uniqueCitations.push({ ...citation, label: newLabel })
+          labelMap.set(originalLabel, newLabel)
+        }
+      } else {
+        const firstLabel = memoryIdToFirstLabel.get(citation.memory_id)
+        if (firstLabel !== undefined) {
+          // This memory_id was seen before, map to the first occurrence's label
+          labelMap.set(originalLabel, firstLabel)
+        } else {
+          // First time seeing this memory_id
+          const newLabel = uniqueCitations.length + 1
+          memoryIdToFirstLabel.set(citation.memory_id, newLabel)
+          uniqueCitations.push({ ...citation, label: newLabel })
+          labelMap.set(originalLabel, newLabel)
+        }
+      }
+    })
+
+    return { uniqueCitations, labelMap }
+  }
+
+  const { uniqueCitations, labelMap } = getDeduplicatedCitations()
+
+  // Process answer text to update citation numbers
+  const processAnswerText = (text: string): string => {
+    if (!text || labelMap.size === 0) return text
+
+    // Match citation patterns like [2], [2, 3, 4], [2,3,4], etc.
+    let processed = text.replace(
+      /\[(\d+(?:\s*,\s*\d+)*)\]/g,
+      (_match, numbers) => {
+        const citationNumbers = numbers
+          .split(",")
+          .map((n: string) => parseInt(n.trim(), 10))
+          .filter((n: number) => !isNaN(n))
+
+        const mappedNumbers = citationNumbers
+          .map((n: number) => labelMap.get(n))
+          .filter((n: number | undefined): n is number => n !== undefined)
+          .sort((a: number, b: number) => a - b)
+
+        // Remove duplicates from mapped numbers
+        const uniqueMappedNumbers = Array.from(new Set(mappedNumbers))
+
+        if (uniqueMappedNumbers.length === 0) {
+          return "" // Remove citation if all references were filtered out
+        }
+
+        return `[${uniqueMappedNumbers.join(", ")}]`
+      }
+    )
+
+    // Second pass: Merge consecutive duplicate citations like [1] [1] [1] or [1], [1], [1] into [1]
+    processed = processed.replace(
+      /(\[\d+(?:,\s*\d+)*\])(?:\s*,\s*\1|\s+\1)+/g,
+      "$1"
+    )
+
+    // Clean up multiple consecutive spaces (but preserve newlines)
+    processed = processed
+      .replace(/[ \t]+/g, " ")
+      .replace(/^[ \t]+|[ \t]+$/gm, "")
+
+    return processed
+  }
+
+  const processedAnswer = searchAnswer ? processAnswerText(searchAnswer) : null
 
   return (
     <div
@@ -174,9 +285,18 @@ const SpotlightSearchComponent: React.FC<SpotlightSearchProps> = ({
 
         {/* Results */}
         <div className="max-h-[60vh] overflow-y-auto">
-          {isSearching && (
-            <div className="p-8 text-center text-sm text-gray-500">
-              Searching...
+          {!searchQuery.trim() && (
+            <div className="p-8 text-center text-sm text-gray-400">
+              Start typing to search your memories...
+            </div>
+          )}
+
+          {isSearching && searchQuery.trim() && (
+            <div className="p-8 text-center">
+              <div className="inline-flex items-center gap-2 text-sm text-gray-600">
+                <div className="w-4 h-4 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
+                <span>Searching memories...</span>
+              </div>
             </div>
           )}
 
@@ -184,15 +304,17 @@ const SpotlightSearchComponent: React.FC<SpotlightSearchProps> = ({
           {isEmbeddingOnly &&
             !isSearching &&
             searchQuery.trim() &&
+            searchResults !== null &&
             results.length === 0 && (
               <div className="p-8 text-center text-sm text-gray-500">
-                No results found
+                No memories found for "{searchQuery}"
               </div>
             )}
 
           {isEmbeddingOnly &&
             !isSearching &&
             searchQuery.trim() &&
+            searchResults !== null &&
             results.length > 0 && (
               <div className="divide-y divide-gray-100">
                 {results.map((result, idx) => {
@@ -248,43 +370,45 @@ const SpotlightSearchComponent: React.FC<SpotlightSearchProps> = ({
           {!isEmbeddingOnly &&
             !isSearching &&
             searchQuery.trim() &&
-            !searchAnswer &&
-            (!searchCitations || searchCitations.length === 0) && (
+            searchResults !== null &&
+            !processedAnswer &&
+            uniqueCitations.length === 0 && (
               <div className="p-8 text-center text-sm text-gray-500">
-                No results found
+                No memories found for "{searchQuery}"
               </div>
             )}
 
           {/* Answer Section */}
-          {!isSearching && searchAnswer && (
+          {!isSearching && processedAnswer && (
             <div className="border-t border-gray-200 p-4 bg-gray-50">
               <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">
                 Answer
               </div>
               <p className="text-sm text-gray-900 leading-relaxed whitespace-pre-wrap">
-                {searchAnswer}
+                {processedAnswer}
               </p>
             </div>
           )}
 
           {/* Citations */}
-          {!isSearching && searchCitations && searchCitations.length > 0 && (
+          {!isSearching && uniqueCitations.length > 0 && (
             <div className="border-t border-gray-200 p-4 bg-gray-50">
               <div className="text-xs font-semibold uppercase tracking-wider text-gray-700 mb-2">
                 Citations
               </div>
               <div className="space-y-1">
-                {searchCitations.map((citation, idx) => {
+                {uniqueCitations.map((citation) => {
                   const title = citation.title || "Untitled Memory"
                   const url =
                     citation.url && citation.url !== "unknown"
                       ? citation.url
                       : null
                   return (
-                    <div key={idx} className="flex items-center gap-2 text-xs">
-                      <span className="text-gray-500">
-                        [{citation.label ?? idx + 1}]
-                      </span>
+                    <div
+                      key={`${citation.memory_id}-${citation.label}`}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="text-gray-500">[{citation.label}]</span>
                       {url ? (
                         <a
                           href={url}
