@@ -147,18 +147,21 @@ function extractVisibleText(): string {
     if (!document.body || !document.body.textContent) {
       return sanitizeText(document.documentElement?.textContent || document.title || '')
     }
-    removeSensitiveElements(document.body)
-    cleanWebPageContent(document.body)
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    const bodyClone = document.body.cloneNode(true) as HTMLElement
+    removeSensitiveElements(bodyClone)
+    cleanWebPageContent(bodyClone)
+    const walker = document.createTreeWalker(bodyClone, NodeFilter.SHOW_TEXT, {
       acceptNode: node => {
         try {
           const parent = node.parentElement
           if (!parent) return NodeFilter.FILTER_REJECT
-          const style = window.getComputedStyle(parent)
-          if (style.display === 'none' || style.visibility === 'hidden') {
+          if (parent.closest('input[type="password"], input[autocomplete*="password"]')) {
             return NodeFilter.FILTER_REJECT
           }
-          if (parent.closest('input[type="password"], input[autocomplete*="password"]')) {
+          if (parent.closest('[style*="display: none"], [style*="display:none"]')) {
+            return NodeFilter.FILTER_REJECT
+          }
+          if (parent.closest('[style*="visibility: hidden"], [style*="visibility:hidden"]')) {
             return NodeFilter.FILTER_REJECT
           }
           return NodeFilter.FILTER_ACCEPT

@@ -165,6 +165,11 @@ const WEB_NOISE_SELECTORS = [
   '[id*="recommended"]',
 ]
 
+/**
+ * Removes tracking scripts, pixels, and noise elements from the DOM.
+ * WARNING: This function modifies the element in place. Only call on clones, never on the actual DOM.
+ * @param element - Element or Document to clean (must be a clone, not the actual DOM)
+ */
 export function cleanWebPageContent(element: Element | Document): void {
   if (!element) return
 
@@ -205,6 +210,11 @@ export function cleanWebPageContent(element: Element | Document): void {
   })
 }
 
+/**
+ * Removes or redacts sensitive form elements (passwords, credit cards, etc.) from the DOM.
+ * WARNING: This function modifies the element in place. Only call on clones, never on the actual DOM.
+ * @param element - Element or Document to sanitize (must be a clone, not the actual DOM)
+ */
 export function removeSensitiveElements(element: Element | Document): void {
   if (!element) return
 
@@ -227,6 +237,12 @@ export function removeSensitiveElements(element: Element | Document): void {
   })
 }
 
+/**
+ * Sanitizes element content by cloning it first, then removing sensitive data.
+ * Safe to call on actual DOM elements as it works on a clone.
+ * @param element - Element to sanitize (can be actual DOM, will be cloned internally)
+ * @returns Sanitized text content
+ */
 export function sanitizeElementContent(element: Element): string {
   if (!element) return ''
 
