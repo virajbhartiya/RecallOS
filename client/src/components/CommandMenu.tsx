@@ -159,12 +159,16 @@ const CommandMenuComponent = () => {
               <span>Home</span>
               <CommandShortcut>⌘H</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect(() => navigate("/memories"))}>
+            <CommandItem
+              onSelect={() => handleSelect(() => navigate("/memories"))}
+            >
               <Brain className="mr-2 h-4 w-4" />
               <span>Memories</span>
               <CommandShortcut>⌘M</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => handleSelect(() => navigate("/analytics"))}>
+            <CommandItem
+              onSelect={() => handleSelect(() => navigate("/analytics"))}
+            >
               <BarChart3 className="mr-2 h-4 w-4" />
               <span>Analytics</span>
               <CommandShortcut>⌘A</CommandShortcut>
@@ -246,7 +250,9 @@ const CommandMenuComponent = () => {
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Settings">
-            <CommandItem onSelect={() => handleSelect(() => navigate("/profile"))}>
+            <CommandItem
+              onSelect={() => handleSelect(() => navigate("/profile"))}
+            >
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
               <CommandShortcut>⌘P</CommandShortcut>

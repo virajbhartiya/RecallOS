@@ -83,8 +83,13 @@ const SpotlightSearchComponent: React.FC<SpotlightSearchProps> = ({
       if (e.key === "Enter" && selectedIndex >= 0) {
         const results = searchResults?.results || []
         if (results[selectedIndex]) {
-          onSelectMemory(results[selectedIndex].memory)
-          onClose()
+          const memory = results[selectedIndex].memory
+          if (memory.url) {
+            window.open(memory.url, "_blank", "noopener,noreferrer")
+          } else {
+            onSelectMemory(memory)
+            onClose()
+          }
         }
         return
       }
@@ -201,8 +206,16 @@ const SpotlightSearchComponent: React.FC<SpotlightSearchProps> = ({
                         isSelected ? "bg-gray-50" : "hover:bg-gray-50"
                       }`}
                       onClick={() => {
-                        onSelectMemory(memory)
-                        onClose()
+                        if (memory.url) {
+                          window.open(
+                            memory.url,
+                            "_blank",
+                            "noopener,noreferrer"
+                          )
+                        } else {
+                          onSelectMemory(memory)
+                          onClose()
+                        }
                       }}
                     >
                       <div className="flex items-start justify-between gap-3">
