@@ -5,15 +5,26 @@ import { logger } from '../utils/logger.util'
 
 type Provider = 'gemini' | 'ollama' | 'hybrid'
 
-const provider: Provider = (process.env.AI_PROVIDER as Provider) || 'hybrid'
+const legacyProvider: Provider = (process.env.AI_PROVIDER as Provider) || 'hybrid'
+const embedProvider: Provider = (process.env.EMBED_PROVIDER as Provider) || legacyProvider
+const genProvider: Provider = (process.env.GEN_PROVIDER as Provider) || legacyProvider
 
 const OLLAMA_BASE = process.env.OLLAMA_BASE_URL || 'http://localhost:11434'
-const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'all-minilm:l6-v2'
+const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text:latest'
 const OLLAMA_GEN_MODEL = process.env.OLLAMA_GEN_MODEL || 'llama3.1:8b'
+
+logger.log('AI Provider Configuration', {
+  embedProvider,
+  genProvider,
+  ollamaBase: OLLAMA_BASE,
+  ollamaEmbedModel: OLLAMA_EMBED_MODEL,
+  ollamaGenModel: OLLAMA_GEN_MODEL,
+})
 
 export const aiProvider = {
   get isInitialized(): boolean {
-    if (provider === 'gemini') {
+    const needsGemini = embedProvider === 'gemini' || genProvider === 'gemini'
+    if (needsGemini) {
       const isInit = geminiService.isInitialized
       if (!isInit) {
         logger.warn('Gemini service not initialized. Check GEMINI_API_KEY environment variable.')
@@ -27,18 +38,34 @@ export const aiProvider = {
     let result: number[]
     let modelUsed: string | undefined
 
-    if (provider === 'gemini') {
+    logger.log('[ai-provider] generateEmbedding called', {
+      embedProvider,
+      textLength: text.length,
+      userId,
+    })
+
+    if (embedProvider === 'gemini') {
+      logger.log('[ai-provider] Using Gemini for embeddings')
       const response = await geminiService.generateEmbedding(text)
       result = response.embedding
       modelUsed = response.modelUsed
-    } else if (provider === 'hybrid') {
+    } else if (embedProvider === 'hybrid') {
+      logger.log('[ai-provider] Using hybrid mode for embeddings')
       result = await this.generateHybridEmbedding(text)
     } else {
+      logger.log('[ai-provider] Using Ollama for embeddings', {
+        model: OLLAMA_EMBED_MODEL,
+        baseUrl: OLLAMA_BASE,
+      })
       try {
         result = await this.tryOllamaEmbedding(text, OLLAMA_EMBED_MODEL)
         modelUsed = OLLAMA_EMBED_MODEL
+        logger.log('[ai-provider] Ollama embedding successful', {
+          model: OLLAMA_EMBED_MODEL,
+          embeddingLength: result.length,
+        })
       } catch (error) {
-        logger.error('Ollama embedding failed, using fallback:', error)
+        logger.error('[ai-provider] Ollama embedding failed, using fallback:', error)
         result = this.generateFallbackEmbedding(text)
       }
     }
@@ -59,44 +86,80 @@ export const aiProvider = {
   },
 
   async generateHybridEmbedding(text: string): Promise<number[]> {
+    logger.log('[ai-provider] Hybrid embedding mode - trying multiple models')
     const methods = [
-      () => this.generateFallbackEmbedding(text),
-      () => this.tryOllamaEmbedding(text, 'all-minilm:l6-v2'),
+      () => this.tryOllamaEmbedding(text, 'nomic-embed-text:latest'),
       () => this.tryOllamaEmbedding(text, 'bge-large:latest'),
       () => this.tryOllamaEmbedding(text, 'mxbai-embed-large:latest'),
-      () => this.tryOllamaEmbedding(text, 'nomic-embed-text:latest'),
+      () => this.generateFallbackEmbedding(text),
     ]
 
-    for (const method of methods) {
+    for (let i = 0; i < methods.length; i++) {
       try {
-        const embedding = await method()
+        logger.log('[ai-provider] Hybrid mode - trying method', { index: i })
+        const embedding = await methods[i]()
         if (embedding && embedding.length > 0) {
+          logger.log('[ai-provider] Hybrid mode - method succeeded', {
+            index: i,
+            embeddingLength: embedding.length,
+          })
           return embedding
         }
       } catch (error) {
-        logger.error('Embedding method failed:', error)
+        logger.error('[ai-provider] Hybrid mode - method failed:', {
+          index: i,
+          error,
+        })
         continue
       }
     }
 
-    // Final fallback
+    logger.log('[ai-provider] Hybrid mode - all methods failed, using fallback')
     return this.generateFallbackEmbedding(text)
   },
 
   async tryOllamaEmbedding(text: string, model: string): Promise<number[]> {
-    const res = await fetch(`${OLLAMA_BASE}/api/embeddings`, {
+    const url = `${OLLAMA_BASE}/api/embeddings`
+    const payload = { model, input: text }
+
+    logger.log('[ai-provider] Calling Ollama embeddings API', {
+      url,
+      model,
+      textLength: text.length,
+      textPreview: text.substring(0, 100),
+    })
+
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, input: text }),
+      body: JSON.stringify(payload),
+    })
+
+    logger.log('[ai-provider] Ollama API response', {
+      status: res.status,
+      statusText: res.statusText,
+      ok: res.ok,
     })
 
     if (!res.ok) {
-      throw new Error(`Ollama embeddings failed: ${res.status}`)
+      const errorText = await res.text().catch(() => 'Unable to read error response')
+      logger.error('[ai-provider] Ollama API error response', {
+        status: res.status,
+        statusText: res.statusText,
+        errorText,
+      })
+      throw new Error(`Ollama embeddings failed: ${res.status} - ${errorText}`)
     }
 
     type EmbeddingResponse = { embedding?: number[]; embeddings?: number[] }
     const data = (await res.json()) as EmbeddingResponse
     const vec: number[] = data?.embedding || data?.embeddings || []
+
+    logger.log('[ai-provider] Ollama embedding response parsed', {
+      hasEmbedding: !!data?.embedding,
+      hasEmbeddings: !!data?.embeddings,
+      vectorLength: vec.length,
+    })
 
     if (!Array.isArray(vec) || vec.length === 0) {
       throw new Error('Empty embedding array')
@@ -286,7 +349,7 @@ export const aiProvider = {
     let result: string
     let modelUsed: string | undefined
 
-    if (provider === 'gemini') {
+    if (genProvider === 'gemini') {
       const response = await geminiService.generateContent(
         prompt,
         isSearchRequest,
@@ -356,7 +419,7 @@ export const aiProvider = {
     }
     let modelUsed: string | undefined
 
-    if (provider === 'gemini') {
+    if (genProvider === 'gemini') {
       const response = await geminiService.extractContentMetadata(
         rawText,
         metadata,
