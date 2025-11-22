@@ -1,6 +1,12 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma.lib'
-import { normalizeText, hashCanonical, normalizeUrl, calculateSimilarity } from '../utils/text.util'
+import {
+  normalizeText,
+  hashCanonical,
+  normalizeUrl,
+  calculateSimilarity,
+  sanitizeContentForStorage,
+} from '../utils/text.util'
 import { memoryScoringService } from './memory-scoring.service'
 
 type MetadataRecord = Record<string, unknown>
@@ -49,7 +55,8 @@ type MemoryCreatePayload = {
 
 export class MemoryIngestionService {
   canonicalizeContent(content: string, url?: string | null): CanonicalizationResult {
-    const canonicalText = normalizeText(content)
+    const sanitizedContent = sanitizeContentForStorage(content)
+    const canonicalText = normalizeText(sanitizedContent)
     const canonicalHash = hashCanonical(canonicalText)
     const normalizedUrl = url ? normalizeUrl(url) : undefined
     return { canonicalText, canonicalHash, normalizedUrl }
@@ -221,16 +228,18 @@ export class MemoryIngestionService {
       importanceScore,
     })
 
+    const sanitizedContent = sanitizeContentForStorage(payload.content)
+
     return {
       user: { connect: { id: payload.userId } },
       source: (metadata.source as string | undefined) || payload.source || 'extension',
       url: payload.url || 'unknown',
       title: payload.title || (typeof metadata.title === 'string' ? metadata.title : 'Untitled'),
-      content: payload.content,
+      content: sanitizedContent,
       canonical_text: payload.canonicalText,
       canonical_hash: payload.canonicalHash,
       timestamp: BigInt(Math.floor(Date.now() / 1000)),
-      full_content: payload.content,
+      full_content: sanitizedContent,
       page_metadata: pageMetadata as Prisma.InputJsonValue,
       importance_score: importanceScore,
       confidence_score: confidenceScore,

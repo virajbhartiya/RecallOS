@@ -48,12 +48,45 @@ const SENSITIVE_SELECTORS = [
   'textarea[id*="passwd" i]',
 ]
 
+function decodeHtmlEntities(text: string): string {
+  const textarea = document.createElement('textarea')
+  textarea.innerHTML = text
+  return textarea.value
+}
+
+const TRACKING_PATTERNS = {
+  googleAnalytics:
+    /\b(?:ga|gtag|gtm|analytics|_ga|_gid|_gat)[-_]?[a-z0-9_]*[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi,
+  facebookPixel:
+    /\b(?:fb|facebook)[-_]?(?:pixel|track|event)[-_]?[a-z0-9_]*[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi,
+  trackingId: /\b(?:tracking|track)[-_]?(?:id|code|token|key)[:=]\s*['"]?[a-zA-Z0-9_-]{10,}['"]?/gi,
+  sessionId: /\b(?:session|sess)[-_]?(?:id|token)[:=]\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/gi,
+  utmParams:
+    /[?&](?:utm_[a-z]+|ref|source|campaign|medium|term|content|gclid|fbclid|_hsenc|_hsmi)=[^&\s]*/gi,
+  marketingTags:
+    /\b(?:marketing|promo|affiliate)[-_]?(?:id|code|tag)[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi,
+}
+
+const UI_NOISE_PATTERNS = [
+  /\b(?:click|tap)\s+(?:here|now|to)\s+(?:continue|proceed|learn more|read more|see more)/gi,
+  /\b(?:subscribe|sign up|register)\s+(?:now|today|free|for|to)/gi,
+  /\b(?:cookie|privacy|terms)\s+(?:notice|banner|popup|dialog)/gi,
+  /\b(?:accept|decline|agree|disagree)\s+(?:all|all cookies|cookies)/gi,
+  /\b(?:skip|jump)\s+to\s+(?:content|main|navigation)/gi,
+  /\b(?:menu|navigation|nav)\s+(?:toggle|button|icon)/gi,
+  /\b(?:close|×|✕)\s*(?:menu|dialog|popup|modal)/gi,
+  /\b(?:loading|please wait|processing)/gi,
+  /\b(?:error|404|not found|page not found)/gi,
+]
+
 export function sanitizeText(text: string): string {
   if (!text || typeof text !== 'string') {
     return text
   }
 
   let sanitized = text
+
+  sanitized = decodeHtmlEntities(sanitized)
 
   sanitized = sanitized.replace(SENSITIVE_PATTERNS.creditCard, '[REDACTED: Credit Card]')
   sanitized = sanitized.replace(SENSITIVE_PATTERNS.ssn, '[REDACTED: SSN]')
@@ -83,7 +116,93 @@ export function sanitizeText(text: string): string {
     })
   }
 
+  sanitized = sanitized.replace(TRACKING_PATTERNS.googleAnalytics, '')
+  sanitized = sanitized.replace(TRACKING_PATTERNS.facebookPixel, '')
+  sanitized = sanitized.replace(TRACKING_PATTERNS.trackingId, '')
+  sanitized = sanitized.replace(TRACKING_PATTERNS.sessionId, '')
+  sanitized = sanitized.replace(TRACKING_PATTERNS.utmParams, '')
+  sanitized = sanitized.replace(TRACKING_PATTERNS.marketingTags, '')
+
+  UI_NOISE_PATTERNS.forEach(pattern => {
+    sanitized = sanitized.replace(pattern, '')
+  })
+
+  sanitized = sanitized.replace(/\s+/g, ' ').trim()
+
   return sanitized
+}
+
+const WEB_NOISE_SELECTORS = [
+  'script[src*="analytics"]',
+  'script[src*="gtag"]',
+  'script[src*="gtm"]',
+  'script[src*="facebook"]',
+  'script[src*="tracking"]',
+  'iframe[src*="facebook"]',
+  'iframe[src*="twitter"]',
+  'iframe[src*="instagram"]',
+  'iframe[src*="youtube"]',
+  'iframe[src*="analytics"]',
+  '[class*="cookie"]',
+  '[class*="gdpr"]',
+  '[class*="privacy-notice"]',
+  '[class*="newsletter"]',
+  '[class*="subscribe"]',
+  '[class*="social-share"]',
+  '[class*="share-buttons"]',
+  '[class*="related-articles"]',
+  '[class*="trending"]',
+  '[class*="recommended"]',
+  '[id*="cookie"]',
+  '[id*="gdpr"]',
+  '[id*="privacy-notice"]',
+  '[id*="newsletter"]',
+  '[id*="subscribe"]',
+  '[id*="social-share"]',
+  '[id*="share-buttons"]',
+  '[id*="related-articles"]',
+  '[id*="trending"]',
+  '[id*="recommended"]',
+]
+
+export function cleanWebPageContent(element: Element | Document): void {
+  if (!element) return
+
+  WEB_NOISE_SELECTORS.forEach(selector => {
+    try {
+      const noiseElements = element.querySelectorAll(selector)
+      noiseElements.forEach(el => {
+        el.remove()
+      })
+    } catch (_error) {}
+  })
+
+  const trackingScripts = element.querySelectorAll('script')
+  trackingScripts.forEach(script => {
+    const src = script.getAttribute('src') || ''
+    const content = script.textContent || ''
+    if (
+      src.includes('analytics') ||
+      src.includes('gtag') ||
+      src.includes('gtm') ||
+      src.includes('facebook') ||
+      src.includes('tracking') ||
+      content.includes('analytics') ||
+      content.includes('gtag') ||
+      content.includes('gtm') ||
+      content.includes('facebook') ||
+      content.includes('tracking')
+    ) {
+      script.remove()
+    }
+  })
+
+  const trackingPixels = element.querySelectorAll(
+    'img[src*="pixel"], img[src*="tracking"], img[src*="analytics"]'
+  )
+  trackingPixels.forEach(img => {
+    img.remove()
+  })
 }
 
 export function removeSensitiveElements(element: Element | Document): void {
@@ -113,6 +232,7 @@ export function sanitizeElementContent(element: Element): string {
 
   const clone = element.cloneNode(true) as Element
   removeSensitiveElements(clone)
+  cleanWebPageContent(clone)
 
   let text = clone.textContent || ''
   text = sanitizeText(text)

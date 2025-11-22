@@ -1,12 +1,20 @@
 import { createHash } from 'crypto'
 
+const TRACKING_PATTERNS = [
+  /\b(?:ga|gtag|gtm|analytics|_ga|_gid|_gat)[-_]?[a-z0-9_]*[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi,
+  /\b(?:fb|facebook)[-_]?(?:pixel|track|event)[-_]?[a-z0-9_]*[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi,
+  /\b(?:tracking|track)[-_]?(?:id|code|token|key)[:=]\s*['"]?[a-zA-Z0-9_-]{10,}['"]?/gi,
+  /\b(?:session|sess)[-_]?(?:id|token)[:=]\s*['"]?[a-zA-Z0-9_-]{20,}['"]?/gi,
+  /\b(?:utm_[a-z]+|ref|source|campaign|medium|term|content|gclid|fbclid|_hsenc|_hsmi)=[^&\s]*/gi,
+  /\b(?:marketing|promo|affiliate)[-_]?(?:id|code|tag)[:=]\s*['"]?[a-zA-Z0-9_-]+['"]?/gi,
+]
+
 export function normalizeText(input: string): string {
   if (typeof input !== 'string') return ''
-  return input
+  let normalized = input
     .normalize('NFKC')
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, ' ')
     .replace(/\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}[Z]?/g, '') // ISO timestamps
     .replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/g, '') // Date formats
     .replace(/\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)?/gi, '') // Time formats
@@ -21,8 +29,12 @@ export function normalizeText(input: string): string {
     .replace(/<style[\s\S]*?<\/style>/gi, '') // Style tags
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, '') // Noscript tags
     .replace(/<[^>]+>/g, ' ') // Remove remaining HTML tags
-    .replace(/\s+/g, ' ')
-    .trim()
+
+  TRACKING_PATTERNS.forEach(pattern => {
+    normalized = normalized.replace(pattern, '')
+  })
+
+  return normalized.replace(/\s+/g, ' ').trim()
 }
 
 export function hashCanonical(canonical: string): string {
@@ -58,4 +70,56 @@ export function calculateSimilarity(text1: string, text2: string): number {
 export function buildContentPreview(text: string | null | undefined, length: number = 400): string {
   if (!text) return ''
   return text.replace(/\s+/g, ' ').trim().slice(0, length)
+}
+
+export function sanitizeContentForStorage(content: string): string {
+  if (typeof content !== 'string') return ''
+  if (!content.trim()) return ''
+
+  let sanitized = content
+
+  sanitized = sanitized
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<noscript[\s\S]*?<\/noscript>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<object[\s\S]*?<\/object>/gi, '')
+    .replace(/<embed[\s\S]*?>/gi, '')
+
+  TRACKING_PATTERNS.forEach(pattern => {
+    sanitized = sanitized.replace(pattern, '')
+  })
+
+  sanitized = sanitized
+    .replace(/<img[^>]*src=["'][^"']*pixel[^"']*["'][^>]*>/gi, '')
+    .replace(/<img[^>]*src=["'][^"']*tracking[^"']*["'][^>]*>/gi, '')
+    .replace(/<img[^>]*src=["'][^"']*analytics[^"']*["'][^>]*>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&[a-z]+;/gi, ' ')
+
+  sanitized = sanitized
+    .replace(/[""]/g, '"')
+    .replace(/['']/g, "'")
+    .replace(/[—–]/g, '-')
+    .replace(/\.{3,}/g, '...')
+    .replace(/[!]{2,}/g, '!')
+    .replace(/[?]{2,}/g, '?')
+    .replace(/\s+([.,!?;:])/g, '$1')
+    .replace(/([.,!?;:])\s{2,}/g, '$1 ')
+    .replace(/\n\s*\n+/g, '\n\n')
+    .replace(/^\s+|\s+$/gm, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return sanitized
 }

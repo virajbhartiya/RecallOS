@@ -7,6 +7,7 @@ import {
   removeSensitiveElements,
   sanitizeElementContent,
   sanitizeContextData,
+  cleanWebPageContent,
 } from '@/lib/utils'
 
 interface ContextData {
@@ -147,6 +148,7 @@ function extractVisibleText(): string {
       return sanitizeText(document.documentElement?.textContent || document.title || '')
     }
     removeSensitiveElements(document.body)
+    cleanWebPageContent(document.body)
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
       acceptNode: node => {
         try {
@@ -266,6 +268,7 @@ function extractMeaningfulContent(): string {
       tempDiv.textContent = document.body.textContent || ''
     }
     removeSensitiveElements(tempDiv)
+    cleanWebPageContent(tempDiv)
     boilerplateSelectors.forEach(selector => {
       try {
         const elements = tempDiv.querySelectorAll(selector)
@@ -345,12 +348,24 @@ function extractMeaningfulContent(): string {
   }
 }
 function cleanText(text: string): string {
-  return text
-    .replace(/\s+/g, ' ')
-    .replace(/\n\s*\n/g, '\n')
-    .replace(/[^\w\s.,!?;:()\-'"]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return (
+    text
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001F\u007F-\u009F]/g, '')
+      .replace(/[""]/g, '"')
+      .replace(/['']/g, "'")
+      .replace(/[—–]/g, '-')
+      .replace(/\.{3,}/g, '...')
+      .replace(/[!]{2,}/g, '!')
+      .replace(/[?]{2,}/g, '?')
+      .replace(/\s+([.,!?;:])/g, '$1')
+      .replace(/([.,!?;:])\s{2,}/g, '$1 ')
+      .replace(/\s+/g, ' ')
+      .replace(/\n\s*\n+/g, '\n\n')
+      .replace(/^\s+|\s+$/gm, '')
+      .trim()
+  )
 }
 function isBoilerplateText(text: string): boolean {
   const boilerplatePatterns = [
@@ -361,19 +376,25 @@ function isBoilerplateText(text: string): boolean {
     /^(loading|please wait|error|404|not found)/i,
     /^(login|sign in|register|sign up|logout)/i,
     /^(skip to|jump to|table of contents)/i,
-    /^(read more|continue reading|show more)/i,
+    /^(read more|continue reading|show more|expand|view more)/i,
     /^(related|recommended|trending|popular)/i,
     /^(tags|categories|archive|older|newer)/i,
-    /^(social media|connect with|follow)/i,
+    /^(social media|connect with|follow|share on|tweet|like on|follow on)/i,
     /^(disclaimer|legal notice|terms of service)/i,
-    /^(this website uses cookies|we use cookies)/i,
-    /^(accept|decline|agree|disagree)/i,
-    /^(subscribe to our|get updates|stay informed)/i,
-    /^(share this|tell your friends|spread the word)/i,
+    /^(this website uses cookies|we use cookies|cookie consent|cookie policy)/i,
+    /^(accept|decline|agree|disagree|accept all|reject all)/i,
+    /^(subscribe to our|get updates|stay informed|sign up for|join our)/i,
+    /^(share this|tell your friends|spread the word|share now)/i,
     /^(ad blocker|disable ad blocker)/i,
     /^(javascript|enable javascript)/i,
     /^(browser|upgrade|update)/i,
     /^(mobile|desktop|tablet)/i,
+    /^(share button|share icon|social share|share via)/i,
+    /^(cookie banner|cookie notice|cookie popup|cookie dialog)/i,
+    /^(newsletter signup|email signup|subscribe form|signup form)/i,
+    /^(read more link|continue reading link|show more button)/i,
+    /^(facebook|twitter|linkedin|instagram|pinterest|reddit)\s+(?:share|like|follow|connect)/i,
+    /^(click|tap)\s+(?:here|now)\s+(?:to|for)/i,
   ]
   const shortText = text.toLowerCase().trim()
   if (shortText.length < 20) return true
