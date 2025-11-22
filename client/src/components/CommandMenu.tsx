@@ -29,6 +29,11 @@ const CommandMenuComponent = () => {
   const enableInternalRoutes =
     import.meta.env.VITE_ENABLE_INTERNAL_ROUTES !== "false"
 
+  const handleSelect = (callback: () => void) => {
+    callback()
+    setOpen(false)
+  }
+
   useEffect(() => {
     if (!enableInternalRoutes) {
       return
@@ -149,31 +154,33 @@ const CommandMenuComponent = () => {
         <CommandList>
           <CommandEmpty>No results found.</CommandEmpty>
           <CommandGroup heading="Navigation">
-            <CommandItem onSelect={() => navigate("/")}>
+            <CommandItem onSelect={() => handleSelect(() => navigate("/"))}>
               <Calendar className="mr-2 h-4 w-4" />
               <span>Home</span>
               <CommandShortcut>⌘H</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => navigate("/memories")}>
+            <CommandItem onSelect={() => handleSelect(() => navigate("/memories"))}>
               <Brain className="mr-2 h-4 w-4" />
               <span>Memories</span>
               <CommandShortcut>⌘M</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => navigate("/analytics")}>
+            <CommandItem onSelect={() => handleSelect(() => navigate("/analytics"))}>
               <BarChart3 className="mr-2 h-4 w-4" />
               <span>Analytics</span>
               <CommandShortcut>⌘A</CommandShortcut>
             </CommandItem>
-            <CommandItem onSelect={() => navigate("/docs")}>
+            <CommandItem onSelect={() => handleSelect(() => navigate("/docs"))}>
               <BookOpen className="mr-2 h-4 w-4" />
               <span>Documentation</span>
               <CommandShortcut>⌘D</CommandShortcut>
             </CommandItem>
             <CommandItem
               onSelect={() => {
-                if (window.history.length > 1) {
-                  navigate(-1)
-                }
+                handleSelect(() => {
+                  if (window.history.length > 1) {
+                    navigate(-1)
+                  }
+                })
               }}
             >
               <ArrowLeft className="mr-2 h-4 w-4" />
@@ -185,13 +192,15 @@ const CommandMenuComponent = () => {
           <CommandGroup heading="Actions">
             <CommandItem
               onSelect={() => {
-                const searchInput = document.querySelector(
-                  'input[type="search"], input[placeholder*="search" i], input[placeholder*="Search"]'
-                ) as HTMLInputElement
-                if (searchInput) {
-                  searchInput.focus()
-                  searchInput.select()
-                }
+                handleSelect(() => {
+                  const searchInput = document.querySelector(
+                    'input[type="search"], input[placeholder*="search" i], input[placeholder*="Search"]'
+                  ) as HTMLInputElement
+                  if (searchInput) {
+                    searchInput.focus()
+                    searchInput.select()
+                  }
+                })
               }}
             >
               <Search className="mr-2 h-4 w-4" />
@@ -201,17 +210,19 @@ const CommandMenuComponent = () => {
             {location.pathname === "/profile" && (
               <CommandItem
                 onSelect={() => {
-                  const buttons = Array.from(
-                    document.querySelectorAll("button")
-                  )
-                  const refreshButton = buttons.find(
-                    (btn) =>
-                      btn.textContent?.trim() === "Refresh" ||
-                      btn.textContent?.trim() === "Refreshing..."
-                  ) as HTMLButtonElement
-                  if (refreshButton && !refreshButton.disabled) {
-                    refreshButton.click()
-                  }
+                  handleSelect(() => {
+                    const buttons = Array.from(
+                      document.querySelectorAll("button")
+                    )
+                    const refreshButton = buttons.find(
+                      (btn) =>
+                        btn.textContent?.trim() === "Refresh" ||
+                        btn.textContent?.trim() === "Refreshing..."
+                    ) as HTMLButtonElement
+                    if (refreshButton && !refreshButton.disabled) {
+                      refreshButton.click()
+                    }
+                  })
                 }}
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
@@ -222,7 +233,9 @@ const CommandMenuComponent = () => {
             {location.pathname !== "/profile" && (
               <CommandItem
                 onSelect={() => {
-                  window.location.reload()
+                  handleSelect(() => {
+                    window.location.reload()
+                  })
                 }}
               >
                 <RefreshCw className="mr-2 h-4 w-4" />
@@ -233,7 +246,7 @@ const CommandMenuComponent = () => {
           </CommandGroup>
           <CommandSeparator />
           <CommandGroup heading="Settings">
-            <CommandItem onSelect={() => navigate("/profile")}>
+            <CommandItem onSelect={() => handleSelect(() => navigate("/profile"))}>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
               <CommandShortcut>⌘P</CommandShortcut>
