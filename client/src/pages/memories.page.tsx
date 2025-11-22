@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react"
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { MemoryService } from "@/services/memory.service"
 import { SearchService } from "@/services/search.service"
 import { requireAuthToken } from "@/utils/user-id.util"
@@ -215,6 +215,24 @@ export const Memories: React.FC = () => {
     }
   }, [])
 
+  const highlightedMemoryIds = useMemo(
+    () => [
+      ...(clickedNodeId ? [clickedNodeId] : []),
+      ...(selectedMemory ? [selectedMemory.id] : []),
+    ],
+    [clickedNodeId, selectedMemory]
+  )
+
+  const memorySources = useMemo(
+    () => Object.fromEntries(memories.map((m) => [m.id, m.source || ""])),
+    [memories]
+  )
+
+  const memoryUrls = useMemo(
+    () => Object.fromEntries(memories.map((m) => [m.id, m.url || ""])),
+    [memories]
+  )
+
   if (!isAuthenticated) {
     return null
   }
@@ -247,33 +265,9 @@ export const Memories: React.FC = () => {
             onNodeClick={handleNodeClick}
             similarityThreshold={similarityThreshold}
             selectedMemoryId={clickedNodeId || undefined}
-            highlightedMemoryIds={[
-              ...(spotlightSearchResults?.results || []).map(
-                (r) => r.memory.id
-              ),
-              ...(clickedNodeId ? [clickedNodeId] : []),
-              ...(selectedMemory ? [selectedMemory.id] : []),
-            ]}
-            memorySources={{
-              ...Object.fromEntries(
-                memories.map((m) => [m.id, m.source || ""])
-              ),
-              ...Object.fromEntries(
-                (spotlightSearchResults?.results || []).map((r) => [
-                  r.memory.id,
-                  r.memory.source || "",
-                ])
-              ),
-            }}
-            memoryUrls={{
-              ...Object.fromEntries(memories.map((m) => [m.id, m.url || ""])),
-              ...Object.fromEntries(
-                (spotlightSearchResults?.results || []).map((r) => [
-                  r.memory.id,
-                  r.memory.url || "",
-                ])
-              ),
-            }}
+            highlightedMemoryIds={highlightedMemoryIds}
+            memorySources={memorySources}
+            memoryUrls={memoryUrls}
           />
 
           {/* Corner brand/label */}
