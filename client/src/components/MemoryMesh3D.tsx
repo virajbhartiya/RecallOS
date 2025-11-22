@@ -83,7 +83,7 @@ const MemoryNodeComponent: React.FC<MemoryNodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null)
   const { camera } = useThree()
   const [hovered, setHovered] = useState(false)
-  
+
   const baseSize = 0.0035 + importance * 0.0015
   const size = baseSize
   const opacity = inLatentSpace ? 0.95 : 0.75
@@ -659,6 +659,7 @@ const MemoryMesh3D: React.FC<MemoryMesh3DProps> = ({
             target={[0, 0, 0]}
             enableDamping={true}
             dampingFactor={0.05}
+            autoRotate={false}
             mouseButtons={{
               LEFT: THREE.MOUSE.ROTATE,
               MIDDLE: THREE.MOUSE.DOLLY,
